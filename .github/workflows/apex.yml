@@ -1,25 +1,38 @@
 name: APEX
+
 on:
   workflow_dispatch:
   push:
     paths:
-      - apex-seed.zip
       - BUILD
-      - src/**
-      - tools/**
+      - 'src/**'
+      - 'tools/**'
       - regions.json
       - package.json
       - package-lock.json
-      - signing/**
+      - capacitor.config.json
+      - 'signing/**'
 
 concurrency:
-  group: apex-${{ github.ref }}
+  group: build
   cancel-in-progress: true
+
 
 permissions:
   contents: write
   pages: write
   id-token: write
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+env:
+  # The region — bbox, anchors, imagery zoom — lives in regions.json.
+  # Change which one CI builds here; bump TILES_KEY in the same commit or the
+  # cache will hand back the previous region's artifacts.
+  APEX_REGION: neml-bullgap
+  TILES_KEY: neml-v2
 
 jobs:
   seed:
@@ -29,12 +42,27 @@ jobs:
       - uses: actions/checkout@v4
       - name: Unpack apex-seed.zip if it is sitting in the repo root
         run: |
-          if [ ! -f apex-seed.zip ]; then
-            echo "no seed zip — nothing to unpack, going straight to the build"
+          ZIP=""
+          for c in apex-seed.zip apex-orv-github-repo.zip; do
+            [ -f "$c" ] && ZIP="$c" && break
+          done
+          if [ -z "$ZIP" ]; then
+            echo "no seed zip in the repo root — nothing to unpack, going"
+            echo "straight to the build (this is normal after the first run)"
             exit 0
           fi
-          unzip -o apex-seed.zip -d .
-          rm -f apex-seed.zip
+          echo "unpacking $ZIP"
+          unzip -o "$ZIP" -d _seed
+          # apex-orv-github-repo.zip nests everything under one folder; the
+          # plain seed does not. Flatten either shape to the repo root so the
+          # wrong-but-reasonable choice still works (landmine 78).
+          SRC=_seed
+          if [ ! -f _seed/BUILD ] && [ "$(ls -1 _seed | wc -l)" = "1" ]; then
+            SRC="_seed/$(ls -1 _seed)"
+            echo "  (nested zip — flattening $SRC)"
+          fi
+          cp -a "$SRC/." .
+          rm -rf _seed "$ZIP"
           echo "unpacked $(find . -type f -not -path './.git/*' | wc -l) files"
           # Gate BEFORE committing: a bad seed must not half-populate the repo.
           python3 tools/gate.py
@@ -50,6 +78,28 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+
+      # Fail here, plainly, rather than 200 lines later inside npm or python.
+      # Jacob uploaded the wrong zip and got a Node error that said nothing
+      # about the actual problem (landmine 78).
+      - name: Check the repo actually contains the project
+        run: |
+          missing=
+          for f in BUILD tools/pipeline.py src/app.html regions.json package.json; do
+            [ -f "$f" ] || missing="$missing $f"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::This repo has no APEX source. Missing:$missing"
+            echo ""
+            echo "The seed step unpacks apex-seed.zip from the repo ROOT."
+            echo "Files present at root:"; ls -A | sed 's/^/  /'
+            echo ""
+            echo "Upload **apex-seed.zip** (not apex-orv-github-repo.zip, which"
+            echo "nests everything under an apex-orv/ folder), commit it to the"
+            echo "root, and run this workflow again."
+            exit 1
+          fi
+          echo "source present — take $(grep -oP 'OFFROAD_TAKE=\K[0-9]+' BUILD)"
 
       - name: Restore region artifacts
         id: tilecache
@@ -182,13 +232,19 @@ jobs:
       - name: Build the signed APK
         run: cd android && ./gradlew assembleRelease --no-daemon -q
 
+      # The apk PATH must be an output of this step. It was referenced as
+      # steps.pkg.outputs.apk and no step has id 'pkg', so it resolved to an
+      # EMPTY STRING: upload-artifact got no path and `gh release create` got no
+      # asset. Every release would have published with no APK attached
+      # (landmine 78). Renamed too — the app became APEX ORV at take 38.
       - name: Name it after the take
-        id: take
+        id: pkg
         run: |
           T=$(grep -oP 'OFFROAD_TAKE=\K[0-9]+' BUILD)
           echo "take=$T" >> "$GITHUB_OUTPUT"
           cp android/app/build/outputs/apk/release/app-release.apk \
-             "apex-offroad-take-$T.apk"
+             "apex-orv-take-$T.apk"
+          echo "apk=apex-orv-take-$T.apk" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -201,9 +257,10 @@ jobs:
         run: |
           gh release create "take-${{ github.run_number }}" \
             "${{ steps.pkg.outputs.apk }}" \
-            --title "APEX ORV — take ${{ steps.take.outputs.take }}" \
+            --title "APEX ORV — take ${{ steps.pkg.outputs.take }}" \
             --notes "Signed release build (~50 MB — satellite tiles at 3.4 m/px). Install from this page on the Fold.
 
           Then: airplane mode on, force-stop, reopen. The map has to render
           identically and the NET badge has to stay green. Tap PAN TEST and
           report avg fps, p99 min fps, and the badge states."
+          
