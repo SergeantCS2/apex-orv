@@ -1,0 +1,7 @@
+{
+  "appId": "com.sergeantslabs.apex",
+  "appName": "APEX ORV",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false }
+}

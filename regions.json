@@ -1,0 +1,110 @@
+{
+  "_note": "One definition per riding area. Every tool reads this; nothing hardcodes a bbox. Adding a region is one entry here, then `python3 tools/pipeline.py --region <id>`. `state` is the outline drawn at low zoom for orientation only \u2014 never routable.",
+  "default": "neml-bullgap",
+  "regions": {
+    "neml-bullgap": {
+      "name": "Bull Gap \u00b7 Mio \u00b7 Rose City",
+      "bbox": [
+        -84.3,
+        44.42,
+        -83.9,
+        44.72
+      ],
+      "imagery_zoom": 14,
+      "centre": [
+        -84.09,
+        44.57
+      ],
+      "note": "Huron NF east of M-33 plus the Ogemaw state trails.",
+      "anchors": [
+        [
+          "Bull Gap",
+          -84.0274,
+          44.6166,
+          "site"
+        ],
+        [
+          "Mio",
+          -84.133,
+          44.6597,
+          "town"
+        ],
+        [
+          "The Pink Store",
+          -84.1279,
+          44.5219,
+          "site"
+        ],
+        [
+          "Rose City",
+          -84.0666,
+          44.4939,
+          "town"
+        ],
+        [
+          "Luzerne",
+          -84.256,
+          44.628,
+          "town"
+        ],
+        [
+          "Mack Lake",
+          -84.06,
+          44.57,
+          "site"
+        ],
+        [
+          "McKinley",
+          -83.96,
+          44.61,
+          "town"
+        ],
+        [
+          "South Branch",
+          -83.928,
+          44.4747,
+          "town"
+        ]
+      ],
+      "state": "Michigan",
+      "imagery_max_zoom": 15
+    },
+    "sthelen": {
+      "name": "St. Helen \u00b7 Roscommon",
+      "bbox": [
+        -84.56,
+        44.3,
+        -84.22,
+        44.54
+      ],
+      "imagery_zoom": 14,
+      "centre": [
+        -84.39,
+        44.42
+      ],
+      "note": "St. Helen scramble area and the Au Sable State Forest trails. Different DNR management unit from the Bull Gap region, which is the point of having it \u2014 it proves the pipeline is not shaped around one place.",
+      "anchors": [
+        [
+          "St. Helen",
+          -84.4103,
+          44.3611,
+          "town"
+        ],
+        [
+          "Roscommon",
+          -84.5919,
+          44.4986,
+          "town"
+        ],
+        [
+          "Houghton Lake",
+          -84.7639,
+          44.3169,
+          "town"
+        ]
+      ],
+      "state": "Michigan",
+      "imagery_max_zoom": 15
+    }
+  }
+}

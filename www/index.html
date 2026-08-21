@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>APEX ORV</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<style>
+  :root{
+    --sand:#E4D7BC;--water:#8FA9B8;--ink:#1C1A17;--flag:#E2570F;--bone:#F5EFE2;
+    --ok:#8FAE63;--rail:#14120F;--line:#2C2822;--dim:#6E665B;
+    /* Difficulty, not taxonomy. A rider needs to know what a line will DO to them,
+       not which agency drew it — green/blue/black is the language every trail map
+       already speaks and onX uses it for exactly this reason (take 46). */
+      --easy:#2F7D4F;--mod:#1F6FB2;--hard:#17150F;--road:#6E665B;
+      --r72:#2F7D4F;--t50:#1F6FB2;--m24:#17150F;--mcct:#17150F;--fst:#1F6FB2;
+    --fsr:#5A5248;--shut:#C1121F;--adv:#A6997F;--route:#00A8E8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--rail);color:var(--bone);
+    font-family:Roboto,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+  /* min-width:0 on the grid children. Without it a grid item refuses to shrink
+     below its content, so the route row grew the whole rail to 788px on a 411px
+     screen: the 4th and 5th options existed but were unreachable and the strip
+     could not scroll because nothing was overflowing (take 35). */
+  #shell>*{min-width:0}
+  #shell{display:grid;grid-template-rows:1fr auto;height:100dvh;
+    padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+  #bar[hidden]{display:none}
+  #bar{display:flex;align-items:center;gap:6px;padding:9px 13px;border-bottom:1px solid var(--line)}
+  #title{font-size:11px;font-weight:700;font-stretch:condensed;letter-spacing:.17em;
+    text-transform:uppercase;margin-right:auto}
+  #title b{color:var(--flag)}
+  .badge{font:600 9px/1 ui-monospace,monospace;letter-spacing:.08em;padding:5px 6px;
+    border-radius:2px;background:var(--line);color:var(--dim);white-space:nowrap}
+  .badge.good{background:rgba(143,174,99,.18);color:var(--ok)}
+  .badge.bad{background:rgba(226,87,15,.2);color:var(--flag)}
+
+  #stage{position:relative;min-height:0}
+  #map{position:absolute;inset:0;background:var(--sand)}
+  #readout{position:absolute;left:13px;top:82px;pointer-events:none;z-index:3;
+    font:700 12px/1.25 Roboto,system-ui,sans-serif;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 2px rgba(0,0,0,.9)}
+  .maplibregl-ctrl-scale{background:transparent!important;border:none!important;
+    border-bottom:2px solid rgba(255,255,255,.95)!important;
+    color:#fff!important;font:700 11px/1.2 Roboto,system-ui,sans-serif!important;
+    text-shadow:0 1px 3px rgba(0,0,0,.85);padding:0 0 1px!important;margin:0!important}
+  .maplibregl-ctrl-bottom-left{left:9px;bottom:auto;top:60px}
+  .maplibregl-ctrl-attrib{font-size:9px}.maplibregl-ctrl-top-right{display:none}
+  .strip{position:absolute;left:0;right:0;display:flex;gap:6px;padding:8px 11px;
+    overflow-x:auto;scrollbar-width:none}
+  .strip::-webkit-scrollbar{display:none}
+  #chips{top:0;background:linear-gradient(180deg,rgba(228,215,188,.96),rgba(228,215,188,0))}
+  #tools{bottom:0;background:linear-gradient(0deg,rgba(228,215,188,.96),rgba(228,215,188,0))}
+  .chip{flex:0 0 auto;appearance:none;border:1px solid rgba(28,26,23,.22);
+    background:rgba(245,239,226,.94);color:var(--ink);font:600 11px/1 Roboto,system-ui,sans-serif;
+    padding:12px 13px;border-radius:16px;cursor:pointer;white-space:nowrap;
+    min-height:38px;display:inline-flex;align-items:center}
+  .chip:active{background:var(--ink);color:var(--bone)}
+  .chip.on{background:var(--ink);color:var(--bone);border-color:var(--ink)}
+  .chip.arm{background:var(--flag);color:#fff;border-color:var(--flag)}
+  .pin{width:26px;height:26px;border-radius:50%;border:3px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.5);display:grid;place-items:center;
+    font:700 12px/1 Roboto,sans-serif;color:#fff}
+  .pin.home{background:#2E5E3E}.pin.you{background:#0A84FF;border-color:#F5EFE2;box-shadow:0 0 0 4px rgba(10,132,255,.28)}
+.pin.me{background:#00A8E8}
+  .pin.truck{background:#8A4B14}
+  .pin.drop{background:#7A3F0C;border-color:#F5EFE2}
+  #alert{position:absolute;left:11px;right:11px;top:54px;background:#C1121F;color:#fff;
+    border-radius:4px;padding:11px 13px;font:700 13px/1.35 Roboto,system-ui,sans-serif;
+    box-shadow:0 3px 12px rgba(0,0,0,.4);display:none}
+  #alert.on{display:block}
+  #alert small{display:block;font-weight:400;font-size:11px;opacity:.9;margin-top:3px}
+  .crumb{stroke:#00A8E8}
+
+  #rail{border-top:2px solid var(--flag);padding:10px 13px 9px;
+    font-family:ui-monospace,"Roboto Mono",monospace}
+  #coords{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+  #coords .unit{color:var(--dim);font-size:11px}
+  #grid{margin-top:7px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+    background:var(--line);border:1px solid var(--line)}
+  .cell{background:var(--rail);padding:6px 8px}
+  .k{font-size:8px;letter-spacing:.13em;color:var(--dim);text-transform:uppercase}
+  .v{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+  .v.warn{color:var(--flag)}.v.good{color:var(--ok)}
+  #panel{margin-top:7px;font-size:11px;line-height:1.5;color:#9A9184;min-height:46px}
+  #panel b{color:var(--bone);font-weight:600}
+  #panel.fail b{color:var(--flag)}#panel.pass b{color:var(--ok)}
+  #panel .tn{font-family:Roboto,system-ui,sans-serif;font-size:14px;color:var(--bone);
+    font-weight:700}
+  .tag{display:inline-block;font-size:8.5px;letter-spacing:.09em;text-transform:uppercase;
+    padding:2px 5px;border-radius:2px;margin-right:4px;background:var(--line);color:var(--bone)}
+  .tag.legal{background:rgba(46,94,62,.5);color:#B8D9C2}
+  .tag.adv{background:rgba(166,153,127,.3);color:#D8CDB6}
+  .tag.shut{background:rgba(193,18,31,.35);color:#FFB3B8}
+
+  #srch{display:none;margin-top:8px}
+  #srch.on{display:block}
+  #q{width:100%;appearance:none;border:1px solid #3A342C;background:#0F0D0B;
+    color:var(--bone);font:600 15px/1 Roboto,system-ui,sans-serif;padding:12px 11px;
+    border-radius:3px;outline:none}
+  #q:focus{border-color:var(--flag)}
+  #hits{max-height:132px;overflow-y:auto;margin-top:6px}
+  .hit{padding:9px 10px;border-bottom:1px solid #241F1A;cursor:pointer;
+    font:400 12px/1.35 Roboto,system-ui,sans-serif;color:#9A9184}
+  .hit:active{background:#211E19}
+  .hit b{color:var(--bone);font-weight:700;font-size:13px}
+  .hit i{font-style:normal;color:var(--dim);font-size:9.5px;letter-spacing:.08em;
+    text-transform:uppercase;margin-left:6px}
+  #steps{max-height:150px;overflow-y:auto;margin-top:4px}
+  .st{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid #241F1A}
+  .st .ar{flex:0 0 22px;font:700 15px/1.2 Roboto,system-ui,sans-serif;color:var(--flag);
+    text-align:center}
+  .st .tx{flex:1;font:400 11.5px/1.4 Roboto,system-ui,sans-serif;color:#9A9184}
+  .st .tx b{color:var(--bone);font-weight:700}
+  .st .d{flex:0 0 52px;text-align:right;font:600 11px/1.4 ui-monospace,monospace;
+    color:var(--dim)}
+  #routes{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;margin-top:2px;
+    max-width:100%;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
+    overscroll-behavior-x:contain}
+  .rc{scroll-snap-align:start}
+  #routes:after{content:'';flex:0 0 4px}
+  #routes::-webkit-scrollbar{display:none}
+  .rc{flex:0 0 152px;background:#1B1813;border:1px solid #332D25;border-radius:4px;
+    padding:9px 10px;cursor:pointer}
+  .rc.sel{border-color:var(--route);background:#0E2029}
+  .rc h5{margin:0 0 4px;font:700 11px/1.2 Roboto,system-ui,sans-serif;color:var(--bone);
+    letter-spacing:.02em}
+  .rc .big{font-size:17px;font-weight:700;color:var(--bone);font-variant-numeric:tabular-nums}
+  .rc .sub{font-size:9px;color:var(--dim);line-height:1.5;margin-top:3px}
+  .rc .warn{color:var(--flag)}
+  .rc .good{color:var(--ok)}
+  #actions{display:flex;gap:6px;margin-top:9px}
+  button.act{flex:1;appearance:none;border:1px solid #3A342C;background:#211E19;color:var(--bone);
+    font:600 10.5px/1 Roboto,system-ui,sans-serif;font-stretch:condensed;letter-spacing:.11em;
+    text-transform:uppercase;padding:13px 4px;border-radius:3px;cursor:pointer}
+  button.act:active{background:var(--line)}
+  button.act:focus-visible{outline:2px solid var(--flag);outline-offset:2px}
+  button.act[disabled]{opacity:.4}
+  button.act.primary{border-color:var(--flag);color:var(--flag)}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="shell">
+  <!-- The title bar and its NET/GRAPH badges were the first thing on screen and
+       said nothing a rider needs — they read as a build console. Kept in the DOM,
+       hidden, so every diagnostic that writes to them still works and the
+       self-test still reports them; About shows them on demand. -->
+  <div id="bar" hidden>
+    <span id="title"><b>APEX</b> ORV · Take 51</span>
+    <span class="badge" id="b-net">NET —</span>
+    <span class="badge" id="b-src">GRAPH —</span>
+  </div>
+
+  <div id="stage">
+    <div id="map"></div>
+    <!-- Scale and elevation, floated over the map where every off-road app puts
+         them. A rider reads distance and height far more often than anything the
+         old title bar showed. -->
+    <div id="readout"><span id="ro-elev">—</span></div>
+    <div class="strip" id="chips"></div>
+    <div id="alert"></div>
+    <div class="strip" id="tools">
+      <button class="chip" id="c-machine">🏍 Dirt bike 24"</button>
+      <button class="chip" id="c-home">⌂ Set home</button>
+      <button class="chip" id="c-me">◎ I'm here</button>
+      <button class="chip" id="c-fuel">⛽ 50 mi</button>
+      <button class="chip" id="c-ride">▶ Ride it</button>
+      <button class="chip" id="c-lost">😖 Wrong turn</button>
+      <button class="chip" id="c-locate">◉ Locate</button>
+      <button class="chip" id="c-pan">⏱ Pan test</button>
+      <button class="chip" id="c-base">🗺 Map</button>
+      <button class="chip on" id="c-relief">⛰ Relief</button>
+      <button class="chip" id="c-labels">🏷 Labels</button>
+      <button class="chip" id="c-about">ⓘ About</button>
+      <button class="chip" id="c-loop">◯ Loop</button>
+      <button class="chip" id="c-selftest">⛑ Self-test</button>
+      <button class="chip" id="c-search">🔍 Search</button>
+    </div>
+  </div>
+
+  <div id="rail">
+    <div id="coords">—<span class="unit"></span></div>
+    <div id="grid">
+      <div class="cell"><div class="k">To truck</div><div class="v" id="v-truck">—</div></div>
+      <div class="cell"><div class="k">Recorded</div><div class="v" id="v-rec">—</div></div>
+      <div class="cell"><div class="k">Elevation</div><div class="v" id="v-elev">—</div></div>
+      <div class="cell" hidden><div class="v" id="v-fps">—</div></div>
+    </div>
+    <div id="srch">
+      <input id="q" type="search" placeholder="Trail, road, junction, place…"
+        autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div id="hits"></div>
+    </div>
+    <div id="panel">You're at Bull Gap, home is the Pink Store. Tap <b>Return home</b> for ranked ways back — then <b>▶ Ride it</b>, hit <b>😖 Wrong turn</b>, and watch what happens.</div>
+    <div id="actions">
+      <button class="act" id="btn-disp">Dispatch</button>
+      <button class="act" id="btn-retrace">Retrace</button>
+      <button class="act" id="btn-steps">Directions</button>
+      <button class="act primary" id="btn-home">Return home</button>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/maplibre-gl-csp.js"></script>
+<script>maplibregl.setWorkerUrl("vendor/maplibre-gl-csp-worker.js");</script>
+<script src="app.js"></script>
+</body>
+</html>
