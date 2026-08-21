@@ -153,7 +153,7 @@ def scan_hosts():
             targets.append((d, os.listdir(d)))
     for d, files in targets:
         for fn in files:
-            if not fn.endswith((".py", ".yml", ".yaml")):
+            if not fn.endswith((".py", ".yml", ".yaml", ".sh")):
                 continue
             try:
                 txt = open(os.path.join(d, fn), encoding="utf-8").read()

@@ -331,38 +331,88 @@ def check_orphan_sources():
 # to a note on the one machine where it matters. Check the dependency list
 # against what the tools actually import (landmine 82).
 def check_ci_deps():
+    """Per JOB, not per workflow. Every job is a fresh runner, so the bundle
+    job's `pip install` does nothing for the apk job — which called android.py,
+    which imports icon.py, which needs PIL, and had no Python deps installed at
+    all. My first version of this check searched the whole file and passed
+    (landmine 83). Imports are resolved TRANSITIVELY through local modules.
+    """
     import ast as _ast
     import sys as _sys
+    import yaml as _yaml
+
     std = set(_sys.stdlib_module_names)
     local = {f[:-3] for f in os.listdir(HERE) if f.endswith(".py")}
-    third = {}
+    direct, uses_local = {}, {}
     for fn in sorted(os.listdir(HERE)):
         if not fn.endswith(".py"):
             continue
+        mod = fn[:-3]
+        direct[mod], uses_local[mod] = set(), set()
         try:
             tree = _ast.parse(open(os.path.join(HERE, fn), encoding="utf-8").read())
         except Exception:
             continue
         for n in _ast.walk(tree):
+            names = []
             if isinstance(n, _ast.Import):
-                for a in n.names:
-                    third.setdefault(a.name.split(".")[0], fn)
+                names = [a.name.split(".")[0] for a in n.names]
             elif isinstance(n, _ast.ImportFrom) and n.module and n.level == 0:
-                third.setdefault(n.module.split(".")[0], fn)
-    third = {k: v for k, v in third.items() if k not in std and k not in local}
-    wf = ""
-    for d in (os.path.join(ROOT, "ci"), os.path.join(ROOT, ".github", "workflows")):
-        if os.path.isdir(d):
-            for f in os.listdir(d):
-                if f.endswith((".yml", ".yaml")):
-                    wf += open(os.path.join(d, f), encoding="utf-8").read()
+                names = [n.module.split(".")[0]]
+            for nm in names:
+                if nm in local:
+                    uses_local[mod].add(nm)
+                elif nm not in std:
+                    direct[mod].add(nm)
+
+    def closure(mod, seen=None):
+        seen = seen or set()
+        if mod in seen or mod not in direct:
+            return set()
+        seen.add(mod)
+        out = set(direct[mod])
+        for dep in uses_local.get(mod, ()):
+            out |= closure(dep, seen)
+        return out
+
     PKG = {"PIL": "pillow", "yaml": "pyyaml", "cv2": "opencv-python"}
-    missing = sorted(f"{k} ({v}) -> pip {PKG.get(k, k)}"
-                     for k, v in third.items() if PKG.get(k, k) not in wf)
-    if missing:
-        fails.append("imports CI does not install: " + "; ".join(missing))
+    problems = []
+    dirs = [os.path.join(ROOT, "ci")]
+    if not os.environ.get("APEX_GATE_SEED"):
+        dirs.append(os.path.join(ROOT, ".github", "workflows"))
+    for d in dirs:
+        if not os.path.isdir(d):
+            continue
+        for f in sorted(os.listdir(d)):
+            if not f.endswith((".yml", ".yaml")):
+                continue
+            try:
+                doc = _yaml.safe_load(open(os.path.join(d, f), encoding="utf-8"))
+            except Exception:
+                continue
+            for jname, job in (doc.get("jobs") or {}).items():
+                runs = "\n".join(s.get("run", "") for s in (job.get("steps") or []))
+                # a job may delegate to a script in the repo; follow it, or the
+                # deps look absent when they are simply one level down
+                for sh in re.findall(r"(?:bash|sh)\s+(ci/[\w.-]+\.sh)", runs):
+                    sp = os.path.join(ROOT, sh)
+                    if os.path.exists(sp):
+                        runs += "\n" + open(sp, encoding="utf-8").read()
+                need = set()
+                for m in re.finditer(r"python3?\s+tools/(\w+)\.py", runs):
+                    need |= closure(m.group(1))
+                if "tools/pipeline.py" in runs:            # pipeline runs them all
+                    for mod in direct:
+                        need |= closure(mod)
+                miss = sorted(p for p in {PKG.get(x, x) for x in need}
+                              if p not in runs)
+                if miss:
+                    problems.append(f"{f}:{jname} runs python without {miss}")
+    if problems:
+        fails.append("a job installs no Python deps it needs — each job is a "
+                     "fresh runner: " + "; ".join(problems[:3]))
     else:
-        notes.append(f"ci deps: all {len(third)} third-party imports installed")
+        notes.append("ci deps: every job installs what its Python tools import")
 
 
 # ── 6b1a1. No tool may depend on a path outside the repo ────────────────────
@@ -397,6 +447,8 @@ def check_absolute_paths():
 # while GitHub would have rejected the file outright as "Invalid workflow file".
 # CI had never actually been valid; we only ever ran the pipeline locally.
 def check_workflow_yaml():
+    if os.environ.get("APEX_GATE_SEED"):
+        return notes.append("seed mode: workflow files are the user's, not gated here")
     dirs = [os.path.join(ROOT, ".github", "workflows"), os.path.join(ROOT, "ci")]
     dirs = [x for x in dirs if os.path.isdir(x)]
     if not dirs:
@@ -554,12 +606,15 @@ def check_current():
     # (apex.yml) merges seed + build so a phone can drop one file into an empty
     # repo; the gate was looking for build.yml, found nothing, and failed three
     # checks on a perfectly good seed (take 48).
+    # The workflow is a thin shim now; the steps it used to contain live in
+    # ci/*.sh so the seed can update them (landmine 84). Read both, or every
+    # check that greps the workflow for a command reports it missing.
     wf = ""
     for _d in (os.path.join(ROOT, ".github", "workflows"), os.path.join(ROOT, "ci")):
         if not os.path.isdir(_d):
             continue
         for _f in sorted(os.listdir(_d)):
-            if _f.endswith((".yml", ".yaml")):
+            if _f.endswith((".yml", ".yaml", ".sh")):
                 wf += open(os.path.join(_d, _f)).read() + "\n"
     if "maplibre-gl-csp-worker.js" not in wf:
         fails.append("workflow does not vendor the CSP worker — the APK will "

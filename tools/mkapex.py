@@ -59,7 +59,13 @@ SEED_JOB = '''
           rm -rf _seed "$ZIP"
           echo "unpacked $(find . -type f -not -path './.git/*' | wc -l) files"
           # Gate BEFORE committing: a bad seed must not half-populate the repo.
-          python3 tools/gate.py
+          # APEX_GATE_SEED=1 skips the workflow-file checks: the workflow here is
+          # the one YOU pasted, not part of the seed, and it cannot be updated by
+          # this job (GITHUB_TOKEN has no workflows permission). Gating the seed
+          # against it would deadlock — the fix ships in the seed the gate is
+          # refusing to install (landmine 84).
+          python3 -m pip install --quiet pyyaml
+          APEX_GATE_SEED=1 python3 tools/gate.py
           git config user.name  apex-seed
           git config user.email seed@users.noreply.github.com
           git add -A

@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 53.*
+*Current as of take 55.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -83,6 +83,8 @@ Start here. Do not read top to bottom.
 | Installer overwrites the workflow running it | 80 |
 | Asset borrowed from the build machine | 81 |
 | Import CI never installs | 82 |
+| Dependency installed in the wrong job | 83 |
+| Gate blocks the seed carrying its own fix | 84 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
 | Told but not shown | 64 |
@@ -104,6 +106,8 @@ Start here. Do not read top to bottom.
 | Installer overwrites the workflow running it | 80 |
 | Asset borrowed from the build machine | 81 |
 | Import CI never installs | 82 |
+| Dependency installed in the wrong job | 83 |
+| Gate blocks the seed carrying its own fix | 84 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
 | Told but not shown | 64 |
@@ -991,3 +995,33 @@ time.** A font from my sandbox, a module path from my sandbox, a package that wa
 already installed here. Same shape three times: the build depended on my machine
 in a way invisible from inside it. Enumerate the whole class — paths, packages,
 assets — and gate each.
+
+**83. Every CI job is a fresh runner.** `pip install` in the bundle job does
+nothing for the apk job. The apk job called `android.py`, which imports
+`icon.py`, which imports `PIL` — and installed no Python packages at all.
+
+Worse: the check written one take earlier to prevent exactly this searched the
+whole workflow file, found `pillow` in another job's install line, and passed.
+**Scope the check the way the platform scopes the resource.** Per job, and
+resolve imports transitively through local modules — `android.py` never mentions
+PIL, so a direct-import scan finds nothing.
+
+**Corollary — a check that passes for the wrong reason is worse than no check.**
+It converts "I should verify this" into "this is verified", and the second is
+much harder to revisit.
+
+**84. Do not gate a delivery mechanism against something it cannot deliver.**
+`gate.py` validated `.github/workflows/*`, the seed job ran `gate.py` before
+committing, and the seed job cannot write workflow files (landmine 46). A
+workflow one version behind therefore failed the gate, which failed the seed,
+which was carrying the newer workflow. Deadlock, with the fix on the wrong side.
+
+Two fixes, both needed. `APEX_GATE_SEED=1` narrows the seed-time gate to the
+seed's own contents. And — more durably — **anything that changes often must live
+where the delivery mechanism can reach it**: the workflow is now a thin shim and
+every volatile step moved to `ci/*.sh` inside the repo.
+
+**Corollary — when you move logic, move every check that reads it.** Three checks
+grepped the workflow YAML for commands that had just moved into shell scripts,
+and all three reported the commands missing. A check anchored on a location is a
+check that breaks when the location changes.

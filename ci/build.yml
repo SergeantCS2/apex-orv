@@ -91,53 +91,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Pipeline dependencies
-        # pyyaml is not optional: gate.py uses it to reject duplicate keys in
-        # workflow files, and without it that check silently downgrades to a
-        # note — which is how an invalid workflow survived 30 takes (landmine 79).
-        run: pip install --quiet pillow numpy scipy pyyaml
-
-      - name: Build the region
-        # Unconditional — landmine 44. Skipping on cache-hit left bundles/ and
-        # www/bundle unbuilt, so every SECOND build died at the manifest cp.
-        # With dem/img caches restored, a warm run is ~30s and still executes
-        # bundle, build_app, and both smokes.
-        run: python3 tools/pipeline.py
-
-      - name: Bundle and assemble
-        run: |
-          # pipeline.py already ran bundle + build_app; just place the manifest
-          cp "bundles/$APEX_REGION/manifest.json" www/bundle/manifest.json
-          mkdir -p www/vendor
-          # The CSP build plus a real worker file: Android WebView could not
-          # start MapLibre's blob: worker, so every source-backed layer drew
-          # nothing while background and DOM markers looked fine (landmine 47).
-          for f in maplibre-gl.css maplibre-gl-csp.js maplibre-gl-csp-worker.js; do
-            curl -fsSL -o "www/vendor/$f" "https://unpkg.com/maplibre-gl@5/dist/$f"
-          done
-          test -s www/vendor/maplibre-gl-csp-worker.js
-
-      # The render check is what found a map that had drawn nothing for 14
-      # takes. Without a browser in CI the gate merely NOTES that it skipped —
-      # which is how the bug survived two audits (landmine 53).
-      - name: Install Chrome for the render check
-        run: |
-          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
-          npx puppeteer browsers install chrome
-
-      - name: Render the app in a real browser
-        run: node tools/render.mjs
-
-      - name: Gate
-        run: python3 tools/gate.py
-
-      - name: Report size
-        run: |
-          echo "### Region bundle" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          du -h www/bundle/* www/vendor/* >> $GITHUB_STEP_SUMMARY
-          du -sh www >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+      - name: Build the region, render it, and gate
+        # Every step that can change lives in ci/bundle.sh, which the seed job
+        # updates. The workflow file is pasted by hand and cannot be (landmine 84).
+        run: bash ci/bundle.sh
 
       - uses: actions/upload-artifact@v4
         with:
@@ -192,28 +149,12 @@ jobs:
       # setup-java provides a full JDK. Neither was true of the container this
       # was proven in — landmine 40 — so the job calls the exact tool that
       # produced a working APK there, instead of its own copy of the steps.
-      - name: Generate and patch the Android project
-        run: python3 tools/android.py
-
-      - name: Copy the region into assets
-        run: npx cap sync android
-
+      # Every job is a FRESH runner: the bundle job's pip install does not carry
+      # over. android.py imports icon.py which needs PIL, and the apk job had no
+      # Python deps at all (landmine 83).
       - name: Build the signed APK
-        run: cd android && ./gradlew assembleRelease --no-daemon -q
-
-      # The apk PATH must be an output of this step. It was referenced as
-      # steps.pkg.outputs.apk and no step has id 'pkg', so it resolved to an
-      # EMPTY STRING: upload-artifact got no path and `gh release create` got no
-      # asset. Every release would have published with no APK attached
-      # (landmine 78). Renamed too — the app became APEX ORV at take 38.
-      - name: Name it after the take
         id: pkg
-        run: |
-          T=$(grep -oP 'OFFROAD_TAKE=\K[0-9]+' BUILD)
-          echo "take=$T" >> "$GITHUB_OUTPUT"
-          cp android/app/build/outputs/apk/release/app-release.apk \
-             "apex-orv-take-$T.apk"
-          echo "apk=apex-orv-take-$T.apk" >> "$GITHUB_OUTPUT"
+        run: bash ci/apk.sh
 
       - uses: actions/upload-artifact@v4
         with:

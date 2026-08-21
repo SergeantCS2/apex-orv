@@ -1,7 +1,91 @@
-# HANDOFF — through Take 53
+# HANDOFF — through Take 55
 
 Newest first. Written BEFORE the build ships, per PROTOCOL §6.
 The gate refuses to build a take with no entry here.
+
+## Take 55 — 2026-08-22 — The gate deadlocked the fix it was gating
+
+My own take-54 check failed the seed job:
+
+```
+FAIL a job installs no Python deps it needs — each job is a fresh runner:
+  apex.yml:seed runs python without ['pyyaml']
+  apex.yml:bundle runs python without ['pyyaml']
+  apex.yml:apk runs python without ['pillow']
+```
+
+The check was right about all three. But it exposed a design fault I had built in
+and not noticed: **`gate.py` validates the workflow file, and the workflow file
+is one Jacob pasted by hand that the seed job cannot update.** So a workflow one
+version behind fails the gate, the gate fails the seed, and the seed is the thing
+carrying the fix. A deadlock, with the fix on the wrong side of it.
+
+Three changes:
+
+**1. The workflow is a thin shim now.** Everything that can change moved into
+`ci/bundle.sh` and `ci/apk.sh`, which live in the repo and *are* updated by
+seeding. The bundle job went from eleven steps to six; the apk job from ten to
+seven. Dependency lists, vendoring, render, gate — all in the scripts. The pasted
+file should now almost never need re-pasting.
+
+**2. `APEX_GATE_SEED=1`** skips workflow-file checks in the seed job. The
+workflow there is the user's, not part of the seed, and gating the seed against
+it is the deadlock. The seed still runs every other check.
+
+**3. The seed job installs pyyaml**, because it runs `gate.py`.
+
+Two knock-ons the move required: `check_ci_deps()` now follows `bash ci/*.sh`
+into the script, or the deps look absent one level down; and every check that
+greps "the workflow" for a command — CSP worker vendoring, `tools/android.py`,
+the unpkg host — now reads `ci/*.sh` too, since that is where those commands went.
+
+Simulated: a deliberately stale pasted workflow, a fresh seed zip, seed mode
+gate. **51 files unpacked, GATE PASSED, no block.**
+
+---
+
+## Take 54 — 2026-08-21 — Each job is a fresh runner
+
+The bundle job **passed** on the runner — ingest, graph, terrain, glyphs,
+imagery, bundle, both smokes, render, gate. The first complete pipeline run on a
+machine that is not mine.
+
+Then the apk job died:
+
+```
+File "tools/icon.py", line 19, in <module>
+    from PIL import Image, ImageDraw
+ModuleNotFoundError: No module named 'PIL'
+```
+
+**Every job is a fresh runner.** The bundle job's `pip install pillow numpy scipy
+pyyaml` does nothing for the apk job, which had no Python dependencies installed
+at all. Added.
+
+**My own check from take 53 missed it**, and that is the part worth recording. It
+searched the whole workflow file for the package name, found `pillow` in the
+bundle job's install line, and passed. Dependencies are **per job**.
+
+`check_ci_deps()` is rewritten to work per job and to resolve imports
+**transitively through local modules** — `android.py` imports `icon`, and
+`icon.py` imports `PIL`, a chain no direct-import scan would have found. It also
+understands that `tools/pipeline.py` pulls in every tool. Negative-controlled by
+removing pillow from the apk job alone.
+
+### Pages
+
+`Failed to create deployment (status: 404)` — Pages was not enabled. Jacob has
+since set Source to GitHub Actions. The job is `continue-on-error: true`, so it
+never blocked the APK; it just looked alarming.
+
+### Four environment faults, four CI runs
+
+A font from my sandbox, a module path from my sandbox, a package that was already
+installed here, and now a package installed in the wrong job. Every one invisible
+from inside the machine that had it. The gate now covers paths, per-job
+dependencies with transitive resolution, and vendored assets.
+
+---
 
 ## Take 53 — 2026-08-21 — Stop finding these one CI run at a time
 

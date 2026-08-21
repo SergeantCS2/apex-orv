@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 53.* Ranked by blocking-ness, not by interest.
+*Current as of take 55.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -587,4 +587,15 @@ The third is not:
   negative-controlled.
 - **Ruled out:** fixing environment faults one CI run at a time. Three in three
   runs, all the same shape.
-- **Open:** the runner has not yet completed glyphs → bundle → APK.
+- **PROVEN take 54:** the bundle job completes on ubuntu-latest — pipeline,
+  both smokes, render and gate all green on a machine that is not mine.
+- **Open:** the apk job has not yet produced an APK on the runner.
+
+## A51 — Workflow is a stable shim · SHIPPED take 55
+
+- **PROVEN:** volatile CI steps live in ci/bundle.sh and ci/apk.sh, which the
+  seed updates; the pasted workflow shrank to six and seven steps and should
+  rarely change again.
+- **PROVEN:** APEX_GATE_SEED=1 lets the seed gate its own contents without being
+  blocked by a stale pasted workflow. Simulated end to end.
+- **Ruled out:** gating the seed against the workflow file. It deadlocks the fix.
