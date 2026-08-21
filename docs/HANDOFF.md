@@ -1,7 +1,94 @@
-# HANDOFF — through Take 63
+# HANDOFF — through Take 65
 
 Newest first. Written BEFORE the build ships, per PROTOCOL §6.
 The gate refuses to build a take with no entry here.
+
+## Take 65 — 2026-08-22 — Labels a zoom earlier, and stop designing for one phone
+
+### "Confused by the distance indicator"
+
+A scale bar reading **3000 ft** with **1194 ft** directly beneath it. Two numbers,
+same unit, no captions — of course it was confusing. The lower one now reads
+**"1194 ft elevation"**.
+
+### Labels started too late
+
+Measured against the scale bar rather than guessed:
+
+| zoom | scale | trail names | road names |
+|---|---|---|---|
+| 12 | 3000 ft | **0** | **0** |
+| 12.5 | 3000 ft | 5 | 0 |
+| 13 | 2000 ft | 6 | 6 |
+
+His screenshot exactly: at 3000 ft, nothing. Minzooms dropped a full level —
+trail 12.5 → 11.4, road 12.8 → 12.0, forest road 13.4 → 12.4, show-only
+13.8 → 13.0. Now 4 trail names at z11.5 and 15 road names at z12.
+
+### One phone is not a device target
+
+The harness ran at 411x960 — the Fold cover screen, which is unusually narrow —
+and the default is now a mid-size Android (412x915). Layout is checked across
+**four sizes**: 360x800, 412x915, 430x932, and the Fold. A control that fits at
+430 px and slides off at 360 px is broken for half the people who might use this.
+
+**The new check failed on all four immediately**, flagging `c-labels` off-screen
+— including the Fold, where it demonstrably works. A chip inside a horizontally
+scrolling strip is not off-screen, it is *scrolled*: reaching it is one swipe.
+Only vertical overflow strands a control. Landmine 54 for the ninth time, caught
+because "it fails on the device that works" is not a believable result.
+
+Negative-controlled by pushing the map-detail button to `top: 2000px` — all four
+sizes then report `c-base (vertical)`.
+
+---
+
+## Take 64 — 2026-08-22 — Two false failures, and a duplicate I will not paper over
+
+Field report: **PASS 41 · FAIL 2**. Both failures were my checks, not the map.
+
+- **`trails 0 features`** — the check measured whatever viewport Jacob had left
+  the map in. He was parked over Brainard Springs, where there genuinely is no
+  designated trail. Now an info line, not an assertion; `trail-names` jumps to a
+  known site and is the real check.
+- **`labels 0`** — queried in the same tick as its own `jumpTo`. Symbols are
+  placed asynchronously, which is landmine 87 and was already fixed for
+  `stLabels`; this second copy still had it. Now informational, with a pointer to
+  the check that waits.
+
+### The doubled lines
+
+"Some paths don't match the road properly." He is right: **5,390 spans carry more
+than one edge**, 1,957 of them `fsroad + track` — the same physical road from two
+sources, a few metres apart, drawn as two jagged parallel lines. `conflate.py`
+dedupes USFS against DNR and nothing deduped OSM against either.
+
+I tried to drop the OSM copies. At a 45 m tolerance that removed **558 miles — a
+quarter of the network** — and connectivity fell 99.7% → 97.4%. Swept it:
+
+| tolerance | dropped | miles |
+|---|---|---|
+| 45 m, ±1 cell, 72% | 539 ways | 558 |
+| 22 m, ±1 cell, 85% | 389 ways | 452 |
+| **17 m, no neighbours, 85%** | **14 ways** | **~5** |
+
+Shipped the conservative one: 2,241 mi, 99.7% routable — unchanged from before.
+
+**It barely dents the doubling, and that is the finding.** The duplicates are
+real, but deleting them costs connectivity because the two sources have different
+topology — the OSM way bridges gaps the agency geometry leaves. The correct fix
+is to keep both for routing and draw only one, which needs a flag through
+`emit_graph`'s packed edge format. That is a deliberate change, not something to
+bodge at the end of a take. **A57 open.**
+
+### Also
+
+Designated trail widened and two-track dimmed to `#9C7343`, so the ORV network
+reads first — "it's really hard to see the ORV trails". And the release notes no
+longer say "on the Fold": this should install on any Android 8+ device, and it
+has never been tested in tablet mode.
+
+---
 
 ## Take 63 — 2026-08-22 — Relief hidden, not faded
 

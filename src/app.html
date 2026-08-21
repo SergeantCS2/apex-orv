@@ -154,7 +154,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 63</span>
+    <span id="title"><b>APEX</b> ORV · Take 65</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -494,14 +494,14 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        ride. Muted grey-tan for the road, warm brown for the two-track, and only
        the two-track gets a casing (take 61). */
     lyr('fsroad','fsroad','#8A7C66',w(0.6,1.4,3.2)),
-    lyr('track','track','#A9702F',w(0.8,2.1,4.6)),
+    lyr('track','track','#9C7343',w(0.7,1.8,3.9)),
     /* Trails, by difficulty. Widest/easiest drawn first so the hard singletrack
        sits on top where it matters. */
-    lyr('route72','route72','#2F7D4F',w(1.5,3.6,8.5)),
-    lyr('fstrail','fstrail','#1F6FB2',w(1.2,2.9,7)),
-    lyr('trail50','trail50','#1F6FB2',w(1.3,3.2,7.6)),
-    lyr('mccct','mccct','#17150F',w(1.3,3.2,7.6)),
-    lyr('moto24','moto24','#17150F',w(1.3,3.2,7.6)),
+    lyr('route72','route72','#2F7D4F',w(1.7,4.1,9.5)),
+    lyr('fstrail','fstrail','#1F6FB2',w(1.4,3.4,8)),
+    lyr('trail50','trail50','#1F6FB2',w(1.5,3.7,8.6)),
+    lyr('mccct','mccct','#17150F',w(1.5,3.7,8.6)),
+    lyr('moto24','moto24','#17150F',w(1.5,3.7,8.6)),
     lyr('closed','closed','#C1121F',w(1.2,3,7),[2,1.3]),
     lyr('fsclosed','fsclosed','#C1121F',w(1.2,3,7),[2,1.3]),
     /* Both of these were written twice and never landed: my patches anchored on
@@ -557,7 +557,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-anchor':'center','text-allow-overlap':false,'text-padding':6},
       paint:{'text-color':['case',['==',['get','k'],'town'],'#1C1A17','#7A3F0C'],
         'text-halo-color':'#EFE6D2','text-halo-width':2.2,'text-halo-blur':0.5}},
-    {id:'lbl-trail',type:'symbol',source:'strokes',minzoom:12.5,
+    {id:'lbl-trail',type:'symbol',source:'strokes',minzoom:11.4,
       filter:['in',['get','c'],['literal',['route72','trail50','moto24','mccct','fstrail']]],
       layout:{'symbol-placement':'line','text-field':['get','lb'],
         'text-font':['APEX'],'text-size':w(9.5,11.5,14),
@@ -580,18 +580,18 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        so this sat in front and a non-ridable path ("Mack's Sault") was named
        while the trail loop a rider was standing on was not (take 57). Names you
        may ride come first. */
-    {id:'lbl-show',type:'symbol',source:'showonly',minzoom:13.8,
+    {id:'lbl-show',type:'symbol',source:'showonly',minzoom:13.0,
       layout:{'symbol-placement':'line','text-field':['get','n'],
         'text-font':['APEX'],'text-size':w(8.5,9.5,11),'text-max-angle':75,
         'symbol-spacing':160,'text-padding':2},
       paint:{'text-color':'#6E6152','text-halo-color':'#EFE6D2','text-halo-width':1.5}},
-    {id:'lbl-fsroad',type:'symbol',source:'strokes',minzoom:13.4,
+    {id:'lbl-fsroad',type:'symbol',source:'strokes',minzoom:12.4,
       filter:['==',['get','c'],'fsroad'],
       layout:{'symbol-placement':'line','text-field':['get','lb'],
         'text-font':['APEX'],'text-size':w(8.5,10,12),
         'text-max-angle':70,'symbol-spacing':180,'text-padding':2},
       paint:{'text-color':'#4A423A','text-halo-color':'#EFE6D2','text-halo-width':1.5}},
-    {id:'lbl-road',type:'symbol',source:'strokes',minzoom:12.8,
+    {id:'lbl-road',type:'symbol',source:'strokes',minzoom:12.0,
       filter:['in',['get','c'],['literal',['paved','minor']]],
       layout:{'symbol-placement':'line','text-field':['get','lb'],
         'text-font':['APEX'],'text-size':w(8.5,10,12.5),
@@ -1853,8 +1853,12 @@ function stRender(){
     catch(e){return -1}};
   var all=renderedCount();
   stAdd('RENDER','features-drawn',all>0,all+' in viewport');
-  stAdd('RENDER','trails',q(['trail50','route72','moto24','fstrail','mccct'])>0,
-    q(['trail50','route72','moto24','fstrail','mccct'])+' features');
+  /* Viewport-dependent, so it cannot be a pass/fail: Jacob's map was parked over
+     Brainard Springs, where there is genuinely no designated trail, and this
+     reported FAIL on a perfectly good map. The trail-names check below jumps to
+     a known site and IS a real assertion (take 64). */
+  stInfo('RENDER','trails',q(['trail50','route72','moto24','fstrail','mccct'])+
+    ' designated · '+q(['track'])+' two-track in the view you left it on');
   stAdd('RENDER','roads',q(['fsroad','minor','paved','track'])>0,
     q(['fsroad','minor','paved','track'])+' features');
   /* Counted at the CURRENT viewport, this reported 0 on a device whose screen
@@ -1867,9 +1871,13 @@ function stRender(){
   /* Knowing WHICH trail you are on is the point of a trail map. text-max-angle
      was 32 degrees, which on a network this twisty placed zero names — the data
      had a label on 100% of trail edges and almost none were shown (take 44). */
+  /* Symbols are placed ASYNCHRONOUSLY: querying in the same tick as the jump
+     returns 0 on a map that shows several a moment later — which is exactly what
+     it reported for Jacob while trail-names, which waits, found 4. stLabels()
+     already asserts this properly, so here it is only information. */
   var lb=q(['lbl-place','lbl-trail']);
-  stAdd('RENDER','labels',lb>0,lb+' at '+site[1].toFixed(3)+','+site[0].toFixed(3)+
-    ' z13.6 (glyph pack renders)');
+  stInfo('RENDER','labels',lb+' at '+site[1].toFixed(3)+','+site[0].toFixed(3)+
+    ' z13.6 — placed asynchronously, see trail-names for the real check');
   stInfo('RENDER','labels-here',q(['lbl-place','lbl-trail'])+' at the view you left it on');
   map.jumpTo({center:[was.c.lng,was.c.lat],zoom:was.z});
   var vis;try{vis=map.getLayoutProperty('sat','visibility')}catch(e){vis='err'}
@@ -2545,7 +2553,10 @@ Array.prototype.forEach.call(document.querySelectorAll('#chips .chip'),function(
 function refreshReadout(){
   var c=map.getCenter(),e=elevAt([c.lng,c.lat]);
   var r=el('ro-elev');
-  if(r)r.textContent=(e===null?'':ft(e)+' ft');
+  /* Was a bare "1194 ft" sitting under a scale bar reading "3000 ft" — two
+     numbers in the same unit with nothing to tell them apart. Say which is
+     which (take 65). */
+  if(r)r.textContent=(e===null?'':ft(e)+' ft elevation');
   var v=el('v-elev');
   if(v)v.textContent=(e===null?'—':ft(e)+' ft')}
 

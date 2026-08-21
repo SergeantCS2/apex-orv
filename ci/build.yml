@@ -2,7 +2,7 @@ name: build
 
 # Phone-only pipeline. Everything that needs a real computer happens here.
 #   bundle -> builds the map archive + vendors libraries
-#   pages  -> Stage 0: open it in Chrome on the Fold, run PAN TEST
+#   pages  -> browser build, for checking a change without installing
 #   apk    -> Stage 1: installable APK on the Releases tab
 #
 # Run it from the Actions tab ("Run workflow") or just push.
@@ -180,8 +180,7 @@ jobs:
           gh release create "take-${{ github.run_number }}" \
             "${{ steps.pkg.outputs.apk }}" \
             --title "APEX ORV — take ${{ steps.pkg.outputs.take }}" \
-            --notes "Signed release build (~50 MB — satellite tiles at 3.4 m/px). Install from this page on the Fold.
+            --notes "Signed release build (~50 MB — satellite tiles at 3.4 m/px). Install from this page on any Android 8+ device.
 
-          Then: airplane mode on, force-stop, reopen. The map has to render
-          identically and the NET badge has to stay green. Tap PAN TEST and
-          report avg fps, p99 min fps, and the badge states."
+          Then: airplane mode on, force-stop, reopen. The map must render
+          identically and stay offline. Tap the self-test and share the report."

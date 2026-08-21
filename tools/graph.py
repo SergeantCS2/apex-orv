@@ -169,6 +169,45 @@ CLS = {"motorway": "paved", "trunk": "paved", "primary": "paved",
        "residential": "minor", "living_street": "minor", "service": "track", "track": "track",
        "path": "foot", "footway": "foot", "bridleway": "horse",
        "cycleway": "cycle", "raceway": "race"}
+# ── drop OSM lines that duplicate agency geometry ──────────────────────────
+# conflate.py dedupes USFS against DNR, but nothing deduped OSM against either —
+# so a forest road present in both MVUM and OSM was drawn twice, as two jagged
+# parallel lines a few metres apart. 5,390 overlapping spans, 1,957 of them
+# fsroad+track. Jacob: "some paths don't match the road properly" (take 64).
+#
+# The agency line is authoritative on classification and legality; the OSM copy
+# adds nothing but noise. Grid-hash every authoritative vertex at ~34 m and drop
+# any OSM way whose points mostly land on one.
+_CELL = 0.00015                      # ~17 m; see the sweep below
+_grid = set()
+for _r in net:
+    _g = _r.get("geometry") or {}
+    _cs = _g.get("coordinates") or []
+    if _g.get("type") == "MultiLineString":
+        _cs = [q for part in _cs for q in part]
+    for _pt in _cs:
+        try:
+            _grid.add((int(_pt[0] / _CELL), int(_pt[1] / _CELL)))
+        except Exception:
+            pass
+
+
+def _covered(coords):
+    """Fraction of points sitting on a cell an agency line already occupies."""
+    if not coords:
+        return 0.0
+    hit = 0
+    for x, y in coords:
+        cx, cy = int(x / _CELL), int(y / _CELL)
+        # No neighbour expansion. At 45 m with neighbours this removed 558 miles
+        # — a quarter of the network — and connectivity fell from 99.7% to 97.4%.
+        # A road running parallel to a trail is not the same road.
+        if (cx, cy) in _grid:
+            hit += 1
+    return hit / len(coords)
+
+
+osm_dupe = 0
 osm_n = 0
 _osm_ok = os.path.exists("aoi.json")
 if _osm_ok:
@@ -193,12 +232,18 @@ for e in json.load(open("aoi.json"))["elements"]:
     g = e.get("geometry")
     if not c or not g or len(g) < 2:
         continue
+    _coords = [[q["lon"], q["lat"]] for q in g]
+    # 0.72: a road that merely crosses or briefly shares an agency line is kept;
+    # one that runs along it for most of its length is the same road twice.
+    if c not in SHOW_ONLY and _covered(_coords) >= 0.85:
+        osm_dupe += 1
+        continue
     (show if c in SHOW_ONLY else net).append({"c": c, "src": "osm", "auth": "advisory",
                 "n": t.get("name"),
                 "geometry": {"type": "LineString",
                              "coordinates": [[p["lon"], p["lat"]] for p in g]}})
     osm_n += 1
-print(f"osm context: {osm_n} lines added ({len(net)} total)")
+print(f"osm context: {osm_n} added, {osm_dupe} dropped as duplicates of agency geometry ({len(net)} total)")
 
 # ── 3. node the network ────────────────────────────────────────────────────
 polys = []

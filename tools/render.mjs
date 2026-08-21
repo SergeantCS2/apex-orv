@@ -71,12 +71,20 @@ const browser = await puppeteer.launch({
          "--disable-dev-shm-usage"],
 });
 const page = await browser.newPage();
-// The Fold's cover screen, exactly: 411 x 960 css px at dpr 2.625. The harness
-// used to run at 900x1400 — three times the area — so every label-density
-// number it reported was optimistic. Jacob's device showed 3 names where this
-// claimed 8, because MapLibre places symbols against the viewport it has
-// (landmine 87). Measure the screen the app runs on.
-await page.setViewport({ width: 411, height: 960, deviceScaleFactor: 2.625 });
+// Measure the screen the app RUNS on, not a desktop window. The harness used to
+// run at 900x1400 — three times the area — so every label-density figure it
+// reported was optimistic (landmine 87).
+//
+// The default is a mid-size Android phone, not one specific handset: this should
+// work on whatever anyone brings, and the Fold cover screen it was tuned on is
+// unusually narrow. LAYOUT is then checked across the range below.
+const DEVICES = [
+  { name: "small  (Galaxy S / Pixel a)", width: 360, height: 800, dpr: 3 },
+  { name: "mid    (Pixel 8 / S24)", width: 412, height: 915, dpr: 2.6 },
+  { name: "large  (Pro Max / Ultra)", width: 430, height: 932, dpr: 3 },
+  { name: "fold   (cover screen)", width: 411, height: 960, dpr: 2.625 },
+];
+await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2.6 });
 
 const consoleErrors = [], pageErrors = [], badRequests = [];
 page.on("response", (r) => { if (r.status() >= 400) badRequests.push(r.status() + " " + r.url()); });
@@ -289,6 +297,50 @@ const layers2 = await page.evaluate(async () => {
 ok(layers2.route > 0, `route line renders ${layers2.route} features`);
 ok(layers2.alt > 0, `dimmed alternates render ${layers2.alt} features`);
 ok(layers2.approach > 0, `dashed off-network legs render ${layers2.approach} features`);
+
+/* The same layout checks the on-device self-test runs, across the phone sizes
+   people actually own. A control that fits on a 430 px screen and slides off a
+   360 px one is broken for half the users (take 65). */
+for (const dev of DEVICES) {
+  await page.setViewport({ width: dev.width, height: dev.height, deviceScaleFactor: dev.dpr });
+  await new Promise((r) => setTimeout(r, 1200));
+  const fit = await page.evaluate(() => {
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const wide = [];
+    document.querySelectorAll("#shell *").forEach((e) => {
+      const r = e.getBoundingClientRect();
+      if (r.width > vw + 1) wide.push((e.id || e.className || e.tagName) + " " + Math.round(r.width));
+    });
+    const off = [];
+    ["btn-home", "c-base", "c-labels", "coords"].forEach((id) => {
+      const e = document.getElementById(id);
+      if (!e) return;
+      const r = e.getBoundingClientRect();
+      if (!r.height) return;
+      // A chip inside a horizontally scrolling strip is not off-screen, it is
+      // scrolled — reaching it is one swipe. Only VERTICAL overflow strands a
+      // control. Flagging c-labels on every size, including the one Jacob uses
+      // daily, was the check being wrong (landmine 54, again).
+      let scroller = e.parentElement;
+      let inStrip = false;
+      while (scroller && scroller !== document.body) {
+        const ox = getComputedStyle(scroller).overflowX;
+        if (ox === "auto" || ox === "scroll") { inStrip = true; break; }
+        scroller = scroller.parentElement;
+      }
+      if (r.bottom > vh + 2 || r.top < -2) off.push(id + " (vertical)");
+      else if (!inStrip && r.right > vw + 2) off.push(id + " (horizontal)");
+    });
+    return { wide, off, vw, vh };
+  });
+  ok(fit.wide.length === 0 && fit.off.length === 0,
+     `${dev.name} ${dev.width}x${dev.height}: nothing overflows, controls reachable`
+     + (fit.wide.length ? " — wide: " + fit.wide.join(", ") : "")
+     + (fit.off.length ? " — off-screen: " + fit.off.join(", ") : ""));
+}
+await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2.6 });
+await new Promise((r) => setTimeout(r, 800));
 
 /* Pixel evidence. Feed the screenshot BACK into the page as an <img>, draw it to
    a 2D canvas and read it there: reading the WebGL canvas directly always

@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 63.*
+*Current as of take 65.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -94,6 +94,8 @@ Start here. Do not read top to bottom.
 | Shared casing swamps a thinner line | 91 |
 | className assignment discards a style class | 92 |
 | Opacity 0 is not off | 93 |
+| Assertion on a user-controlled viewport | 94 |
+| Tuned to one screen size | 95 |
 | checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
@@ -127,6 +129,8 @@ Start here. Do not read top to bottom.
 | Shared casing swamps a thinner line | 91 |
 | className assignment discards a style class | 92 |
 | Opacity 0 is not off | 93 |
+| Assertion on a user-controlled viewport | 94 |
+| Tuned to one screen size | 95 |
 | checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
@@ -1188,3 +1192,35 @@ had its own handler that set opacity directly; `setBasemap` set visibility. Afte
 fixing only the latter, turning relief ON did nothing — `visibility=none,
 opacity=0.42`. Grep for every writer of a property before declaring it fixed, and
 measure every state of a toggle, not just the default one.
+
+**94. Do not assert on a viewport the user controls.** The self-test failed
+`trails 0 features` because the rider had left the map over an area with no
+designated trail. The map was fine. A check that depends on where someone
+happened to pan is an info line; if you want an assertion, jump to a known
+anchor, wait for placement, and measure there.
+
+The same report failed `labels 0` — a second copy of landmine 87, querying
+symbols in the same tick as its own `jumpTo`. Fixing a timing bug in one place
+does not fix the copy.
+
+**Corollary — when a fix costs more than the bug, stop and say so.** Deduping
+OSM against agency geometry removed 558 miles at a loose tolerance and dropped
+connectivity from 99.7% to 97.4%. The duplicates are real; deleting them is the
+wrong tool, because the two sources have different topology. Ship the safe
+version, record the measurement, and do the correct fix — keep both for routing,
+draw one — deliberately.
+
+**95. One handset is not a device target.** Everything here was tuned at
+411x960, the Fold's cover screen, which is unusually narrow — and the app is
+meant for whatever phone anyone brings. `render.mjs` now checks layout at
+360x800, 412x915, 430x932 and the Fold, and defaults to the mid-size phone.
+
+The check flagged `c-labels` off-screen on **all four**, including the device it
+demonstrably works on, which is the tell that the check is wrong. A chip inside a
+horizontally scrolling strip is not off-screen, it is scrolled — one swipe away.
+Only vertical overflow strands a control. Negative-controlled by moving a real
+control to `top: 2000px`.
+
+**Corollary — two numbers in the same unit need captions.** A scale bar reading
+"3000 ft" with "1194 ft" beneath it is not a readout, it is a puzzle. Say
+"elevation".

@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 63.* Ranked by blocking-ness, not by interest.
+*Current as of take 65.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -689,3 +689,25 @@ The third is not:
 - **Ruled out:** fading a layer to zero as a way of disabling it. It keeps the
   GPU work and hides the cost.
 - **Open:** whether this shows up in the A18 battery figure. Only a ride tells.
+
+## A60 — Duplicate agency/OSM geometry · OPEN
+
+- **PROVEN:** 5,390 spans carry >1 edge; 1,957 are fsroad+track. Visible as
+  jagged parallel lines at riding zoom.
+- **PROVEN:** dropping OSM duplicates at 45 m removes 558 mi and costs
+  connectivity (99.7% -> 97.4%). At 17 m it is safe but removes only 14 ways.
+- **Ruled out:** deleting the duplicate. The sources differ topologically and
+  the OSM way bridges gaps the agency geometry leaves.
+- **Open:** mark duplicates through emit_graph and filter them from the render
+  layers only — routable but drawn once.
+
+## A61 — Works on ordinary Android phones · SHIPPED take 65
+
+- **PROVEN:** layout checked at 360x800, 412x915, 430x932 and 411x960; harness
+  default is a mid-size phone, not the Fold. Negative-controlled.
+- **PROVEN:** labels appear at z11.5-12 (scale 3000 ft-1 mi) where they
+  previously needed z12.5; measured against the scale bar.
+- **Ruled out:** treating horizontal overflow inside a scrolling strip as an
+  unreachable control.
+- **Open:** never run on any device other than the Fold. Only a second phone
+  settles it.
