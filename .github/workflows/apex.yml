@@ -1,4 +1,4 @@
-name: apex
+name: APEX
 on:
   workflow_dispatch:
   push:
