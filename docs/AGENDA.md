@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 58.* Ranked by blocking-ness, not by interest.
+*Current as of take 59.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -642,3 +642,11 @@ The third is not:
 - **Ruled out:** trusting distance alone to rank routes for a dirt bike.
 - **Open:** an emergency profile crossing non-ORV line. Pavement is already
   never forbidden; routing onto a hiking trail needs more than a multiplier.
+
+## A55 — Fallback data stays inside the region · CLOSED take 59
+
+- **PROVEN:** TIGER geometry clipped to bbox+0.02; nodes outside the gate's
+  tolerance fell 3.14% -> 0.01%. OSM path unchanged at 0.11%.
+- **PROVEN:** failure reproduced locally before the fix by forcing every mirror
+  to fail, and both paths re-measured after.
+- **Ruled out:** keeping a whole way because one point is near the region.

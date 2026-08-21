@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 58.*
+*Current as of take 59.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -89,6 +89,7 @@ Start here. Do not read top to bottom.
 | Volunteer service on the critical path | 86 |
 | Harness viewport is not the device | 87 |
 | Styling contradicts legality | 88 |
+| Filtered whole ways instead of clipping | 89 |
 | checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
@@ -117,6 +118,7 @@ Start here. Do not read top to bottom.
 | Volunteer service on the critical path | 86 |
 | Harness viewport is not the device | 87 |
 | Styling contradicts legality | 88 |
+| Filtered whole ways instead of clipping | 89 |
 | checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
@@ -1103,3 +1105,18 @@ because pavement IS fast, easy, short and flat. Return Home offered a dirt biker
 what made it visible; "Most trail" is what fixed it. Show the composition of a
 route, not just its length — a rider choosing between 9.3 mi of road and 11.1 mi
 of trail is not choosing on distance.
+
+**89. Filter the geometry, not the feature.** The TIGER fallback kept an entire
+road if one of its points lay near the region, so county roads ran on to the
+county line — the graph spanned 44.16 to 44.86 against a 44.42-44.72 region and
+the gate refused the bundle as "not this region". A bbox query from any agency
+returns features that INTERSECT the box, with their full geometry attached.
+
+Clip: emit each run of consecutive in-box points as its own way. 3.14% of nodes
+outside became 0.01%.
+
+**Corollary — measure with the checker's tolerance, not your own.** Mid-fix I
+reported 2,566 nodes outside using the strict bbox, which looked worse than the
+3.14% that had just failed. The gate allows a 0.05 degree pad and a 2% budget;
+by that measure it was 2. A second opinion computed differently from the thing
+it is second-guessing is not a second opinion.

@@ -142,6 +142,10 @@ def tiger_roads():
              "S1500": "track", "S1640": "service", "S1740": "service",
              "S1730": "residential", "S1780": "service"}
     W, S_, E, N = R.bbox
+    # A small margin so a trail crossing the edge still connects, but bounded —
+    # the gate allows a little slop, not a county.
+    PAD = 0.02
+    PAD_W, PAD_S, PAD_E, PAD_N = W - PAD, S_ - PAD, E + PAD, N + PAD
     els, seen = [], 0
     for fips, cname in counties_for(R.bbox):
         url = (f"https://www2.census.gov/geo/tiger/TIGER2023/ROADS/"
@@ -161,17 +165,31 @@ def tiger_roads():
             hw = MTFCC.get(row.get("MTFCC", ""))
             if not hw or not parts:
                 continue
+            name = (row.get("FULLNAME") or "").strip()
             for pts in parts:
-                if len(pts) < 2:
-                    continue
-                if all(x < W - 0.01 or x > E + 0.01 or y < S_ - 0.01 or y > N + 0.01
-                       for x, y in pts):
-                    continue
-                els.append({"type": "way", "id": len(els) + 1,
-                            "tags": {"highway": hw,
-                                     "name": (row.get("FULLNAME") or "").strip()},
-                            "geometry": [{"lon": round(x, 6), "lat": round(y, 6)}
-                                         for x, y in pts]})
+                # CLIP, do not filter. Keeping a whole way because one point is
+                # near the box let county roads trail off to the county line —
+                # the graph spanned 44.16 to 44.86 against a 44.42-44.72 region
+                # and the gate refused the bundle as "not this region"
+                # (landmine 89). Emit each run of consecutive in-box points as
+                # its own way; a road that leaves and returns becomes two.
+                run = []
+                for x, y in pts:
+                    if PAD_W <= x <= PAD_E and PAD_S <= y <= PAD_N:
+                        run.append((x, y))
+                    else:
+                        if len(run) >= 2:
+                            els.append({"type": "way", "id": len(els) + 1,
+                                        "tags": {"highway": hw, "name": name},
+                                        "geometry": [{"lon": round(a, 6),
+                                                      "lat": round(b, 6)}
+                                                     for a, b in run]})
+                        run = []
+                if len(run) >= 2:
+                    els.append({"type": "way", "id": len(els) + 1,
+                                "tags": {"highway": hw, "name": name},
+                                "geometry": [{"lon": round(a, 6), "lat": round(b, 6)}
+                                             for a, b in run]})
     print(f"tiger: {len(els)} road ways from {seen} features (OSM fallback)")
     return els
 

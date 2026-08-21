@@ -1,7 +1,48 @@
-# HANDOFF — through Take 58
+# HANDOFF — through Take 59
 
 Newest first. Written BEFORE the build ships, per PROTOCOL §6.
 The gate refuses to build a take with no entry here.
+
+## Take 59 — 2026-08-22 — The gate refused my own bundle, correctly
+
+CI, on the take-58 seed:
+
+```
+FAIL bundle neml-bullgap UNUSABLE: graph.json is not this region:
+  579/18420 nodes outside bbox [-84.3, 44.42, -83.9, 44.72]
+  (data spans -84.37,44.16 to -83.87,44.86)
+```
+
+Overpass was down again, so the TIGER fallback from take 56 ran — and my filter
+there was wrong. It kept a **whole way** if any single point fell near the
+region, so county roads trailed off to the county line. 44.16 to 44.86 against a
+44.42-44.72 region: eighteen miles of overhang in each direction.
+
+**Filter replaced with a clip.** Each run of consecutive in-box points becomes
+its own way; a road that leaves the region and returns becomes two. Measured with
+the gate's own tolerance (pad 0.05, limit 2%):
+
+| | outside | verdict |
+|---|---|---|
+| CI, before | 579/18420 = **3.14%** | refused |
+| TIGER, clipped | 2/18272 = **0.01%** | passes |
+| OSM path, unchanged | 13/12177 = 0.11% | passes |
+
+Reproduced the failure locally first by pointing every mirror at an invalid host
+— the span came back 44.16-44.86 exactly as CI saw it — then fixed, then
+re-measured both paths.
+
+**The check that caught this was written at take 11** and has sat green ever
+since. It exists because a bundle built for one region and shipped as another
+would put a rider on the wrong map, and it refused a bundle I had just built and
+would otherwise have shipped.
+
+One correction to my own reporting mid-fix: I measured containment against the
+*strict* bbox and reported 2,566 nodes outside, which looked worse than the
+original failure. The gate allows ±0.05 and 2%; measured its way, it is 2.
+The check was right and my probe was too strict.
+
+---
 
 ## Take 58 — 2026-08-22 — Half the network was styled as "not for you"
 
