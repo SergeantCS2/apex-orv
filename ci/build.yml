@@ -173,6 +173,11 @@ jobs:
           name: apk
           path: ${{ steps.pkg.outputs.apk }}
 
+      # Notes come from ci/RELEASE.md, in the REPO. They used to be inline here —
+      # and the workflow is the one file the seed cannot update, so the notes
+      # were frozen at whatever take the user last pasted. Jacob was still
+      # reading "Install from this page on the Fold" two takes after I changed
+      # it (landmine 96).
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -180,7 +185,4 @@ jobs:
           gh release create "take-${{ github.run_number }}" \
             "${{ steps.pkg.outputs.apk }}" \
             --title "APEX ORV — take ${{ steps.pkg.outputs.take }}" \
-            --notes "Signed release build (~50 MB — satellite tiles at 3.4 m/px). Install from this page on any Android 8+ device.
-
-          Then: airplane mode on, force-stop, reopen. The map must render
-          identically and stay offline. Tap the self-test and share the report."
+            --notes-file ci/RELEASE.md

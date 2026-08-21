@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 65.* Ranked by blocking-ness, not by interest.
+*Current as of take 66.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -711,3 +711,15 @@ The third is not:
   unreachable control.
 - **Open:** never run on any device other than the Fold. Only a second phone
   settles it.
+
+## A62 — Every named feature is readable without tapping · SHIPPED take 66
+
+- **PROVEN:** short named strokes get a wrapping point label; 8 names appeared at
+  Bull Gap that had never drawn, including M-33 Bull Gap Trailhead.
+- **PROVEN:** show-only routes coloured by use (hiking lime, equestrian violet,
+  ski/snowmobile cyan, NFS motorised amber), still dashed.
+- **PROVEN:** release notes read from ci/RELEASE.md so the seed can update them.
+- **Ruled out:** line-center placement for short features. It still fits text to
+  the line and drew nothing.
+- **Open:** whether the brighter blue and wider casing are enough under real
+  canopy on a real screen in daylight.

@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 65.*
+*Current as of take 66.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -96,6 +96,8 @@ Start here. Do not read top to bottom.
 | Opacity 0 is not off | 93 |
 | Assertion on a user-controlled viewport | 94 |
 | Tuned to one screen size | 95 |
+| User-facing text inside the workflow | 96 |
+| Short feature cannot fit a line label | 97 |
 | checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
@@ -131,6 +133,8 @@ Start here. Do not read top to bottom.
 | Opacity 0 is not off | 93 |
 | Assertion on a user-controlled viewport | 94 |
 | Tuned to one screen size | 95 |
+| User-facing text inside the workflow | 96 |
+| Short feature cannot fit a line label | 97 |
 | checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
@@ -1224,3 +1228,22 @@ control to `top: 2000px`.
 **Corollary — two numbers in the same unit need captions.** A scale bar reading
 "3000 ft" with "1194 ft" beneath it is not a readout, it is a puzzle. Say
 "elevation".
+
+**96. User-facing text does not belong in the workflow file.** The release notes
+were inline in the YAML — the one file the seed cannot update — so the user was
+still reading "Install from this page on the Fold" two takes after I changed it,
+and I had told him the workflow would rarely need re-pasting. Move anything that
+changes into the repo: `ci/RELEASE.md`, read with `--notes-file`.
+
+**97. A short feature cannot carry a long line label.** "M-33 Bull Gap Trailhead"
+is 23 characters; its feature is 740 ft, about 90 px at riding zoom. No text size
+fits, so MapLibre drew nothing — at every zoom, permanently — and the only way to
+learn the name was to tap it. `symbol-placement: line-center` does not help; it
+still fits text along the line.
+
+Emit a POINT at the stroke midpoint and label that with `text-max-width` so it
+wraps. Eight previously invisible names appeared at Bull Gap alone.
+
+**Corollary — one grey for many meanings is no information.** Every non-ORV route
+was the same grey dash, so a hiking trail and a snowmobile route were
+indistinguishable. Colour by use; keep the dash to mean "not yours to ride".

@@ -1,7 +1,52 @@
-# HANDOFF — through Take 65
+# HANDOFF — through Take 66
 
 Newest first. Written BEFORE the build ships, per PROTOCOL §6.
 The gate refuses to build a take with no entry here.
+
+## Take 66 — 2026-08-22 — Release notes in the repo, and a trailhead that names itself
+
+### "I still see the fold portion"
+
+He was reading **"Install from this page on the Fold"** two takes after I changed
+it. The release notes were **inline in the workflow YAML** — the one file the
+seed cannot update — so they were frozen at whatever take he last pasted. Exactly
+the failure take 55 was supposed to prevent, in the one place I did not move.
+
+Notes now live in **`ci/RELEASE.md`**, read with `--notes-file`. In the repo,
+seeded like everything else. Landmine 96.
+
+### A trailhead you had to tap to identify
+
+"M-33 Bull Gap Trailhead is not labeled so I'm sure there's others."
+
+It is **740 ft across 3 edges** — about 90 px at riding zoom — and its name is 23
+characters. No line label of any size fits, so MapLibre drew nothing, at every
+zoom, forever. `line-center` did not help: it still fits text along the line.
+
+Short named strokes now get a **point** at their midpoint and a wrapping label
+(`text-max-width: 9`). At Bull Gap that turned up eight names that had never been
+drawn: *M-33 Bull Gap Trailhead, 4523, Shaw Lake Road, Shaw Lake Drive, Center
+Drive, Hilda Lane, H57-12, MAT.*
+
+### Non-ORV routes were all one grey
+
+A hiking trail and a snowmobile route looked identical, and both looked like
+"some line". Coloured by use, still dashed because dashed means *not yours to
+ride*: **hiking lime `#7CB342`**, equestrian violet, ski/snowmobile cyan, NFS
+motorised amber.
+
+### Legibility on satellite
+
+Designated blue brightened to `#2585D8`, and the white casing widened to
+`w(3.2, 7.2, 15)` — near-black singletrack on dark canopy is legible only
+because of that halo, which is what "dirtbike trails are hard to see" was about.
+
+**I broke the app mid-take**: `strokeLen(pts)` where `pts` was not in scope at
+either call site — the geometry comes from `walk()`. The app caught it and
+rendered the fatal screen, so there was no console error; the smoke harness said
+`map constructed: FAIL` and that is what found it.
+
+---
 
 ## Take 65 — 2026-08-22 — Labels a zoom earlier, and stop designing for one phone
 

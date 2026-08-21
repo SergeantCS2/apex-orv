@@ -13,7 +13,7 @@
     /* Difficulty, not taxonomy. A rider needs to know what a line will DO to them,
        not which agency drew it — green/blue/black is the language every trail map
        already speaks and onX uses it for exactly this reason (take 46). */
-      --easy:#2F7D4F;--mod:#1F6FB2;--hard:#17150F;--road:#6E665B;
+      --easy:#2F7D4F;--mod:#2585D8;--hard:#17150F;--road:#6E665B;
       --r72:#2F7D4F;--t50:#1F6FB2;--m24:#17150F;--mcct:#17150F;--fst:#1F6FB2;
     --fsr:#5A5248;--shut:#C1121F;--adv:#A6997F;--route:#00A8E8;
   }
@@ -154,7 +154,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 65</span>
+    <span id="title"><b>APEX</b> ORV · Take 66</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -301,6 +301,17 @@ var nf2=EDGES.map(function(e){return {type:'Feature',
 
    Chain consecutive edges that share a label into maximal strokes, and place
    labels on those instead. Built once at load over 16k edges. */
+/* Metres along a stroke. A 740 ft trailhead cannot fit "M-33 Bull Gap
+   Trailhead" at 60 px symbol-spacing, so MapLibre placed nothing and Jacob had
+   to TAP the trailhead to learn its name (take 66). Short features get their own
+   layer with symbol-placement:line-center — exactly one label, centred. */
+function strokeLen(pts){
+  var m=0;
+  for(var i=1;i<pts.length;i++){
+    var dx=(pts[i][0]-pts[i-1][0])*79000,dy=(pts[i][1]-pts[i-1][1])*111320;
+    m+=Math.sqrt(dx*dx+dy*dy)}
+  return Math.round(m)}
+
 function chainStrokes(){
   var byKey={};
   EDGES.forEach(function(e){
@@ -332,12 +343,14 @@ function chainStrokes(){
     var starts=[];
     Object.keys(adj).forEach(function(n){if(adj[n].length===1)starts.push(+n)});
     starts.forEach(function(n){
-      (adj[n]||[]).forEach(function(e){if(!used[e.i])
-        feats.push({type:'Feature',properties:{c:cls,lb:lb},
-          geometry:{type:'LineString',coordinates:walk(n,e)}})})});
-    list.forEach(function(e){if(!used[e.i])
-      feats.push({type:'Feature',properties:{c:cls,lb:lb},
-        geometry:{type:'LineString',coordinates:walk(e.a,e)}})});
+      (adj[n]||[]).forEach(function(e){if(!used[e.i]){
+        var co=walk(n,e);
+        feats.push({type:'Feature',properties:{c:cls,lb:lb,px:strokeLen(co)},
+          geometry:{type:'LineString',coordinates:co}})}})});
+    list.forEach(function(e){if(!used[e.i]){
+      var co2=walk(e.a,e);
+      feats.push({type:'Feature',properties:{c:cls,lb:lb,px:strokeLen(co2)},
+        geometry:{type:'LineString',coordinates:co2}})}});
   });
   return feats}
 /* ══ SHOW-ONLY ROUTES ═══════════════════════════════════════════════════════
@@ -354,6 +367,18 @@ var showFeats=(SHOW&&SHOW.r?SHOW.r:[]).map(function(r){
     geometry:{type:'LineString',coordinates:r.g}}});
 
 var strokes=chainStrokes();
+/* "M-33 Bull Gap Trailhead" is 23 characters and its feature is 740 ft — about
+   90 px at riding zoom. No line label of any size fits, so line-center drew
+   nothing and Jacob had to TAP the trailhead to find out what it was. A POINT
+   label at the middle of the stroke wraps onto two or three lines and fits
+   (take 66). */
+var shortPts={type:'FeatureCollection',features:strokes.filter(function(f){
+    return f.properties.lb && f.properties.px<420 &&
+           f.geometry.coordinates.length>1})
+  .map(function(f){
+    var c=f.geometry.coordinates,m=c[Math.floor(c.length/2)];
+    return {type:'Feature',properties:{lb:f.properties.lb,c:f.properties.c},
+            geometry:{type:'Point',coordinates:m}}})};
 
 function w(a,b,c){return ['interpolate',['linear'],['zoom'],10,a,14,b,17,c]}
 /* MapLibre forbids more than ONE zoom-based interpolate per expression, so
@@ -440,6 +465,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     wtr:{type:'geojson',data:{type:'FeatureCollection',features:wf}},
     net:{type:'geojson',data:{type:'FeatureCollection',features:nf2}},
     strokes:{type:'geojson',data:{type:'FeatureCollection',features:strokes}},
+    shortpts:{type:'geojson',data:shortPts},
     showonly:{type:'geojson',data:{type:'FeatureCollection',features:showFeats}},
     state:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     lakes:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
@@ -471,7 +497,9 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     {id:'casing',type:'line',source:'net',
       layout:{'line-cap':'round','line-join':'round'},
       filter:['in',['get','c'],['literal',['route72','trail50','moto24','mccct','fstrail']]],
-      paint:{'line-color':'#FFFFFF','line-opacity':0.9,'line-width':w(2.8,6.2,13)}},
+      /* Wider than it was. Near-black singletrack on dark canopy is only
+         legible because of this halo — "dirtbike trails are hard to see". */
+      paint:{'line-color':'#FFFFFF','line-opacity':0.95,'line-width':w(3.2,7.2,15)}},
     /* Two-track gets its OWN, narrower casing. Sharing the designated-trail
        casing swamped it — a 1.6 px brown line under a 6 px white halo reads as a
        cream line, which is how the two-track disappeared entirely (take 61). */
@@ -498,10 +526,10 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     /* Trails, by difficulty. Widest/easiest drawn first so the hard singletrack
        sits on top where it matters. */
     lyr('route72','route72','#2F7D4F',w(1.7,4.1,9.5)),
-    lyr('fstrail','fstrail','#1F6FB2',w(1.4,3.4,8)),
-    lyr('trail50','trail50','#1F6FB2',w(1.5,3.7,8.6)),
-    lyr('mccct','mccct','#17150F',w(1.5,3.7,8.6)),
-    lyr('moto24','moto24','#17150F',w(1.5,3.7,8.6)),
+    lyr('fstrail','fstrail','#2585D8',w(1.4,3.4,8)),
+    lyr('trail50','trail50','#2585D8',w(1.5,3.7,8.6)),
+    lyr('mccct','mccct','#1C1A16',w(1.5,3.7,8.6)),
+    lyr('moto24','moto24','#1C1A16',w(1.5,3.7,8.6)),
     lyr('closed','closed','#C1121F',w(1.2,3,7),[2,1.3]),
     lyr('fsclosed','fsclosed','#C1121F',w(1.2,3,7),[2,1.3]),
     /* Both of these were written twice and never landed: my patches anchored on
@@ -512,8 +540,14 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        approach legs over it so the dashes stay readable. */
     {id:'show-line',type:'line',source:'showonly',minzoom:11.5,
       layout:{'line-cap':'round'},
-      paint:{'line-color':'#7C6F5A','line-width':w(0.9,1.6,2.6),
-        'line-dasharray':[1,2],'line-opacity':0.75}},
+      /* One grey for every non-ORV route told Jacob nothing — a hiking trail and a
+         snowmobile route looked identical, and both looked like "some line".
+         Colour by use; dashed still means "not yours to ride" (take 66). */
+      paint:{'line-color':['match',['get','c'],
+          'foot','#7CB342','horse','#8E6BB5','snow','#4FB3C9',
+          'snowmob','#4FB3C9','nfsmoto','#C98A2E','#7C6F5A'],
+        'line-width':w(1.1,2,3.2),
+        'line-dasharray':[2,2],'line-opacity':0.9}},
     {id:'alt-line',type:'line',source:'alt',
       layout:{'line-cap':'round','line-join':'round'},
       paint:{'line-color':'#5F574B','line-width':w(2.6,3.8,5.2),'line-opacity':0.72}},
@@ -580,6 +614,14 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        so this sat in front and a non-ridable path ("Mack's Sault") was named
        while the trail loop a rider was standing on was not (take 57). Names you
        may ride come first. */
+    /* Short named features — trailheads, connectors, spurs — get ONE centred
+       label. Without this a 740 ft trailhead is unlabelled at every zoom. */
+    {id:'lbl-trail-short',type:'symbol',source:'shortpts',minzoom:13.4,
+      layout:{'text-field':['get','lb'],'text-font':['APEX'],
+        'text-size':w(9,10.5,12),'text-max-width':9,'text-line-height':1.15,
+        'text-padding':2,'text-anchor':'center','text-allow-overlap':false},
+      paint:{'text-color':'#FFFFFF','text-halo-color':'rgba(20,18,15,0.92)',
+        'text-halo-width':1.9,'text-halo-blur':0.2}},
     {id:'lbl-show',type:'symbol',source:'showonly',minzoom:13.0,
       layout:{'symbol-placement':'line','text-field':['get','n'],
         'text-font':['APEX'],'text-size':w(8.5,9.5,11),'text-max-angle':75,
