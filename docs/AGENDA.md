@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 59.* Ranked by blocking-ness, not by interest.
+*Current as of take 63.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -650,3 +650,42 @@ The third is not:
 - **PROVEN:** failure reproduced locally before the fix by forcing every mirror
   to fail, and both paths re-measured after.
 - **Ruled out:** keeping a whole way because one point is near the region.
+
+## A56 — Fallback cannot become permanent · CLOSED take 60
+
+- **PROVEN:** TIGER-derived aoi.json is marked at write time; fetch_osm retries
+  OSM on seeing the marker instead of skipping. Both cache states exercised
+  against the real ingest, with Overpass genuinely down for the second.
+- **Ruled out:** treating file existence as proof the data is good.
+
+## A57 — Road / two-track / trail read distinctly · SHIPPED take 61
+
+- **PROVEN:** four weights distinguishable in one view at Wagner Lake — 18
+  designated, 37 two-track, 19 forest road, 25 road.
+- **PROVEN:** attribution collapsed to 24 px on load; no longer covers a chip.
+- **Ruled out:** one colour for all ridable dirt. A forest road is drivable, a
+  two-track is ridable, and the source splits single roads between them.
+
+## A58 — Opening state and control placement · SHIPPED take 62
+
+- **PROVEN:** only Labels enabled at open; Relief off; basemap opens on Map with
+  satellite off and hillshade at 0; attribution collapsed.
+- **PROVEN:** map-detail button floats at left 11 / top 104, under the scale, and
+  turns orange on satellite. Verified via computed style, not just a screenshot.
+- **PROVEN by data:** road/trail distinction holds across all classes — 0 of
+  3,211 designated-trail edges carry a road name; all 9,526 road edges are grey.
+- **Ruled out:** burying map detail in the horizontally scrolling chip strip,
+  and opening on satellite. A basemap is a choice, not a landing state.
+- **Ruled out:** trusting a screenshot to confirm placement — the button looked
+  absent and computed style showed why.
+- **Open:** the 534 road-named two-tracks (Bull Gap Road et al.) are brown by
+  design. Only a rider can confirm they are two-track on the ground.
+
+## A59 — Relief costs nothing when off · SHIPPED take 63
+
+- **PROVEN:** hillshade uses visibility:none when off, not opacity 0 — no raster
+  draw on the default view. Four states measured: open none, on visible/0.42,
+  satellite+on visible/0.16, off none.
+- **Ruled out:** fading a layer to zero as a way of disabling it. It keeps the
+  GPU work and hides the cost.
+- **Open:** whether this shows up in the A18 battery figure. Only a ride tells.

@@ -313,8 +313,15 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        separation from the roads at all. */
     {id:'casing',type:'line',source:'net',
       layout:{'line-cap':'round','line-join':'round'},
-      filter:['in',['get','c'],['literal',['route72','trail50','moto24','mccct','fstrail','fsroad','track']]],
+      filter:['in',['get','c'],['literal',['route72','trail50','moto24','mccct','fstrail']]],
       paint:{'line-color':'#FFFFFF','line-opacity':0.9,'line-width':w(2.8,6.2,13)}},
+    /* Two-track gets its OWN, narrower casing. Sharing the designated-trail
+       casing swamped it — a 1.6 px brown line under a 6 px white halo reads as a
+       cream line, which is how the two-track disappeared entirely (take 61). */
+    {id:'casing-track',type:'line',source:'net',
+      layout:{'line-cap':'round','line-join':'round'},
+      filter:['==',['get','c'],'track'],
+      paint:{'line-color':'#FFFFFF','line-opacity':0.75,'line-width':w(1.7,3.8,8)}},
     /* PAVED and MINOR are roads and read as background. TRACK and FSROAD are
        not: forest two-track and USFS road are 1,169 of the 2,246 miles here —
        52% — and they are exactly what a dirt bike rides. Styled as grey dashes
@@ -323,8 +330,14 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        than designated trail so the hierarchy still reads. */
     lyr('minor','minor','#4A443B',w(0.4,0.9,2.2)),
     lyr('paved','paved','#3A352E',w(0.9,2,4.8)),
-    lyr('fsroad','fsroad','#B07A3C',w(0.7,1.8,4.2)),
-    lyr('track','track','#B07A3C',w(0.6,1.5,3.4)),
+    /* fsroad and track were the same brown at take 58, and Jacob's own example
+       shows why that is wrong: "East Wagner Lake Road" is minor and "E. Wagner
+       Lake Rd" is fsroad — the SAME road, split in the source. A Forest Service
+       road is something you drive a truck down; a two-track is something you
+       ride. Muted grey-tan for the road, warm brown for the two-track, and only
+       the two-track gets a casing (take 61). */
+    lyr('fsroad','fsroad','#8A7C66',w(0.6,1.4,3.2)),
+    lyr('track','track','#A9702F',w(0.8,2.1,4.6)),
     /* Trails, by difficulty. Widest/easiest drawn first so the hard singletrack
        sits on top where it matters. */
     lyr('route72','route72','#2F7D4F',w(1.5,3.6,8.5)),
@@ -951,7 +964,7 @@ el('btn-steps').addEventListener('click',function(){
    jack pine is unreadable, and a trail you cannot see is not on the map. */
 var BASEMAPS=['Map','Satellite','Hybrid'],bmi=0;
 function setBasemap(i){
-  if(!SAT_OK){bmi=0;el('c-base').textContent='🗺 Map';el('c-base').className='chip';
+  if(!SAT_OK){bmi=0;el('c-base').textContent='🗺 Map';el('c-base').className='basebtn';
     map.setLayoutProperty('sat','visibility','none');
     return}
   bmi=i%BASEMAPS.length;
@@ -960,8 +973,13 @@ function setBasemap(i){
   /* The casing is no longer a satellite-only trick: it separates a
      difficulty-coloured trail from the road network on ANY base, and this
      line was switching it off on the default map (take 46). */
-  map.setPaintProperty('hillshade','raster-opacity',
-    el('c-relief').className.indexOf('on')<0?0:(sat?0.16:0.42));
+  /* Hide the layer, do not just fade it. A raster layer at opacity 0 is still
+     uploaded and drawn every frame — real GPU work for something invisible, and
+     battery is the one thing about this app still unmeasured (A18). Relief is
+     off by default, so that cost was being paid on every frame by default. */
+  var reliefOn=el('c-relief').className.indexOf('on')>=0;
+  map.setLayoutProperty('hillshade','visibility',reliefOn?'visible':'none');
+  if(reliefOn)map.setPaintProperty('hillshade','raster-opacity',sat?0.16:0.42);
   /* Satellite used to force every label off — from before labels had a dark
      halo, when dark-on-light was unreadable over jack pine. They are white on
      a halo now and survive it. Worse, lbl-show was NOT in LBL, so on satellite
@@ -971,7 +989,7 @@ function setBasemap(i){
     map.setLayoutProperty(id,'visibility',
       el('c-labels').className.indexOf('on')<0?'none':'visible')});
   el('c-base').textContent=(sat?'🛰 ':'🗺 ')+m;
-  el('c-base').className='chip'+(sat?' on':'');
+  el('c-base').className='basebtn'+(sat?' on':'');
 }
 
 /* LABELS block moved above the map constructor at take 15 — see the note where
@@ -2226,6 +2244,15 @@ function lpAt(cx,cy){
 })();
 /* desktop / stylus right-click, and the path the harness drives */
 map.on('contextmenu',function(e){buzz(18);dropPin([e.lngLat.lng,e.lngLat.lat])});
+/* MapLibre's compact attribution renders EXPANDED on first paint, and on a
+   411 px screen that bar sits across the chip strip and hides a button. Collapse
+   it; the (i) still opens it, and the credits are also in About (take 61). */
+function collapseAttrib(){
+  try{Array.prototype.forEach.call(
+    document.querySelectorAll('.maplibregl-ctrl-attrib.maplibregl-compact-show'),
+    function(el){el.classList.remove('maplibregl-compact-show')})}catch(e){}}
+map.on('load',collapseAttrib);map.on('idle',collapseAttrib);
+
 map.on('idle',function(){if(!healthOK)renderHealth()});
 map.on('move',refreshReadout);map.on('load',refreshReadout);
 map.on('load',function(){el('c-labels').className='chip on';setBasemap(0);
@@ -2274,8 +2301,11 @@ function showAway(acc){
 el('c-relief').addEventListener('click',function(){
   var on=el('c-relief').className.indexOf('on')<0;
   el('c-relief').className='chip'+(on?' on':'');
-  map.setPaintProperty('hillshade','raster-opacity',
-    on?(BASEMAPS[bmi]==='Map'?0.42:0.16):0)});
+  /* visibility, not just opacity — see setBasemap. Both places must agree or
+     the toggle looks dead: setBasemap hid the layer and this only faded it. */
+  map.setLayoutProperty('hillshade','visibility',on?'visible':'none');
+  if(on)map.setPaintProperty('hillshade','raster-opacity',
+    BASEMAPS[bmi]==='Map'?0.42:0.16)});
 
 el('c-lost').addEventListener('click',function(){
   if(rideMode)return show('Live GPS is driving — the alert fires from your actual track, not a button.','');

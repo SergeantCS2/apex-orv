@@ -39,6 +39,11 @@
 
   #stage{position:relative;min-height:0}
   #map{position:absolute;inset:0;background:var(--sand)}
+  .basebtn{position:absolute;left:11px;top:104px;z-index:4;
+    font:700 11.5px/1 Roboto,system-ui,sans-serif;letter-spacing:.02em;
+    color:#fff;background:rgba(24,22,18,.82);border:1px solid rgba(255,255,255,.28);
+    border-radius:8px;padding:8px 11px;min-height:38px}
+  .basebtn.on{background:rgba(226,87,15,.92);border-color:rgba(255,255,255,.5)}
   #readout{position:absolute;left:13px;top:82px;pointer-events:none;z-index:3;
     font:700 12px/1.25 Roboto,system-ui,sans-serif;color:#fff;
     text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 2px rgba(0,0,0,.9)}
@@ -149,7 +154,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 59</span>
+    <span id="title"><b>APEX</b> ORV · Take 63</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -160,6 +165,10 @@
          them. A rider reads distance and height far more often than anything the
          old title bar showed. -->
     <div id="readout"><span id="ro-elev">—</span></div>
+    <!-- Map detail sits under the scale, top-left, where onX and every other
+         off-road app puts it — not buried in a horizontally scrolling strip
+         where you have to find it (take 62). -->
+    <button id="c-base" class="basebtn">🗺 Map</button>
     <div class="strip" id="chips"></div>
     <div id="alert"></div>
     <div class="strip" id="tools">
@@ -171,8 +180,7 @@
       <button class="chip" id="c-lost">😖 Wrong turn</button>
       <button class="chip" id="c-locate">◉ Locate</button>
       <button class="chip" id="c-pan">⏱ Pan test</button>
-      <button class="chip" id="c-base">🗺 Map</button>
-      <button class="chip on" id="c-relief">⛰ Relief</button>
+      <button class="chip" id="c-relief">⛰ Relief</button>
       <button class="chip" id="c-labels">🏷 Labels</button>
       <button class="chip" id="c-about">ⓘ About</button>
       <button class="chip" id="c-loop">◯ Loop</button>

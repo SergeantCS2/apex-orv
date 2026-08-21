@@ -203,8 +203,21 @@ def fetch_osm(path="aoi.json"):
     """
     import os
     if os.path.exists(path):
-        print(f"osm: {path} present, skipping fetch")
-        return
+        # A TIGER-derived aoi.json must NOT be sticky. CI caches this file, and
+        # fetch_osm skips when it exists — so one Overpass outage would pin the
+        # region to the road-only fallback forever, with no water layer and no
+        # OSM paths, and nothing would ever retry (landmine 90). Jacob's manual
+        # rerun succeeded precisely because the cache held a GOOD OSM copy, which
+        # is the same mechanism working in his favour.
+        try:
+            if json.load(open(path)).get("source") == "tiger":
+                print("osm: cached aoi.json came from the TIGER fallback — "
+                      "retrying OSM before settling for it again")
+            else:
+                print(f"osm: {path} present, skipping fetch")
+                return
+        except Exception:
+            print(f"osm: {path} unreadable — refetching")
     q = f"""[out:json][timeout:240];
 (
   way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|track|path|footway|bridleway|cycleway|raceway)$"]({S_},{W_},{N_},{E_});
@@ -249,7 +262,9 @@ out geom;"""
                       f"falling back to Census TIGER roads")
                 els = tiger_roads()
                 if els:
-                    json.dump({"elements": els}, open("aoi.json", "w"))
+                    # marked, so a later run knows to try OSM again
+                    json.dump({"source": "tiger", "elements": els},
+                              open("aoi.json", "w"))
                     print(f"osm: aoi.json written from TIGER ({len(els)} ways); "
                           f"no water layer, bundle will be PARTIAL")
                 return

@@ -1,7 +1,157 @@
-# HANDOFF — through Take 59
+# HANDOFF — through Take 63
 
 Newest first. Written BEFORE the build ships, per PROTOCOL §6.
 The gate refuses to build a take with no entry here.
+
+## Take 63 — 2026-08-22 — Relief hidden, not faded
+
+Jacob asked to confirm relief is off at open. It already was, as of take 62 —
+verified by measurement rather than assertion: hillshade opacity 0, satellite
+off, Labels the only chip on, plain sand map with blue trail, brown two-track,
+grey roads and labels drawn.
+
+But "opacity 0" is the wrong way to switch a raster layer off. **The tiles are
+still uploaded and drawn every frame** — real GPU work for something invisible,
+and relief is off by *default*, so that cost was being paid on every frame by
+every user by default. Battery is the one thing about this app still unmeasured
+(A18), which makes free GPU work worth removing.
+
+`visibility: none` now, in `setBasemap`.
+
+**And the toggle broke, which is the part worth recording.** The Relief chip has
+its own handler that set opacity directly and never touched visibility — so
+`setBasemap` hid the layer and the chip only faded it. Turning relief ON did
+nothing at all: `visibility=none, opacity=0.42`. Two places controlling one
+thing, changed in one place.
+
+Both agree now. All four states measured:
+
+| state | visibility | opacity |
+|---|---|---|
+| open | none | — |
+| relief on | visible | 0.42 |
+| satellite + relief | visible | 0.16 |
+| relief off | none | — |
+
+---
+
+## Take 62 — 2026-08-22 — Opening state, and the road question answered with data
+
+### "Did you fix this for the other roads as well?"
+
+Checked rather than asserted. Across the whole graph:
+
+| class | edges | road-named | drawn |
+|---|---|---|---|
+| track | 7,085 | 534 | warm brown — RIDE |
+| fsroad | 4,494 | 4 | grey-tan — ROAD |
+| minor | 4,134 | 3,398 | grey — ROAD |
+| paved | 898 | 808 | dark grey — ROAD |
+| trail50 / mccct / moto24 / route72 / fstrail | 3,211 | **0** | trail colours |
+
+**No designated trail carries a road name, and all 9,526 road edges are grey
+family.** The distinction holds everywhere, not just at Wagner Lake.
+
+The 534 road-named tracks are the interesting case, and they are correct:
+*Bull Gap Road, Keeley Road, River Loop Road, Stoney Ridge Road* — 90 distinct
+names that are seasonal two-track in fact. Jacob's own words: "many roads up here
+lead to trails." A road name does not mean maintained, and the source classifies
+these as vehicular trail.
+
+### Opening state
+
+Only **Labels** is on now. Relief was on in the markup and is off. Basemap opens
+on **Map** — satellite is something you choose, not something you land in.
+
+### The map-detail button moved
+
+Out of the horizontally scrolling chip strip, to a floating tile at top-left
+**under the scale and elevation**, where every off-road app puts it. Orange when
+satellite is active.
+
+**It rendered at 0,0 first, and the cause is worth recording.** The CSS was
+correct and the DOM was correct — but `setBasemap()` runs at load and rewrote
+`className` to `'chip'`, discarding the positioning class entirely. Computed
+style said `position: static`. I had replaced one of the two assignment sites and
+missed the other because it was indented two spaces, not four — the same
+indentation trap as landmines 65 and 75.
+
+Asking the browser for the computed style found it in one step, after reading the
+source twice had not.
+
+---
+
+## Take 61 — 2026-08-22 — Three tiers, not two
+
+Jacob on take 59/60: "trails have color, but the trail color also bleeds into the
+main roads like E Wagner. E Wagner is brown and the trails that run off it is
+also brown."
+
+His example proved the point better than he knew. In the data:
+
+| name | class | drawn as |
+|---|---|---|
+| East Wagner Lake Road | minor | grey |
+| **E. Wagner Lake Rd** | **fsroad** | **brown** |
+
+The *same road*, split in the source between the county-maintained part and a
+Forest Service segment. Take 58 painted `fsroad` and `track` the same brown, so
+half of one road looked like trail.
+
+They are not the same thing. **A Forest Service road is something you drive a
+truck down; a two-track is something you ride.** Three tiers now:
+
+- designated ORV line — green / blue / black, thickest, white casing
+- **two-track** — warm brown `#A9702F` with its own casing
+- **forest road** — muted grey-tan `#8A7C66`, thin, no casing
+- paved and county road — grey
+
+**The two-track then disappeared entirely**, and the reason is worth recording:
+it shares the `net` source with designated trail, so it inherited the casing
+tuned for a 3.2 px trail line. A 1.6 px brown line under a 6 px white halo reads
+as a *cream* line. Two-track now has its own narrower casing and a slightly
+wider stroke. In view at Wagner Lake: 18 designated · 37 two-track · 19 forest
+road · 25 road, and all four are distinguishable.
+
+### Attribution was covering a button
+
+MapLibre's compact attribution renders **expanded** on first paint, and on a
+411 px screen that bar lies across the chip strip. Collapsed on load and on idle;
+the (i) still opens it, and the credits are in About too. 24 px wide now.
+
+---
+
+## Take 60 — 2026-08-22 — Why the rerun worked, and the trap under it
+
+Jacob: "I reran the workflow manually and it did work, so that's weird."
+
+Not weird — the **cache**. CI caches `aoi.json`, and `fetch_osm` returns
+immediately when that file exists. His first run hit an Overpass outage, fell
+back to TIGER, and failed the region check. The rerun restored a **good OSM
+`aoi.json` from an earlier successful run**, so TIGER never ran and the bad data
+never appeared. The cache was working in his favour.
+
+But the same mechanism is a trap. If a TIGER-derived `aoi.json` is ever cached,
+`fetch_osm` skips it forever: the region would be pinned to the road-only
+fallback, with no water layer and none of the OSM path classes, and **nothing
+would ever retry**. A single outage would silently degrade every future build.
+
+`aoi.json` written by the fallback now carries `"source": "tiger"`, and
+`fetch_osm` retries OSM when it sees that marker rather than settling. Verified
+against the real code:
+
+```
+plain cache      -> osm: aoi.json present, skipping fetch
+tiger-marked     -> osm: cached aoi.json came from the TIGER fallback —
+                    retrying OSM before settling for it again
+                    osm: overpass-api.de HTTPError 503
+                    -> rebuilt from TIGER, clipped, 4556 elements
+```
+
+Overpass was genuinely down while testing, which made control 2 an end-to-end
+proof rather than a simulation.
+
+---
 
 ## Take 59 — 2026-08-22 — The gate refused my own bundle, correctly
 

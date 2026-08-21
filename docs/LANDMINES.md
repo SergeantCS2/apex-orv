@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 59.*
+*Current as of take 63.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -90,6 +90,10 @@ Start here. Do not read top to bottom.
 | Harness viewport is not the device | 87 |
 | Styling contradicts legality | 88 |
 | Filtered whole ways instead of clipping | 89 |
+| Cached fallback becomes permanent | 90 |
+| Shared casing swamps a thinner line | 91 |
+| className assignment discards a style class | 92 |
+| Opacity 0 is not off | 93 |
 | checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
@@ -119,6 +123,10 @@ Start here. Do not read top to bottom.
 | Harness viewport is not the device | 87 |
 | Styling contradicts legality | 88 |
 | Filtered whole ways instead of clipping | 89 |
+| Cached fallback becomes permanent | 90 |
+| Shared casing swamps a thinner line | 91 |
+| className assignment discards a style class | 92 |
+| Opacity 0 is not off | 93 |
 | checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
@@ -1120,3 +1128,63 @@ reported 2,566 nodes outside using the strict bbox, which looked worse than the
 3.14% that had just failed. The gate allows a 0.05 degree pad and a 2% budget;
 by that measure it was 2. A second opinion computed differently from the thing
 it is second-guessing is not a second opinion.
+
+**90. A cached fallback is a permanent fallback.** CI caches `aoi.json` and
+`fetch_osm` returns early when it exists. That is what made a manual rerun
+succeed where the first run failed — the cache still held good OSM data. It is
+also a trap: cache a TIGER-derived `aoi.json` once and the region is pinned to
+the road-only fallback forever, with no water layer and no OSM path classes, and
+nothing ever retries.
+
+Mark degraded output at the point it is written (`"source": "tiger"`) and make
+the fast path check the marker, not merely the file's existence. A fallback
+should be temporary by construction, not by luck.
+
+**Corollary — "it worked on a rerun" is a clue, not an all-clear.** The rerun
+succeeded because of a cached artifact, so the bug was still there and would have
+resurfaced on any cache eviction, new region, or fresh clone — at which point it
+would look intermittent and inexplicable.
+
+**91. A casing tuned for one line width erases another.** `track` shares the
+`net` source with designated trail, so it inherited a 6 px white casing under a
+1.6 px stroke — which renders as a cream line, and the two-track vanished from
+the map entirely. Give each weight class its own casing layer rather than one
+filter covering everything that needs a halo.
+
+**Corollary — one paint for two meanings is one meaning too few.** Forest
+Service roads and two-tracks were both "ridable dirt" and both brown at take 58.
+The user's own example showed the cost: "East Wagner Lake Road" is `minor` and
+"E. Wagner Lake Rd" is `fsroad` — the same road, split in the source — so half of
+it looked like a trail. Drivable and ridable are different facts and need
+different paint.
+
+**MapLibre's compact attribution renders EXPANDED.** `compact: true` controls the
+style, not the initial state; on a 411 px screen the bar lies across the chip
+strip and hides a control. Remove `maplibregl-compact-show` on load and on idle.
+
+**92. Assigning `className` throws away every other class.** The map-detail
+button was given a positioning class in the markup, and `setBasemap()` — which
+runs at load — set `className = 'chip' + ...`, silently discarding it. The CSS
+was right, the DOM was right, and the element computed to `position: static` at
+0,0.
+
+Use `classList.add/remove` for state, or make every assignment site include the
+structural class. And when an element ignores CSS that is demonstrably present,
+**ask the browser for the computed style** — that answered it in one step after
+reading the source twice had not.
+
+**Corollary — grep for EVERY assignment site.** I fixed one of two and the
+survivor was indented two spaces instead of four, which is the same trap as
+landmines 65 and 75. `grep -n "\.className"` costs nothing.
+
+**93. Opacity 0 is not off.** A raster layer faded to zero is still uploaded and
+drawn every frame. The hillshade is off by default, so that cost was paid on
+every frame by default, on a device whose battery life is the one thing about
+this app still unmeasured. Use `visibility: none` to switch a layer off and keep
+opacity for how it looks when it is on.
+
+**Corollary — when two places control one thing, change both.** The Relief chip
+had its own handler that set opacity directly; `setBasemap` set visibility. After
+fixing only the latter, turning relief ON did nothing — `visibility=none,
+opacity=0.42`. Grep for every writer of a property before declaring it fixed, and
+measure every state of a toggle, not just the default one.
