@@ -71,7 +71,12 @@ const browser = await puppeteer.launch({
          "--disable-dev-shm-usage"],
 });
 const page = await browser.newPage();
-await page.setViewport({ width: 900, height: 1400, deviceScaleFactor: 1 });
+// The Fold's cover screen, exactly: 411 x 960 css px at dpr 2.625. The harness
+// used to run at 900x1400 — three times the area — so every label-density
+// number it reported was optimistic. Jacob's device showed 3 names where this
+// claimed 8, because MapLibre places symbols against the viewport it has
+// (landmine 87). Measure the screen the app runs on.
+await page.setViewport({ width: 411, height: 960, deviceScaleFactor: 2.625 });
 
 const consoleErrors = [], pageErrors = [], badRequests = [];
 page.on("response", (r) => { if (r.status() >= 400) badRequests.push(r.status() + " " + r.url()); });

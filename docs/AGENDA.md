@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 56.* Ranked by blocking-ness, not by interest.
+*Current as of take 58.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -569,7 +569,7 @@ The third is not:
 - **Ruled out:** shipping build.yml inside the seed. GITHUB_TOKEN cannot push it
   and it would double every build.
 
-## A49 — Build runs on a machine that is not mine · IN PROGRESS take 53
+## A49 — Build runs on a machine that is not mine · CLOSED take 56
 
 - **PROVEN:** repo seeds and commits on GitHub; ingest, pack, graph, emit_graph
   and terrain all complete on ubuntu-latest.
@@ -619,3 +619,26 @@ The third is not:
   stopped a build.
 - **Open:** water is still OSM-only, so an outage yields a PARTIAL bundle. That
   is honest and the app says so.
+
+## A53 — Labels legible on the real screen · SHIPPED take 57
+
+- **PROVEN:** harness now runs at 411x960 dpr 2.625 and reproduces the device
+  (4 names vs Jacob's 3, where it used to claim 8). Swept params at that size:
+  6 names at z14.5.
+- **PROVEN:** ridable names outrank show-only ones, and survive Satellite —
+  Map 3 · Satellite 3 · Hybrid 3, where Satellite was 0.
+- **Ruled out:** tuning label density against a 900x1400 harness. It measured a
+  screen that does not exist.
+- **Open:** A18 Stage 1 — still no recorded ride. Battery and canopy GPS remain
+  unmeasured.
+
+## A54 — Ridable dirt looks ridable; routes state their approval · SHIPPED take 58
+
+- **PROVEN:** track + fsroad (1,169 mi, 52% of network) styled as ridable dirt
+  with casing, distinct from both designated trail and pavement.
+- **PROVEN:** every route card shows designated / forest road / paved miles and
+  an approval tag. "Most trail" profile returns 93% designated where Fastest
+  returned 0%.
+- **Ruled out:** trusting distance alone to rank routes for a dirt bike.
+- **Open:** an emergency profile crossing non-ORV line. Pavement is already
+  never forbidden; routing onto a hiking trail needs more than a multiplier.

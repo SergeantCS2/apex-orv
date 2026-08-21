@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 56.*
+*Current as of take 58.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -87,6 +87,8 @@ Start here. Do not read top to bottom.
 | Gate blocks the seed carrying its own fix | 84 |
 | checkout lands on the triggering commit | 85 |
 | Volunteer service on the critical path | 86 |
+| Harness viewport is not the device | 87 |
+| Styling contradicts legality | 88 |
 | checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
@@ -113,6 +115,8 @@ Start here. Do not read top to bottom.
 | Gate blocks the seed carrying its own fix | 84 |
 | checkout lands on the triggering commit | 85 |
 | Volunteer service on the critical path | 86 |
+| Harness viewport is not the device | 87 |
+| Styling contradicts legality | 88 |
 | checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
@@ -1068,3 +1072,34 @@ reader already in the repo, and carries MTFCC **S1500 Vehicular Trail (4WD)** �
 the two-track this app is for. It is the fallback, written in Overpass's element
 shape so the graph needs no special case. With OSM entirely unreachable: 4,100
 roads, 414 4WD trails, 2,856 mi, 99.8% connected.
+
+**87. Measure the screen the app runs on.** `render.mjs` ran at 900x1400 while
+the Fold's cover screen is 411x960 — under a third of the area. Label placement,
+collision and any density metric are viewport-dependent, so every figure the
+harness reported was optimistic: 8 names where the device showed 3. Setting the
+harness to the real viewport reproduced the device exactly, and only then was
+tuning meaningful.
+
+**Corollary — symbol layer ORDER is collision priority.** `lbl-show` sat before
+`lbl-trail`, so paths a rider may not use were named in preference to the trail
+under their wheels. Put the labels that matter first.
+
+**Corollary — revisit rules whose reason has expired.** Satellite forced every
+label off, a defence from before labels had a dark halo. They have had one since
+take 46. The rule survived its justification and, because `lbl-show` had been
+added to the style but not to the list the rule governed, it inverted: on
+satellite the only visible names were the non-ridable ones.
+
+**88. Style what the user can USE, not what the source calls it.** Forest
+two-track and USFS road are "roads" in the data and 52% of the ridable network
+in fact — 1,169 of 2,246 miles. Drawn as thin grey dashes they read as "not for
+you", and the rider reported that the trails he rides "have no color". The
+legality model already knew they were open to him; only the paint disagreed.
+
+**Corollary — a cost function optimises what you tell it to, not what the user
+wants.** Fastest, Easiest, Shortest and Least-climbing all preferred pavement,
+because pavement IS fast, easy, short and flat. Return Home offered a dirt biker
+8.5 miles of highway and 0 miles of trail. Adding the composition to the card is
+what made it visible; "Most trail" is what fixed it. Show the composition of a
+route, not just its length — a rider choosing between 9.3 mi of road and 11.1 mi
+of trail is not choosing on distance.

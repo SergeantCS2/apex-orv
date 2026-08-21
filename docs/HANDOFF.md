@@ -1,7 +1,95 @@
-# HANDOFF — through Take 56
+# HANDOFF — through Take 58
 
 Newest first. Written BEFORE the build ships, per PROTOCOL §6.
 The gate refuses to build a take with no entry here.
+
+## Take 58 — 2026-08-22 — Half the network was styled as "not for you"
+
+Jacob: "a lot of trail colors are missing. Alot of trails I'd ride with my
+dirtbike have no color." His two place cards proved the *data* was right —
+"M-33 Bull Gap Trailhead · USFS · LEGAL · Moto open" and "Ogemaw Hills Route ·
+DNR · LEGAL". The trails were there and known legal. They just did not look it.
+
+### 1,169 of 2,246 miles
+
+| class | miles | was styled |
+|---|---|---|
+| track (forest two-track, TIGER 4WD) | 784 | thin tan **dashes** |
+| fsroad (USFS road) | 384 | thin grey **dashes** |
+
+**52% of the network** — and it is exactly what a dirt bike rides. Drawn as grey
+dashes it reads as "not for you". Both are now solid warm tan with a white
+casing, thinner than designated trail so the hierarchy still reads: designated
+ORV line in green/blue/black, ridable dirt in tan, actual roads muted grey.
+
+### Routes were sending him down the highway
+
+He also asked for routes to say whether they are fully approved. Adding that
+composition line immediately exposed something worse than a display gap:
+
+```
+Fastest          9.3 mi   no designated trail · 0.8 forest road · 8.5 PAVED
+Easiest          8.4 mi   no designated trail · 2.3 forest road · 6.1 paved
+Pavement soonest 8.7 mi   no designated trail · 0.7 forest road · 7.9 paved
+```
+
+Every profile optimised for speed or ease, and pavement wins both. Return Home
+was handing a man on a dirt bike eight and a half miles of highway.
+
+**"Most trail" is now the first profile:** designated ORV line costs 0.55x,
+forest road 1.3x, pavement 8x — expensive but never forbidden, because crossing
+M-33 is inevitable and he said so. Result:
+
+```
+Most trail      11.1 mi   93% designated · 10.3 trail · 0.5 forest road · 0.3 paved
+```
+
+Two miles longer and it is the ride he wants. Six profiles now, and every card
+carries **all designated trail / N% designated / no designated trail** so the
+approval status is visible before committing.
+
+**Not done:** an emergency profile that routes over non-ORV line. Pavement is
+already never forbidden and "Pavement soonest" is the get-out — routing anyone
+onto a hiking trail needs more thought than a cost multiplier.
+
+---
+
+## Take 57 — 2026-08-22 — CI built it, and the field report found three label bugs
+
+**Take 56 was built by GitHub Actions, installed from a release, and passed
+43/0 on the Fold.** The chain works: push, build, release, install. No more APKs
+by hand.
+
+The self-test then reported something I did not like:
+`trail-names: 3 names for 85 trail segments`. My harness had claimed 8 for 66.
+
+### The harness was measuring a screen that does not exist
+
+`render.mjs` ran at **900x1400**; the Fold's cover screen is **411x960** — under
+a third of the area. MapLibre places symbols against the viewport it has, so
+every label-density figure I have quoted was optimistic. Set to 411x960 at dpr
+2.625, the harness immediately reproduced the device: **4 names for 86
+segments**, against Jacob's 3 for 85.
+
+Swept the parameters at the real size rather than guessing: 75/100/pad2 → 4,
+85/60/pad1 → 5, and with slightly smaller text → **6**. Past that it flattens.
+
+### Then two bugs the sweep exposed
+
+**Show-only labels outranked ridable ones.** `lbl-show` sat before `lbl-trail`,
+and MapLibre gives earlier symbol layers collision priority — so a path Jacob may
+NOT ride was named while the loop under his wheels was not. Moved after.
+
+**Satellite hid every trail name.** `LBL` was forced to `none` in Satellite mode,
+a rule from before labels had a dark halo, when dark-on-light was unreadable over
+jack pine. They are white-on-halo since take 46 and survive it fine. Worse,
+`lbl-show` was not in `LBL` — so on satellite the *only* names left were the
+trails he may not ride: "Shore To Shore Trail" labelled, his own trail not.
+
+Measured after: **Map 3 · Satellite 3 · Hybrid 3** ridable names, where Satellite
+was 0.
+
+---
 
 ## Take 56 — 2026-08-22 — checkout lands on the commit that triggered the run
 
