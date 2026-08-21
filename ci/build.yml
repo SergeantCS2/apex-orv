@@ -92,7 +92,10 @@ jobs:
           python-version: '3.12'
 
       - name: Pipeline dependencies
-        run: pip install --quiet pillow numpy scipy
+        # pyyaml is not optional: gate.py uses it to reject duplicate keys in
+        # workflow files, and without it that check silently downgrades to a
+        # note — which is how an invalid workflow survived 30 takes (landmine 79).
+        run: pip install --quiet pillow numpy scipy pyyaml
 
       - name: Build the region
         # Unconditional — landmine 44. Skipping on cache-hit left bundles/ and

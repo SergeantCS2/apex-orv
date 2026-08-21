@@ -1,7 +1,32 @@
-# HANDOFF — through Take 52
+# HANDOFF — through Take 53
 
 Newest first. Written BEFORE the build ships, per PROTOCOL §6.
 The gate refuses to build a take with no entry here.
+
+## Take 53 — 2026-08-21 — Stop finding these one CI run at a time
+
+The runner hit the same font error, because the fix was in my take-52 seed and
+Jacob's repo was still on take 51. Rather than just say "upload the new zip", I
+went looking for what would break NEXT.
+
+**`gate.py` imports `yaml`; CI installs `pillow numpy scipy`.** On the runner the
+import would have failed, the workflow validator would have **silently
+downgraded to a note**, and the check that exists specifically to catch invalid
+workflows would have been absent on the one machine where a workflow is actually
+parsed. It would have passed, greenly, doing nothing.
+
+`pyyaml` added to the install line, and **`check_ci_deps()`** now walks every
+`import` in `tools/`, subtracts the standard library and local modules, and fails
+if the workflow does not install the rest. Negative-controlled by removing pyyaml
+from the line.
+
+That is three environment faults in three CI runs — a font from my sandbox, a
+path from my sandbox, and a package I never had to install because it was already
+there. All the same shape: **the build depended on my machine and I could not see
+it from inside my machine.** There are now three gate checks in that family:
+absolute paths, CI dependencies, and vendored assets.
+
+---
 
 ## Take 52 — 2026-08-21 — The typeface only existed in my sandbox
 

@@ -325,6 +325,46 @@ def check_orphan_sources():
         notes.append(f"style: {len(srcs)} sources, every one drawn by a layer")
 
 
+# ── 6b1a0. Every third-party import must be installed by CI ─────────────────
+# glyphs.py needed a font the runner did not have; gate.py needs pyyaml, which
+# CI did not install — so its workflow validation would have silently downgraded
+# to a note on the one machine where it matters. Check the dependency list
+# against what the tools actually import (landmine 82).
+def check_ci_deps():
+    import ast as _ast
+    import sys as _sys
+    std = set(_sys.stdlib_module_names)
+    local = {f[:-3] for f in os.listdir(HERE) if f.endswith(".py")}
+    third = {}
+    for fn in sorted(os.listdir(HERE)):
+        if not fn.endswith(".py"):
+            continue
+        try:
+            tree = _ast.parse(open(os.path.join(HERE, fn), encoding="utf-8").read())
+        except Exception:
+            continue
+        for n in _ast.walk(tree):
+            if isinstance(n, _ast.Import):
+                for a in n.names:
+                    third.setdefault(a.name.split(".")[0], fn)
+            elif isinstance(n, _ast.ImportFrom) and n.module and n.level == 0:
+                third.setdefault(n.module.split(".")[0], fn)
+    third = {k: v for k, v in third.items() if k not in std and k not in local}
+    wf = ""
+    for d in (os.path.join(ROOT, "ci"), os.path.join(ROOT, ".github", "workflows")):
+        if os.path.isdir(d):
+            for f in os.listdir(d):
+                if f.endswith((".yml", ".yaml")):
+                    wf += open(os.path.join(d, f), encoding="utf-8").read()
+    PKG = {"PIL": "pillow", "yaml": "pyyaml", "cv2": "opencv-python"}
+    missing = sorted(f"{k} ({v}) -> pip {PKG.get(k, k)}"
+                     for k, v in third.items() if PKG.get(k, k) not in wf)
+    if missing:
+        fails.append("imports CI does not install: " + "; ".join(missing))
+    else:
+        notes.append(f"ci deps: all {len(third)} third-party imports installed")
+
+
 # ── 6b1a1. No tool may depend on a path outside the repo ────────────────────
 # Twice now a tool has worked here and died on a clean machine because it
 # referenced an absolute path that only existed in my sandbox: emit_graph.py
@@ -687,6 +727,7 @@ def check_manifest():
 for fn in (check_handoff, check_stamps, check_offline,
            check_style, check_agenda, check_syntax, check_stubs,
            check_orphan_sources, check_class_legality, check_workflow_yaml,
+           check_ci_deps,
            check_absolute_paths, check_workflow_refs,
            check_smoke, check_render,
            check_current,

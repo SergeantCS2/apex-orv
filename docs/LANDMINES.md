@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 52.*
+*Current as of take 53.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -82,6 +82,7 @@ Start here. Do not read top to bottom.
 | Permissive parser mistaken for a validator | 79 |
 | Installer overwrites the workflow running it | 80 |
 | Asset borrowed from the build machine | 81 |
+| Import CI never installs | 82 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
 | Told but not shown | 64 |
@@ -102,6 +103,7 @@ Start here. Do not read top to bottom.
 | Permissive parser mistaken for a validator | 79 |
 | Installer overwrites the workflow running it | 80 |
 | Asset borrowed from the build machine | 81 |
+| Import CI never installs | 82 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
 | Told but not shown | 64 |
@@ -972,3 +974,20 @@ emit_graph's `/home/claude/pack.py`, glyphs' font, and every future one.
 **Corollary — the first machine that is not yours finds these instantly.** Four
 minutes of CI found two hand-dependencies that fifty takes of local verification
 could not, because every local check ran on the machine that had them.
+
+**82. A missing dependency can make a check disappear rather than fail.**
+`gate.py` imports `yaml` inside a `try/except ImportError` that downgrades to a
+note. CI installed `pillow numpy scipy` and not `pyyaml` — so on the runner the
+workflow validator would have quietly done nothing, on the one machine where a
+workflow actually gets parsed. Green, and empty.
+
+Guard the dependency list itself: walk every `import` in the tools, subtract the
+standard library and local modules, and fail if the workflow does not install the
+remainder. A soft-fail on an absent import is fine only if something else
+guarantees the import is present.
+
+**Corollary — after the second environment fault, stop fixing them one at a
+time.** A font from my sandbox, a module path from my sandbox, a package that was
+already installed here. Same shape three times: the build depended on my machine
+in a way invisible from inside it. Enumerate the whole class — paths, packages,
+assets — and gate each.

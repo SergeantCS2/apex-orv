@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 52.* Ranked by blocking-ness, not by interest.
+*Current as of take 53.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -569,7 +569,7 @@ The third is not:
 - **Ruled out:** shipping build.yml inside the seed. GITHUB_TOKEN cannot push it
   and it would double every build.
 
-## A49 — Build runs on a machine that is not mine · IN PROGRESS take 52
+## A49 — Build runs on a machine that is not mine · IN PROGRESS take 53
 
 - **PROVEN:** repo seeds and commits on GitHub; ingest, pack, graph, emit_graph
   and terrain all complete on ubuntu-latest.
@@ -579,3 +579,12 @@ The third is not:
   green pipelines here missed two hand-dependencies that a clean runner found in
   four minutes.
 - **Open:** the run has not yet reached glyphs → bundle → APK on the runner.
+
+## A50 — Environment faults are gated, not discovered · SHIPPED take 53
+
+- **PROVEN:** three gate checks now cover the class — absolute paths outside the
+  repo, third-party imports CI does not install, and vendored assets. Each
+  negative-controlled.
+- **Ruled out:** fixing environment faults one CI run at a time. Three in three
+  runs, all the same shape.
+- **Open:** the runner has not yet completed glyphs → bundle → APK.
