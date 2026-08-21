@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 51.*
+*Current as of take 52.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -81,6 +81,7 @@ Start here. Do not read top to bottom.
 | Failure surfaces far from its cause | 78 |
 | Permissive parser mistaken for a validator | 79 |
 | Installer overwrites the workflow running it | 80 |
+| Asset borrowed from the build machine | 81 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
 | Told but not shown | 64 |
@@ -100,6 +101,7 @@ Start here. Do not read top to bottom.
 | Failure surfaces far from its cause | 78 |
 | Permissive parser mistaken for a validator | 79 |
 | Installer overwrites the workflow running it | 80 |
+| Asset borrowed from the build machine | 81 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
 | Told but not shown | 64 |
@@ -952,3 +954,21 @@ every push, since the generated file contains every job the original has.
 **Corollary — anything that scans "the workflows" must scan both places.** Moving
 the source to `ci/` made a declared provisioning host look unreached until
 `scan_hosts()` learned about it.
+
+**81. If the build needs it, vendor it.** `glyphs.py` loaded its typeface from
+`/mnt/skills/.../NationalPark-Bold.ttf`, a path that existed only in my sandbox.
+The pipeline passed here every single time and died six steps into the first real
+CI run with `OSError: cannot open resource`.
+
+A typeface is a source asset, exactly like the logo (landmine 57) and the
+keystore. Vendor it; do not borrow whatever the machine happens to have
+installed, and do not apt-get it either — a font package version bump would
+silently change every label on the map.
+
+`check_absolute_paths()` fails the gate on any tool referencing `/mnt`, `/home`,
+`/opt`, `/usr` or `/Users`. This is landmine 32 restated for the third time:
+emit_graph's `/home/claude/pack.py`, glyphs' font, and every future one.
+
+**Corollary — the first machine that is not yours finds these instantly.** Four
+minutes of CI found two hand-dependencies that fifty takes of local verification
+could not, because every local check ran on the machine that had them.

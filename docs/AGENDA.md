@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 51.* Ranked by blocking-ness, not by interest.
+*Current as of take 52.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -568,3 +568,14 @@ The third is not:
   `.github/workflows/apex.yml`; gate and scan_hosts read both locations.
 - **Ruled out:** shipping build.yml inside the seed. GITHUB_TOKEN cannot push it
   and it would double every build.
+
+## A49 — Build runs on a machine that is not mine · IN PROGRESS take 52
+
+- **PROVEN:** repo seeds and commits on GitHub; ingest, pack, graph, emit_graph
+  and terrain all complete on ubuntu-latest.
+- **PROVEN:** typeface vendored at assets/fonts/; gate rejects any tool path
+  outside the repo, negative-controlled.
+- **Ruled out:** local verification as evidence that CI works. Fifty takes of
+  green pipelines here missed two hand-dependencies that a clean runner found in
+  four minutes.
+- **Open:** the run has not yet reached glyphs → bundle → APK on the runner.

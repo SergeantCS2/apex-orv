@@ -1,7 +1,45 @@
-# HANDOFF — through Take 51
+# HANDOFF — through Take 52
 
 Newest first. Written BEFORE the build ships, per PROTOCOL §6.
 The gate refuses to build a take with no entry here.
+
+## Take 52 — 2026-08-21 — The typeface only existed in my sandbox
+
+The repo seeded, the workflow ran, and the pipeline got six steps deep on a real
+GitHub runner — ingest 1,027 features, conflation, 20,133 edges, 110 DEM tiles,
+98k ft of climb — then died:
+
+```
+OSError: cannot open resource
+  tools/glyphs.py, ImageFont.truetype(font_path, SIZE)
+```
+
+`glyphs.py` loaded its typeface from
+`/mnt/skills/examples/canvas-design/canvas-fonts/NationalPark-Bold.ttf` — a path
+that exists **only inside my container**. Same fault as `emit_graph.py` importing
+`/home/claude/pack.py` at take 45, and the same reasoning as the logo at take 30:
+**a typeface is a source asset, not something to borrow from whatever happens to
+be installed.**
+
+`assets/fonts/NationalPark-Bold.ttf` is vendored (77 KB) and `glyphs.py` resolves
+it relative to the repo. Identical output — 107 glyphs, 45.9 KB pbf — so no map
+changes.
+
+**`check_absolute_paths()`** now fails the gate on any tool referencing
+`/mnt`, `/home`, `/opt`, `/usr` or `/Users`, excepting the publish directory.
+Negative-controlled by putting the old path back.
+
+Full pipeline clean in 105 s afterwards, all five smoke modes and the render
+green.
+
+### What the first real CI run taught
+
+Nothing local could have caught this. Every check ran in the container that had
+the font. The runner is the first machine that did not — and it found the last
+two hand-dependencies in four minutes. Landmine 81 is really landmine 32
+restated: **if a build needs it, it belongs in the repo.**
+
+---
 
 ## Take 51 — 2026-08-21 — The seeder tried to overwrite the workflow running it
 

@@ -12,6 +12,7 @@ Output is a Mapbox/MapLibre glyph PBF: hand-encoded protobuf, no dependency.
   message fontstack{ string name=1; string range=2; repeated glyph glyphs=3 }
   message glyphs   { repeated fontstack stacks=1 }
 """
+import os
 import base64, json, sys
 import numpy as np
 from PIL import Image, ImageFont, ImageDraw
@@ -65,6 +66,13 @@ def sdf(mask):
     return np.clip(np.round(v), 0, 255).astype(np.uint8)
 
 
+# The typeface is a SOURCE asset, like the logo — vendored in the repo, not
+# borrowed from whatever happens to be installed. It was an absolute path into
+# my own container (/mnt/skills/...), so the pipeline ran here and died on the
+# GitHub runner at step six with "cannot open resource" (landmine 81).
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
 def build(font_path, stack_name, chars):
     font = ImageFont.truetype(font_path, SIZE)
     glyphs = b""
@@ -112,7 +120,7 @@ if __name__ == "__main__":
     # ONE fontstack on purpose: a single stack can be served from a static data:
     # URI, which avoids needing a custom protocol handler for glyph requests.
     for name, path in (
-        ("APEX", "/mnt/skills/examples/canvas-design/canvas-fonts/NationalPark-Bold.ttf"),
+        ("APEX", os.path.join(ROOT, "assets", "fonts", "NationalPark-Bold.ttf")),
     ):
         pbf, n = build(path, name, CHARS)
         packs[name] = base64.b64encode(pbf).decode()

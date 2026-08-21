@@ -325,6 +325,32 @@ def check_orphan_sources():
         notes.append(f"style: {len(srcs)} sources, every one drawn by a layer")
 
 
+# ── 6b1a1. No tool may depend on a path outside the repo ────────────────────
+# Twice now a tool has worked here and died on a clean machine because it
+# referenced an absolute path that only existed in my sandbox: emit_graph.py
+# importing /home/claude/pack.py (take 45), and glyphs.py loading a typeface
+# from /mnt/skills/... (take 51, found by the first real CI run). Anything a
+# build needs must be IN the repo.
+def check_absolute_paths():
+    bad = []
+    for fn in sorted(os.listdir(HERE)):
+        if not fn.endswith((".py", ".mjs")) or fn == "gate.py":
+            continue
+        txt = open(os.path.join(HERE, fn), encoding="utf-8").read()
+        for m in re.finditer(r"['\"](/(?:mnt|home|opt|usr|Users)/[^'\"]*)['\"]", txt):
+            path = m.group(1)
+            # /mnt/user-data/outputs is where deliverables are published, and
+            # /usr/bin shebang-ish references are fine; the danger is INPUTS.
+            if path.startswith("/mnt/user-data/outputs"):
+                continue
+            bad.append(f"{fn}: {path}")
+    if bad:
+        fails.append("tools reference paths outside the repo — they will not "
+                     "exist on a clean runner: " + "; ".join(bad[:4]))
+    else:
+        notes.append("no tool depends on a path outside the repo")
+
+
 # ── 6b1a2b. Workflows must be valid YAML *by GitHub's rules* ────────────────
 # PyYAML's safe_load silently keeps the LAST of duplicate keys. build.yml carried
 # two `concurrency:` blocks from take 20 to take 49 and passed every gate run,
@@ -660,7 +686,8 @@ def check_manifest():
 
 for fn in (check_handoff, check_stamps, check_offline,
            check_style, check_agenda, check_syntax, check_stubs,
-           check_orphan_sources, check_class_legality, check_workflow_yaml, check_workflow_refs,
+           check_orphan_sources, check_class_legality, check_workflow_yaml,
+           check_absolute_paths, check_workflow_refs,
            check_smoke, check_render,
            check_current,
            check_provision,
