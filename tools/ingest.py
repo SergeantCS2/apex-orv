@@ -118,6 +118,64 @@ def short(name):
     return n
 
 
+def tiger_roads():
+    """Roads from Census TIGER, when Overpass will not answer.
+
+    OSM is richer and stays the primary. But it is volunteer-run, all three
+    mirrors 503'd during a CI build, and graph.py then correctly refused to ship
+    a bundle whose Return Home cannot reach a road — so a build that fetched
+    every trail perfectly produced nothing (take 56).
+
+    TIGER is a US government CDN with no rate limit and no outage history worth
+    planning around. It also carries **S1500, Vehicular Trail (4WD)** — 384 of
+    them in Oscoda County alone, which is exactly the two-track this app is for.
+
+    Written in Overpass's element shape so graph.py needs no special case.
+    """
+    import io
+    import zipfile
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from context import parse_dbf, parse_shp_all
+    from address import counties_for
+
+    MTFCC = {"S1100": "motorway", "S1200": "primary", "S1400": "residential",
+             "S1500": "track", "S1640": "service", "S1740": "service",
+             "S1730": "residential", "S1780": "service"}
+    W, S_, E, N = R.bbox
+    els, seen = [], 0
+    for fips, cname in counties_for(R.bbox):
+        url = (f"https://www2.census.gov/geo/tiger/TIGER2023/ROADS/"
+               f"tl_2023_{fips}_roads.zip")
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "APEX-Offroad/1.0"})
+            with urllib.request.urlopen(req, timeout=240) as r:
+                z = zipfile.ZipFile(io.BytesIO(r.read()))
+        except Exception as e:
+            print(f"  tiger {cname}: unavailable ({type(e).__name__})")
+            continue
+        base = next(n[:-4] for n in z.namelist() if n.endswith(".shp"))
+        rows = parse_dbf(z.read(base + ".dbf"))
+        shapes = parse_shp_all(z.read(base + ".shp"), polyline=True)
+        for row, parts in zip(rows, shapes):
+            seen += 1
+            hw = MTFCC.get(row.get("MTFCC", ""))
+            if not hw or not parts:
+                continue
+            for pts in parts:
+                if len(pts) < 2:
+                    continue
+                if all(x < W - 0.01 or x > E + 0.01 or y < S_ - 0.01 or y > N + 0.01
+                       for x, y in pts):
+                    continue
+                els.append({"type": "way", "id": len(els) + 1,
+                            "tags": {"highway": hw,
+                                     "name": (row.get("FULLNAME") or "").strip()},
+                            "geometry": [{"lon": round(x, 6), "lat": round(y, 6)}
+                                         for x, y in pts]})
+    print(f"tiger: {len(els)} road ways from {seen} features (OSM fallback)")
+    return els
+
+
 def fetch_osm(path="aoi.json"):
     """OSM context roads. Advisory only — never authoritative (landmine 12).
 
@@ -169,9 +227,13 @@ out geom;"""
                 # says which layer is missing (landmine 34). Take 43: a clean run
                 # died here on an Overpass 503 and took the whole pipeline with
                 # it, including a graph that had already been fetched fine.
-                print(f"osm: UNAVAILABLE after 4 tries ({type(e).__name__}) — "
-                      f"continuing without water. The bundle will be PARTIAL "
-                      f"and the app will say so.")
+                print(f"osm: every mirror failed ({type(e).__name__}) — "
+                      f"falling back to Census TIGER roads")
+                els = tiger_roads()
+                if els:
+                    json.dump({"elements": els}, open("aoi.json", "w"))
+                    print(f"osm: aoi.json written from TIGER ({len(els)} ways); "
+                          f"no water layer, bundle will be PARTIAL")
                 return
             time.sleep(3)
     open(path, "wb").write(blob)

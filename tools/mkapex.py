@@ -118,6 +118,15 @@ def build():
 
 
 if __name__ == "__main__":
-    dest = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "apex.yml")
-    open(dest, "w").write(build())
-    print(f"apex.yml written to {dest} — validated, no duplicate keys")
+    out = build()
+    # Always write the repo copy so the GATE validates the file that actually
+    # runs. Without it the workflow checks passed vacuously — there was no
+    # workflow in the tree to check (take 56).
+    repo = os.path.join(ROOT, ".github", "workflows", "apex.yml")
+    os.makedirs(os.path.dirname(repo), exist_ok=True)
+    open(repo, "w").write(out)
+    dests = [repo]
+    if len(sys.argv) > 1:
+        open(sys.argv[1], "w").write(out)
+        dests.append(sys.argv[1])
+    print("apex.yml written to " + " and ".join(dests) + " — validated")

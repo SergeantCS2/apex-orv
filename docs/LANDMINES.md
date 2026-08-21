@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 55.*
+*Current as of take 56.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -85,6 +85,9 @@ Start here. Do not read top to bottom.
 | Import CI never installs | 82 |
 | Dependency installed in the wrong job | 83 |
 | Gate blocks the seed carrying its own fix | 84 |
+| checkout lands on the triggering commit | 85 |
+| Volunteer service on the critical path | 86 |
+| checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
 | Told but not shown | 64 |
@@ -108,6 +111,9 @@ Start here. Do not read top to bottom.
 | Import CI never installs | 82 |
 | Dependency installed in the wrong job | 83 |
 | Gate blocks the seed carrying its own fix | 84 |
+| checkout lands on the triggering commit | 85 |
+| Volunteer service on the critical path | 86 |
+| checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
 | Told but not shown | 64 |
@@ -1025,3 +1031,40 @@ every volatile step moved to `ci/*.sh` inside the repo.
 grepped the workflow YAML for commands that had just moved into shell scripts,
 and all three reported the commands missing. A check anchored on a location is a
 check that breaks when the location changes.
+
+**85. `actions/checkout` takes the commit that triggered the run.** Not the
+branch tip. A job that pushes (the seed) and a job downstream of it that checks
+out bare will land on the tree from *before* the push — `bash: ci/bundle.sh: No
+such file or directory`, on a file that is definitely in the repo. Pin
+`ref: ${{ github.ref_name }}` on every checkout downstream of a push.
+
+**Corollary — a check with nothing to look at reports success.**
+`check_checkout_ref()` scanned `ci/` and `.github/workflows/`; the generated
+workflow lived in neither, since it is written to the outputs directory for the
+user to paste. So every workflow check had been validating a file nobody runs and
+saying "ok". Generate the artifact INTO the repo so the gate can see the thing
+that actually executes, and make sure a negative control fires — a green check
+over an empty set looks identical to a green check over a passing one.
+
+**85. `actions/checkout` checks out the commit that TRIGGERED the run.** Not the
+branch tip. A seed job that pushes new files is followed by jobs that check out
+the tree from *before* the push — `bash: ci/bundle.sh: No such file or
+directory`. Any job downstream of one that pushes needs
+`ref: ${{ github.ref_name }}`.
+
+The check written for this passed **vacuously**: it looked for a job that pushes,
+`ci/build.yml` has none, and the generated `apex.yml` was not in the repo — so
+there was nothing to check and it reported success. Generate the artefact INTO
+the repo so the gate validates the file that actually runs, and always confirm a
+new check can fail.
+
+**86. Do not put a volunteer service on the critical path.** Every Overpass
+mirror 503'd mid-build; `graph.py` correctly refused to ship a bundle whose
+Return Home cannot reach a road, so a build that fetched all 1,027 trails
+produced nothing. The refusal was right and the dependency was wrong.
+
+Census TIGER is a government CDN with no rate limit, parses with the shapefile
+reader already in the repo, and carries MTFCC **S1500 Vehicular Trail (4WD)** —
+the two-track this app is for. It is the fallback, written in Overpass's element
+shape so the graph needs no special case. With OSM entirely unreachable: 4,100
+roads, 414 4WD trails, 2,856 mi, 99.8% connected.

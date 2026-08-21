@@ -43,7 +43,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
+      # ref is REQUIRED here. checkout defaults to the commit that TRIGGERED the
+      # run; the seed job pushes a newer one, so a default checkout lands on a
+      # tree without ci/bundle.sh and fails with "No such file or directory"
+      # (landmine 85). ref_name follows the branch tip.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
 
       # Fail here, plainly, rather than 200 lines later inside npm or python.
       # Jacob uploaded the wrong zip and got a Node error that said nothing
@@ -129,7 +135,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      # ref is REQUIRED here. checkout defaults to the commit that TRIGGERED the
+      # run; the seed job pushes a newer one, so a default checkout lands on a
+      # tree without ci/bundle.sh and fails with "No such file or directory"
+      # (landmine 85). ref_name follows the branch tip.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
 
       - uses: actions/download-artifact@v4
         with:

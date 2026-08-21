@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 55.* Ranked by blocking-ness, not by interest.
+*Current as of take 56.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -599,3 +599,23 @@ The third is not:
 - **PROVEN:** APEX_GATE_SEED=1 lets the seed gate its own contents without being
   blocked by a stale pasted workflow. Simulated end to end.
 - **Ruled out:** gating the seed against the workflow file. It deadlocks the fix.
+
+## A52 — CI runs the tree the seed just pushed · SHIPPED take 56
+
+- **PROVEN:** downstream checkouts pin `ref: github.ref_name`; gate fails without
+  it, negative-controlled against the real apex.yml.
+- **PROVEN:** mkapex writes the repo copy, so the gate validates the workflow
+  that actually runs — previously it validated only ci/build.yml, which has no
+  seed job.
+- **Ruled out:** assuming checkout follows the branch tip.
+
+## A52 — Build survives an OSM outage · SHIPPED take 56
+
+- **PROVEN:** with every Overpass mirror pointed at an invalid host, TIGER
+  produced 4,100 roads incl. 414 4WD vehicular trails, and the graph built to
+  2,856 mi at 99.8% connectivity.
+- **PROVEN:** OSM remains primary; the normal path is unchanged and still wins.
+- **Ruled out:** OSM as a hard dependency for roads. It is volunteer-run and it
+  stopped a build.
+- **Open:** water is still OSM-only, so an outage yields a PARTIAL bundle. That
+  is honest and the app says so.

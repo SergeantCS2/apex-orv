@@ -325,6 +325,46 @@ def check_orphan_sources():
         notes.append(f"style: {len(srcs)} sources, every one drawn by a layer")
 
 
+# ── 6b1a-1. A job downstream of a pushing job must pin its checkout ─────────
+# actions/checkout defaults to the TRIGGERING commit. The seed job pushes a new
+# one, so any job that needs it and checks out bare lands on a tree without the
+# files the seed just delivered (landmine 85).
+def check_checkout_ref():
+    try:
+        import yaml as _yaml
+    except ImportError:
+        return
+    for d in (os.path.join(ROOT, "ci"), os.path.join(ROOT, ".github", "workflows")):
+        if not os.path.isdir(d):
+            continue
+        for f in sorted(os.listdir(d)):
+            if not f.endswith((".yml", ".yaml")):
+                continue
+            try:
+                doc = _yaml.safe_load(open(os.path.join(d, f), encoding="utf-8"))
+            except Exception:
+                continue
+            jobs = doc.get("jobs") or {}
+            pushers = {n for n, j in jobs.items()
+                       if "git push" in "\n".join(s.get("run", "")
+                                                  for s in (j.get("steps") or []))}
+            if not pushers:
+                continue
+            for name, job in jobs.items():
+                needs = job.get("needs") or []
+                needs = [needs] if isinstance(needs, str) else needs
+                if not (set(needs) & pushers):
+                    continue
+                for st in (job.get("steps") or []):
+                    if str(st.get("uses", "")).startswith("actions/checkout"):
+                        if not (st.get("with") or {}).get("ref"):
+                            fails.append(
+                                f"{f}:{name} needs a job that pushes, but checks out "
+                                f"the triggering commit — add ref: ${{{{ github.ref_name }}}}")
+    if not any("triggering commit" in x for x in fails):
+        notes.append("checkout: jobs after a push pin their ref")
+
+
 # ── 6b1a0. Every third-party import must be installed by CI ─────────────────
 # glyphs.py needed a font the runner did not have; gate.py needs pyyaml, which
 # CI did not install — so its workflow validation would have silently downgraded
@@ -782,6 +822,7 @@ def check_manifest():
 for fn in (check_handoff, check_stamps, check_offline,
            check_style, check_agenda, check_syntax, check_stubs,
            check_orphan_sources, check_class_legality, check_workflow_yaml,
+           check_checkout_ref,
            check_ci_deps,
            check_absolute_paths, check_workflow_refs,
            check_smoke, check_render,

@@ -1,7 +1,97 @@
-# HANDOFF — through Take 55
+# HANDOFF — through Take 56
 
 Newest first. Written BEFORE the build ships, per PROTOCOL §6.
 The gate refuses to build a take with no entry here.
+
+## Take 56 — 2026-08-22 — checkout lands on the commit that triggered the run
+
+```
+bash: ci/bundle.sh: No such file or directory
+```
+
+`actions/checkout@v4` checks out **the commit that triggered the run**, not the
+tip of the branch. The seed job pushes a new commit; every downstream job then
+checked out the *old* SHA, where `ci/bundle.sh` genuinely does not exist. I had
+assumed checkout follows the branch and never verified it.
+
+Both downstream checkouts now pin `ref: ${{ github.ref_name }}`.
+
+### The check I wrote for it passed vacuously
+
+`check_checkout_ref()` reported green — because it scans `ci/` and
+`.github/workflows/`, and **the generated `apex.yml` was in neither**. It is
+written to the outputs directory for Jacob to paste; my repo had an empty
+`.github/workflows/`. So every workflow check has been validating `ci/build.yml`,
+which has no seed job, and reporting on a file nobody runs.
+
+`tools/mkapex.py` now writes the repo copy as well. The gate sees 2 workflow
+files instead of 1, and the negative control fires properly:
+*"apex.yml:bundle needs a job that pushes, but checks out the triggering
+commit."*
+
+Landmine 54 for the ninth time, and the most expensive variant yet: not a check
+that was wrong, a check that had **nothing to look at** and said so as though it
+had looked.
+
+### On the cadence
+
+Six CI failures in six runs. Every one real, every one a property of the runner
+invisible from inside my container — but the pattern is that I have been
+*learning the platform by trial* rather than reading it. The honest fix is what I
+did here: after finding the fault, ask what else in the same family I have
+assumed, and gate it. Checkout semantics, per-job runners, per-job dependency
+installs, workflow validity, absolute paths, vendored assets — six gate checks
+now, all negative-controlled.
+
+---
+
+## Take 56 — 2026-08-22 — A volunteer service on the critical path
+
+CI got further than ever — the workflow shim worked, the seed pushed, the bundle
+job started — and then every Overpass mirror 503'd. `graph.py` correctly refused
+to ship a bundle whose Return Home cannot reach a road, so a build that fetched
+all 1,027 trails perfectly produced nothing.
+
+The refusal was right. The dependency was wrong. **OSM is volunteer-run and it
+was the single point of failure for the entire build.**
+
+### Census TIGER roads as the fallback
+
+TIGER is a US government CDN: no rate limit, no outage history worth planning
+around, and I already parse its shapefiles for addresses and boundaries. It also
+carries **MTFCC S1500, "Vehicular Trail (4WD)"** — 384 in Oscoda County alone,
+which is precisely the two-track this app exists for.
+
+`tiger_roads()` writes Overpass's element shape, so `graph.py` needs no special
+case. OSM stays primary; TIGER is used only when every mirror fails.
+
+Exercised by pointing every mirror at an invalid host:
+
+```
+osm: every mirror failed (URLError) — falling back to Census TIGER roads
+tiger: 4100 road ways from 15708 features
+  residential 3099 · service 567 · track 414 · primary 20
+noded: 18619 nodes, 35115 edges
+network 2856 mi total, 2850 mi (99.8%) routable together
+```
+
+A complete, routable graph with no OSM at all. Water is still skipped — that
+layer is genuinely OSM-only — so the bundle reports PARTIAL and the app says so,
+which is the designed behaviour.
+
+### Also fixed: checkout landed on the wrong commit
+
+`bash: ci/bundle.sh: No such file or directory`. `actions/checkout` defaults to
+the commit that **triggered** the run; the seed job pushes a newer one, so every
+downstream job was checking out a tree from before the seed. `ref:
+${{ github.ref_name }}` on both. Landmine 85.
+
+**My check for it passed vacuously** — `ci/build.yml` has no seed job, and the
+generated `apex.yml` was not in the repo at all, so there was no workflow with a
+pushing job to check. `mkapex.py` now writes the repo copy too, and the negative
+control fails correctly.
+
+---
 
 ## Take 55 — 2026-08-22 — The gate deadlocked the fix it was gating
 
