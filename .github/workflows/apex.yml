@@ -71,6 +71,10 @@ jobs:
             SRC="_seed/$(ls -1 _seed)"
             echo "  (nested zip — flattening $SRC)"
           fi
+          # NEVER write .github/workflows: GITHUB_TOKEN is refused there
+          # (landmine 46), and the workflow running this IS the build — a
+          # second copy would run everything twice. Whatever you pasted stays.
+          rm -rf "$SRC/.github"
           cp -a "$SRC/." .
           rm -rf _seed "$ZIP"
           echo "unpacked $(find . -type f -not -path './.git/*' | wc -l) files"
