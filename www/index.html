@@ -44,6 +44,18 @@
     color:#fff;background:rgba(24,22,18,.82);border:1px solid rgba(255,255,255,.28);
     border-radius:8px;padding:8px 11px;min-height:38px}
   .basebtn.on{background:rgba(226,87,15,.92);border-color:rgba(255,255,255,.5)}
+  .actbtn{top:150px}
+  #actpanel{position:absolute;left:11px;top:196px;z-index:5;max-width:min(232px,72vw);
+    background:rgba(24,22,18,.95);border:1px solid rgba(255,255,255,.22);
+    border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45)}
+  #actpanel[hidden]{display:none}
+  .actrow{display:flex;align-items:center;gap:9px;width:100%;min-height:38px;
+    padding:5px 8px;background:none;border:0;border-radius:7px;color:#F2ECE0;
+    font:600 12.5px/1.2 Roboto,system-ui,sans-serif;text-align:left}
+  .actrow.on{background:rgba(226,87,15,.9);color:#fff}
+  .sw{flex:0 0 auto;width:22px;height:5px;border-radius:3px;
+    box-shadow:0 0 0 1.5px rgba(255,255,255,.85)}
+  .sw.dash{background-image:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 9px)}
   #readout{position:absolute;left:13px;top:82px;pointer-events:none;z-index:3;
     font:700 12px/1.25 Roboto,system-ui,sans-serif;color:#fff;
     text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 2px rgba(0,0,0,.9)}
@@ -121,12 +133,21 @@
   .st .tx b{color:var(--bone);font-weight:700}
   .st .d{flex:0 0 52px;text-align:right;font:600 11px/1.4 ui-monospace,monospace;
     color:var(--dim)}
+  .st .at{font:600 9.5px/1.3 ui-monospace,monospace;color:#6F6659;margin-top:2px}
+  .st .unn{font-style:italic;color:#8A8175}
   #routes{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;margin-top:2px;
     max-width:100%;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
     overscroll-behavior-x:contain}
   .rc{scroll-snap-align:start}
   #routes:after{content:'';flex:0 0 4px}
   #routes::-webkit-scrollbar{display:none}
+  /* The elevation profile. width:100% on BOTH — space-between does nothing if
+     the flex container shrinks to its content, which is why the two figures
+     rendered touching (take 68). */
+  .prof{margin:6px 0 2px;width:100%}
+  .profax{display:flex;justify-content:space-between;align-items:baseline;
+    width:100%;font:600 9.5px/1 ui-monospace,monospace;color:var(--dim);
+    margin-top:3px}
   .rc{flex:0 0 152px;background:#1B1813;border:1px solid #332D25;border-radius:4px;
     padding:9px 10px;cursor:pointer}
   .rc.sel{border-color:var(--route);background:#0E2029}
@@ -154,7 +175,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 66</span>
+    <span id="title"><b>APEX</b> ORV · Take 73</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -169,6 +190,11 @@
          off-road app puts it — not buried in a horizontally scrolling strip
          where you have to find it (take 62). -->
     <button id="c-base" class="basebtn">🗺 Map</button>
+    <!-- Activity filter, and the legend. Eight colours accumulated with nothing
+         telling a rider what any of them mean; this says so and filters at the
+         same time (take 67). -->
+    <button id="c-act" class="basebtn actbtn">🏍 All routes</button>
+    <div id="actpanel" hidden></div>
     <div class="strip" id="chips"></div>
     <div id="alert"></div>
     <div class="strip" id="tools">

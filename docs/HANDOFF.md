@@ -1,7 +1,250 @@
-# HANDOFF — through Take 66
+# HANDOFF — through Take 73
 
 Newest first. Written BEFORE the build ships, per PROTOCOL §6.
 The gate refuses to build a take with no entry here.
+
+## Take 73 — 2026-08-22 — Search forgives a gloved thumb, and the notes became a test script
+
+The last unexamined surface. Search turned out well built — ranked place → trail
+→ junction, live address geocoding, trail-ID lookup — with one gap a rider hits
+constantly: **it demanded exact text from someone typing in gloves.**
+
+`mcct` (one C short of MCCCT): nothing. `pinkstore`: nothing. `h5717`: nothing.
+
+Two tiers behind the existing exact ones, in strict rank order so a fuzzy hit can
+never outrank an exact one:
+
+- **compressed** — spaces and punctuation stripped from both sides, so
+  `pinkstore` finds *The Pink Store* and `h5717` finds *H57-17*
+- **one edit** — a single wrong, missing or extra character, only when nothing
+  better matched and the query is ≥4 characters: `mcct` → *Meadows-MCCCT*,
+  `wagnr` → *Wagner Lake*, `bul gap` → *Bull Gap*
+
+Also: forest roads were typed *trail* in results, contradicting the take-61 map
+distinction. Now *road* — search speaks the language the map draws.
+
+**`ci/RELEASE.md` is rewritten as a test script in ride order** — opening state,
+filter, search, labels, loops, cards, directions, dispatch, satellite — since
+Jacob tests from this build. Eleven checks, each one sentence, each answerable.
+
+Disk filled a fourth time mid-verification; the failure-count-with-no-text tell
+from landmine 101's corollary named it in one step instead of a debugging
+detour.
+
+---
+
+## Take 72 — 2026-08-22 — The county, which decides who gets sent
+
+Left open at take 71. Michigan dispatch is organised by county, so the first
+question after "where are you" is which one — and the card could give the
+coordinate, the road, the junction, the elevation and the nearest pavement, and
+not that.
+
+`context.py` already parses Census cartographic shapefiles and simplifies rings
+for the state outline, so the counties come from the same source with the same
+simplifier: **9 counties touching the region, 70 points, 1.4 KB.** Ray casting
+at runtime; the payload went 7.0 KB → 8.4 KB.
+
+### Verified against the real boundaries, not my memory
+
+Four locations through the actual dispatch card: Mio → Oscoda, Rose City →
+Ogemaw, Bull Gap → Oscoda, South Branch → **Ogemaw**.
+
+I had expected South Branch to be Iosco and marked it MISMATCH. **I was wrong and
+the app was right** — the full-resolution Census polygons say Ogemaw. Checking
+against the source rather than trusting my expectation is the only reason that
+did not become a bug hunt for a bug that was not there.
+
+Then the question that actually mattered: does simplification move a boundary?
+**3,000 random points across the region, 3,000 agree with the unsimplified
+polygons — 100%.** A county line is exactly the place a cheap simplification
+would show up, and it does not.
+
+Failure is non-fatal by design: no county list degrades one dispatch line and
+never stops a build.
+
+---
+
+## Take 71 — 2026-08-22 — Reading the dispatch card
+
+The highest-stakes screen in the app, and I had never read its output. With no
+fix it refuses correctly. With one, it gave coordinates, nearest trail, junction,
+truck, elevation and nearest pavement — **and no address at all**, two takes
+after the geocoder learned to produce one for most points.
+
+A street name and number is what a dispatcher types into their own system; the
+trail name and junction are what the responder needs once close. The address now
+comes first after the coordinate:
+
+```
+44.65970 -84.13300                    DECIMAL DEGREES
+Nearest address 0.2 mi NW of 798 N Morenci Rd, 48647
+On or near an unnamed two-track — 505 ft, OSM
+Nearest junction Pond Drive × South Ream Road — 0.23 mi N
+Elevation 965 ft
+Nearest pavement 0.18 mi ESE — North Morenci Avenue
+Read the coordinates first, then the address, then the junction.
+```
+
+Labelled **"Nearest address"** when it is a bearing-and-distance rather than the
+address of the point — the distinction from take 69, carried into the place it
+matters most.
+
+**And landmine 101 was here too.** "On or near **two-track**" bolded a class as
+though the trail were named that. In directions it reads oddly; on a dispatch
+card it is a false statement to someone sending help. Now "an unnamed
+**two-track**".
+
+Verified by giving the browser a real geolocation at two points — one with an
+exact address (Pink Store: *Address 5525 S Mount Tom Rd*) and one without
+(*Nearest address 0.2 mi NW of…*).
+
+---
+
+## Take 70 — 2026-08-22 — Reading the directions for the first time
+
+I had never actually read the turn-by-turn output. It is better than I expected —
+turn arrows, trail names carrying the IDs that appear on real trail markers
+(`H57-17`), climb notes, right-aligned distances. Two things were wrong.
+
+**Nothing said where you are in the ride.** Every step gave its own length and
+the header gave the total, but a rider glancing down mid-ride is asking "I have
+done about four miles, which step am I on" — and nothing answered it. `tot` was
+already being accumulated for the header and thrown away. Each step now shows the
+running total at its start:
+
+```
+Bear right  Mack Lake Motorized Trail (MAT)      4.9 mi
+                                              at 0.4 mi
+Continue    Mack Lake Motorized Trail · H57-6    3.8 mi
+                                              at 5.3 mi
+```
+
+**"Turn left two-track"** reads as though the trail is *named* two-track. It has
+no name at all; the string was a class label dressed up as one. Unnamed features
+now read "unnamed two-track", in italic, so the distinction is visible.
+
+Verified at 360x800, the smallest phone in the matrix.
+
+**Disk filled again mid-verification** — my own screenshots — and render reported
+5 failures with no failure text. Not a code fault. Third time; the tell is a
+failure count with nothing to read.
+
+---
+
+## Take 69 — 2026-08-22 — Silence was throwing away a true answer
+
+`address-at-anchors 2/8` has sat in every field report for twenty takes. I had
+read it as a data gap. It was not:
+
+| anchor | nearest addressed road | old behaviour |
+|---|---|---|
+| The Pink Store | 60 m | address given |
+| Mack Lake | 100 m | address given |
+| **Mio** | **307 m** | **nothing** |
+| **Luzerne** | **377 m** | **nothing** |
+| **Rose City** | **635 m** | nothing |
+| Bull Gap | 2,555 m | nothing — correctly |
+
+`ADDR_CAP` is 0.09 mi (145 m), and beyond it the app said *nothing at all*. That
+rule exists for a good reason — an address 300 m away is not your address, and
+claiming it would be a lie of exactly the kind this app refuses to tell.
+
+But there is a true statement available: **"0.2 mi NW of 798 N Morenci Rd"**.
+That is what you read to dispatch when there is no address where you are
+standing, and it was being thrown away.
+
+Second tier out to 0.55 mi, phrased as a bearing and distance FROM a road, never
+as the address of the point. **2 exact, 4 near, of 8.** `address-honest` still
+passes — nothing is invented.
+
+**The bearings are verified independently**, because a reversed one sends help
+the wrong way: recomputed all four from the raw segment geometry outside the app
+and compared compass points. Mio NW, Rose City SE, Luzerne W, South Branch S —
+all agree.
+
+`segNear` now returns its planar offset so the bearing comes from the geometry
+it already computed, rather than being re-derived.
+
+---
+
+## Take 68 — 2026-08-22 — Two things we already had, doing their job
+
+Asked to improve what exists rather than add features, so I looked for things
+already computed that were not being used properly.
+
+### Loops were still costed by hand
+
+Take 58 established that a dirt bike wants trail, and gave point-to-point routing
+`DESIG`/`DIRT` tables. **The loop generator never got them.** Its "most trail"
+shape named `moto24` and `trail50` by hand and missed `route72`, `mccct` and
+`fstrail` entirely — so an MCCCT loop was costed no better than a gravel road.
+And `fastest` was listed first, which on a dirt bike means pavement.
+
+Same tables now, most-trail first:
+
+| | before | after |
+|---|---|---|
+| first loop offered | fastest, **4.7 mi trail of 14.3** | most trail, **15.0 mi of 15.0** |
+
+The cost is 11% ridden twice, up from 0%. For a loop chosen by "most trail", that
+is the right trade.
+
+### The elevation profile was a hairline
+
+`summarise()` has computed a full profile since take 12; `spark()` drew it as a
+128x26 px line with no numbers. Now it fills the card width, is shaded, and
+prints low and high in feet — climb and drop were already on the line below.
+
+**And it had no CSS at all.** Two failed asserts earlier in the take each aborted
+their script *before* `write_text`, so the stylesheet additions were silently
+lost twice while the markup landed. `.profax` computed to `display: block`,
+which is why the two figures rendered as "1955 ft2572 ft". Found by asking the
+browser for computed style and span positions rather than looking at a
+screenshot: now `space-between`, spans at 0-40 and 90-130 in a 130 px card.
+
+Verified at 360x800, the smallest phone in the matrix.
+
+---
+
+## Take 67 — 2026-08-22 — Filter by activity, which is also the legend
+
+Eight colours had accumulated with nothing anywhere telling a rider what any of
+them meant. Jacob asked for an activity filter and for the picker to say which
+colour is which — the same control answers both, and that is the right shape:
+**a legend that can drift from the map is worse than none**, so the picker and
+the map read the same table.
+
+`ACTS` lists every discipline with its swatch colour, its classes, and whether
+it is dashed (non-ridable). Selecting one filters the map; roads always stay
+visible, because you still need to know where the road is — especially when the
+answer to "can I ride this" is no.
+
+Measured at Bull Gap, z12.6:
+
+| filter | designated | two-track | show-only | roads |
+|---|---|---|---|---|
+| All routes | 143 | 121 | 60 | 233 |
+| ORV / dirt bike | 143 | 0 | 0 | 233 |
+| Hiking | 0 | 0 | 45 | 233 |
+| Snowmobile / ski | 0 | 0 | 1 | 233 |
+
+### Three things went wrong, all caught by harnesses
+
+- **`p.querySelectorAll is not a function`** — the DOM stub models elements but
+  had no element-level query API. Extended, along with `data-*` parsing beyond
+  `data-i` and `hidden`.
+- **`check_stubs` failed: `MapStub.setFilter()`** — the gate that exists exactly
+  for this, catching the app calling something the harness cannot model. 20 map
+  calls now covered.
+- **Every dashed swatch rendered hollow.** `background: transparent` inline is a
+  *shorthand* and resets `background-image` — the dash pattern — so the legend
+  showed no colour for precisely the disciplines it exists to explain.
+  `background-color` instead. Verified by computed style, per row:
+  hiking `rgb(124,179,66)`, equestrian `rgb(142,107,181)`, snowmobile
+  `rgb(79,179,201)`, NFS `rgb(201,138,46)`.
+
+---
 
 ## Take 66 — 2026-08-22 — Release notes in the repo, and a trailhead that names itself
 

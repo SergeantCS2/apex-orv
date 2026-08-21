@@ -209,7 +209,47 @@ def main():
             out.append(s)
     out.sort(key=len, reverse=True)
 
-    payload = {"name": name,
+    # ── county boundaries ──────────────────────────────────────────────────
+    # Michigan dispatch is organised by county: the first question after "where
+    # are you" is which county, because it decides who is sent. The app knew the
+    # coordinate, the road and the junction and could not answer it (take 72).
+    # Same cartographic source and the same simplifier as the state outline.
+    counties = []
+    try:
+        cu = ("https://www2.census.gov/geo/tiger/GENZ2023/shp/"
+              "cb_2023_us_county_20m.zip")
+        creq = urllib.request.Request(cu, headers={"User-Agent": "APEX-Offroad/1.0"})
+        with urllib.request.urlopen(creq, timeout=240) as r:
+            cz = zipfile.ZipFile(io.BytesIO(r.read()))
+        cbase = next(n[:-4] for n in cz.namelist() if n.endswith(".shp"))
+        crows = parse_dbf(cz.read(cbase + ".dbf"))
+        cshapes = parse_shp_all(cz.read(cbase + ".shp"))
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from region import R as _R
+        W, S, E, N = _R.bbox
+        PAD = 0.25
+        for row, parts in zip(crows, cshapes):
+            if row.get("STATEFP") != "26" or not parts:
+                continue
+            keep = []
+            for ring in parts:
+                if all(x < W - PAD or x > E + PAD or y < S - PAD or y > N + PAD
+                       for x, y in ring):
+                    continue
+                pts = [(round(x, 4), round(y, 4)) for x, y in ring]
+                sm = rdp(pts, TOL) if len(pts) > 40 else pts
+                if len(sm) >= 4:
+                    keep.append([[x, y] for x, y in sm])
+            if keep:
+                counties.append({"n": row.get("NAME", ""), "r": keep})
+        print(f"context: {len(counties)} counties touching the region "
+              f"({', '.join(c['n'] for c in counties)})")
+    except Exception as e:
+        # A missing county list degrades one dispatch line; it must not stop a
+        # build, and the app checks for its absence.
+        print(f"context: county boundaries unavailable ({type(e).__name__})")
+
+    payload = {"name": name, "counties": counties,
                "rings": [[[x, y] for x, y in r] for r in out],
                "labels": [{"n": n, "at": [lo, la]} for n, lo, la in LAKES.get(name, [])]}
     blob = json.dumps(payload, separators=(",", ":"))

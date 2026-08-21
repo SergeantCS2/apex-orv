@@ -44,6 +44,18 @@
     color:#fff;background:rgba(24,22,18,.82);border:1px solid rgba(255,255,255,.28);
     border-radius:8px;padding:8px 11px;min-height:38px}
   .basebtn.on{background:rgba(226,87,15,.92);border-color:rgba(255,255,255,.5)}
+  .actbtn{top:150px}
+  #actpanel{position:absolute;left:11px;top:196px;z-index:5;max-width:min(232px,72vw);
+    background:rgba(24,22,18,.95);border:1px solid rgba(255,255,255,.22);
+    border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45)}
+  #actpanel[hidden]{display:none}
+  .actrow{display:flex;align-items:center;gap:9px;width:100%;min-height:38px;
+    padding:5px 8px;background:none;border:0;border-radius:7px;color:#F2ECE0;
+    font:600 12.5px/1.2 Roboto,system-ui,sans-serif;text-align:left}
+  .actrow.on{background:rgba(226,87,15,.9);color:#fff}
+  .sw{flex:0 0 auto;width:22px;height:5px;border-radius:3px;
+    box-shadow:0 0 0 1.5px rgba(255,255,255,.85)}
+  .sw.dash{background-image:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 9px)}
   #readout{position:absolute;left:13px;top:82px;pointer-events:none;z-index:3;
     font:700 12px/1.25 Roboto,system-ui,sans-serif;color:#fff;
     text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 2px rgba(0,0,0,.9)}
@@ -121,12 +133,21 @@
   .st .tx b{color:var(--bone);font-weight:700}
   .st .d{flex:0 0 52px;text-align:right;font:600 11px/1.4 ui-monospace,monospace;
     color:var(--dim)}
+  .st .at{font:600 9.5px/1.3 ui-monospace,monospace;color:#6F6659;margin-top:2px}
+  .st .unn{font-style:italic;color:#8A8175}
   #routes{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;margin-top:2px;
     max-width:100%;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
     overscroll-behavior-x:contain}
   .rc{scroll-snap-align:start}
   #routes:after{content:'';flex:0 0 4px}
   #routes::-webkit-scrollbar{display:none}
+  /* The elevation profile. width:100% on BOTH — space-between does nothing if
+     the flex container shrinks to its content, which is why the two figures
+     rendered touching (take 68). */
+  .prof{margin:6px 0 2px;width:100%}
+  .profax{display:flex;justify-content:space-between;align-items:baseline;
+    width:100%;font:600 9.5px/1 ui-monospace,monospace;color:var(--dim);
+    margin-top:3px}
   .rc{flex:0 0 152px;background:#1B1813;border:1px solid #332D25;border-radius:4px;
     padding:9px 10px;cursor:pointer}
   .rc.sel{border-color:var(--route);background:#0E2029}
@@ -154,7 +175,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 66</span>
+    <span id="title"><b>APEX</b> ORV · Take 73</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -169,6 +190,11 @@
          off-road app puts it — not buried in a horizontally scrolling strip
          where you have to find it (take 62). -->
     <button id="c-base" class="basebtn">🗺 Map</button>
+    <!-- Activity filter, and the legend. Eight colours accumulated with nothing
+         telling a rider what any of them mean; this says so and filters at the
+         same time (take 67). -->
+    <button id="c-act" class="basebtn actbtn">🏍 All routes</button>
+    <div id="actpanel" hidden></div>
     <div class="strip" id="chips"></div>
     <div id="alert"></div>
     <div class="strip" id="tools">
@@ -902,10 +928,15 @@ function fitLoop(start,targetMi,base,bearing){
 function buildLoops(startNode,targetMi){
   var out=[];
   /* six bearings, and two cost shapes: quickest, and trail-hungry */
+  /* Most trail FIRST, and costed from the same DESIG/DIRT tables the
+     point-to-point profiles use. The old weights named moto24 and trail50 by
+     hand and missed route72, mccct and fstrail entirely — so an MCCCT loop was
+     costed no better than a gravel road — and the loop shown first was the
+     fastest, which on a dirt bike means pavement (take 68). */
   var shapes=[
-    {h:'Loop · fastest',k:'lfast',f:function(e){return e.L/(SPEED[e.c]||14)}},
     {h:'Loop · most trail',k:'ltrail',f:function(e){
-        return e.L*((e.c==='paved'||e.c==='minor')?7:(e.c==='moto24'||e.c==='trail50')?0.7:1.6)}}
+        return e.L*(DESIG[e.c]?0.55:DIRT[e.c]?1.3:8)}},
+    {h:'Loop · fastest',k:'lfast',f:function(e){return e.L/(SPEED[e.c]||14)}}
   ];
   shapes.forEach(function(sh){
     var best=null;
@@ -946,7 +977,7 @@ function renderRoutes(out){
         if(s.road>0.05)bits.push(s.road.toFixed(1)+' paved');
         return '<div class="sub">'+tag+' '+bits.join(' · ')+'</div>'})()+
       '<div class="sub">hardest <b>'+label(s.hard)+'</b></div>'+
-      spark(s.prof)+
+      spark(s.prof,s.up,s.dn)+
       '<div class="sub">climb <b>'+ft(s.up)+' ft</b> · drop '+ft(s.dn)+' ft</div>'+
       (overFuel?'<div class="sub warn">⛽ '+(s.mi-fuel).toFixed(1)+' mi past your range</div>':
         (fuel?'<div class="sub good">⛽ within range</div>':''))+
@@ -973,15 +1004,25 @@ function renderRoutes(out){
 /* Elevation profile per option. A 12 mile route with 900 ft of climbing is a
    different ride from a 12 mile route with 200, and the number alone does not
    land the way the shape does. */
-function spark(p){
+/* The elevation profile was a 128x26 hairline with no numbers — the shape of
+   the ride and nothing else. Filled now, full card width, and it says the low,
+   the high, and the climb, because "how much climbing" is a question with an
+   answer we already compute (take 68). */
+function spark(p,up,dn){
   if(!p||p.length<3)return '';
   var lo=Math.min.apply(null,p),hi=Math.max.apply(null,p),r=Math.max(1,hi-lo);
-  var W=128,H=26,step=Math.max(1,Math.floor(p.length/W)),pts=[];
-  for(var i=0,x=0;i<p.length;i+=step,x++){
-    pts.push((x*W/(p.length/step)).toFixed(1)+','+(H-((p[i]-lo)/r)*H).toFixed(1))}
-  return '<svg width="'+W+'" height="'+H+'" style="display:block;margin:5px 0 2px">'+
-    '<polyline points="'+pts.join(' ')+'" fill="none" stroke="#8FAE63" stroke-width="1.4"/>'+
-    '</svg>'}
+  var W=250,H=44,step=Math.max(1,Math.floor(p.length/W)),pts=[],n=0,tot=Math.ceil(p.length/step);
+  for(var i=0;i<p.length;i+=step,n++){
+    pts.push((n*W/tot).toFixed(1)+','+(H-2-((p[i]-lo)/r)*(H-8)).toFixed(1))}
+
+  return '<div class="prof">'+
+    '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" '+
+      'style="display:block;width:100%;height:44px">'+
+      '<polygon points="0,'+H+' '+pts.join(' ')+' '+W+','+H+'" fill="rgba(143,174,99,0.22)"/>'+
+      '<polyline points="'+pts.join(' ')+'" fill="none" stroke="#8FAE63" '+
+        'stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>'+
+    '<div class="profax"><span>'+ft(lo)+' ft</span>'+
+      '<span>'+ft(hi)+' ft</span></div></div>'}
 
 function label(c){return {route72:'ORV route 72"',trail50:'ORV trail 50"',
   moto24:'motorcycle 24"',mccct:'MCCCT',fstrail:'USFS trail',fsroad:'USFS road',
@@ -1048,7 +1089,7 @@ function buildIndex(){
     [[e.n,'trail'],[e.id,'number']].forEach(function(p){
       var s=p[0];if(!s||seen[s])return;seen[s]=1;
       var g=decode(GR.g[i]),m=g[(g.length/2)|0];
-      rows.push({t:s,k:(e.c==='paved'||e.c==='minor')?'road':p[1],c:m,cls:e.c})})}
+      rows.push({t:s,k:(e.c==='paved'||e.c==='minor'||e.c==='fsroad')?'road':p[1],c:m,cls:e.c})})}
   for(var k in JX){var lab=JX[k].map(function(x){return NM[x]}).join(' × ');
     if(seen[lab])continue;seen[lab]=1;
     rows.push({t:lab,k:'junction',c:[NODES[k][0],NODES[k][1]],cls:'jx'})}
@@ -1061,7 +1102,10 @@ function buildIndex(){
     ADDR.names.forEach(function(nm,i){
       if(seen[nm]||first[i]===undefined)return;seen[nm]=1;var g=first[i];
       rows.push({t:nm,k:'street',c:[(g[1]+g[3])/2,(g[2]+g[4])/2],cls:'addr'})})}
-  rows.forEach(function(r){r.l=r.t.toLowerCase()});
+  rows.forEach(function(r){r.l=r.t.toLowerCase();
+    /* compressed: spaces and punctuation stripped, so "pinkstore" finds
+       "Pink Store" and "h5717" finds "H57-17" (take 73) */
+    r.z=r.l.replace(/[^a-z0-9]/g,'')});
   IDX=rows;return rows}
 
 var KRANK={address:0,place:1,trail:2,number:3,road:4,street:5,junction:6};
@@ -1071,13 +1115,36 @@ function search(q){
   /* a typed street address resolves to a point and leads the results */
   var gc=geocode(q);
   if(gc)out.push([-1,-1,0,{t:gc.t,k:'address',c:gc.c,cls:'addr'}]);
+  var qz=q.replace(/[^a-z0-9]/g,'');
   for(var i=0;i<rows.length;i++){var r=rows[i],p=r.l.indexOf(q);
-    if(p<0)continue;
-    /* exact, then start-of-string, then start-of-word, then anywhere */
-    var s=r.l===q?0:p===0?1:(r.l[p-1]===' '||r.l[p-1]==='(')?2:3;
-    out.push([s,(KRANK[r.k]||5),r.t.length,r])}
+    if(p>=0){
+      /* exact, then start-of-string, then start-of-word, then anywhere */
+      var s=r.l===q?0:p===0?1:(r.l[p-1]===' '||r.l[p-1]==='(')?2:3;
+      out.push([s,(KRANK[r.k]||5),r.t.length,r]);continue}
+    /* "pinkstore" -> Pink Store: the query with spacing squeezed out */
+    if(qz.length>=3&&r.z.indexOf(qz)>=0)out.push([4,(KRANK[r.k]||5),r.t.length,r])}
+  /* one wrong or missing character — the gloved-thumb tier. Only when nothing
+     better matched, and only for queries long enough to mean something. */
+  if(!out.length&&qz.length>=4){
+    for(var i2=0;i2<rows.length;i2++){var r2=rows[i2];
+      if(near1(qz,r2.z))out.push([5,(KRANK[r2.k]||5),r2.t.length,r2])}}
   out.sort(function(a,b){return a[0]-b[0]||a[1]-b[1]||a[2]-b[2]});
   return out.slice(0,9).map(function(x){return x[3]})}
+
+/* Does needle occur in hay with at most one substitution, insertion or
+   deletion? Bounded prefix scan; 3,353 entries per keystroke is cheap. */
+function near1(needle,hay){
+  var n=needle.length;
+  for(var st=0;st<=Math.max(0,hay.length-n+1);st++){
+    var i=0,j=st,miss=0,end=Math.min(hay.length,st+n+1);
+    while(i<n&&j<end){
+      if(needle[i]===hay[j]){i++;j++;continue}
+      if(miss++)break;
+      if(needle[i+1]===hay[j]){i++;continue}
+      if(needle[i]===hay[j+1]){j++;continue}
+      i++;j++}
+    if(i>=n&&miss<=1)return true}
+  return false}
 
 function renderHits(list){
   if(!list.length){el('hits').innerHTML=
@@ -1140,13 +1207,23 @@ el('btn-steps').addEventListener('click',function(){
   var a=nearestNode(ME),steps=directions(last[sel].s.path,a);
   if(!steps.length)return show('No steps.','fail');
   var tot=0,html='<div id="steps">';
-  steps.forEach(function(s){tot+=s.mi;
-    var nm=s.name+(s.id&&s.id!==s.name?' · '+s.id:'');
+  /* Each step said how long IT is, and nothing said where you are in the ride.
+     Mid-ride the question is "I have done about four miles — which step am I
+     on", so every step now carries the running total at its START. `tot` was
+     already accumulated for the header and thrown away (take 70). */
+  steps.forEach(function(s){
+    var at=tot;tot+=s.mi;
+    /* "Turn left two-track" reads as if the trail is named two-track. It is not
+       named at all — say so rather than dressing a class up as a name. */
+    var named=s.name&&!/^(two-track|forest road|road|paved|trail)$/i.test(s.name);
+    var nm=named?(s.name+(s.id&&s.id!==s.name?' \u00b7 '+s.id:''))
+                :('unnamed '+(s.name||'track')+(s.id?' \u00b7 '+s.id:''));
     html+='<div class="st"><div class="ar">'+s.turn[1]+'</div><div class="tx">'+
-      s.turn[0]+' <b>'+nm+'</b>'+
+      s.turn[0]+' '+(named?'<b>'+nm+'</b>':'<i class="unn">'+nm+'</i>')+
       (MACHINE[machine].ok.indexOf(s.cls)<0?' <span class="tag shut">illegal</span>':'')+
       (s.up>8?'<br><span style="color:#C9A227">climbs '+ft(s.up)+' ft</span>':'')+
       '</div><div class="d">'+(s.mi<0.1?(s.mi*5280|0)+' ft':s.mi.toFixed(1)+' mi')+
+      (at>0.05?'<div class="at">at '+at.toFixed(1)+' mi</div>':'')+
       '</div></div>'});
   html+='</div>';
   el('panel').className='';
@@ -1161,6 +1238,61 @@ el('btn-steps').addEventListener('click',function(){
 
    In satellite mode a pale casing goes under the trail lines. Dark ink on dark
    jack pine is unreadable, and a trail you cannot see is not on the map. */
+/* Every route class, grouped the way a rider thinks about them. `sw` is the
+   swatch colour shown in the panel, so the legend cannot drift from the map:
+   both read this table. `dash` marks the ones routing will never use. */
+var ACTS=[
+  {k:'all',  h:'All routes',        sw:'#2585D8'},
+  {k:'orv',  h:'ORV / dirt bike',   sw:'#2585D8', cls:['route72','trail50','moto24','mccct','fstrail']},
+  {k:'dirt', h:'Two-track',         sw:'#A9702F', cls:['track']},
+  {k:'foot', h:'Hiking',            sw:'#7CB342', cls:['foot'], dash:1},
+  {k:'horse',h:'Equestrian',        sw:'#8E6BB5', cls:['horse'], dash:1},
+  {k:'snow', h:'Snowmobile / ski',  sw:'#4FB3C9', cls:['snow','snowmob'], dash:1},
+  {k:'nfs',  h:'NFS trails',        sw:'#C98A2E', cls:['nfsmoto'], dash:1}
+];
+var TRAIL_LAYERS=['route72','trail50','moto24','mccct','fstrail'];
+var act='all';
+
+function actLabel(){
+  var a=ACTS.filter(function(x){return x.k===act})[0];
+  el('c-act').textContent=(act==='all'?'🏍 ':'🎯 ')+a.h;
+  el('c-act').className='basebtn actbtn'+(act==='all'?'':' on')}
+
+function applyAct(){
+  /* Roads stay visible whatever is selected — you still need to know where the
+     road is, especially when the answer to "can I ride this" is no. */
+  var a=ACTS.filter(function(x){return x.k===act})[0],sel=a.cls||null;
+  TRAIL_LAYERS.forEach(function(id){
+    map.setLayoutProperty(id,'visibility',
+      (!sel||sel.indexOf(id)>=0)?'visible':'none')});
+  map.setLayoutProperty('track','visibility',
+    (!sel||sel.indexOf('track')>=0)?'visible':'none');
+  var showCls=(a.cls||[]).filter(function(c){
+    return ['foot','horse','snow','snowmob','nfsmoto'].indexOf(c)>=0});
+  if(!sel){map.setFilter('show-line',null);map.setFilter('lbl-show',null);
+    map.setLayoutProperty('show-line','visibility','visible');
+    map.setLayoutProperty('lbl-show','visibility','visible')}
+  else if(showCls.length){
+    var f=['in',['get','c'],['literal',showCls]];
+    map.setFilter('show-line',f);map.setFilter('lbl-show',f);
+    map.setLayoutProperty('show-line','visibility','visible');
+    map.setLayoutProperty('lbl-show','visibility','visible')}
+  else{map.setLayoutProperty('show-line','visibility','none');
+    map.setLayoutProperty('lbl-show','visibility','none')}
+  actLabel()}
+
+function buildActPanel(){
+  var p=el('actpanel');
+  p.innerHTML=ACTS.map(function(a){
+    return '<button class="actrow'+(a.k===act?' on':'')+'" data-k="'+a.k+'">'+
+      '<span class="sw'+(a.dash?' dash':'')+'" style="'+
+        (a.dash?'color:'+a.sw+';background-color:transparent':'background-color:'+a.sw)+'"></span>'+
+      '<span>'+a.h+'</span></button>'}).join('');
+  Array.prototype.forEach.call(p.querySelectorAll('.actrow'),function(b){
+    b.addEventListener('click',function(){
+      act=b.dataset.k;applyAct();buildActPanel();p.hidden=true;
+      logAct('tap','activity '+act)})})}
+
 var BASEMAPS=['Map','Satellite','Hybrid'],bmi=0;
 function setBasemap(i){
   if(!SAT_OK){bmi=0;el('c-base').textContent='🗺 Map';el('c-base').className='basebtn';
@@ -1428,8 +1560,18 @@ el('btn-disp').addEventListener('click',function(){
     var out='<span class="tn">'+ME[1].toFixed(5)+'  '+ME[0].toFixed(5)+'</span>'+
       '<span class="tag legal">decimal degrees</span><br>';
     var bits=[];
+    /* The address goes FIRST after the coordinate. A street name and number is
+       what a dispatcher types into their own system; the trail name and junction
+       are what the responder needs once they are close. Exact if we have one,
+       otherwise the bearing-and-distance form from take 69 — and labelled
+       "Nearest address" so it is never mistaken for where you are standing. */
+    var ad=addressAt(ME)||addressAt(ME,true);
+    if(ad)bits.push((ad.near?'Nearest address ':'Address ')+'<b>'+ad.txt+'</b>');
+    var cty=countyAt(ME);
+    if(cty)bits.push('County <b>'+cty+' County, MI</b>');
     if(ne.e){var a=attrs(ne.e);
-      bits.push('On or near <b>'+(ne.e.n||label(ne.e.c))+'</b>'+
+      bits.push('On or near '+(ne.e.n?'<b>'+ne.e.n+'</b>'
+                               :'an unnamed <b>'+label(ne.e.c)+'</b>')+
         (ne.e.id?' (<b>'+ne.e.id+'</b>)':'')+
         ' — '+(ne.d*5280|0)+' ft'+(a.src?', '+a.src.toUpperCase():''))}
     if(nj.n!==null){var nm=JX[nj.n].map(function(i){return NM[i]}).join(' × ');
@@ -1442,7 +1584,8 @@ el('btn-disp').addEventListener('click',function(){
     var np=nearestPavement(ME);
     if(np.p)bits.push('Nearest pavement <b>'+np.d.toFixed(2)+' mi '+
       compass(bearing(ME,np.p))+'</b>'+(np.e&&np.e.n?' — '+np.e.n:''));
-    bits.push('Read the coordinates first, then the junction.');
+    bits.push(ad?'Read the coordinates first, then the address, then the junction.'
+                :'Read the coordinates first, then the junction.');
     show(out+bits.join('<br>'),'')},20)});
 
 /* ── ride simulator ────────────────────────────────────────────────────────
@@ -1597,6 +1740,8 @@ function startSim(){
     if(i%6===0)map.easeTo({center:ME,duration:280})},170)}
 
 el('c-base').addEventListener('click',function(){setBasemap(bmi+1)});
+el('c-act').addEventListener('click',function(){
+  var p=el('actpanel');buildActPanel();p.hidden=!p.hidden});
 el('c-about').addEventListener('click',function(){show(ABOUT,'')});
 /* every label layer, so the Labels chip governs all of them */
 var LBL=['lbl-trail','lbl-show','lbl-fsroad','lbl-road','lbl-place'];
@@ -1674,7 +1819,14 @@ function flyToYou(){
 
    Both directions are offline. Coverage is partial out here, and when there is
    no address the card shows nothing rather than announcing an absence. */
-var ADDR_CAP=0.09;                 /* miles; beyond this, a road is not "your" road */
+var ADDR_CAP=0.09;                 /* miles; inside this, it IS your address */
+/* Beyond ADDR_CAP the app said nothing at all, and that threw away a true and
+   useful answer: Mio sits 307 m from an addressed road and Luzerne 377 m, so
+   both got silence. "A quarter mile south-west of 4951 S Branch Rd" is exactly
+   what you give dispatch when there is no address where you are standing.
+   Reported as a BEARING AND DISTANCE FROM a road, never as your address — the
+   distinction is the whole point (take 69). */
+var ADDR_NEAR=0.55;                /* miles; beyond this even that is noise */
 
 function segNear(at,a,b){
   /* Point-to-segment in local planar space, returning distance in miles, the
@@ -1685,11 +1837,28 @@ function segNear(at,a,b){
   var dx=bx-ax, dy=by-ay, L=dx*dx+dy*dy;
   var t=L>0?Math.max(0,Math.min(1,-(ax*dx+ay*dy)/L)):0;
   var px=ax+t*dx, py=ay+t*dy;
-  return {d:Math.sqrt(px*px+py*py), t:t, side:(dx*(-ay)-dy*(-ax))>0?'L':'R'}}
+  return {d:Math.sqrt(px*px+py*py), t:t, px:px, py:py, side:(dx*(-ay)-dy*(-ax))>0?'L':'R'}}
 
-function addressAt(at){
+/* Which county a point is in. Michigan dispatch is organised by county — it
+   decides who is sent — and the card could name the road, the junction and the
+   elevation but not the county (take 72). Ray casting against the simplified
+   cartographic rings in context.json; 9 counties, 70 points, 1.4 KB. */
+function countyAt(at){
+  if(!CTX||!CTX.counties)return null;
+  var x=at[0],y=at[1];
+  for(var c=0;c<CTX.counties.length;c++){
+    var co=CTX.counties[c];
+    for(var r=0;r<co.r.length;r++){
+      var ring=co.r[r],inside=false;
+      for(var i=0,j=ring.length-1;i<ring.length;j=i++){
+        var xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];
+        if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi))inside=!inside}
+      if(inside)return co.n}}
+  return null}
+
+function addressAt(at,wide){
   if(!ADDR||!ADDR.segs)return null;
-  var S=ADDR.segs,best=null,bd=ADDR_CAP;
+  var S=ADDR.segs,best=null,bd=wide?ADDR_NEAR:ADDR_CAP;
   for(var i=0;i<S.length;i++){var g=S[i];
     var r=segNear(at,[g[1],g[2]],[g[3],g[4]]);
     if(r.d<bd){bd=r.d;best={g:g,r:r}}}
@@ -1701,8 +1870,15 @@ function addressAt(at){
   var n=Math.round(f+(t-f)*r.t);
   /* keep the parity of the side's range — odd side stays odd */
   if(f%2!==n%2)n+=(n>f?-1:1);
-  return {n:n,street:ADDR.names[g[0]],zip:g[9]||0,
-          txt:n+' '+ADDR.names[g[0]]+(g[9]?', '+g[9]:'')}}
+  var txt=n+' '+ADDR.names[g[0]]+(g[9]?', '+g[9]:'');
+  var out={n:n,street:ADDR.names[g[0]],zip:g[9]||0,d:bd,txt:txt,near:false};
+  if(bd>ADDR_CAP){
+    /* far enough that this is NOT the address of this point — say where it is
+       relative to the road instead, and say how far. */
+    var c=compass((Math.atan2(-r.px,-r.py)*180/Math.PI+360)%360);
+    out.near=true;
+    out.txt=(bd<0.1?Math.round(bd*5280)+' ft':bd.toFixed(1)+' mi')+' '+c+' of '+txt}
+  return out}
 
 function geocode(q){
   /* "4952 S Branch Rd" -> a point, by finding a segment of that name whose
@@ -1756,7 +1932,7 @@ function placeCard(at,kind,title){
     (e!==null?' · '+ft(e)+' ft':'')+'</span>');
   if(kind!=='me')rows.push('<span class="unit">'+d.toFixed(2)+' mi '+b.pt+
     ' ('+b.deg+'°) from your position</span>');
-  var ad=addressAt(at);
+  var ad=addressAt(at)||addressAt(at,true);
   if(ad)rows.push('<span style="color:#F5EFE2">'+ad.txt+'</span>');
   if(ne)rows.push('<span class="unit">nearest: '+(ne.e.n||label(ne.e.c))+
     (ne.e.id?' · '+ne.e.id:'')+' — '+ne.mi.toFixed(2)+' mi</span>');
@@ -2064,10 +2240,13 @@ function stData(){
   else{
     stInfo('DATA','address-index',ADDR.segs.length+' segments, '+
       ADDR.names.length+' street names');
-    var hits=0,shown=[];
-    PLACES.forEach(function(pl){var a=addressAt([pl[1],pl[2]]);
-      if(a){hits++;if(shown.length<2)shown.push(pl[0]+': '+a.txt)}});
-    stInfo('DATA','address-at-anchors',hits+'/'+PLACES.length+' resolve · '+
+    var hits=0,near=0,shown=[];
+    PLACES.forEach(function(pl){
+      var at=[pl[1],pl[2]],a=addressAt(at),n=a?null:addressAt(at,true);
+      if(a){hits++;if(shown.length<2)shown.push(pl[0]+': '+a.txt)}
+      else if(n){near++;if(shown.length<3)shown.push(pl[0]+': '+n.txt)}});
+    stInfo('DATA','address-at-anchors',hits+' exact, '+near+' near, of '+
+      PLACES.length+' · '+
       (shown.join(' · ')||'none near an anchor, which is normal out here'));
     var g0=ADDR.segs[0],mid=[(g0[1]+g0[3])/2,(g0[2]+g0[4])/2];
     var a0=addressAt(mid);
@@ -2462,7 +2641,7 @@ map.on('load',collapseAttrib);map.on('idle',collapseAttrib);
 
 map.on('idle',function(){if(!healthOK)renderHealth()});
 map.on('move',refreshReadout);map.on('load',refreshReadout);
-map.on('load',function(){el('c-labels').className='chip on';setBasemap(0);
+map.on('load',function(){el('c-labels').className='chip on';setBasemap(0);buildActPanel();actLabel();
   setTimeout(renderHealth,1800);
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Geolocation;
   if(C){try{C.requestPermissions().then(locateOnce).catch(locateOnce)}catch(e){locateOnce()}}

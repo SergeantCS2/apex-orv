@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 66.*
+*Current as of take 73.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -98,6 +98,10 @@ Start here. Do not read top to bottom.
 | Tuned to one screen size | 95 |
 | User-facing text inside the workflow | 96 |
 | Short feature cannot fit a line label | 97 |
+| Legend drifts from the map | 98 |
+| Failed assert silently drops the whole patch | 99 |
+| Refusing when a weaker true answer exists | 100 |
+| Class label presented as a name | 101 |
 | checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
@@ -135,6 +139,10 @@ Start here. Do not read top to bottom.
 | Tuned to one screen size | 95 |
 | User-facing text inside the workflow | 96 |
 | Short feature cannot fit a line label | 97 |
+| Legend drifts from the map | 98 |
+| Failed assert silently drops the whole patch | 99 |
+| Refusing when a weaker true answer exists | 100 |
+| Class label presented as a name | 101 |
 | checkout takes the triggering commit | 85 |
 | Unresolved workflow reference is empty, not an error | 78 |
 | Rename works everywhere but the home screen | 63 |
@@ -1247,3 +1255,111 @@ wraps. Eight previously invisible names appeared at Bull Gap alone.
 **Corollary — one grey for many meanings is no information.** Every non-ORV route
 was the same grey dash, so a hiking trail and a snowmobile route were
 indistinguishable. Colour by use; keep the dash to mean "not yours to ride".
+
+**98. A legend must read the same table the map does.** Eight route colours had
+accumulated with nothing explaining them. The activity picker is now generated
+from `ACTS` — discipline, swatch colour, classes, dashed-or-not — and the style
+uses the same values, so the two cannot disagree. A hand-written legend is one
+edit away from lying.
+
+**Corollary — `background:` is a shorthand and resets `background-image`.**
+Setting `background: transparent` inline killed the dash pattern on every
+non-ridable swatch, so the legend showed no colour for exactly the disciplines it
+was added to explain. Use `background-color`. Verified per row by computed style,
+not by looking at a screenshot.
+
+**Corollary — extend the harness when the app grows, not after.** Adding a filter
+UI cost three harness failures in a row: a missing element query API, missing
+`data-*` parsing, and a missing `MapStub.setFilter`. All three were caught before
+the device saw them, two by `check_stubs` doing precisely its job.
+
+**99. A failed assert aborts the whole script, including the parts that worked.**
+Two patches in this take bundled a CSS addition with a code change. The code
+anchor missed, the assert fired, and `write_text` never ran — so the CSS was lost
+along with it, twice, while an *earlier* successful patch had already added the
+markup that needed it. The result was a styled-looking element with no rule at
+all: `.profax` computed to `display: block`.
+
+Assert-before-write is right. The lesson is to keep one concern per script, or
+verify each change landed rather than assuming the script that printed no error
+did everything it contained. `grep -c` for the thing you just added costs
+nothing.
+
+**Corollary — ask the browser, not the screenshot.** "1955 ft2572 ft" looks like
+a formatting slip; computed style said `display: block` and named the cause in
+one step.
+
+**Corollary — a rule established for one code path does not propagate itself.**
+`DESIG`/`DIRT` fixed point-to-point routing at take 58 and the loop generator
+kept its hand-written class list for ten takes, costing an MCCCT loop the same as
+a gravel road. When you introduce a table, grep for everything that should be
+reading it.
+
+**100. Refusing is right; refusing when a weaker TRUE answer exists is not.**
+The reverse geocoder said nothing beyond 145 m, because an address 300 m away is
+not your address. Correct — and it threw away "0.2 mi NW of 798 N Morenci Rd",
+which is true, useful, and exactly what you read to dispatch when there is no
+address where you stand. Four of eight anchors got silence for twenty takes.
+
+The distinction that makes it honest is the phrasing: a bearing and distance FROM
+a road, never presented as the address of the point. Refusal and precision are
+not the same axis — say the strongest thing that is true, and label how strong it
+is.
+
+**Corollary — verify a bearing outside the code that produced it.** A reversed
+compass point sends help the wrong way. All four were recomputed from raw segment
+geometry and compared before shipping.
+
+**101. A class label is not a name.** Directions read "Turn left two-track",
+which sounds like a trail called "two-track". The feature has no name; the class
+was being rendered in the name slot. Say "unnamed two-track" and style it
+differently, so the rider can tell the difference between a trail whose name you
+are telling them and a trail that has none.
+
+**Corollary — read the output of a feature before improving it.** The
+turn-by-turn list had never been read end to end. Doing so took one probe and
+found both the missing running total and the naming problem; neither was visible
+from the code.
+
+**Corollary — a failure count with no failure text means look at the machine.**
+Render reported 5 failures printing nothing. The disk was full, from my own
+screenshots. Third occurrence.
+
+**Landmine 101, second occurrence — dispatch.** The class-as-name fault fixed in
+directions at take 70 was also on the dispatch card, where it is worse: telling a
+dispatcher the trail is called "two-track" is a false statement to someone
+sending help. When a landmine is found, grep for every other place the same
+pattern appears rather than fixing the instance in front of you.
+
+**Corollary — a capability added in one take does not reach its best consumer by
+itself.** The geocoder gained near-addresses at take 69; the dispatch card, which
+exists specifically to state a location to a stranger, did not use them until
+someone read its output. New data does not route itself to the screen that needs
+it most.
+
+**102. Check the expectation before calling it a mismatch.** The county lookup
+reported South Branch as Ogemaw; I had written Iosco in the test and marked it
+MISMATCH. The app was right and my memory was wrong. One query against the
+source settled it — without that, the next hour goes into hunting a bug that does
+not exist, and the "fix" would have introduced one.
+
+When a check disagrees with you, establish which of you is wrong before acting on
+it.
+
+**Corollary — simplification needs a sampled check, not a spot check.** Four
+points agreeing does not show that a simplified boundary is safe; a county line
+is precisely where a cheap RDP would drift. 3,000 random points across the region
+compared against the unsimplified polygons: 100%. That is the evidence, not the
+four named towns.
+
+**103. Search must forgive the hands that use it.** Exact substring match is
+correct on a desk and wrong on a trail: a gloved thumb types `mcct`, `pinkstore`
+and `h5717`, and all three returned nothing. Add a compressed tier (strip spaces
+and punctuation from both sides) and a single-edit tier — strictly ranked below
+exact matches, gated to queries of four or more characters, and only when nothing
+better matched, so forgiveness can never displace precision.
+
+**Corollary — every surface speaks the map's language.** Search results typed a
+Forest Service road as *trail* eleven takes after the map learned to draw the
+difference. When a distinction is established, grep every place that names the
+thing.

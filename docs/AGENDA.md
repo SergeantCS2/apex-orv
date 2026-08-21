@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 66.* Ranked by blocking-ness, not by interest.
+*Current as of take 73.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -723,3 +723,76 @@ The third is not:
   the line and drew nothing.
 - **Open:** whether the brighter blue and wider casing are enough under real
   canopy on a real screen in daylight.
+
+## A63 — Activity filter and legend · SHIPPED take 67
+
+- **PROVEN:** picker filters the map (ORV 143/0/0, hiking 0/0/45, roads always
+  233) and shows a colour swatch per discipline, generated from the same table
+  the style uses.
+- **PROVEN:** swatch colours verified by computed style per row, dashed for every
+  non-ridable discipline.
+- **Ruled out:** a hand-written legend. It drifts from the map by construction.
+- **Open:** whether "roads always visible" is right when filtering to hiking.
+  Only riding with it settles that.
+
+## A64 — Loops and profiles use what we already compute · SHIPPED take 68
+
+- **PROVEN:** loops costed from DESIG/DIRT; first loop offered went from 4.7 mi
+  trail of 14.3 to 15.0 of 15.0.
+- **PROVEN:** elevation profile filled, card-width, low/high in feet; layout
+  verified by computed style at 360x800.
+- **Ruled out:** hand-written class weights in the loop generator. They drifted
+  from the routing tables for ten takes.
+- **Open:** address coverage is still 2/8 at anchors, and trail-names 4 of 84.
+  Both are next.
+
+## A65 — Location is stated as strongly as the data allows · SHIPPED take 69
+
+- **PROVEN:** anchors went 2/8 to 2 exact + 4 near; near form is a bearing and
+  distance from an addressed road, never the address itself.
+- **PROVEN:** all four bearings recomputed independently from segment geometry
+  and agree (Mio NW, Rose City SE, Luzerne W, South Branch S).
+- **Ruled out:** silence beyond ADDR_CAP. It discarded a true answer.
+- **Open:** Bull Gap is 2.5 km from any addressed road. Nothing to say there,
+  and the app says nothing — which is correct.
+
+## A66 — Directions usable mid-ride · SHIPPED take 70
+
+- **PROVEN:** every step carries the running total at its start; verified across
+  a 13-step 11.1 mi route at 360x800.
+- **PROVEN:** unnamed features read "unnamed two-track" in italic rather than
+  presenting a class as a name.
+- **Ruled out:** showing only per-step distance. It cannot answer "which step am
+  I on", which is the question a rider actually has.
+- **Open:** consecutive steps on the same trail with different IDs are not
+  merged. The IDs match markers on the ground, so that may be correct.
+
+## A67 — Dispatch states the strongest location available · SHIPPED take 71
+
+- **PROVEN:** dispatch leads with the address after the coordinate — exact where
+  known, bearing-and-distance otherwise, labelled so the two cannot be confused.
+  Verified at two real coordinates via browser geolocation.
+- **PROVEN:** unnamed features read "an unnamed two-track" on the card.
+- **Ruled out:** a dispatch card without an address. It withheld the one field a
+  dispatcher can act on directly.
+- **CLOSED take 72:** county stated on the dispatch card, 100% agreement with
+  unsimplified Census boundaries over 3,000 sampled points.
+
+## A68 — County on dispatch · SHIPPED take 72
+
+- **PROVEN:** 9 counties in context.json (70 points, 1.4 KB); dispatch names the
+  county; 3,000 random points match full-resolution Census polygons exactly.
+- **Ruled out:** trusting four named towns as evidence a simplified boundary is
+  safe.
+- **Open:** nothing states the county on the place card, only on dispatch. That
+  may be right — the card is for planning, dispatch is for help.
+
+## A69 — Search audit and release test script · SHIPPED take 73
+
+- **PROVEN:** six realistic near-miss queries all resolve (mcct, pinkstore,
+  h5717, bul gap, wagnr) with exact queries unchanged and fuzzy strictly ranked
+  below exact.
+- **PROVEN:** search types match the map's road/trail distinction.
+- **Ruled out:** exact-only matching for a rider in gloves.
+- **Open:** field test — the next report is Jacob's, against the eleven-item
+  script in ci/RELEASE.md.

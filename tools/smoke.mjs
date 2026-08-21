@@ -65,15 +65,29 @@ class El {
     this._html = String(h);
     /* parse just enough: elements with a class and optional data-i */
     this._children = [];
-    const re = /<(?:button|div)\s+class="([^"]+)"(?:\s+data-i="(\d+)")?/g;
+    // data-k as well as data-i: the activity filter identifies rows by
+    // discipline key. A stub that models half the DOM rejects working code.
+    const re = /<(?:button|div)\s+class="([^"]+)"((?:\s+data-[a-z]+="[^"]*")*)/g;
     let m;
     while ((m = re.exec(this._html))) {
       const c = new El(null);
       c.className = m[1];
-      if (m[2] !== undefined) c.dataset.i = m[2];
+      for (const d of (m[2] || "").matchAll(/data-([a-z]+)="([^"]*)"/g)) {
+        c.dataset[d[1]] = d[2];
+      }
       this._children.push(c);
     }
   }
+  /* Real elements have these and the app calls them. check_stubs catches the
+     reverse — the app calling what the harness lacks — which is exactly how the
+     missing setFilter below was found (take 67). */
+  querySelectorAll(sel) {
+    const want = String(sel).replace(/^\./, "");
+    return this._children.filter((c) => (c.className || "").split(/\s+/).includes(want));
+  }
+  querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
+  get hidden() { return !!this._hidden; }
+  set hidden(v) { this._hidden = !!v; }
   addEventListener(t, fn) { (this._listeners[t] ||= []).push(fn); }
   fire(t, ev) { for (const fn of this._listeners[t] || []) fn(ev || {}); }
   focus() {}
@@ -178,6 +192,7 @@ class MapStub {
     return this._ct;
   }
   unproject(p) { return { lng: this._up ? this._up[0] : -84.09, lat: this._up ? this._up[1] : 44.57 }; }
+  setFilter(id, f) { (record.filters ||= []).push([id, f]); }
   setLayoutProperty(id, k, v) { record.layout.push([id, k, v]); }
   setPaintProperty(id, k, v) { record.paint.push([id, k, v]); }
   queryRenderedFeatures(box) {
