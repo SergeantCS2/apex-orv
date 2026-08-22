@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 73.* Ranked by blocking-ness, not by interest.
+*Current as of take 75.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -796,3 +796,25 @@ The third is not:
 - **Ruled out:** exact-only matching for a rider in gloves.
 - **Open:** field test — the next report is Jacob's, against the eleven-item
   script in ci/RELEASE.md.
+
+## A70 — Labels at the 1 mi scale · SHIPPED take 74
+
+- **PROVEN:** trail/road names render from z11 (1 mi): 3 trail + 25 road labels
+  measured at 412x915; z11.3 screenshot shows clean spacing, names tracking
+  roads.
+- **PROVEN:** forest-road numbers deliberately held to 3000 ft (11 at z12).
+- **Ruled out:** lowering fsroad to 1 mi as well — 4-digit IDs at that scale are
+  noise where road names are signal.
+- **Open:** the field answer. Jacob is riding take 73; take 74 is the build that
+  should make the "zoomed out" complaint go away.
+
+## A71 — v1 complete · take 75
+
+- **PROVEN:** v1 field-tested at take 73 — 41 PASS / 0 FAIL on-device, first
+  fix 5.8 s ±6 m, filter/cards/labels/satellite confirmed by screenshots.
+- **PROVEN:** the repo is self-describing: README, V1-STATE, HANDOFF (75
+  takes), LANDMINES (103 rules), AGENDA, V2 kickoff brief.
+- **Ruled out:** ending v1 with essential knowledge living only in chat
+  transcripts — everything durable is in the repository.
+- **Open:** v2. It begins with a study-only session driven by
+  docs/V2-KICKOFF-PROMPT.md; A18 and A60 head the technical queue.

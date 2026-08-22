@@ -1,7 +1,58 @@
-# HANDOFF — through Take 73
+# HANDOFF — through Take 75 · V1 COMPLETE
 
 Newest first. Written BEFORE the build ships, per PROTOCOL §6.
 The gate refuses to build a take with no entry here.
+
+## Take 75 — 2026-08-22 — v1 capstone (documentation only)
+
+Jacob: **"I'd call v1 done!"** — on the strength of the take-73 field test
+(41/0 on-device, screenshots of filter, cards, labels and satellite behaving)
+and the take-74 label push.
+
+No code changed this take. What changed is that the project can now explain
+itself to a stranger:
+
+- **README.md** — the repo front page, which had never existed: what it is,
+  install from Releases, the data-honesty line, the not-an-emergency-device
+  block, how the seed builds.
+- **docs/V1-STATE.md** — the whole of v1 in one document: numbers, feature
+  surface, pipeline, CI, verification, and the honest open list.
+- **docs/V2-KICKOFF-PROMPT.md** — the brief for the next session: study
+  everything, change nothing, produce an architecture readback, an invariant
+  list, a labeled v2 proposal, and questions.
+
+Durable knowledge now lives in the repo, not in a chat transcript. That was
+the point of every seal since take 1; this take finishes the job.
+
+---
+
+## Take 74 — 2026-08-22 — Labels one more notch out, from the field
+
+First live field report: **41 PASS / 0 FAIL** on the CI build, screenshots of the
+filter, cards, and satellite all behaving. One ask: names further out — "those
+show around 1000 ft".
+
+Minzooms dropped again — trail 11.4 → 10.8, road 12.0 → 11.0, forest road
+12.4 → 11.6 — and measured before shipping:
+
+| zoom | scale | trail | road | fsroad |
+|---|---|---|---|---|
+| 10.5 | 2 mi | 0 | 0 | 0 |
+| **11** | **1 mi** | **3** | **25** | 0 |
+| 12 | 3000 ft | 2 | 19 | 11 |
+
+The z11.3 screenshot settles the clutter question: a dozen named section roads
+(Cauchy, Hoy, Evans, Curtisville, Brainard Springs, Fowler…), MAT twice on the
+blue line, names tracking their roads with clean halos. That is orientation, not
+soup — the section-road grid with names is exactly "which road am I two east
+of". Forest-road numbers stay one notch later on purpose; 4-digit IDs at 1 mi
+would be noise where names are signal.
+
+Mid-take an aborted run left the tree in an uncertain state; greps confirmed the
+minzooms had landed and the measurement screenshot had survived before anything
+was rebuilt. Verify, then proceed — cheaper than re-doing either by assumption.
+
+---
 
 ## Take 73 — 2026-08-22 — Search forgives a gloved thumb, and the notes became a test script
 

@@ -1,3 +1,5 @@
+**v1 complete.** Documentation capstone — functionally identical to take 74.
+
 Signed release build, ~50 MB — satellite tiles at 3.4 m/px. Installs on any
 Android 8+ device.
 
@@ -14,9 +16,10 @@ with no network. Then tap **Self-test** and share the report.
 - **Search** — try sloppy queries: `pinkstore`, `mcct`, `h5717`, `wagnr`, a
   street address like `798 n morenci`. One wrong or squeezed-out character should
   still find it. Forest roads are typed *road*, not *trail*.
-- **Labels at 1 mi / 3000 ft scale** — trail and road names without zooming
-  right in; short features like **M-33 Bull Gap Trailhead** named without
-  tapping.
+- **Labels from the 1 mi scale** — you asked for names further out: county
+  roads and trails now label at 1 mi (was 3000 ft), forest-road numbers join at
+  3000 ft. Check it reads as orientation, not soup; short features like **M-33
+  Bull Gap Trailhead** still name themselves without tapping.
 - **Loops** — first option is *most trail*. Check the card's trail mileage
   against what you ride, and whether the small repeated stretch is acceptable.
 - **Route cards** — elevation profile with low/high, and the designated / forest

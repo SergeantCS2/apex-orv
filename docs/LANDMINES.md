@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 73.*
+*Current as of take 75.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -1363,3 +1363,12 @@ better matched, so forgiveness can never displace precision.
 Forest Service road as *trail* eleven takes after the map learned to draw the
 difference. When a distinction is established, grep every place that names the
 thing.
+
+**Landmine 101 corollary, fourth disk incident — the hog can live outside the
+project.** Render passed standalone, then the gate's nested render failed with
+"Could not compile fragment shader" and zero trail features. No code had
+changed; disk had fallen to 70 MB. The consumer was not /tmp or the repo but
+**/root/.cache — 652 MB** of headless-Chrome shader caches and downloads
+accumulated across seventy takes. A GPU-sounding error on SwiftShader is a disk
+error until proven otherwise, and `du -sh` on the home caches belongs in the
+diagnosis before any shader theory does.
