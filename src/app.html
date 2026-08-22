@@ -53,6 +53,12 @@
     padding:5px 8px;background:none;border:0;border-radius:7px;color:#F2ECE0;
     font:600 12.5px/1.2 Roboto,system-ui,sans-serif;text-align:left}
   .actrow.on{background:rgba(226,87,15,.9);color:#fff}
+  /* Legend-only rows: they explain a colour, they do not filter by it. Indented
+     under the activity they belong to, quieter, and not tappable. The 38 px
+     tap-target minimum (take 37) applies to CONTROLS; this is not one, so the
+     on-device layout check must not read it as an undersized button. */
+  .actrow.tierrow{min-height:26px;padding-left:22px;opacity:.82;
+    font-size:11.5px;cursor:default;background:none}
   .sw{flex:0 0 auto;width:22px;height:5px;border-radius:3px;
     box-shadow:0 0 0 1.5px rgba(255,255,255,.85)}
   .sw.dash{background-image:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 9px)}
@@ -84,8 +90,29 @@
 .pin.me{background:#00A8E8}
   .pin.truck{background:#8A4B14}
   .pin.drop{background:#7A3F0C;border-color:#F5EFE2}
-  #alert{position:absolute;left:11px;right:11px;top:54px;background:#C1121F;color:#fff;
-    border-radius:4px;padding:11px 13px;font:700 13px/1.35 Roboto,system-ui,sans-serif;
+  /* ── RIDE HUD (take 78) ────────────────────────────────────────────────
+     overflow:hidden, not auto — the ribbon is clipped, never scrollable, so the
+     layout self-test does not count it as a scroller that cannot scroll. */
+  #hudbar{position:absolute;left:0;right:0;top:0;height:30px;z-index:4;
+    overflow:hidden;pointer-events:none;
+    background:linear-gradient(180deg,rgba(24,22,18,.92),rgba(24,22,18,.62))}
+  #hudbar[hidden]{display:none}
+  #hudticks{position:absolute;inset:0}
+  #hudticks i{position:absolute;top:0;width:1px;background:rgba(255,255,255,.5)}
+  #hudticks i.maj{background:rgba(255,255,255,.9)}
+  #hudticks b{position:absolute;top:11px;transform:translateX(-50%);
+    font:700 11px/1 Roboto,system-ui,sans-serif;color:#fff;letter-spacing:.04em;
+    text-shadow:0 1px 2px rgba(0,0,0,.9)}
+  #hudneedle{position:absolute;left:50%;top:0;width:2px;height:30px;
+    margin-left:-1px;background:#E2570F;box-shadow:0 0 4px rgba(0,0,0,.6)}
+  #hudstats{position:absolute;right:11px;top:38px;z-index:4;pointer-events:none;
+    text-align:right;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 2px rgba(0,0,0,.9)}
+  #hudstats[hidden]{display:none}
+  #hud-spd{font:700 30px/1 Roboto,system-ui,sans-serif}
+  #hud-spd .hu{font-size:12px;font-weight:700;margin-left:3px;opacity:.9}
+  #hud-trip{font:700 11.5px/1.3 Roboto,system-ui,sans-serif;margin-top:2px;opacity:.95}
+  #alert{position:absolute;left:11px;right:11px;top:54px;background:#C1121F;color:#fff;    border-radius:4px;padding:11px 13px;font:700 13px/1.35 Roboto,system-ui,sans-serif;
     box-shadow:0 3px 12px rgba(0,0,0,.4);display:none}
   #alert.on{display:block}
   #alert small{display:block;font-weight:400;font-size:11px;opacity:.9;margin-top:3px}
@@ -175,7 +202,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 75</span>
+    <span id="title"><b>APEX</b> ORV · Take 82</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -195,6 +222,20 @@
          same time (take 67). -->
     <button id="c-act" class="basebtn actbtn">🏍 All routes</button>
     <div id="actpanel" hidden></div>
+    <!-- ── RIDE HUD (take 78) ──────────────────────────────────────────────
+         Only on screen while a ride is running. On a bike the two questions are
+         "which way am I pointing" and "how fast am I going", and until now the
+         app answered neither — it recorded time, distance and elevation from
+         take 41 and displayed only elevation.
+         The ribbon takes the chip strip's slot rather than adding height: those
+         chips jump the camera to a town, and during a ride the map recentres on
+         the rider every sixth fix, so they are already undone the moment they
+         are used. Stats go top-RIGHT, which is the only empty corner. -->
+    <div id="hudbar" hidden><div id="hudticks"></div><div id="hudneedle"></div></div>
+    <div id="hudstats" hidden>
+      <div id="hud-spd">—<span class="hu">mph</span></div>
+      <div id="hud-trip"><span id="hud-time">—</span> · <span id="hud-dist">—</span></div>
+    </div>
     <div class="strip" id="chips"></div>
     <div id="alert"></div>
     <div class="strip" id="tools">
@@ -210,6 +251,7 @@
       <button class="chip" id="c-labels">🏷 Labels</button>
       <button class="chip" id="c-about">ⓘ About</button>
       <button class="chip" id="c-loop">◯ Loop</button>
+      <button class="chip" id="c-saved">☆ Saved</button>
       <button class="chip" id="c-selftest">⛑ Self-test</button>
       <button class="chip" id="c-search">🔍 Search</button>
     </div>
@@ -263,6 +305,50 @@ function decode(a){var p=[],x=0,y=0;for(var i=0;i<a.length;i+=2){x+=a[i];y+=a[i+
  p.push([x/1e5,y/1e5])}return p}
 
 /* ── graph ─────────────────────────────────────────────────────────────── */
+/* ══ MACHINE LEGALITY ═══════════════════════════════════════════════════════
+   Take 80. `MACHINE[m].ok` is a CLASS allow-list and it encodes the DNR's rules
+   correctly, because the DNR expresses width in the layer a feature comes from:
+   a 24" trail is class moto24, a 50" trail is trail50, and the allow-lists
+   follow. Nothing to fix there.
+
+   The Forest Service does not work that way. It publishes ONE class of trail
+   and puts the per-vehicle rules in the attributes. In this region 25 fstrail
+   edges (3.13 mi) carry `moto: open` with `atv` unset, and their MVUM symbol
+   reads "Trails open to motorcycles, Yearlong". A quad is allowed on class
+   fstrail, so the router would put one on a motorcycle trail — and the feature
+   card printed "Moto open" beside it, so the app was displaying the fact and
+   ignoring it at the same time.
+
+   Where the source states a per-vehicle rule, that rule governs. Where it does
+   not, the class rule stands. Both the router and the snapper go through here,
+   because a snap that lands on an illegal node reports "no route" when a legal
+   one exists, or worse, starts you on one (take 24).
+
+   sxs has no stored flag: the MVUM's `other_ohv_gt50inches` and
+   `highclearancevehicle` are fetched by ingest and dropped before the bundle.
+   It falls back to the class rule, which excludes fstrail entirely, so it is
+   conservative rather than wrong. Recorded as open — see A86. */
+var MACH_FLAG={bike:'moto',quad:'atv',sxs:null};
+
+function machineLegal(e){
+  if(MACHINE[machine].ok.indexOf(e.c)<0)return false;
+  if(e.c==='closed'||e.c==='fsclosed')return false;
+  var fl=MACH_FLAG[machine];
+  if(!fl)return true;                       /* no per-vehicle field for it */
+  var v=B[e.bi>=0?e.bi:0];
+  if(e.bi<0||!v)return true;                /* no attributes: class rule stands */
+  var mi=BK.indexOf('moto'),ai=BK.indexOf('atv');
+  var has=(mi>=0&&v[mi])||(ai>=0&&v[ai]);
+  if(!has)return true;                      /* source states nothing per-vehicle */
+  var k=BK.indexOf(fl);
+  if(k<0)return true;
+  var val=v[k];
+  /* "open" is the only value the MVUM uses for permitted. Anything else —
+     absent, "closed", a seasonal string we do not parse — is not a licence to
+     ride, and this is not the place to be generous (invariant: nothing may
+     route a rider onto a trail they may not legally ride). */
+  return String(val||'').toLowerCase()==='open'}
+
 var NODES=decode(GR.n), CLS=GR.cls, NM=GR.nm, BK=GR.bk, B=GR.b;
 var EDGES=GR.e.map(function(e,i){return {a:e[0],b:e[1],L:e[2],c:CLS[e[3]],
   n:e[4]>=0?NM[e[4]]:null,id:e[5]>=0?NM[e[5]]:null,bi:e[6],i:i}});
@@ -278,6 +364,11 @@ el('b-src').className='badge good';
 /* Machine legality. This is ROADMAP 7.4 driven by real MVUM and DNR width data,
    not a guess: a 24" motorcycle trail is illegal for a quad, and a side-by-side
    belongs on 72" routes and roads only. */
+/* Jacob rides a NARROW dirt bike, so in practice he is on the `bike` profile and
+   every width and per-vehicle rule below is permissive for him — the take-81
+   quad exclusion touches nothing he will ever ride. Recorded because it matters
+   for debugging: if a route looks wrong on his phone, machine legality is not
+   the first place to look. It becomes live for anyone else, and for A72. */
 var MACHINE={
   bike:{lbl:'🏍 Dirt bike 24"',ok:['route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track']},
   quad:{lbl:'🛻 Quad 50"',ok:['route72','trail50','mccct','fstrail','fsroad','paved','minor','track']},
@@ -406,6 +497,53 @@ var shortPts={type:'FeatureCollection',features:strokes.filter(function(f){
     return {type:'Feature',properties:{lb:f.properties.lb,c:f.properties.c},
             geometry:{type:'Point',coordinates:m}}})};
 
+/* ══ PALETTE ═══════════════════════════════════════════════════════════════
+   ONE table. The style paints from it and the activity picker reads from it, so
+   the legend cannot drift from the map — which it had. Take 61 set two-track to
+   #A9702F, take 64 dimmed the LAYER to #9C7343, take 67 wrote the swatch from
+   the take-61 value, and nothing connected the two: dE 12.9 apart, four times
+   the just-noticeable difference, and #A9702F appeared nowhere in the style at
+   all. A legend generated from a COPY of the palette is a hand-written legend
+   with extra steps (landmine 98).
+
+   Every value below was chosen by measurement against 1,048,576 real satellite
+   pixels sampled from this region's own z15 tiles, scored on FOUR axes at once
+   (take 77):
+     · separation from the sand basemap        — the app opens on Map
+     · separation from the darkest canopy      — the rider uses Hybrid
+     · separation from its siblings            — the hierarchy must read
+     · separation from every NON-RIDABLE class — landmine 88, and the one that
+       actually changed an answer: #B0722B scored best for two-track on
+       visibility and sits dE 12.5 from nfsmoto amber, a trail whose ridability
+       the MVUM governs. Rejected on legality, not on looks.
+
+   What the measurement REFUSED to give: a colour that makes `fsroad` legible.
+   The sand basemap is light (228,215,188) and canopy is dark (91,106,84), so
+   any single mid-tone loses to one of them — lighter candidates gained on
+   satellite exactly as fast as they lost on sand. fsroad is fixed with a
+   CASING, the same answer as designated trail and two-track, not with paint. */
+var PAL={
+  /* designated ORV line, by difficulty. green / blue / black is what every
+     trail map on earth uses, so it is learnable before it is explained. */
+  route72:'#0FAE57',                    /* easy   · was #2F7D4F, dE 26->49 vs canopy */
+  trail50:'#0B7FE8', fstrail:'#0B7FE8', /* mod    · was #2585D8, dE 62->74 */
+  mccct:'#1C1A16',  moto24:'#1C1A16',   /* hard   · unchanged; the halo carries it */
+  /* ridable dirt */
+  track:'#96562A',                      /* was #9C7343, dE 29->42; clears nfsmoto by 28 */
+  fsroad:'#8A7C66',                     /* unchanged — see the casing note above */
+  /* roads: background by design */
+  minor:'#4A443B', paved:'#3A352E',
+  /* closed to everything */
+  closed:'#C1121F', fsclosed:'#C1121F',
+  /* show-only: drawn so the map is honest about what exists, dashed because
+     dashed means "not yours to ride". */
+  foot:'#7CB342', horse:'#8E6BB5', snow:'#4FB3C9', snowmob:'#4FB3C9',
+  nfsmoto:'#C98A2E',
+  showother:'#5E6B7A'  /* was #7C6F5A — dE 5.2 from fsroad, so an unmatched
+                          show-only route was almost indistinguishable from a
+                          forest road the rider MAY use. Now 25.5. */
+};
+
 function w(a,b,c){return ['interpolate',['linear'],['zoom'],10,a,14,b,17,c]}
 /* MapLibre forbids more than ONE zoom-based interpolate per expression, so
    ['case', cond, w(...), w(...)] is invalid — and an invalid expression makes
@@ -533,31 +671,45 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       layout:{'line-cap':'round','line-join':'round'},
       filter:['==',['get','c'],'track'],
       paint:{'line-color':'#FFFFFF','line-opacity':0.75,'line-width':w(1.7,3.8,8)}},
+    /* Forest road gets a casing too, and take 77 measured why it had to. Colour
+       alone cannot fix this one: the sand basemap is light and canopy is dark,
+       so every lighter candidate gained on satellite exactly as fast as it lost
+       on sand. At #8A7C66 it sits dE 15.8 from median ground with NOTHING under
+       it — the least legible drawn class on the map, and the only ridable one
+       with no halo.
+       Deliberately the faintest of the three casings, so the hierarchy take 61
+       established still reads: designated trail 0.95 / two-track 0.75 / forest
+       road 0.55, each narrower than the last. A road you drive a truck down
+       should be findable, not loud. */
+    {id:'casing-fsroad',type:'line',source:'net',
+      layout:{'line-cap':'round','line-join':'round'},
+      filter:['==',['get','c'],'fsroad'],
+      paint:{'line-color':'#FFFFFF','line-opacity':0.55,'line-width':w(1.2,2.6,5.5)}},
     /* PAVED and MINOR are roads and read as background. TRACK and FSROAD are
        not: forest two-track and USFS road are 1,169 of the 2,246 miles here —
        52% — and they are exactly what a dirt bike rides. Styled as grey dashes
        they read as "not for you", which is why Jacob said the trails he rides
        had no colour (take 58). They are ridable dirt: a warm tan, solid, thinner
        than designated trail so the hierarchy still reads. */
-    lyr('minor','minor','#4A443B',w(0.4,0.9,2.2)),
-    lyr('paved','paved','#3A352E',w(0.9,2,4.8)),
+    lyr('minor','minor',PAL.minor,w(0.4,0.9,2.2)),
+    lyr('paved','paved',PAL.paved,w(0.9,2,4.8)),
     /* fsroad and track were the same brown at take 58, and Jacob's own example
        shows why that is wrong: "East Wagner Lake Road" is minor and "E. Wagner
        Lake Rd" is fsroad — the SAME road, split in the source. A Forest Service
        road is something you drive a truck down; a two-track is something you
        ride. Muted grey-tan for the road, warm brown for the two-track, and only
        the two-track gets a casing (take 61). */
-    lyr('fsroad','fsroad','#8A7C66',w(0.6,1.4,3.2)),
-    lyr('track','track','#9C7343',w(0.7,1.8,3.9)),
+    lyr('fsroad','fsroad',PAL.fsroad,w(0.6,1.4,3.2)),
+    lyr('track','track',PAL.track,w(0.7,1.8,3.9)),
     /* Trails, by difficulty. Widest/easiest drawn first so the hard singletrack
        sits on top where it matters. */
-    lyr('route72','route72','#2F7D4F',w(1.7,4.1,9.5)),
-    lyr('fstrail','fstrail','#2585D8',w(1.4,3.4,8)),
-    lyr('trail50','trail50','#2585D8',w(1.5,3.7,8.6)),
-    lyr('mccct','mccct','#1C1A16',w(1.5,3.7,8.6)),
-    lyr('moto24','moto24','#1C1A16',w(1.5,3.7,8.6)),
-    lyr('closed','closed','#C1121F',w(1.2,3,7),[2,1.3]),
-    lyr('fsclosed','fsclosed','#C1121F',w(1.2,3,7),[2,1.3]),
+    lyr('route72','route72',PAL.route72,w(1.7,4.1,9.5)),
+    lyr('fstrail','fstrail',PAL.fstrail,w(1.4,3.4,8)),
+    lyr('trail50','trail50',PAL.trail50,w(1.5,3.7,8.6)),
+    lyr('mccct','mccct',PAL.mccct,w(1.5,3.7,8.6)),
+    lyr('moto24','moto24',PAL.moto24,w(1.5,3.7,8.6)),
+    lyr('closed','closed',PAL.closed,w(1.2,3,7),[2,1.3]),
+    lyr('fsclosed','fsclosed',PAL.fsclosed,w(1.2,3,7),[2,1.3]),
     /* Both of these were written twice and never landed: my patches anchored on
        'route-line', and the layer is called 'routeline'. The SOURCES were
        created and fed data, so every check I wrote — which measured setData —
@@ -570,8 +722,8 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
          snowmobile route looked identical, and both looked like "some line".
          Colour by use; dashed still means "not yours to ride" (take 66). */
       paint:{'line-color':['match',['get','c'],
-          'foot','#7CB342','horse','#8E6BB5','snow','#4FB3C9',
-          'snowmob','#4FB3C9','nfsmoto','#C98A2E','#7C6F5A'],
+          'foot',PAL.foot,'horse',PAL.horse,'snow',PAL.snow,
+          'snowmob',PAL.snowmob,'nfsmoto',PAL.nfsmoto,PAL.showother],
         'line-width':w(1.1,2,3.2),
         'line-dasharray':[2,2],'line-opacity':0.9}},
     {id:'alt-line',type:'line',source:'alt',
@@ -701,11 +853,19 @@ el('c-me').addEventListener('click',function(){
 function syncArm(){el('c-home').className='chip'+(arm==='home'?' arm':'');
   el('c-me').className='chip'+(arm==='me'?' arm':'')}
 
+el('c-saved').addEventListener('click',function(){
+  logAct('act  saved routes');buildSavedPanel()});
+
 el('c-machine').addEventListener('click',function(){
   machIdx=(machIdx+1)%ORDER.length;machine=ORDER[machIdx];
   el('c-machine').textContent=MACHINE[machine].lbl;
+  applyMachine();
+  var no=machineIllegal();
   clearRoute();show('Machine set to <b>'+MACHINE[machine].lbl.replace(/^\S+\s/,'')+
-   '</b>. Routing now respects what is legal for it.','')});
+   '</b>. Routing respects what is legal for it, and the map now shows it: '+
+   (no.length?'<b>'+no.length+'</b> kind'+(no.length>1?'s':'')+' of line faded '+
+     'because they are too narrow for it. They are still real trails \u2014 just '+
+     'not yours today.':'nothing on this map is off limits for it.'),'')});
 
 var FUELS=[30,50,80,120,0],fi=1;
 el('c-fuel').addEventListener('click',function(){fi=(fi+1)%FUELS.length;
@@ -717,13 +877,14 @@ el('c-fuel').addEventListener('click',function(){fi=(fi+1)%FUELS.length;
    use. Snapping to the geometrically nearest node strands a 72" side-by-side on
    a 50" trailhead and reports "no route" when a legal one exists 200 m away. */
 function nearestNode(ll){
-  var ok={};MACHINE[machine].ok.forEach(function(c){ok[c]=1});
   var best=1e18,bi=-1;
   for(var i=0;i<NODES.length;i++){
     var ad=ADJ[i],legal=false;
     for(var k=0;k<ad.length;k++){
-      var c=ad[k].c;
-      if(ok[c]&&c!=='closed'&&c!=='fsclosed'){legal=true;break}}
+      /* the same predicate the router uses — a snap onto a node whose only
+         edges are illegal for this machine either reports "no route" when a
+         legal one exists, or starts the rider on one (take 24, take 80) */
+      if(machineLegal(ad[k])){legal=true;break}}
     if(!legal)continue;
     var dx=NODES[i][0]-ll[0],dy=NODES[i][1]-ll[1],d=dx*dx*0.51+dy*dy;
     if(d<best){best=d;bi=i}}
@@ -734,7 +895,6 @@ function snapMiles(ll,ni){if(ni<0)return 0;
   return Math.sqrt(dx*dx+dy*dy)}
 
 function route(from,to,cost){
-  var ok={};MACHINE[machine].ok.forEach(function(c){ok[c]=1});
   var N=NODES.length,dist=new Float64Array(N),prev=new Int32Array(N),
       pe=new Int32Array(N),done=new Uint8Array(N);
   dist.fill(Infinity);prev.fill(-1);pe.fill(-1);dist[from]=0;
@@ -754,7 +914,7 @@ function route(from,to,cost){
     var ad=ADJ[u];
     for(var k=0;k<ad.length;k++){var e=ad[k];
       if(e.c==='closed'||e.c==='fsclosed')continue;   /* never route through a closure */
-      if(!ok[e.c])continue;                            /* never route somewhere illegal */
+      if(!machineLegal(e))continue;                    /* class AND per-vehicle (take 80) */
       var v=e.a===u?e.b:e.a;if(done[v])continue;
       var nd=d+cost(e);
       if(nd<dist[v]){dist[v]=nd;prev[v]=u;pe[v]=e.i;push([nd,v])}}}
@@ -819,6 +979,169 @@ var PROFILES=[
   {k:'short',h:'Shortest',f:function(e){return e.L}},
   {k:'flat',h:'Least climbing',f:function(e){return e.L*0.35+UP[e.i]*45}}
 ];
+
+/* ══ SAVED ROUTES ═══════════════════════════════════════════════════════════
+   A85, and the last thing take 25 named as missing from A28: "saving and naming
+   a planned route so it survives an app restart."
+
+   THE DESIGN DECISION: a saved route stores its INPUTS — the two points, the
+   machine, the profile — and is re-routed when you open it. It does NOT store
+   the line.
+
+   That is a safety property, not a storage preference. The bundle carries
+   twelve temporarily-closed segments and they are refreshed from the DNR on
+   every build. A route frozen as geometry in October and replayed in May would
+   happily draw you down something that closed in between, with every closure
+   check bypassed because the answer was already on disk. Re-routing from the
+   inputs runs the current legality filter, the current closures and the current
+   machine rules every time.
+
+   The cost is that a reopened route can differ from the one you saved. That is
+   the correct behaviour and the app says so when the bundle has changed under it.
+
+   localStorage is not a network call — it is same-origin state on the device,
+   which PROTOCOL §8 draws the line around explicitly. Nothing here is sent
+   anywhere. */
+var SVKEY='apex.routes.v1';
+
+function svAvailable(){
+  /* file:// in some browsers throws on ACCESS, not on use, so probe rather than
+     feature-detect (landmine 56 — a platform's return type, or its willingness
+     to answer at all, is not something to assume) */
+  try{var k='__apex_probe';localStorage.setItem(k,'1');localStorage.removeItem(k);
+      return true}catch(e){return false}}
+
+function svLoad(){
+  if(!svAvailable())return [];
+  try{var a=JSON.parse(localStorage.getItem(SVKEY)||'[]');
+      return Array.isArray(a)?a:[]}catch(e){return []}}
+
+function svWrite(a){
+  if(!svAvailable())return false;
+  try{localStorage.setItem(SVKEY,JSON.stringify(a));return true}catch(e){return false}}
+
+function svAdd(rec){
+  var a=svLoad();
+  /* newest first, and a re-save under the same name replaces rather than
+     accumulating near-duplicates the rider then has to tell apart */
+  a=a.filter(function(x){return x.n!==rec.n});
+  a.unshift(rec);
+  if(a.length>40)a=a.slice(0,40);
+  return svWrite(a)?a:null}
+
+function svDel(name){
+  var a=svLoad().filter(function(x){return x.n!==name});
+  return svWrite(a)?a:null}
+
+function svCurrent(name){
+  /* What is on screen right now, as INPUTS.
+     A loop is not flagged on the option record — I assumed it was and it is
+     not (landmine 102). It is identifiable from the state that actually
+     exists: buildLoops sets na === nb and the chip handler records LOOP_MI. */
+  if(!last||last[sel]===undefined||!last[sel])return null;
+  var o=last[sel],isLoop=(o.na===o.nb&&LOOP_MI>0);
+  if(!RFROM)return null;
+  return {n:name,k:isLoop?'loop':'route',
+          f:RFROM.slice(),t:(!isLoop&&RTO)?RTO.slice():null,
+          mi:isLoop?LOOP_MI:null,
+          m:machine,p:o.k||null,
+          r:BUNDLE.region||null,b:BUNDLE.hash||null,
+          lbl:DESTLBL||null,ts:Date.now()}}
+
+function svName(){
+  /* One tap, no dialog. A rider in gloves on a moving bike should not meet a
+     system prompt, so the name is generated from what the route IS and can be
+     renamed later from the panel. */
+  var o=last&&last[sel];
+  if(!o)return 'Route';
+  var d=new Date(),md=(d.getMonth()+1)+'/'+d.getDate();
+  var isLoop=(o.na===o.nb&&LOOP_MI>0);
+  return (isLoop?'Loop ':'')+o.s.mi.toFixed(1)+' mi'+
+    (isLoop?'':' to '+(DESTLBL||'there'))+' · '+md}
+
+function svOpen(rec){
+  if(!rec)return;
+  if(rec.r&&BUNDLE.region&&rec.r!==BUNDLE.region)
+    return show('<b>'+rec.n+'</b> was saved in a different region ('+rec.r+
+      '). Routes are only meaningful against the map they were planned on.','fail');
+  if(!rec.f)return show('<b>'+rec.n+'</b> has no start point saved.','fail');
+  /* Re-route, never replay. See the note on SVKEY: closures move between
+     builds and a frozen line would bypass every check that exists to catch
+     them. Say so when the data has changed underneath. */
+  var stale=(rec.b&&BUNDLE.hash&&rec.b!==BUNDLE.hash);
+  /* There is no syncMachine() — I called one that does not exist. The chip
+     handler sets machIdx, machine and the label inline, so do the same three
+     things here rather than inventing a helper (landmine 102: check the code,
+     not your memory of it). */
+  if(rec.m&&MACHINE[rec.m]){
+    machine=rec.m;
+    var _mi=ORDER.indexOf(rec.m);if(_mi>=0)machIdx=_mi;
+    el('c-machine').textContent=MACHINE[machine].lbl}
+  ME=rec.f.slice();if(mM)mM.setLngLat(ME);
+  var note=stale?'<br><span class="sub">The map has been rebuilt since you saved '+
+    'this — it has been routed again on the current data, so closures and '+
+    'reroutes are up to date. The line may differ from the one you saved.</span>':'';
+  if(rec.k==='loop'&&rec.mi){
+    LOOP_MI=rec.mi;
+    show('Rebuilding <b>'+rec.n+'</b>…'+note,'');
+    setTimeout(function(){
+      var a=nearestNode(ME);
+      if(a<0)return show('<b>Nothing legal nearby</b> for that machine at the '+
+        'saved start point.','fail');
+      RFROM=ME.slice();RTO=ME.slice();
+      var out=buildLoops(a,rec.mi);
+      if(!out.length)return show('<b>'+rec.n+'</b> will not rebuild — the legal '+
+        'network within reach no longer connects back at '+rec.mi+' mi.','fail');
+      out.forEach(function(o){o.h+=' · '+o.s.mi.toFixed(1)+' mi';
+        if(o.repeat>0.25)o.h+=' ⟲'});
+      presentRoutes(out);svPrefer(rec.p)},30);
+    return}
+  if(!rec.t)return show('<b>'+rec.n+'</b> has no destination saved.','fail');
+  routeToPoint(rec.t,rec.lbl||'there');
+  setTimeout(function(){svPrefer(rec.p);if(note)el('panel').innerHTML+=note},80)}
+
+function svPrefer(k){
+  /* reselect the profile the route was saved with, if it still exists */
+  if(!k||!last)return;
+  for(var i=0;i<last.length;i++)if(last[i].k===k){
+    sel=i;draw(last[i],true);
+    Array.prototype.forEach.call(document.querySelectorAll('.rc'),function(d){
+      d.className='rc'+(+d.dataset.i===sel?' sel':'')});
+    return}}
+
+function buildSavedPanel(){
+  var a=svLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region});
+  if(!svAvailable())
+    return show('<b>Saved routes are unavailable here.</b> This browser will not '+
+      'let the page store anything. In the app they work normally.','fail');
+  if(!a.length)
+    return show('<b>No saved routes yet.</b><br>Plan a route or a loop, then tap '+
+      '<b>☆ Save</b> on the card you want to keep. It is stored on this phone '+
+      'only — nothing is sent anywhere — and reopening it routes again on the '+
+      'current map, so closures stay up to date.','');
+  var h='<div id="routes">';
+  a.forEach(function(r,i){
+    h+='<div class="rc" data-sv="'+i+'"><h5>'+r.n+'</h5>'+
+       '<div class="sub">'+(r.k==='loop'?'loop · '+r.mi+' mi target':'point to point')+
+       ' · '+((MACHINE[r.m]||{}).lbl||r.m||'')+'</div>'+
+       '<div class="sub"><button class="chip" data-svopen="'+i+'">Open</button> '+
+       '<button class="chip" data-svren="'+i+'">Rename</button> '+
+       '<button class="chip" data-svdel="'+i+'">Delete</button></div></div>'});
+  el('panel').className='';el('panel').innerHTML=h+'</div>';
+  var bind=function(attr,fn){
+    Array.prototype.forEach.call(document.querySelectorAll('['+attr+']'),function(b){
+      b.addEventListener('click',function(e){
+        if(e&&e.stopPropagation)e.stopPropagation();
+        fn(a[+b.getAttribute(attr)])})})};
+  bind('data-svopen',function(r){logAct('act  open saved '+r.n);svOpen(r)});
+  bind('data-svdel',function(r){logAct('act  delete saved '+r.n);
+    svDel(r.n);buildSavedPanel()});
+  bind('data-svren',function(r){
+    var n=null;
+    try{n=window.prompt?window.prompt('Name this route',r.n):null}catch(e){n=null}
+    if(!n)return;
+    var all=svLoad().map(function(x){return x.n===r.n?(x.n=n,x):x});
+    svWrite(all);buildSavedPanel()})}
 
 var last=null,sel=null;
 /* Route from ME to any point. Return Home is just this with HOME as the
@@ -988,7 +1311,22 @@ function renderRoutes(out){
         ' mi off-network (dashed) to reach the trail</div>':'')+
       '</div>'});
   html+='</div>';
+  /* Below the cards, not inside them: a button nested in a selectable card
+     needs stopPropagation on every path, and the thing a rider means by "save"
+     is the option currently chosen. */
+  html+='<div class="sub" style="margin-top:7px">'+
+    '<button class="chip" id="btn-save">\u2606 Save this route</button></div>';
   el('panel').className='';el('panel').innerHTML=html;
+  var sb=el('btn-save');
+  if(sb)sb.addEventListener('click',function(){
+    var rec=svCurrent(svName());
+    if(!rec)return show('Nothing to save yet.','fail');
+    if(!svAdd(rec))return show('<b>Could not save.</b> This browser will not let '+
+      'the page store anything; in the app it works normally.','fail');
+    logAct('act  saved route '+rec.n);
+    show('Saved as <b>'+rec.n+'</b>.<br><span class="sub">Kept on this phone only. '+
+      'Reopening it routes again on the current map, so closures and reroutes '+
+      'stay up to date \u2014 the line may differ from today\u2019s.</span>','pass')});
   Array.prototype.forEach.call(document.querySelectorAll('.rc'),function(c){
     c.addEventListener('click',function(){
       sel=+c.dataset.i;logAct('act  picked '+((last[sel]||{}).h||sel));
@@ -1241,15 +1579,90 @@ el('btn-steps').addEventListener('click',function(){
 /* Every route class, grouped the way a rider thinks about them. `sw` is the
    swatch colour shown in the panel, so the legend cannot drift from the map:
    both read this table. `dash` marks the ones routing will never use. */
+/* Every swatch reads PAL — the same object the style paints from — so the
+   picker and the map cannot disagree. It used to carry its own copy of the
+   colours and had already drifted by dE 12.9 on two-track (take 77).
+
+   `tier` rows are legend-only: they explain a colour without filtering, because
+   ORV/dirt-bike is ONE activity drawn in THREE colours and a single blue swatch
+   standing for green, blue and black explained none of them. Green/blue/black
+   is the universal trail-map grammar; it is learnable the moment it is stated
+   once, and until take 77 nothing in the app stated it. */
+/* Drawn, and deliberately NOT in the legend. Declared here rather than left as
+   a standing note in the gate, because a note that always lists three names
+   carries no signal — a fourth would join it silently (landmine 85's family).
+   With this list the gate can FAIL on anything drawn that is neither explained
+   nor exempt.
+   Grey means road. Nobody needs a swatch to be told that, and two more rows
+   costs panel height on a 360 px screen for information the map already gives.
+   Jacob, take 77, asked directly. */
+var LEGEND_EXEMPT=['minor','paved'];
+
 var ACTS=[
-  {k:'all',  h:'All routes',        sw:'#2585D8'},
-  {k:'orv',  h:'ORV / dirt bike',   sw:'#2585D8', cls:['route72','trail50','moto24','mccct','fstrail']},
-  {k:'dirt', h:'Two-track',         sw:'#A9702F', cls:['track']},
-  {k:'foot', h:'Hiking',            sw:'#7CB342', cls:['foot'], dash:1},
-  {k:'horse',h:'Equestrian',        sw:'#8E6BB5', cls:['horse'], dash:1},
-  {k:'snow', h:'Snowmobile / ski',  sw:'#4FB3C9', cls:['snow','snowmob'], dash:1},
-  {k:'nfs',  h:'NFS trails',        sw:'#C98A2E', cls:['nfsmoto'], dash:1}
+  {k:'all',  h:'All routes',        sw:PAL.trail50},
+  {k:'orv',  h:'ORV / dirt bike',   sw:PAL.trail50, cls:['route72','trail50','moto24','mccct','fstrail']},
+  {k:'_t1',  h:'  easy · 72" route',      sw:PAL.route72, tier:1},
+  {k:'_t2',  h:'  moderate · 50" trail',  sw:PAL.trail50, tier:1},
+  {k:'_t3',  h:'  difficult · 24" / MCCCT',sw:PAL.mccct,  tier:1},
+  {k:'dirt', h:'Two-track',         sw:PAL.track,  cls:['track']},
+  {k:'_fr',  h:'  forest road · drivable', sw:PAL.fsroad, tier:1},
+  {k:'_cl',  h:'  closed · do not ride',   sw:PAL.closed, tier:1},
+  {k:'foot', h:'Hiking',            sw:PAL.foot,   cls:['foot'], dash:1},
+  {k:'horse',h:'Equestrian',        sw:PAL.horse,  cls:['horse'], dash:1},
+  {k:'snow', h:'Snowmobile / ski',  sw:PAL.snow,   cls:['snow','snowmob'], dash:1},
+  {k:'nfs',  h:'NFS trails',        sw:PAL.nfsmoto,cls:['nfsmoto'], dash:1}
 ];
+/* ══ MACHINE LEGALITY ON THE MAP ════════════════════════════════════════════
+   A86. The router has refused illegal line since take 7, but the MAP said
+   nothing: a 24" motorcycle singletrack and a 72" ORV route were drawn
+   identically, so a rider planning on a side-by-side saw a dense network, chose
+   a line, and only learned it was off-limits when routing declined. The app
+   knew the whole time and did not say.
+
+   DIMMED, not hidden and not dashed. Hidden would be dishonest about what
+   exists — the same reason non-ORV trails are drawn at all (landmine 34's
+   spirit). Dashed already means "not yours to ride, ever", and a motorcycle
+   trail is a perfectly legal ORV trail that simply will not take a 72" machine;
+   conflating the two would be a false statement about the world. Opacity says
+   what is true: still there, still a trail, not for what you are on today.
+
+   Closed line is left at full strength. It is closed to everything, red already
+   says so, and fading it would weaken the one colour that must not be missed. */
+var MACH_DIM=0.30;
+var MACH_LAYERS=['casing','casing-track','casing-fsroad','minor','paved',
+                 'fsroad','track','route72','fstrail','trail50','mccct','moto24'];
+var OPA_BASE=null;
+
+function applyMachine(){
+  if(!map||!map.getLayer)return;
+  /* Base opacities are READ FROM THE STYLE once, never copied into a second
+     table. The casings carry 0.95 / 0.75 / 0.55 and those numbers must not
+     exist in two places — that is exactly how the legend drifted from the map
+     for ten takes (landmine 107). */
+  if(!OPA_BASE){
+    OPA_BASE={};
+    MACH_LAYERS.forEach(function(id){
+      if(!map.getLayer(id))return;
+      var v=map.getPaintProperty(id,'line-opacity');
+      OPA_BASE[id]=(typeof v==='number')?v:1})}
+  var ok=(MACHINE[machine]||{}).ok||[];
+  MACH_LAYERS.forEach(function(id){
+    if(!map.getLayer(id))return;
+    var b=OPA_BASE[id];
+    if(b===undefined)b=1;
+    map.setPaintProperty(id,'line-opacity',
+      ['case',['in',['get','c'],['literal',ok]],b,b*MACH_DIM])});
+  var lg=el('machnote');
+  if(lg)lg.textContent=MACHINE[machine].lbl.replace(/^\S+\s/,'')+
+    ' — faded line is legal ORV trail your machine is too wide for';}
+
+function machineIllegal(){
+  /* which drawn network classes the current machine may not use — for the
+     self-test and the picker, so the count is never asserted from memory */
+  var ok=(MACHINE[machine]||{}).ok||[];
+  return ['route72','trail50','fstrail','mccct','moto24','track','fsroad']
+    .filter(function(c){return ok.indexOf(c)<0})}
+
 var TRAIL_LAYERS=['route72','trail50','moto24','mccct','fstrail'];
 var act='all';
 
@@ -1284,11 +1697,17 @@ function applyAct(){
 function buildActPanel(){
   var p=el('actpanel');
   p.innerHTML=ACTS.map(function(a){
-    return '<button class="actrow'+(a.k===act?' on':'')+'" data-k="'+a.k+'">'+
+    /* tier rows EXPLAIN a colour; they do not filter by it. Rendered without a
+       data-k so the binding below skips them — guarding at bind time rather
+       than with a :not() selector, because the harness models dataset and
+       need not model every CSS selector (landmine 62). */
+    return '<button class="actrow'+(a.tier?' tierrow':'')+
+      (!a.tier&&a.k===act?' on':'')+'"'+(a.tier?'':' data-k="'+a.k+'"')+'>'+
       '<span class="sw'+(a.dash?' dash':'')+'" style="'+
         (a.dash?'color:'+a.sw+';background-color:transparent':'background-color:'+a.sw)+'"></span>'+
       '<span>'+a.h+'</span></button>'}).join('');
   Array.prototype.forEach.call(p.querySelectorAll('.actrow'),function(b){
+    if(!b.dataset||!b.dataset.k)return;
     b.addEventListener('click',function(){
       act=b.dataset.k;applyAct();buildActPanel();p.hidden=true;
       logAct('tap','activity '+act)})})}
@@ -1437,6 +1856,74 @@ function rideFix(acc){
   if(RIDE.fixes>1){RIDE.gaps.push(gap);if(gap>RIDE.maxGap)RIDE.maxGap=gap}
   if(acc!==null&&acc!==undefined)RIDE.acc.push(acc)}
 
+/* ══ RIDE HUD ═══════════════════════════════════════════════════════════════
+   A80/A81/A82. Heading, speed and trip, on screen while riding.
+
+   ONE entry point for both drivers. GPS supplies coords.speed and
+   coords.heading when it has them; the simulator supplies its own; and when
+   neither does — Android reports heading null while stopped — both fall back to
+   differencing the crumb trail, which is the same data the track is drawn from.
+   The simulator therefore exercises every line the GPS path does, which is what
+   makes it a usable test double (take 16).
+
+   bearing() and compass() are reused rather than reimplemented: take 69 verified
+   the four cardinal cases independently, outside the code that produced them,
+   after a reversed bearing sent a reader the wrong way. */
+var HUD={spd:null,hdg:null,at:null,t:null};
+
+function hudSet(mps,deg,at){
+  var now=Date.now();
+  /* derive from the trail when the fix withholds either — heading is null on
+     Android whenever you are stopped, and the simulator has no coords at all */
+  if(at&&HUD.at&&HUD.t){
+    var d=mi(HUD.at,at),secs=(now-HUD.t)/1000;
+    if(deg===null||deg===undefined){if(d>0.0015)deg=bearing(HUD.at,at)}
+    if((mps===null||mps===undefined)&&secs>0.4&&secs<30)mps=d*1609.34/secs;
+  }
+  if(mps!==null&&mps!==undefined&&isFinite(mps)&&mps>=0)HUD.spd=mps;
+  if(deg!==null&&deg!==undefined&&isFinite(deg))HUD.hdg=(deg%360+360)%360;
+  if(at){HUD.at=at.slice();HUD.t=now}
+  hudPaint()}
+
+function hudShow(on){
+  var b=el('hudbar'),s=el('hudstats'),c=el('chips');
+  if(b)b.hidden=!on;
+  if(s)s.hidden=!on;
+  /* the place chips jump the camera to a town; during a ride the map recentres
+     on the rider every sixth fix, so they undo themselves. The ribbon is worth
+     more in that slot than they are. */
+  if(c)c.hidden=!!on;
+  if(!on){HUD={spd:null,hdg:null,at:null,t:null}}
+  hudPaint()}
+
+function hudPaint(){
+  var b=el('hudbar');
+  if(!b||b.hidden)return;
+  var w=b.clientWidth||360,SPAN=180,ppd=w/SPAN,h=HUD.hdg;
+  var t=el('hudticks');
+  if(t){
+    if(h===null){t.innerHTML='';}
+    else{
+      var out=[],CARD=['N','NE','E','SE','S','SW','W','NW'];
+      for(var d=0;d<360;d+=15){
+        var off=((d-h+540)%360)-180;
+        if(Math.abs(off)>SPAN/2)continue;
+        var x=w/2+off*ppd,maj=(d%45===0);
+        out.push('<i class="'+(maj?'maj':'')+'" style="left:'+x.toFixed(1)+
+          'px;height:'+(maj?11:6)+'px"></i>');
+        if(maj)out.push('<b style="left:'+x.toFixed(1)+'px">'+CARD[(d/45)|0]+'</b>');
+      }
+      t.innerHTML=out.join('');
+    }
+  }
+  var sp=el('hud-spd');
+  if(sp)sp.innerHTML=(HUD.spd===null?'—':Math.round(HUD.spd*2.23694))+
+    '<span class="hu">mph</span>';
+  var tm=el('hud-time');
+  if(tm)tm.textContent=RIDE?Math.round((Date.now()-RIDE.t0)/60000)+' min':'—';
+  var ds=el('hud-dist');
+  if(ds)ds.textContent=crumbMi.toFixed(1)+' mi';}
+
 function rideStop(){
   if(!RIDE)return null;
   clearInterval(RIDE.pulse);
@@ -1479,6 +1966,7 @@ function rideReport(R){
 function startRecording(at){
   TRUCK=at.slice(); crumbs=[at.slice()]; crumbMi=0;
   rideStart(at);
+  hudShow(true);
   if(!tM)tM=new maplibregl.Marker({element:mk('truck','⛟')}).setLngLat(TRUCK).addTo(map);
   else tM.setLngLat(TRUCK);
   map.getSource('back').setData({type:'FeatureCollection',features:[]});
@@ -1603,6 +2091,7 @@ function simPath(){
   return path.length?path:null}
 
 function stopRide(){if(riding){clearInterval(riding);riding=null;
+  hudShow(false);
   el('c-ride').textContent='▶ Ride it';el('c-ride').className='chip'}}
 
 /* ── real GPS ────────────────────────────────────────────────────────────
@@ -1643,7 +2132,8 @@ function gpsStart(onFix,onFail){
     var w;
     try{ w=C.watchPosition({enableHighAccuracy:true,timeout:12000},function(pos,err){
       if(err||!pos)return onFail&&onFail(err);
-      onFix([pos.coords.longitude,pos.coords.latitude],pos.coords.accuracy);
+      onFix([pos.coords.longitude,pos.coords.latitude],pos.coords.accuracy,
+            pos.coords.speed,pos.coords.heading);
     }) }catch(e){ onFail&&onFail(e); return null }
     if(w&&typeof w.then==='function')w.then(function(id){watchId=id})
       .catch(function(e){onFail&&onFail(e)});
@@ -1651,7 +2141,8 @@ function gpsStart(onFix,onFail){
     return 'cap'}
   if(navigator.geolocation){
     watchId=navigator.geolocation.watchPosition(function(pos){
-      onFix([pos.coords.longitude,pos.coords.latitude],pos.coords.accuracy)},
+      onFix([pos.coords.longitude,pos.coords.latitude],pos.coords.accuracy,
+            pos.coords.speed,pos.coords.heading)},
       function(e){onFail&&onFail(e)},
       {enableHighAccuracy:true,maximumAge:1000,timeout:12000});
     return 'web'}
@@ -1664,6 +2155,7 @@ function gpsStop(){
       else if(navigator.geolocation)navigator.geolocation.clearWatch(watchId)}catch(e){}
   watchId=null}
 function stopReal(){gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=false;
+  hudShow(false);
   el('c-ride').textContent='▶ Ride it';el('c-ride').className='chip';
   var R=rideStop();
   if(!R)return show('Recording stopped. <b>'+crumbMi.toFixed(2)+
@@ -1690,9 +2182,12 @@ function stopReal(){gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=f
     var S=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Share;
     if(S)S.share({title:'APEX ride',text:txt}).catch(function(){});
     else if(navigator.share)navigator.share({title:'APEX ride',text:txt}).catch(function(){})})}
-function onFix(at,acc){
+function onFix(at,acc,mps,deg){
   classifyFix(at);
   rideFix(acc);
+  /* speed and heading arrived on every fix since take 21 and were discarded on
+     both drivers. A82: the data was already flowing (take 78). */
+  if(posMode==='gps')hudSet(mps,deg,at);
   if(posMode==='away'){                     /* honest, and still useful */
     gpsStop();rideMode=null;
     el('c-ride').textContent='▶ Ride it';el('c-ride').className='chip';
@@ -1737,6 +2232,7 @@ function startSim(){
     if(i>=pts.length){stopRide();
       show('Ride finished. <b>'+crumbMi.toFixed(2)+' mi</b> recorded. Tap <b>Retrace</b>, or <b>Dispatch</b> for what to read out.','pass');return}
     ME=pts[i++].slice();mM.setLngLat(ME);record(ME);checkOffRoute();
+    hudSet(null,null,ME);
     if(i%6===0)map.easeTo({center:ME,duration:280})},170)}
 
 el('c-base').addEventListener('click',function(){setBasemap(bmi+1)});
@@ -1796,6 +2292,10 @@ function drawCoverage(){
     return {type:'Feature',properties:{n:l.n},geometry:{type:'Point',coordinates:l.at}}});
   try{map.getSource('lakes').setData({type:'FeatureCollection',features:labs})}catch(e){}}
 map.on('load',drawCoverage);
+/* The map must reflect the current machine from the first frame, not only after
+   someone taps the chip — a rider who never touches it is exactly the one who
+   needs to be told what is off limits (take 80). */
+map.on('load',applyMachine);
 
 /* Locate: fly to the real position when known, otherwise ask for one. The old
    handler delegated to the GeolocateControl, which does nothing useful when the
@@ -1984,9 +2484,19 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.__geo={addressAt:addressAt,geocode:geocode,
                   get ADDR(){return ADDR}};
     window.__route={buildLoops:buildLoops,nearestNode:nearestNode,
+                    machineLegal:machineLegal,EDGES:EDGES,attrs:attrs,
+                    setMachine:function(m){if(MACHINE[m])machine=m},
                     get ME(){return ME}};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
-                   get R(){return RIDE},get last(){return LASTRIDE}}}catch(e){}
+                   get R(){return RIDE},get last(){return LASTRIDE}};
+    /* the layout matrix must be able to put the HUD on screen at four device
+       sizes; measuring it hidden would measure nothing (landmine 85) */
+    window.hudShow=hudShow;window.hudSet=hudSet;window.hudPaint=hudPaint;
+    window.__mach={set:function(m){if(!MACHINE[m])return;machine=m;
+                     var i=ORDER.indexOf(m);if(i>=0)machIdx=i;applyMachine()},
+                   ok:function(){return (MACHINE[machine]||{}).ok||[]},
+                   illegal:machineIllegal};
+    window.PAL=PAL}catch(e){}
 
 /* ══ SELF-TEST ══════════════════════════════════════════════════════════════
    The same battery of checks runs here, on the device, that render.mjs runs in
@@ -2049,9 +2559,25 @@ function stEnv(){
 }
 
 function stLoad(){
-  stAdd('LOAD','bundle-complete',BUNDLE.state==='complete',
-    BUNDLE.state+(BUNDLE.absent&&BUNDLE.absent.length?' absent='+BUNDLE.absent.join(','):''));
+  /* Was 'bundle-complete', asserting state==='complete'. PARTIAL is a DESIGNED
+     state — a region built while Overpass is down legitimately has no water and
+     the app is supposed to SAY so (landmine 34). Asserting completeness scored
+     correct behaviour as a failure, which is landmine 56's corollary: assert the
+     system's RESPONSE to a condition, never the condition itself.
+     What matters is that the state and the named layers agree — that the app is
+     telling the truth about what it has, whichever answer that is (take 76). */
+  var _hon=(BUNDLE.state==='partial')===!!(BUNDLE.absent&&BUNDLE.absent.length);
+  stAdd('LOAD','bundle-honest',_hon,
+    BUNDLE.state+(BUNDLE.absent&&BUNDLE.absent.length?
+      ' — names absent: '+BUNDLE.absent.join(','):' — nothing absent'));
   stAdd('LOAD','offline-clean',remoteHits===0,remoteHits+' remote requests');
+  /* Saved routes are on-device state, not a network surface — PROTOCOL §8 draws
+     the line at requests leaving the phone. Report what storage holds so a
+     rider can see it is local and finite (take 79). */
+  var _sv=svLoad();
+  stAdd('LOAD','saved-routes',true,
+    svAvailable()?_sv.length+' saved on this phone, nothing sent anywhere':
+      'storage unavailable in this browser — saving is disabled, not silent');
   stAdd('LOAD','glyph-pack',GLYPH_BUF&&GLYPH_BUF.length>1000,
     (GLYPH_BUF?GLYPH_BUF.length:0)+' bytes');
   stAdd('LOAD','graph',EDGES.length>1000&&NODES.length>500,
@@ -2157,6 +2683,23 @@ function stLayout(){
   stAdd('UI','tap-targets',small.length===0,
     small.length?small.length+' under 36 px: '+small.slice(0,3).join(', '):
       'every control at least 36 px tall');
+  /* Assert the HUD's RESPONSE to the ride state, not a fixed state — PARTIAL
+     taught this the hard way at take 76 (landmine 56's corollary). */
+  var _rid=!!(rideMode||riding),_hb=el('hudbar'),_hs=el('hudstats');
+  /* The map must agree with the router about what this machine may use. Both
+     read MACHINE[machine].ok, so this asserts they are actually WIRED, not that
+     two lists happen to match (take 80). */
+  var _no=machineIllegal(),_okc=(MACHINE[machine]||{}).ok||[];
+  var _wired=true;
+  try{['trail50','moto24','track'].forEach(function(id){
+    var e=map.getPaintProperty(id,'line-opacity');
+    if(!e||!e.length||e[0]!=='case')_wired=false})}catch(e){_wired=false}
+  stAdd('UI','machine-on-map',_wired,
+    MACHINE[machine].lbl.replace(/^\S+\s/,'')+' — '+_okc.length+' classes legal, '+
+    _no.length+' faded'+(_no.length?' ('+_no.join(', ')+')':''));
+  stAdd('UI','hud-matches-ride',
+    !!_hb&&!!_hs&&_hb.hidden===!_rid&&_hs.hidden===!_rid,
+    _rid?'riding — ribbon and stats on screen':'not riding — HUD off screen');
   var off=[];
   Array.prototype.forEach.call(document.querySelectorAll('#actions .act'),function(e){
     var r=e.getBoundingClientRect();

@@ -116,8 +116,14 @@ const ready = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   for (let i = 0; i < 120; i++) {
     const m = window.map;
-  if (!m) return { route: -1, alt: -1, approach: -1, threw: "no map" };
-    if (m && m.loaded && m.loaded()) return true;
+    /* This line used to read `if (!m) return {route:-1,alt:-1,approach:-1,...}`
+       — a fragment pasted in from the route-layer probe below, which made the
+       poller RETURN on iteration 0 whenever the map had not appeared yet
+       instead of waiting for it. It only ever worked because of the 3 s sleep
+       underneath. Landmine 65's family: a botched edit that lands somewhere
+       valid. Found at take 77 while copying this wait into another harness. */
+    if (!m) { await sleep(250); continue; }
+    if (m.loaded && m.loaded()) return true;
     await sleep(250);
   }
   return false;
@@ -301,9 +307,18 @@ ok(layers2.approach > 0, `dashed off-network legs render ${layers2.approach} fea
 /* The same layout checks the on-device self-test runs, across the phone sizes
    people actually own. A control that fits on a 430 px screen and slides off a
    360 px one is broken for half the users (take 65). */
+/* The HUD is a NEW full-width element and the matrix would otherwise measure it
+   hidden — a check with nothing to look at reports success (landmine 85). Force
+   the ride state on so every device size measures the ribbon and the stats
+   block actually laid out (take 78). */
+await page.evaluate(() => {
+  try { window.hudShow && window.hudShow(true); window.hudSet &&
+        window.hudSet(11.2, 48.8, null); } catch (e) {}
+});
 for (const dev of DEVICES) {
   await page.setViewport({ width: dev.width, height: dev.height, deviceScaleFactor: dev.dpr });
   await new Promise((r) => setTimeout(r, 1200));
+  await page.evaluate(() => { try { window.hudPaint && window.hudPaint(); } catch (e) {} });
   const fit = await page.evaluate(() => {
     const vw = document.documentElement.clientWidth;
     const vh = document.documentElement.clientHeight;
@@ -332,12 +347,75 @@ for (const dev of DEVICES) {
       if (r.bottom > vh + 2 || r.top < -2) off.push(id + " (vertical)");
       else if (!inStrip && r.right > vw + 2) off.push(id + " (horizontal)");
     });
-    return { wide, off, vw, vh };
+    const hb = document.getElementById("hudbar");
+    const hs = document.getElementById("hudstats");
+    const hud = {
+      barVisible: !!(hb && !hb.hidden && hb.getBoundingClientRect().width > 0),
+      barWidth: hb ? Math.round(hb.getBoundingClientRect().width) : -1,
+      labels: hb ? hb.querySelectorAll("#hudticks b").length : -1,
+      statsRight: hs ? Math.round(hs.getBoundingClientRect().right) : -1,
+      statsTop: hs ? Math.round(hs.getBoundingClientRect().top) : -1,
+    };
+    return { wide, off, vw, vh, hud };
   });
   ok(fit.wide.length === 0 && fit.off.length === 0,
      `${dev.name} ${dev.width}x${dev.height}: nothing overflows, controls reachable`
      + (fit.wide.length ? " — wide: " + fit.wide.join(", ") : "")
+     + (fit.wide.length ? " — wide: " + fit.wide.join(", ") : "")
      + (fit.off.length ? " — off-screen: " + fit.off.join(", ") : ""));
+  ok(fit.hud.barVisible && fit.hud.barWidth === fit.vw && fit.hud.labels > 0
+     && fit.hud.statsRight <= fit.vw + 1 && fit.hud.statsTop >= 0,
+     `${dev.name}: ride HUD fits — ribbon ${fit.hud.barWidth}px of ${fit.vw}, `
+     + `${fit.hud.labels} labels, stats right edge ${fit.hud.statsRight}`);
+}
+await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } catch (e) {} });
+
+/* Machine legality on the map (take 80, A86). Assert the PAINT the browser
+   actually resolved, per machine, not that a function ran. */
+const mach = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const out = {};
+  for (const m of ["bike", "quad", "sxs"]) {
+    window.__mach && window.__mach.set(m);
+    await sleep(400);
+    const ok = window.__mach ? window.__mach.ok() : [];
+    const layers = {};
+    for (const id of ["casing", "moto24", "trail50", "route72", "track", "paved"]) {
+      let v = null;
+      try { v = window.map.getPaintProperty(id, "line-opacity"); } catch (e) {}
+      layers[id] = JSON.stringify(v);
+    }
+    const drew = {};
+    for (const id of ["trail50", "track", "fsroad"]) {
+      try { drew[id] = window.map.queryRenderedFeatures({ layers: [id] }).length; }
+      catch (e) { drew[id] = -1; }
+    }
+    out[m] = { ok, layers, drew };
+  }
+  window.__mach && window.__mach.set("bike");
+  return out;
+});
+{
+  const sxs = mach.sxs, bike = mach.bike;
+  /* Assert on a class that is ACTUALLY IN VIEW here. moto24, mccct, route72 and
+     fstrail all render 0 features at this viewport whichever machine is set, so
+     an assertion on them passes vacuously and proves nothing (landmine 85).
+     trail50 renders 244 and is legal for a dirt bike, not for a 72" machine. */
+  ok(bike.ok.includes("trail50") && !sxs.ok.includes("trail50"),
+     `50" trail is legal for a dirt bike and not for a side-by-side`);
+  ok(/"case"/.test(sxs.layers.trail50),
+     "machine legality is a data-driven paint expression, not a layer toggle");
+  ok(sxs.layers.trail50 !== bike.layers.trail50,
+     "the 50-inch layer's opacity expression changes with the machine");
+  ok(bike.drew.trail50 > 0 && sxs.drew.trail50 === bike.drew.trail50,
+     `illegal line is still DRAWN for a side-by-side ` +
+     `(${sxs.drew.trail50} features, same as ${bike.drew.trail50} for a bike) — ` +
+     `dimmed, not hidden: the map stays honest about what exists`);
+  ok(["bike", "quad", "sxs"].every((m) => mach[m].ok.includes("paved")),
+     "pavement is legal for every machine, so it never dims");
+  ok(/0\.285/.test(bike.layers.casing),
+     "the casing's 0.95 base was READ FROM THE STYLE and dimmed to 0.285, " +
+     "not copied into a second table (landmine 107)");
 }
 await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2.6 });
 await new Promise((r) => setTimeout(r, 800));

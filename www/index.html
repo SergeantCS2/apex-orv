@@ -53,6 +53,12 @@
     padding:5px 8px;background:none;border:0;border-radius:7px;color:#F2ECE0;
     font:600 12.5px/1.2 Roboto,system-ui,sans-serif;text-align:left}
   .actrow.on{background:rgba(226,87,15,.9);color:#fff}
+  /* Legend-only rows: they explain a colour, they do not filter by it. Indented
+     under the activity they belong to, quieter, and not tappable. The 38 px
+     tap-target minimum (take 37) applies to CONTROLS; this is not one, so the
+     on-device layout check must not read it as an undersized button. */
+  .actrow.tierrow{min-height:26px;padding-left:22px;opacity:.82;
+    font-size:11.5px;cursor:default;background:none}
   .sw{flex:0 0 auto;width:22px;height:5px;border-radius:3px;
     box-shadow:0 0 0 1.5px rgba(255,255,255,.85)}
   .sw.dash{background-image:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 9px)}
@@ -84,8 +90,29 @@
 .pin.me{background:#00A8E8}
   .pin.truck{background:#8A4B14}
   .pin.drop{background:#7A3F0C;border-color:#F5EFE2}
-  #alert{position:absolute;left:11px;right:11px;top:54px;background:#C1121F;color:#fff;
-    border-radius:4px;padding:11px 13px;font:700 13px/1.35 Roboto,system-ui,sans-serif;
+  /* ── RIDE HUD (take 78) ────────────────────────────────────────────────
+     overflow:hidden, not auto — the ribbon is clipped, never scrollable, so the
+     layout self-test does not count it as a scroller that cannot scroll. */
+  #hudbar{position:absolute;left:0;right:0;top:0;height:30px;z-index:4;
+    overflow:hidden;pointer-events:none;
+    background:linear-gradient(180deg,rgba(24,22,18,.92),rgba(24,22,18,.62))}
+  #hudbar[hidden]{display:none}
+  #hudticks{position:absolute;inset:0}
+  #hudticks i{position:absolute;top:0;width:1px;background:rgba(255,255,255,.5)}
+  #hudticks i.maj{background:rgba(255,255,255,.9)}
+  #hudticks b{position:absolute;top:11px;transform:translateX(-50%);
+    font:700 11px/1 Roboto,system-ui,sans-serif;color:#fff;letter-spacing:.04em;
+    text-shadow:0 1px 2px rgba(0,0,0,.9)}
+  #hudneedle{position:absolute;left:50%;top:0;width:2px;height:30px;
+    margin-left:-1px;background:#E2570F;box-shadow:0 0 4px rgba(0,0,0,.6)}
+  #hudstats{position:absolute;right:11px;top:38px;z-index:4;pointer-events:none;
+    text-align:right;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 2px rgba(0,0,0,.9)}
+  #hudstats[hidden]{display:none}
+  #hud-spd{font:700 30px/1 Roboto,system-ui,sans-serif}
+  #hud-spd .hu{font-size:12px;font-weight:700;margin-left:3px;opacity:.9}
+  #hud-trip{font:700 11.5px/1.3 Roboto,system-ui,sans-serif;margin-top:2px;opacity:.95}
+  #alert{position:absolute;left:11px;right:11px;top:54px;background:#C1121F;color:#fff;    border-radius:4px;padding:11px 13px;font:700 13px/1.35 Roboto,system-ui,sans-serif;
     box-shadow:0 3px 12px rgba(0,0,0,.4);display:none}
   #alert.on{display:block}
   #alert small{display:block;font-weight:400;font-size:11px;opacity:.9;margin-top:3px}
@@ -175,7 +202,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 75</span>
+    <span id="title"><b>APEX</b> ORV · Take 82</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -195,6 +222,20 @@
          same time (take 67). -->
     <button id="c-act" class="basebtn actbtn">🏍 All routes</button>
     <div id="actpanel" hidden></div>
+    <!-- ── RIDE HUD (take 78) ──────────────────────────────────────────────
+         Only on screen while a ride is running. On a bike the two questions are
+         "which way am I pointing" and "how fast am I going", and until now the
+         app answered neither — it recorded time, distance and elevation from
+         take 41 and displayed only elevation.
+         The ribbon takes the chip strip's slot rather than adding height: those
+         chips jump the camera to a town, and during a ride the map recentres on
+         the rider every sixth fix, so they are already undone the moment they
+         are used. Stats go top-RIGHT, which is the only empty corner. -->
+    <div id="hudbar" hidden><div id="hudticks"></div><div id="hudneedle"></div></div>
+    <div id="hudstats" hidden>
+      <div id="hud-spd">—<span class="hu">mph</span></div>
+      <div id="hud-trip"><span id="hud-time">—</span> · <span id="hud-dist">—</span></div>
+    </div>
     <div class="strip" id="chips"></div>
     <div id="alert"></div>
     <div class="strip" id="tools">
@@ -210,6 +251,7 @@
       <button class="chip" id="c-labels">🏷 Labels</button>
       <button class="chip" id="c-about">ⓘ About</button>
       <button class="chip" id="c-loop">◯ Loop</button>
+      <button class="chip" id="c-saved">☆ Saved</button>
       <button class="chip" id="c-selftest">⛑ Self-test</button>
       <button class="chip" id="c-search">🔍 Search</button>
     </div>

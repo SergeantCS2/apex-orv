@@ -176,7 +176,16 @@ def split():
         n = sum(len(f) for _, _, f in os.walk(tdst))
         print(f"  imagery tiles: {n}")
 
-    named = {"graph_payload.json": "graph.json",
+    # The manifest was copied into www/ ONLY as a special case inside
+    # pipeline.py's smoke step, so a build_app run without smoke shipped
+    # whatever manifest a previous run had left — and this is the one file the
+    # loader trusts absolutely: it decides required vs optional, fatal vs
+    # partial, and which payloads to fetch at all. A stale one listed water.json
+    # beside a www/ that no longer had it, and the app hit the fatal screen on a
+    # perfectly good bundle (take 76). The step that assembles www/ owns
+    # everything in www/.
+    named = {"manifest.json": "manifest.json",
+             "graph_payload.json": "graph.json",
              "terrain_payload.json": "terrain.json",
              "glyphs_payload.json": "glyphs.json",
              "water_payload.json": "water.json",
@@ -192,6 +201,17 @@ def split():
         if p:
             shutil.copyfile(p, os.path.join(WWW, "bundle", dst))
             copied.append(dst)
+    # A payload this run did NOT copy must not survive from the last one.
+    # www/ is what cap sync packages, so a leftover water.json rides into the
+    # APK as a layer the pipeline explicitly refused to produce (take 76).
+    # Stale build artifacts are a hazard, not an archive (landmine 54).
+    for dst in named.values():
+        if dst in copied:
+            continue
+        sp = os.path.join(WWW, "bundle", dst)
+        if os.path.exists(sp):
+            os.remove(sp)
+            print(f"  removed stale bundle/{dst} from an earlier build")
     for stale in ("style.json",):
         sp = os.path.join(WWW, stale)
         if os.path.exists(sp):
@@ -219,13 +239,26 @@ def single(out):
     meta = rd("imagery_meta.json")
     _mp = find("manifest.json")
     _man = json.load(open(_mp)) if _mp else {}
+    # This said state:"complete", absent:[] unconditionally — so the browser
+    # build claimed a full region however much was missing, and WATER silently
+    # defaulted to an empty layer. The split build computes this honestly from
+    # what it loaded; the single build was asserting it (take 76). A page that
+    # says COMPLETE with no water in it is exactly the confident wrong answer
+    # this app exists not to give.
+    _absent = [k for k, f in (("imagery", "imagery.jpg"),
+                              ("relief", "hillshade.jpg"),
+                              ("hydro", "water_payload.json"))
+               if not rd(f) and not uri(f)]
+    _state = "partial" if _absent else "complete"
+    if _absent:
+        print(f"  single: PARTIAL — absent: {', '.join(_absent)}")
     decl = (f'var WATER = {rd("water_payload.json") or "{\"l\":{}}"}, '
             f'GR = {rd("graph_payload.json")}, TR = {rd("terrain_payload.json")};\n'
             f'var SHADE = "{uri("hillshade.jpg")}";\n'
             f'var SAT = "{uri("imagery.jpg")}";\n'
             f'var SATB = {json.dumps(json.loads(meta)["b"]) if meta else "[0,0,0,0]"};\n'
             f'var GLYPHS = {rd("glyphs_payload.json")};\n'
-            f'var BUNDLE={{state:"complete",absent:[],'
+            f'var BUNDLE={{state:"{_state}",absent:{json.dumps(_absent)},'
         f'centre:{json.dumps(_man.get("centre"))},bbox:{json.dumps(_man.get("bbox"))},'
         f'anchors:{json.dumps(_man.get("anchors", []))},'
         f'name:{json.dumps(_man.get("name"))}}};\n')

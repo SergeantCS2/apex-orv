@@ -41,6 +41,38 @@ ARTIFACTS = [
     ("other_payload.json",   "other.json",    "other",    False),
 ]
 
+# How many things are actually IN a payload. A layer with no features in it is
+# not a layer, and existence is not content (landmine 74).
+#
+# Take 76: pack.py wrote a structurally valid EMPTY water payload — 65 bytes,
+# both buckets [] — because take 56's TIGER fallback creates an aoi.json that
+# satisfied its "was OSM missing" guard. verify() checked existence, size and
+# SHA-256; all three pass on an empty file. The bundle reported COMPLETE with no
+# water in it and the app never named the gap, which is exactly what the
+# three-state model exists to prevent (landmine 34).
+#
+# Every key below was read off a REAL built payload, not from memory — a counter
+# aimed at the wrong key reports 0 on a good artifact and degrades a healthy
+# bundle, which is landmine 54 wearing a new hat.
+COUNTERS = {
+    "hydro":   lambda d: sum(len(v) for v in (d.get("l") or {}).values()),
+    "other":   lambda d: len(d.get("r") or []),
+    "context": lambda d: len(d.get("counties") or []) + len(d.get("rings") or []),
+    "address": lambda d: len(d.get("segs") or []),
+}
+
+
+def features(kind, path):
+    """Count what is in a payload. None means 'not countable — do not judge'."""
+    fn = COUNTERS.get(kind)
+    if not fn or not path.endswith(".json"):
+        return None
+    try:
+        return fn(json.load(open(path)))
+    except Exception:
+        return None
+
+
 def sha256(path):
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -64,12 +96,33 @@ def build(rid):
         if not os.path.exists(sp):
             missing.append((name, required))
             continue
+        # Second guard, one layer up from pack.py. A safety-relevant path
+        # deserves two (landmine 74) — and this one catches EVERY producer,
+        # not just the one that bit us.
+        n_feat = features(kind, sp)
+        if n_feat == 0:
+            print(f"  {'REQ' if required else 'opt'}  {name:<16} "
+                  f"{'EMPTY — not staged':>20}")
+            missing.append((name, required))
+            continue
         dp = os.path.join(dest, name)
         shutil.copyfile(sp, dp)
         n = os.path.getsize(dp)
         total += n
         entries.append({"path": name, "kind": kind, "required": required,
                         "bytes": n, "sha256": sha256(dp)})
+
+    # Stale artifacts are a hazard, not an archive (landmine 54's corollary).
+    # A previous run's water.json survived in the destination when this run had
+    # none to stage, so build_app copied it into www/ and BOTH verify() and the
+    # app's own loader saw a layer the pipeline had just refused to produce.
+    # The correct app-side check was defeated by a leftover file (landmines 32, 36).
+    staged = {e["path"] for e in entries}
+    for _s, name, _k, _r in ARTIFACTS:
+        p = os.path.join(dest, name)
+        if name not in staged and os.path.exists(p):
+            os.remove(p)
+            print(f"  ---  {name:<16} {'stale — removed':>20}")
 
     man = {"schema": SCHEMA, "region": rid, "name": reg.name,
            "bbox": reg.bbox, "note": reg.note, "centre": reg.centre,
@@ -134,6 +187,18 @@ def verify(rid, root=None):
         return "unusable", [f"schema {man.get('schema')} != {SCHEMA}"], []
 
     bad, absent = [], []
+
+    # An artifact that was never STAGED is not in man["artifacts"] at all, so a
+    # loop over that list can never notice it is gone — which is how a bundle
+    # with no water reported COMPLETE, and how a bundle with no GRAPH would have
+    # too. Check the manifest against what a bundle is supposed to contain
+    # (take 76). Presence is not the same question as "is the X we mean"
+    # (landmine 35).
+    present = {e["path"] for e in man.get("artifacts", [])}
+    for _s, name, _k, required in ARTIFACTS:
+        if name not in present:
+            (bad if required else absent).append(name)
+
     for e in man["artifacts"]:
         p = os.path.join(dest, e["path"])
         if not os.path.exists(p):

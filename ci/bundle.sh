@@ -23,6 +23,10 @@ test -s www/vendor/maplibre-gl-csp-worker.js
 npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 npx puppeteer browsers install chrome
 node tools/render.mjs
+# The pipeline has a palette step, but the pipeline runs ABOVE this line —
+# before npm ci — so it finds no puppeteer and skips. Run it here, where chrome
+# exists. A check that skips is not a check (landmine 53).
+node tools/verify_palette.mjs
 
 python3 tools/gate.py
 

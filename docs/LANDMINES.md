@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 75.*
+*Current as of take 82.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -943,7 +943,8 @@ party actions declare their own outputs; `deploy-pages` emits `page_url` and
 nothing writes it. A check that cannot be right for a valid input is worse than
 no check.
 
-**78. Fail where the user can act, not where the code happens to break.** An
+**119. Fail where the user can act, not where the code happens to break.**
+*(Written as a second "78" at take 49. 78 was already taken by the unresolved-step-reference lesson, which is what mkapex.py and gate.py cite. Given its own number at take 82; nothing was renumbered.)* An
 empty repo produced a Node stack trace from `npm ci` — accurate, and useless:
 the real fault was four steps earlier, in a different language, and amounted to
 "you uploaded the wrong file". Check preconditions at the top of the job, print
@@ -1076,7 +1077,9 @@ saying "ok". Generate the artifact INTO the repo so the gate can see the thing
 that actually executes, and make sure a negative control fires — a green check
 over an empty set looks identical to a green check over a passing one.
 
-**85. `actions/checkout` checks out the commit that TRIGGERED the run.** Not the
+*Restated at take 56, having already been written at take 49. Merged back into 85 at take 82, because two definitions of one number is exactly the confusion the numbering exists to prevent. The closing point below is the part the first writing does not make.*
+
+`actions/checkout` checks out the commit that TRIGGERED the run. Not the
 branch tip. A seed job that pushes new files is followed by jobs that check out
 the tree from *before* the push — `bash: ci/bundle.sh: No such file or
 directory`. Any job downstream of one that pushes needs
@@ -1372,3 +1375,231 @@ changed; disk had fallen to 70 MB. The consumer was not /tmp or the repo but
 accumulated across seventy takes. A GPU-sounding error on SwiftShader is a disk
 error until proven otherwise, and `du -sh` on the home caches belongs in the
 diagnosis before any shader theory does.
+
+**104. An empty artifact is not a missing artifact — and only one of them is
+honest.** `pack.py` wrote a structurally valid water payload with nothing in it:
+65 bytes of `{"bbox":[…],"l":{"waterway":[],"water":[]}}`. `bundle.verify()`
+checks existence, byte size and SHA-256, and **all three pass on an empty file**,
+so the bundle reported COMPLETE while the map had no water and the app never
+named the gap. `ingest` had already printed "bundle will be PARTIAL" in the same
+run — two components describing the same tree, disagreeing.
+
+Landmine 74 restated one level up: **existence is not content.** Count what is
+in a payload before treating it as a layer. Guard it in the producer *and* in the
+bundler, because the next empty artifact will come from a producer nobody has
+written yet. Every counter must be read off a REAL payload — a counter aimed at
+the wrong key reports 0 on a good artifact and degrades a healthy bundle, which
+is landmine 54 wearing a new hat.
+
+**Corollary — a downstream fallback can defeat an upstream guard.** pack.py's
+guard was "if `aoi.json` is missing, skip water", written at take 13. Take 56
+added a TIGER fallback that *writes* an `aoi.json` carrying no water at all. The
+guard was still correct about the question it asked and no longer correct about
+the situation. When you add a fallback, grep for every guard that tests for the
+condition the fallback now conceals.
+
+**Corollary — stale files defeat a correct check.** The app's own loader keys off
+the manifest and would have reported PARTIAL correctly. It didn't, because a
+previous run's `water.json` was still sitting in the destination and got copied
+onward — into `www/`, which is what `cap sync` packages. Any build step that
+stages a set of files must **remove the ones it did not stage**. Landmine 54's
+corollary: stale build artifacts are a hazard, not an archive.
+
+**105. A loop over what is declared can never notice what was never declared.**
+`bundle.verify()` iterated `man["artifacts"]` looking for files that had gone
+missing. An artifact that was never *staged* is not in that list, so the loop is
+structurally blind to it. Proven by reconstructing the predicate verbatim: a
+bundle whose **required** `graph.json` was never staged verified as **COMPLETE**.
+
+Check the manifest against the **specification** — the `ARTIFACTS` table that
+says what a bundle is supposed to contain — not against itself. A document that
+is its own checklist always passes. Same shape as an orphan source (69), a call
+site with no definition (65) and an unresolved workflow reference (78): a
+reference with no referent, silently.
+
+**106. A backgrounded process does not survive the turn.** `nohup … &` to warm a
+long pipeline while reading code: the process is gone by the next command, having
+produced nothing. Worse, Python **block-buffers stdout when it is a file**, so
+the log held only the header and looked like a stall rather than a corpse.
+
+Run long work in the foreground, in stages that each complete, with `python3 -u`.
+Artifacts on disk persist between turns; processes do not. Landmine 40's family —
+the environment has properties that must be learned rather than assumed, and this
+one costs a cycle every time it is rediscovered.
+
+**107. A copy of a table is not the table.** Landmine 98 said a legend must read
+the same table the map does, and take 67 shipped a legend "generated from ACTS"
+— where ACTS carried its own `sw` colour, hand-copied from the style. Take 61
+set two-track to `#A9702F`. Take 64 dimmed the **layer** to `#9C7343`. Take 67
+wrote the swatch from the take-61 value. Ten takes later they were **dE 12.9**
+apart, four times the just-noticeable difference, and `#A9702F` appeared nowhere
+in the style at all.
+
+Generated from a copy is hand-written with extra steps. The style must *read*
+the shared table, not be *kept in sync* with it, and a gate check must fail on
+any literal where a reference belongs — otherwise the next person to adjust a
+colour adjusts one of the two copies, exactly as three people already did.
+
+**Corollary — verify the finished artifact, not the source.** Reading
+`src/app.html` twice is how this survived: both values are right there, forty
+lines apart, and they look fine. Ask the BROWSER what colour it painted and what
+colour the swatch rendered, from computed style, per row. A screenshot cannot
+tell 12.9 dE apart either.
+
+**108. Some contrast problems have no colour that solves them.** `fsroad` was
+illegible over satellite at dE 15.8 from median ground with no casing under it.
+Nine candidate colours, scored against both backdrops: the sand basemap is light
+(228,215,188) and canopy is dark (91,106,84), so **every lighter candidate
+gained on satellite exactly as fast as it lost on sand.** No single mid-tone can
+separate from both. The answer was structural — a casing, the same halo that
+made designated trail and two-track legible in the first place.
+
+When a sweep returns nothing that passes, the constraint set is telling you the
+lever is wrong. Do not widen the thresholds until something passes.
+
+**Corollary — legality is a hard constraint on colour, not a tiebreak.**
+`#B0722B` scored best for two-track on every visibility axis and sits **dE 12.5**
+from `nfsmoto` amber, a trail whose ridability the MVUM governs. A ridable line
+that looks like a maybe-not-ridable line is landmine 88 arriving through the
+palette. Score every candidate against every NON-RIDABLE colour before ranking
+them, not afterwards — it was already written into the table when the collision
+check caught it.
+
+**109. Copy proven harness arguments; do not derive them.** A new browser probe
+launched Chrome with args that looked equivalent to `render.mjs`'s and omitted
+`--enable-unsafe-swiftshader`. Modern Chrome then refuses SwiftShader for WebGL,
+MapLibre never gets a rendering context, and `window.map` never appears — **with
+no page error, no failed request and nothing in the console** beyond a favicon
+404. Twenty minutes, and the first suspicion was the product.
+
+PROTOCOL §3 in its narrowest form: when a harness already works, copy its setup
+verbatim. And a readiness check must distinguish *never constructed* from
+*constructed but never loaded* — one verdict covering two causes is landmine 55
+again.
+
+**110. A check that only reads the OUTPUT cannot see a broken input.**
+`check_syntax` scanned `www/` and never `src/`. A `str_replace` swallowed a
+function header in `src/app.html`, leaving it unparseable, and the gate reported
+`inline syntax ok (2 files)` on the same tree — because it was validating a
+stale-but-valid build. `check_current` compares take *stamps*, not content, so
+an edit within the same take can sit broken in the source indefinitely with the
+gate green.
+
+Check the source AND the artifact. Take 12 built `check_current` because `www/`
+held an old app while the work lived elsewhere; this is the same hole facing the
+other way, and it stayed open for sixty-six takes.
+
+**Corollary — when replacing an anchor, assert the anchor SURVIVES.**
+`assert old in s` before the edit proves the anchor was there. It does not prove
+the replacement put it back. `function rideStop(){` was consumed by a block that
+never restored it, and every brace after that point belonged to the wrong
+function. Landmine 65 for the second time in three takes: grep for the anchor
+again AFTER the write, not only before it.
+
+**111. Forcing the state a check exists to measure is part of the check.**
+The four-device layout matrix runs on a freshly loaded page, where the ride HUD
+is hidden. Adding a new full-width element and running the matrix would have
+measured `display:none` at four sizes and printed four green lines — landmine
+85's corollary arriving through the front door, in the one harness whose entire
+job is to catch a control that does not fit.
+
+If a check covers something conditional, the check must put the system into that
+condition first. Expose whatever the harness needs to do it; a hidden element
+measured at four device sizes is four measurements of nothing.
+
+**112. One sample is not a measurement.** A single probe to `overpass-api.de`
+returned 200 with real data, so the entry "Overpass is back" was written and a
+re-ingest started. The pipeline got 503 on the same host seconds later. Ten
+probes, three seconds apart: **0/10**. The success was noise.
+
+An intermittent service will hand you whichever answer you happen to ask for.
+Before declaring an outage over — or a flaky check fixed, or a race resolved —
+sample it enough times to state a rate, and put the rate in the record rather
+than the verdict. "0/10 at three-second intervals" survives being re-read; "it's
+back" does not.
+
+**Corollary — report the workload's result, not the probe's.** The thing that
+matters is whether the real fetch completes, not whether a hand-built one-line
+query does. When they disagree, the workload is right.
+
+**113. Storing a computed result can bypass the checks that produced it.**
+A saved route could have been stored as the line itself — smaller code, exact
+replay, no re-computation. It would also have replayed a route around closures
+that no longer existed, or *through* twelve segments the DNR closed after it was
+saved, because the closure filter runs at routing time and a stored line has
+already been past it.
+
+Store the INPUTS and recompute. Where a result encodes a safety decision made
+against data that moves, caching the result caches the decision. Accept that the
+recomputed answer may differ from the saved one, and say so — that difference is
+the feature, not a defect.
+
+**114. Assert on something that is actually on screen.** A machine-legality
+check asserted that `moto24` still rendered when dimmed. It renders **zero
+features at the harness viewport whichever machine is set** — the class is not
+in view there at all — so the assertion was simultaneously wrong and incapable
+of passing for the right reason. Its neighbour `trail50` renders 244.
+
+Before asserting that a layer, label or feature behaves a certain way, print the
+count. A check written against a class that is not in frame is landmine 85 with
+extra steps: it will either fail confusingly or pass while proving nothing.
+
+**Corollary — do not compare serialised expressions.** The same check asserted
+`paved` never dims by comparing its paint expression across machines. Those
+strings differ because the ok-list literal inside them differs, while `paved` is
+in every list and its resolved opacity is 1 in all cases. Compare the resolved
+VALUE, or test the input that decides it — never the syntax of the rule.
+
+**115. A visual state must not claim more than it knows.** Line a machine cannot
+legally use is DIMMED, never hidden and never dashed. Hidden would deny that the
+trail exists, which is the fault landmine 34 exists to prevent. Dashed already
+means "not yours to ride, ever" — and a 24" motorcycle trail is a perfectly legal
+ORV trail that merely will not take a 72" machine, so dashing it would state
+something false about the world.
+
+Three different facts need three different marks: *does not exist* (absent),
+*exists and is never legal for anyone* (dashed), *exists, is legal, is not for
+the machine you are on right now* (dimmed). Reusing one mark for two of them
+loses the distinction the rider needs most.
+
+**116. A class is not always the rule.** `MACHINE[m].ok` is a class allow-list
+and it encodes the DNR's rules perfectly, because the DNR expresses width by
+publishing a feature in a 24" / 50" / 72" layer. The Forest Service publishes
+ONE trail class and states the rules per vehicle in the attributes. 25 edges
+here read `moto: open` with `atv` unset — "Trails open to motorcycles,
+Yearlong" — and class-only routing put a quad on them while the feature card
+printed "Moto open" alongside.
+
+Two agencies, two schemas, and a model shaped around one of them silently
+mis-serves the other. When a source states a rule per feature, that rule governs;
+the class rule is the fallback, not the authority. And the router and the
+snapper must apply the SAME predicate — a snap onto a node the router will not
+leave either reports "no route" when a legal one exists or starts the rider on
+one (take 24).
+
+**Corollary — displaying a fact is not honouring it.** The MVUM flags had been
+on the feature card since take 5. The app showed the rider "Moto open" and
+routed as if it had not read it.
+
+**117. Importing a module to test one function runs the whole module.**
+`gate.py` calls `sys.exit()` at module level. A harness that imported it to call
+a single check **ended on the first import**, printing `GATE PASSED` — and four
+negative controls were recorded as passing without ever running. The output of a
+harness that died looks identical to the output of a harness that succeeded.
+
+Load the definitions without the runner, and make the harness prove itself
+first: a baseline that must produce the real, expected NOTE, not merely the
+absence of a failure. Silence is not a pass.
+
+**Corollary — a cut anchor must be unique.** Splitting the file at
+`SRC.find("for fn in (")` matched a line inside the very check under test,
+truncating it after its second statement. Every result was an artefact of the
+harness. Verify the slice contains what you are about to test.
+
+**118. Bound a source-scan window at a structure, not a character count.**
+The machine-legality check looked for `machineLegal(` within 2600 characters of
+`function nearestNode(ll)`. `nearestNode` is twelve lines long, so the window ran
+past its end into `route()` — which does call it — and the check passed on a
+`nearestNode` reverted to class-only. Bound at the next top-level definition.
+
+Found by the negative control, which is the entire argument for writing them.

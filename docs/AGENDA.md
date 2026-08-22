@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 75.* Ranked by blocking-ness, not by interest.
+*Current as of take 82.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -541,7 +541,11 @@ The third is not:
 - **Open:** none of this has run on GitHub yet. The first real CI run is the
   test — everything here is static analysis and simulation.
 
-## A46 — First-run failures are legible · SHIPPED take 49
+## A46b — First-run failures are legible · SHIPPED take 49
+
+*Numbered A46 in error at take 49, when A46 was already taken by the APK-publish
+item above. Disambiguated at take 82 rather than renumbered: A46 keeps its
+meaning, this keeps a citable id of its own.*
 
 - **PROVEN:** seed accepts apex-seed.zip or apex-orv-github-repo.zip, flattening
   the nested shape; bundle refuses in seconds with a message naming the missing
@@ -609,7 +613,10 @@ The third is not:
   seed job.
 - **Ruled out:** assuming checkout follows the branch tip.
 
-## A52 — Build survives an OSM outage · SHIPPED take 56
+## A52b — Build survives an OSM outage · SHIPPED take 56
+
+*Numbered A52 in error at take 56, when A52 was already taken by the seed-tree
+item above. Disambiguated at take 82, not renumbered.*
 
 - **PROVEN:** with every Overpass mirror pointed at an invalid host, TIGER
   produced 4,100 roads incl. 414 4WD vehicular trails, and the graph built to
@@ -818,3 +825,282 @@ The third is not:
   transcripts — everything durable is in the repository.
 - **Open:** v2. It begins with a study-only session driven by
   docs/V2-KICKOFF-PROMPT.md; A18 and A60 head the technical queue.
+
+## A99 — Bundle honesty: an empty layer is not a layer · CLOSED take 76
+
+*A72–A98 are reserved for the v2 backlog derived from the onX study and the
+take-75 review; they land next cycle. This took A99 so no number already quoted
+has to move — numbers are never reused or renumbered.*
+
+- **PROVEN:** `pack.py` emitted a 65-byte water payload with both buckets empty;
+  `verify()` passed it on existence, size and SHA-256 and reported COMPLETE while
+  `ingest` had already printed "bundle will be PARTIAL".
+- **PROVEN:** the same blindness applied to REQUIRED artifacts. Reconstructing
+  the take-75 predicate against a bundle whose `graph.json` was never staged
+  returns **COMPLETE**; it now returns **UNUSABLE**.
+- **PROVEN:** stale artifacts survived in `bundles/<id>/` and in `www/bundle/`,
+  so a layer the pipeline had just refused to produce was copied onward into what
+  `cap sync` packages — defeating the app's own correct manifest-keyed check.
+- **PROVEN:** `build_app.single()` hardcoded `state:"complete", absent:[]`.
+- **PROVEN, both directions:** with water absent → PARTIAL, `water.json` named,
+  smoke 5 modes / 192 assertions, render 26 checks / 4,304 features, gate green.
+  With three synthetic water ways through the real `pack.py` → COMPLETE, smoke
+  asserts "not PARTIAL", self-test 37/0, gate green.
+- **PROVEN, negative controls:** an empty artifact staged and hashed into the
+  manifest fails the gate by name; a missing required artifact verifies unusable.
+- **Ruled out:** a byte-size threshold for "empty". It is a guess that fails on a
+  region with one small pond. Counting features is exact and reads off the real
+  payload shape.
+- **Ruled out:** fixing this in `pack.py` alone. A safety-relevant path deserves
+  two guards (landmine 74), and the bundler's guard catches producers that do not
+  exist yet.
+- **Ruled out:** asserting `state === 'complete'` anywhere. PARTIAL is a designed
+  state; asserting completeness scored correct behaviour as failure in two
+  separate harnesses (landmine 56's corollary).
+- **Open:** the app's `OPT` list (`imagery`, `relief`, `hydro`) is hand-kept
+  beside `bundle.py`'s `ARTIFACTS`. Two lists that must agree is the shape
+  landmine 73 warns about. Not urgent — the loader degrades safely either way —
+  but it wants the same treatment: derive one from the other, or gate them.
+
+## A74 — One colour table, vibrant, and a legend that explains it · SHIPPED take 77
+
+- **PROVEN:** `ACTS` swatch `#A9702F` vs layer `#9C7343` — dE 12.9, and
+  `#A9702F` was in no layer anywhere. The legend read a copy (landmine 107).
+- **PROVEN, in the browser:** all six network swatches now equal the colour
+  MapLibre paints, computed style per row, 18 checks.
+- **PROVEN, 1,048,576 satellite pixels:** dE vs canopy — easy 26.1→49.2,
+  moderate 62.5→74.4, two-track 29.0→41.7.
+- **PROVEN:** `showother` sat dE 5.2 from `fsroad` — a non-ridable route nearly
+  indistinguishable from a ridable forest road. Now 25.5.
+- **Ruled out:** `#B0722B` for two-track. Best on visibility, dE 12.5 from
+  `nfsmoto` amber, which the MVUM governs — landmine 88 through the palette.
+- **Ruled out:** solving `fsroad` with colour. Nine candidates; light gains on
+  canopy exactly as fast as it loses on sand. Fixed with a casing instead.
+- **Ruled out:** legend rows for `minor` and `paved` — grey means road, and two
+  more rows costs panel height on a 360 px screen. Declared in `LEGEND_EXEMPT`
+  with the reason, and gated so a fourth class cannot join them silently.
+- **Open:** the three difficulty tiers are stated in the picker but nowhere on
+  the map itself. Only a ride says whether that is enough.
+
+## A72–A98 — the v2 backlog, from the onX study and the take-75 review
+
+Recorded here so the numbering lives in the repo rather than in a chat
+transcript. Where an item below also has its own `##` heading elsewhere in this
+file, that heading is the outcome and this bullet is the original proposal. Each is expanded in `docs/V2-PROPOSALS.md`. Ordering is by
+blocking-ness; labels are PROVEN-need / INFERRED / UNKNOWN.
+
+- **A72 — statewide ORV coverage, two-tier.** PROVEN-need, deferred behind the
+  square by Jacob's decision. Measured take 75: DNR ORV 4,475 features
+  statewide, MVUM 9,523 roads + 3,480 trails; Michigan is 236× the Bull Gap AOI
+  by area but only 18–26× by network. Agency vector statewide ≈ 8–15 MB.
+  *Ruled out:* one statewide bundle; statewide imagery (8.6 GB at z15);
+  statewide addresses.
+- **A73 — derive the region set from the data.** INFERRED. *Ruled out:*
+  hand-drawing ten bboxes, which is ten chances to mistype a corner.
+- **A75 — highway and route shields.** INFERRED. Answers "which road am I two
+  east of" faster than a name. *Ruled out:* nothing yet; needs glyph coverage
+  checked first (landmine 30).
+- **A76 — named summits with elevation.** INFERRED, GNIS + our DEM. *Ruled out:*
+  deriving summit names from topology — a name nobody can check against the
+  ground, same reasoning as A7.
+- **A77 — water feature labels.** INFERRED. We draw water and never name it.
+- **A78 — trailhead and access-point markers.** INFERRED. A43 already recorded
+  that DNR layer 19 carries `FacilityType` and `SiteName`. *Ruled out:* planning
+  the feature before querying the values (landmine 23).
+- **A79 — draw the county lines.** INFERRED. *Open:* A32 warns they risk reading
+  as roads; needs a weight that says administrative.
+- **A80–A83 — compass ribbon, speed readout, live ride HUD, zoom buttons.**
+  INFERRED, all from telemetry and gestures already present. A82 is PROVEN-need:
+  take 41 records time, distance and elevation and only elevation is shown.
+- **A84 — tools palette.** INFERRED. Line distance, area shape, mark location,
+  waypoint, photo.
+- **A85 — named, saved waypoints and routes.** PROVEN-need. A28's last
+  enumerated gap, listed missing at take 25 and never built.
+- **A86 — filter by machine and by difficulty.** INFERRED. *Ruled out:* onX's
+  width taxonomy, which lists 60"; Michigan designates 24"/50"/72".
+- **A87 — topo basemap with contours.** INFERRED, a fifth product of the DEM
+  ingest already run.
+- **A88 — slope angle shading.** INFERRED, extends A14. *Ruled out:* using the
+  rendered hillshade; needs the encoded DEM (landmine 20). Sequence after A18 —
+  per-frame GPU work on an unmeasured power budget.
+- **A89 — cell carrier coverage, offline.** UNKNOWN. The best idea on onX's
+  layer strip and the one that pairs with our dispatch card. *Ruled out:*
+  planning it before checking FCC Broadband Data Collection resolution, size and
+  licence.
+- **A90 — dispersed camping.** INFERRED, USFS publishes it.
+- **A91 — layer manager.** INFERRED. The chip strip cannot absorb topo, slope,
+  coverage, camping and county lines. Do it before the layers arrive.
+- **A92 — five-mode navigation.** UNKNOWN. Recorded so it is not re-derived.
+  *Ruled out for now:* more structure than this app currently needs.
+- **A93 — ledger hygiene.** PROVEN-need. Two `## Take 56`, two `## Take 49`, two
+  `A46`, two `A52`, `A36` before `A35`, and LANDMINES §0 repeats a ~40-row
+  block. Take 43 deduped exactly this and it re-accumulated. *Ruled out:*
+  renumbering anything — a duplicate/gap CHECK, not a renumber.
+- **A94 — `region.DERIVED` omissions.** INFERRED. `context_payload.json`,
+  `address_payload.json`, `imagery_tiles/` not cleared on a region switch;
+  `address.py`'s early return leaves the previous region's index. Landmine 37's
+  shape. *Ruled out:* treating it as urgent while one region ships — but it is a
+  precondition for A72.
+- **A95 — `sthelen` anchors outside its own bbox.** UNKNOWN. Roscommon 2.5 km
+  west of the edge, Houghton Lake 16 km. Not traced; may be a deliberate
+  signpost.
+- **A96 — dispatch-path latency.** UNKNOWN. `nearestEdge()` decodes all 20,222
+  polylines per call on the highest-stakes screen. *Ruled out:* optimising
+  before measuring on the device.
+- **A97 — weather, radar, air quality, share location.** Ruled out for the
+  field: all network, and nothing in the field may wait on a call (§8).
+  Recorded so they are not re-proposed as offline features.
+- **A98 — SOS.** Ruled out by design. A satellite messenger does something no
+  map can; the README says so and that is better than a feature.
+
+## A80 · A81 · A82 — Ride HUD: heading, speed, trip · SHIPPED take 78
+
+- **PROVEN:** `coords.speed` and `coords.heading` arrived on every fix since
+  take 21 and were discarded in both drivers. A82 was an unconnected wire, not
+  an unbuilt feature.
+- **PROVEN, independently computed:** harness steps of +8e-4 lon / +5e-4 lat give
+  `atan2(0.03941, 0.03450)` = 48.8° = NE, and the ribbon centres on NE. A fix
+  carrying `heading: 90` centres on E; `speed: 8.9408 m/s` reads 20 mph.
+- **PROVEN, four devices with the ride state forced on:** ribbon exactly
+  full-width at 360 / 412 / 430 / 411, stats inside the right edge at all four.
+- **Ruled out:** adding HUD height to the screen. The ribbon takes the place-chip
+  strip's slot, because those chips jump the camera to a town and the map
+  recentres on the rider every sixth fix — they undo themselves during a ride.
+- **Ruled out:** `deviceorientation` for a magnetic compass. Course-over-ground
+  from the fix is what a moving rider wants, needs no new permission, and works
+  identically in the simulator.
+- **Ruled out:** asserting a fixed HUD state in the self-test. `hud-matches-ride`
+  asserts the response to the ride state, whichever it is (landmine 56).
+- **Open:** speed derived from the trail cannot be exercised by the harness —
+  no wall-clock elapses between synchronous fixes. Only a ride shows whether the
+  derived path reads sensibly when `coords.speed` is null.
+- **Open:** A83, zoom buttons. Held back deliberately — map controls are a
+  different concern from ride instrumentation, and the screen is crowded.
+
+### A60 status at take 78 — BLOCKED (see A60 above)
+
+- **PROVEN:** Overpass down at take 78 — `overpass-api.de` 503,
+  `overpass.kumi.systems` 500 after 53 s, `overpass.osm.ch` HTTP 200 with
+  `count = 0` for a box that certainly has roads (landmine 74's signature).
+- **Ruled out:** doing A60 on the TIGER fallback network. A60 is about
+  OSM↔agency duplicate geometry; TIGER produces a different duplicate profile,
+  so the take-64 measurements would not transfer and the fix would be tuned
+  against a network the rider will not have.
+- **Blocked on:** OpenStreetMap returning. Re-ingest first; the take-60 marker
+  retries automatically.
+
+## A85 — Save and name a planned route · SHIPPED take 79
+
+- **PROVEN:** A28's last enumerated gap, named missing at take 25, open until now.
+- **PROVEN, structurally:** the stored record contains no `path`, `geom`, `line`
+  or `coords` — reopening re-routes from inputs against current data.
+- **PROVEN:** save → storage write → one record → list → Open control rendered,
+  across five smoke modes; re-saving under the same name replaces.
+- **Ruled out:** storing route geometry. The bundle carries twelve
+  temporarily-closed segments refreshed every build; a frozen line replays a
+  legality decision made against data that has since moved (landmine 113).
+- **Ruled out:** a naming dialog on the save path. One tap, auto-named from what
+  the route is; rename lives in the panel where there is time. Gloves.
+- **Ruled out:** offering routes saved in another region — a line planned on a
+  different map is not meaningful, so records are region-stamped.
+- **Open:** saved *waypoints* and geotagged photos (the rest of A84) are not
+  built. Routes were the enumerated gap; waypoints are the natural next.
+- **Open:** only a ride shows whether auto-generated names are distinguishable
+  once there are a dozen of them.
+
+## A86 — Machine legality shown on the map · SHIPPED take 80
+
+- **PROVEN:** the router refused illegal line from take 7 and the map said
+  nothing — 24" singletrack and 72" route were drawn identically.
+- **PROVEN, in the browser:** illegal line still draws 34 features for a
+  side-by-side, the same 34 as for a dirt bike — dimmed, not hidden, asserted by
+  count rather than by appearance.
+- **PROVEN:** the casing's 0.95 base resolves to 0.285 under dimming, a number
+  that appears nowhere in the source — the base is read out of the style, not
+  copied (landmine 107).
+- **Ruled out:** hiding illegal line. It denies that the trail exists, which is
+  the fault landmine 34 exists to prevent.
+- **Ruled out:** dashing it. Dashed means "never yours to ride"; a motorcycle
+  trail is legal ORV line that a 72" machine simply cannot fit (landmine 115).
+- **Ruled out:** dimming closed line. It is closed to everyone, red already says
+  so, and fading it weakens the one colour that must not be missed.
+- **Ruled out:** a per-layer opacity toggle. `casing` covers five classes in one
+  layer, so legality has to be a per-feature expression.
+- **Open:** difficulty filtering (the other half of onX's filter sheet) is not
+  built. Machine legality was the honesty gap; difficulty is preference.
+- **Open:** whether 0.30 is the right dim. Faint enough to recede, strong enough
+  to still plan around — only sunlight settles that.
+
+## A86b — Per-vehicle machine legality in the router · SHIPPED take 81
+
+- **PROVEN:** 25 `fstrail` edges (1.95 mi) carry `moto: open` with `atv` unset,
+  MVUM symbol "Trails open to motorcycles, Yearlong". Class `fstrail` is in
+  `quad.ok`, so class-only routing put a quad on a motorcycle trail.
+- **PROVEN, per machine, against the built graph:** bike 0 excluded, quad 25
+  edges / 1.95 mi excluded, sxs 0 excluded.
+- **PROVEN, four negative controls:** router reverted to class-only, snapper
+  diverged from router, `machineLegal` removed, raw allow-list reintroduced —
+  all four fail the gate.
+- **Ruled out:** class-only legality. The DNR encodes width in the layer; the
+  Forest Service does not encode anything in the class (landmine 116).
+- **Ruled out:** treating an absent flag as permission. Anything other than
+  "open" is not a licence to ride.
+- **Open:** `sxs` has no per-vehicle flag stored. The MVUM's
+  `other_ohv_gt50inches` and `highclearancevehicle` are fetched by ingest and
+  dropped before the bundle; sxs falls back to the class rule, which excludes
+  `fstrail` entirely — conservative, not wrong. Storing them is a small ingest
+  and emit change.
+
+## A101 — SpecialRestrictionType is not ingested · OPEN, found take 81
+
+*A precondition for A72. Numbered separately so it is citable on its own.*
+
+- **PROVEN:** the DNR field carries real law — *"ORVs less than 65 inches in
+  width only between the dates of May 1st and November 1st. Off road motorcycles
+  are prohibited"* — including seasonal windows and explicit machine bans.
+- **PROVEN:** **zero** of the 246 in-region features carry one, so the square is
+  unaffected today. The ingest field list is
+  `namefield,TrailNamePrimary,TrailWidthFeet,OpenClosedStatusORV,LicenseType,TrailOnRoad`.
+- **Ruled out:** treating this as urgent for Bull Gap. It is latent, and becomes
+  live the moment A72 pulls in features from outside this box.
+- **Ruled out:** the alarm about `LicenseType: "Snowmobile Trail Permit"` —
+  1,418 of 1,889 ORV Routes statewide carry it, records read
+  `TrailUseCategory: Motorized` and `OpenClosedStatusORV: Open`, and one states
+  "ORV license and trail permit required". It records a winter co-designation,
+  not an ORV restriction. My expectation was wrong, not the data.
+- **Blocked on:** A72, which is itself blocked behind the square being ridden.
+
+## A100 — Jacob's machine is a narrow dirt bike · NOTED take 82
+
+Recorded so it is not re-derived, and so it is not mistaken for a null result.
+
+- **PROVEN (take 81, measured):** on the `bike` profile the per-vehicle rules
+  exclude **0 edges / 0.00 mi**. The 25-edge quad exclusion touches nothing he
+  rides.
+- **Consequence for debugging:** if a route looks wrong on his phone, machine
+  legality is *not* the first place to look. Every width and vehicle rule in the
+  app is permissive for a narrow bike; the cause will be elsewhere.
+- **Consequence for testing:** the take-80 dimming and take-81 routing changes
+  are effectively invisible to him. He cannot confirm them by riding, and should
+  not be asked to. They are verified in the harness instead.
+- **Ruled out:** removing or simplifying the machine model. It is correct, it is
+  gated, and it becomes live the moment anyone else runs this build or A72 pulls
+  in features from outside the box.
+- **Open:** no second machine has ever run this app, so the quad and sxs paths
+  have never been exercised on a device — only in the harness (A61's family).
+
+## A93 — Ledger integrity, gated · SHIPPED take 82
+
+- **PROVEN:** take 43 deduped by hand and declared "no gaps, no duplicates". By
+  take 81: Take 49 ×2, Take 56 ×2, A46 ×2, A52 ×2, landmines 78 ×2 and 85 ×2 —
+  plus A60, A72 and A87 created by me in takes 78–82.
+- **PROVEN, the serious one:** landmine 78 was two *different* lessons sharing a
+  number cited by both `mkapex.py` and `gate.py`.
+- **PROVEN, five negative controls:** duplicate take, missing take, duplicate
+  agenda id, duplicate landmine, landmine gap — all fail the gate, verified
+  against a harness that proves itself with a baseline note first.
+- **Ruled out:** renumbering anything already cited. Disambiguated instead —
+  A46b, A52b, Take 49b, Take 56b, landmine 119 — with the reason in each entry.
+- **Ruled out:** special-casing the checker so a "restated" landmine parses as
+  not-a-definition. 85 was merged into one entry instead; one definition per
+  number is the rule the checker exists to enforce.

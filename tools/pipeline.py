@@ -35,6 +35,7 @@ STEPS = [
     ("smoke-dead", ["smoke.mjs", "--dead-renderer"], "drill the RENDER FAIL detector"),
     ("smoke-away", ["smoke.mjs", "--away"], "drill planning mode out of region"),
     ("render",     ["render.mjs"],     "render in a real browser and check pixels"),
+    ("palette",    ["verify_palette.mjs"], "legend swatches vs the colours the map paints"),
 ]
 
 

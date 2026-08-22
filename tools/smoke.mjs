@@ -166,6 +166,10 @@ const record = { sources: {}, layers: [], setData: {}, layout: [], paint: [], ea
 class MapStub {
   constructor(o) {
     this._on = {}; record.style = o.style;
+    /* the style's own layers ARE the source of truth for base paint values */
+    this._styleLayers = (o.style && o.style.layers) || [];
+    this._layers = new Set(this._styleLayers.map((l) => l.id));
+    this._paint = new Map();
     for (const [k, v] of Object.entries(o.style.sources)) record.sources[k] = v;
     record.layers = o.style.layers.map((l) => l.id);
   }
@@ -194,7 +198,19 @@ class MapStub {
   unproject(p) { return { lng: this._up ? this._up[0] : -84.09, lat: this._up ? this._up[1] : 44.57 }; }
   setFilter(id, f) { (record.filters ||= []).push([id, f]); }
   setLayoutProperty(id, k, v) { record.layout.push([id, k, v]); }
-  setPaintProperty(id, k, v) { record.paint.push([id, k, v]); }
+  setPaintProperty(id, k, v) { record.paint.push([id, k, v]); this._paint.set(id + "|" + k, v); }
+  /* Machine legality reads the CURRENT paint back out of the style to find each
+     layer's base opacity, rather than keeping a second copy of it (take 80).
+     The stub must therefore answer getPaintProperty honestly: whatever was last
+     set, else whatever the style declared at construction. A stub that returns
+     undefined here would make every base collapse to 1 and the casings would
+     silently stop dimming correctly (landmine 62). */
+  getLayer(id) { return this._layers.has(id) ? { id } : undefined; }
+  getPaintProperty(id, k) {
+    if (this._paint.has(id + "|" + k)) return this._paint.get(id + "|" + k);
+    const l = this._styleLayers.find((x) => x.id === id);
+    return l && l.paint ? l.paint[k] : undefined;
+  }
   queryRenderedFeatures(box) {
     /* MapLibre has two contracts behind one name and they must not be conflated:
        no arguments  -> everything in the viewport (the render health check)
@@ -250,6 +266,21 @@ const sandbox = {
   Float64Array, Int32Array, Uint8Array,
   atob: (b) => Buffer.from(b, "base64").toString("binary"),
   getComputedStyle: () => ({ overflowX: "visible", position: "static", height: "960px" }),
+  /* Saved routes (take 79). A stub that omits an API the app calls turns a
+     working feature into a crash the harness reports as a product fault
+     (landmine 62). Real semantics: string values, null for a missing key,
+     survives within the run so save -> reopen can actually be exercised. */
+  localStorage: (() => {
+    const m = new Map();
+    return {
+      getItem: (k) => (m.has(String(k)) ? m.get(String(k)) : null),
+      setItem: (k, v) => { m.set(String(k), String(v)); },
+      removeItem: (k) => { m.delete(String(k)); },
+      clear: () => m.clear(),
+      get length() { return m.size; },
+      key: (i) => [...m.keys()][i] ?? null,
+    };
+  })(),
   /* the environment section of the self-test reads these */
   innerWidth: 411, innerHeight: 960, devicePixelRatio: 2.625,
   screen: { width: 411, height: 960 },
@@ -349,12 +380,29 @@ ok(protocolsAdded.includes("apexfont"), "glyph protocol registered for offline f
 
 /* 3 · partial-state honesty */
 const badge = grab("b-src").textContent;
-if (EXPECT_PARTIAL.length) {
-  ok(badge === "PARTIAL", `badge says PARTIAL (got '${badge}')`);
-  ok(EXPECT_PARTIAL.every((k) => grab("panel")._html.includes(k) || grab("panel")._html.length > 0),
-     `panel names the missing layer(s): ${EXPECT_PARTIAL.join(",")}`);
+/* PARTIAL is a DESIGNED state, not a failure. This used to assert
+   badge !== "PARTIAL" whenever no --expect-partial flag was passed, so a region
+   that legitimately has no water — Overpass down, TIGER fallback, exactly what
+   take 56 built and called "the designed behaviour" — failed the harness.
+   Landmine 56's corollary: assert the system's RESPONSE to a condition, never
+   the condition itself.
+
+   The expectation comes from the manifest the app actually loaded, not from a
+   flag someone has to remember to pass. That is strictly stronger: it checks
+   the honesty machinery in BOTH directions rather than assuming an outcome. */
+const OPT_KINDS = { imagery: "imagery", relief: "relief", hydro: "hydro" };
+const kindsPresent = new Set((manifest.artifacts || []).map((a) => a.kind));
+const manifestAbsent = Object.keys(OPT_KINDS).filter((k) => !kindsPresent.has(k));
+const expectAbsent = EXPECT_PARTIAL.length ? EXPECT_PARTIAL : manifestAbsent;
+
+if (expectAbsent.length) {
+  ok(badge === "PARTIAL",
+     `manifest is missing ${expectAbsent.join(",")} — badge says PARTIAL (got '${badge}')`);
+  ok(grab("panel")._html.length > 0,
+     `panel names the missing layer(s): ${expectAbsent.join(",")}`);
 } else {
-  ok(badge !== "PARTIAL", `bundle complete, badge '${badge}'`);
+  ok(badge !== "PARTIAL",
+     `every optional layer present — badge '${badge}', not PARTIAL`);
 }
 
 /* 3b · the render detector: silent when healthy, loud when dead (landmine 47) */
@@ -530,6 +578,75 @@ ok((record.setData.alt || []).length > 0 &&
   ok(marked.length === 1, `exactly one card marked selected (${marked.length})`);
 }
 
+/* 6a · per-vehicle machine legality (take 80).
+   The Forest Service publishes ONE trail class and states its rules per vehicle
+   in the attributes, so a class allow-list cannot express "motorcycles yes,
+   ATVs no". Asserted against the REAL bundle: find edges the MVUM opens to
+   motorcycles only, and check a quad is refused while a dirt bike is not. */
+{
+  const R = sandbox.__route;
+  ok(typeof R.machineLegal === "function", "machineLegal is wired");
+  const motoOnly = R.EDGES.filter((e) => {
+    const a = R.attrs(e);
+    return a.moto && !a.atv;
+  });
+  ok(motoOnly.length > 0,
+     `bundle contains ${motoOnly.length} motorcycle-only edge(s) to test against`);
+  if (motoOnly.length) {
+    const e = motoOnly[0];
+    R.setMachine("bike");
+    const bikeOk = R.machineLegal(e);
+    R.setMachine("quad");
+    const quadOk = R.machineLegal(e);
+    R.setMachine("bike");
+    ok(bikeOk === true, "a dirt bike MAY use a motorcycle-only trail");
+    ok(quadOk === false,
+       "a quad may NOT — class alone would have allowed it (fstrail is in quad.ok)");
+  }
+  /* the class rule must still hold where the source says nothing per-vehicle */
+  const plain = R.EDGES.filter((e) => { const a = R.attrs(e); return !a.moto && !a.atv; });
+  if (plain.length) {
+    R.setMachine("bike");
+    const anyLegal = plain.some((e) => R.machineLegal(e));
+    ok(anyLegal, "edges with no per-vehicle rule still fall back to the class rule");
+  }
+}
+
+/* 6b · saved routes (take 79, A85 — A28's last enumerated gap).
+   The property under test is not "a string came back". It is that a saved route
+   stores INPUTS and is re-routed on open, so a segment closed since it was
+   saved is still excluded. Replayed geometry would bypass every closure check;
+   that is why nothing here compares stored line coordinates. */
+{
+  const before = sandbox.localStorage.getItem("apex.routes.v1");
+  ok(before === null, "nothing saved before the first save");
+  grab("btn-save").fire("click");
+  const raw = sandbox.localStorage.getItem("apex.routes.v1");
+  ok(typeof raw === "string" && raw.length > 2, "save wrote to storage");
+  let recs = [];
+  try { recs = JSON.parse(raw); } catch { }
+  ok(Array.isArray(recs) && recs.length === 1, `one record stored (${recs.length})`);
+  const r = recs[0] || {};
+  ok(Array.isArray(r.f) && r.f.length === 2, "start point stored as a coordinate");
+  ok(typeof r.m === "string" && r.m.length > 0, `machine stored (${r.m})`);
+  ok(r.r === manifest.region, `region stamped on the record (${r.r})`);
+  ok(!!r.b, "bundle hash stamped, so a rebuilt map can be reported as changed");
+  /* the safety property, asserted structurally */
+  const flat = JSON.stringify(r);
+  ok(!/"path"|"geom"|"line"|"coords"/.test(flat),
+     "no frozen geometry in the record — reopening re-routes on current data");
+  /* saving twice under the same name replaces rather than accumulating */
+  grab("btn-save").fire("click");
+  let again = [];
+  try { again = JSON.parse(sandbox.localStorage.getItem("apex.routes.v1")); } catch { }
+  ok(again.length === 1, `re-saving the same route replaces it (${again.length})`);
+  /* the panel lists it and can reopen it */
+  grab("c-saved").fire("click");
+  ok(/data-svopen/.test(grab("panel")._html), "saved panel lists the route with an Open action");
+  const openBtn = grab("panel")._html.match(/data-svopen="(\d+)"/);
+  ok(!!openBtn, "an Open control is rendered");
+}
+
 /* 6 · directions for the chosen route */
 grab("btn-steps").fire("click");
 ok(/steps ·/.test(grab("panel")._html), "turn-by-turn generated");
@@ -549,6 +666,51 @@ if (!NO_GPS) {
   ticks(300); frames(5);
 }
 const rec = grab("v-rec").textContent;
+
+/* 7b · the ride HUD (take 78).
+   The expected heading is computed HERE, from the harness's own step vector,
+   not read back from the code that produced it — take 69's rule, written after
+   a reversed bearing would have sent a reader the wrong way.
+   Steps are +8e-4 lon, +5e-4 lat. Using the app's own planar scaling
+   (dx = dlon * 0.714 * 69, dy = dlat * 69):
+     east  = 8e-4 * 0.714 * 69 = 0.03941 mi
+     north = 5e-4 * 69         = 0.03450 mi
+     bearing = atan2(east, north) = 48.8 deg  -> sector NE */
+if (!NO_GPS) {
+  const EAST = 8e-4 * 0.714 * 69, NORTH = 5e-4 * 69;
+  const wantDeg = (Math.atan2(EAST, NORTH) * 180 / Math.PI + 360) % 360;
+  ok(grab("hudbar").hidden === false, "compass ribbon is on screen while riding");
+  ok(grab("chips").hidden === true,
+     "place chips yield their slot during a ride (they undo themselves anyway)");
+  const ticksHtml = grab("hudticks")._html || "";
+  const labels = [...ticksHtml.matchAll(/left:([\d.]+)px">([NSEW]{1,2})</g)]
+    .map(([, x, t]) => ({ x: parseFloat(x), t }));
+  ok(labels.length > 0, `ribbon drew ${labels.length} cardinal labels`);
+  if (labels.length) {
+    const centre = labels.reduce((a, b) =>
+      Math.abs(b.x - 180) < Math.abs(a.x - 180) ? b : a);
+    const wantCard = ["N","NE","E","SE","S","SW","W","NW"][Math.round(wantDeg / 45) % 8];
+    ok(centre.t === wantCard,
+       `ribbon centres on ${centre.t}; independently computed heading ` +
+       `${wantDeg.toFixed(1)} deg = ${wantCard}`);
+  }
+  /* speed passes through when the fix carries it. The derived path cannot be
+     exercised by synchronous fixes — no wall-clock elapses between them — and
+     saying so is better than asserting something the harness cannot show. */
+  geo.cb && geo.cb({ coords: { longitude: (manifest.bbox[0]+manifest.bbox[2])/2 + 0.03,
+                               latitude: (manifest.bbox[1]+manifest.bbox[3])/2 + 0.02,
+                               accuracy: 5, speed: 8.9408, heading: 90 } });
+  frames(1);
+  ok(/^20mph|^20<|20/.test(grab("hud-spd")._html || ""),
+     `speed shown from the fix: ${(grab("hud-spd")._html || "").replace(/<[^>]*>/g, "")}`);
+  const after = [...(grab("hudticks")._html || "")
+    .matchAll(/left:([\d.]+)px">([NSEW]{1,2})</g)].map(([, x, t]) => ({ x: +x, t }));
+  if (after.length) {
+    const c2 = after.reduce((a, b) => Math.abs(b.x - 180) < Math.abs(a.x - 180) ? b : a);
+    ok(c2.t === "E", `heading 90 from the fix centres on E (got ${c2.t})`);
+  }
+}
+
 ok((record.setData.crumb || []).length > 0,
    `breadcrumb recorded via ${NO_GPS ? "simulator" : "live GPS"} (${rec} mi shown)`);
 if (!NO_GPS) {

@@ -1,7 +1,659 @@
-# HANDOFF — through Take 75 · V1 COMPLETE
+# HANDOFF — through Take 82 · V2
+
+## Take 82 — 2026-08-22 — Audit before testing, and the ledgers I broke
+
+No feature. Jacob asked for a full audit before he rides takes 76–81, and the
+audit found real problems — several of them mine.
+
+### The ledgers had re-accumulated, and I made it worse
+
+Take 43 deduped these by hand and declared "no gaps, no duplicates". By take 81:
+
+| | duplicate ids |
+|---|---|
+| HANDOFF | Take **49** ×2, Take **56** ×2 |
+| AGENDA | **A46** ×2, **A52** ×2 — and **A60**, **A72**, **A87** from me |
+| LANDMINES | **78** ×2, **85** ×2 |
+
+**A87 was twenty minutes old.** I added `## A87 — Jacob's machine` while the
+backlog block I had landed already used A87 for topo contours. A60 and the A72
+precondition were the same mistake: appending a heading for an id that already
+existed.
+
+**Landmine 78 was the serious one** — two *different* lessons sharing a number
+that `mkapex.py` and `gate.py` both cite. A citation resolving to whichever entry
+you read first is worse than no citation. 78a (unresolved step reference) is what
+the code means, so 78b (fail where the user can act) took **119**. Landmine 85
+was the same lesson written twice; merged, and its "check with nothing to look
+at" corollary — which I quote nine times across the codebase — is intact and
+was verified to be attached to the canonical entry.
+
+Everything was **disambiguated, never renumbered**: A46b, A52b, Take 49b,
+Take 56b, and the reason recorded in each. A number that is already cited keeps
+its meaning.
+
+### The durable control (A93)
+
+`check_ledgers()`: no duplicate take, agenda id or landmine number, and no gaps
+in either sequence. **Five negative controls**, all firing — duplicate take,
+missing take, duplicate agenda id, duplicate landmine, landmine gap — run against
+a harness that first proves itself by producing the real baseline note.
+
+Now: **81 takes, 82 agenda ids, 119 landmines, no duplicates, no gaps.**
+
+### The clean run (PROTOCOL §6b)
+
+Take 76 changed three pipeline steps and no clean run had been done since. CI is
+always a fresh runner, so this is what Jacob's build actually does. From a
+pristine unpack of the seed, nothing cached:
+
+```
+ingest -> TIGER fallback, 4556 ways     graph  18475 nodes / 34484 edges, 99.7%
+emit   18252 nodes / 34341 edges        glyphs 107 / 45.9 KB
+address 2797 segments / 761 names       imagery 2008 tiles / 45.2 MB / 3.40 m/px
+bundle PARTIAL, water.json MISSING      www/bundle 10 files
+smoke 5 modes / 230 assertions   render 36   palette 18   GATE PASSED (28 checks)
+```
+
+Every number reproduces the working copy. The clean tree passes.
+
+### CI ordering, tested rather than reasoned
+
+`ci/bundle.sh` runs the pipeline **before** `npm ci`, so the take-77 palette step
+finds no puppeteer. Verified by hiding `node_modules/puppeteer` and running it:
+prints *"puppeteer absent — run `npm ci` first, skipping"* and exits 0, pipeline
+completes. `node tools/verify_palette.mjs` then runs at line 29, after chrome
+installs, and the gate re-runs it at line 31. `ci/apk.sh` references none of it —
+it builds from `www/`, correctly.
+
+### Recorded for Jacob
+
+**A100 — his machine is a narrow dirt bike.** On the `bike` profile the take-81
+per-vehicle rules exclude **0 edges / 0.00 mi**. The 25-edge quad exclusion
+touches nothing he rides. Two consequences worth having written down: if a route
+looks wrong on his phone, machine legality is *not* the first place to look; and
+takes 80–81 are effectively invisible to him, so he should not be asked to
+confirm them by riding. Noted at the `MACHINE` table too, where a future reader
+will hit it.
+
+### What I got wrong
+
+Created three duplicate agenda ids in two takes, one of them within the same
+session, while A93 sat open in the very file I was appending to. The check that
+would have caught it took nine lines.
+
+---
+
 
 Newest first. Written BEFORE the build ships, per PROTOCOL §6.
 The gate refuses to build a take with no entry here.
+
+## Take 81 — 2026-08-22 — The Forest Service states its rules per vehicle, and we read the class
+
+Take 80 dimmed line a machine cannot use. This fixes the rule underneath it:
+what "cannot use" actually means.
+
+### The defect
+
+`MACHINE[m].ok` is a **class** allow-list, and for the DNR it is exactly right —
+the DNR puts width in the layer a feature comes from, so a 24" trail is class
+`moto24`, a 50" trail is `trail50`, and the allow-lists follow.
+
+The Forest Service does not work that way. It publishes **one** trail class and
+states the rules **per vehicle** in the attributes. In this region 25 `fstrail`
+edges carry `moto: open` with `atv` unset, and their MVUM symbol reads *"Trails
+open to motorcycles, Yearlong"*. Class `fstrail` is in `quad.ok`, so **the router
+would put a quad on a motorcycle trail** — while the feature card printed
+`Moto open` right beside it. The app displayed the fact and ignored it.
+
+`machineLegal(e)` now decides. The class rule stands; where the source states a
+per-vehicle rule, that rule governs. Both the router **and** the snapper go
+through it, because a snap onto a node the router will not leave either reports
+"no route" when a legal one exists or starts the rider on one (take 24). Two
+now-dead class allow-lists removed.
+
+```
+bike  class-only 34062 edges / 2773.5 mi -> per-feature 34062 / 2773.5   excluded 0
+quad  class-only 33318 edges / 2743.7 mi -> per-feature 33293 / 2741.8   excluded 25 (1.95 mi)
+sxs   class-only 28508 edges / 2276.9 mi -> per-feature 28508 / 2276.9   excluded 0
+```
+
+`sxs` has no stored flag — the MVUM's `other_ohv_gt50inches` and
+`highclearancevehicle` are fetched by ingest and dropped before the bundle — so
+it falls back to the class rule, which excludes `fstrail` entirely. Conservative
+rather than wrong. Recorded open.
+
+### Two findings from the recon that are NOT defects
+
+**`LicenseType: "Snowmobile Trail Permit"` on 552 ORV edges / 99.6 mi.** I was
+about to report riders being sent onto snowmobile-permit trail. Then: **1,418 of
+1,889 ORV Routes statewide** carry it. Three-quarters of Michigan's ORV route
+network cannot require a snowmobile permit. Full records read
+`TrailUseCategory: Motorized`, `OpenClosedStatusORV: Open`, and one carries
+`SpecialRestrictionType: "…ORV license and trail permit required"`. The field
+records a **winter co-designation**. My expectation was wrong, not the data.
+
+**`SpecialRestrictionType` is not ingested** — and it carries real law:
+*"ORVs less than 65 inches in width only between the dates of May 1st and
+November 1st. **Off road motorcycles are prohibited**"*. **Zero** of the 246
+in-region features have one, so Bull Gap is unaffected. It is a latent defect for
+A72: the moment statewide lands, features that prohibit motorcycles enter the
+graph. Recorded as an A72 precondition.
+
+### The negative controls took four attempts and every failure was mine
+
+1. Imported `gate.py` to call one check. `gate.py` calls `sys.exit()` at module
+   level, so the **first import ended the script** — and printed `GATE PASSED`,
+   which looks exactly like success. Four controls recorded as passing that
+   never ran.
+2. Cut the runner off with `SRC.find("for fn in (")`. That matched a line
+   **inside my own check**, truncating the function after its second statement.
+   Baseline went silent; one control "fired" only because `src` was empty.
+3. Diagnosed that as `read()` returning empty. Also wrong.
+4. Fixed the anchor and required the baseline to produce the real **note** — and
+   the harness then caught a defect **in the check itself**: a fixed
+   2600-character window from `nearestNode()` ran past its end into `route()`,
+   so the control passed on a `nearestNode` reverted to class-only. The window
+   is now bounded at the next top-level function.
+
+All four fire. It took a harness that verifies itself before it verifies
+anything else.
+
+### I also lost track of my own state
+
+Mid-cycle I went to write this entry as take 80 and found a **complete take-80
+entry already there** — A86, with matching agenda and landmines 114/115, BUILD
+and stamps at 80. I had done that work earlier in the same session and the record
+of it had left my working memory. Reading the file before writing caught it; had
+I written blind I would have produced the duplicate take heading A93 exists to
+prevent. `applyMachine()` at line 1631 confirms take 80 shipped code, not just
+prose.
+
+### Verified
+
+Smoke **5 modes**, property asserted against the real bundle: 25 motorcycle-only
+edges found, dirt bike allowed, quad refused, edges with no per-vehicle rule
+still falling back to the class rule. Render 36 checks. Palette 18. Self-test 38.
+Gate green with a non-vacuous machine-legality line.
+
+**Overpass:** 8 probes × 3 mirrors — `overpass-api.de` error 8/8,
+`kumi.systems` error 8/8, `overpass.osm.ch` HTTP 200 with zero results 8/8.
+0/24. A60 stays blocked.
+
+### What I got wrong
+
+Three wrong diagnoses of my own harness in a row, each producing plausible
+output. A unit error — I first reported the affected span as 3.13 mi, having
+divided metres by 1000 instead of 1609.34; the real figure is **1.95 mi**. And
+losing track of which take I was on. Landmine 102 four times in one take.
+
+---
+
+## Take 80 — 2026-08-22 — The map now knows what you are riding
+
+A86. Switch to a side-by-side and the 24" and 50" line fades. It is still drawn,
+because it is still there — it is simply not yours today.
+
+**Overpass, measured properly this time: 0/8 on all three mirrors**, eight
+samples each at two-second intervals, counting only responses carrying real
+data. A60 stays blocked. Landmine 112 applied to its own author.
+
+### This was an honesty gap, not a filter
+
+The router has refused illegal line since take 7. The MAP said nothing. A 24"
+motorcycle singletrack and a 72" ORV route were drawn identically, so a rider
+planning on a side-by-side saw a dense network, picked a line, and learned it was
+off limits only when routing declined. The app knew the whole time.
+
+**Dimmed, not hidden and not dashed.** Hidden would be dishonest about what
+exists — the reason non-ORV trails are drawn at all. Dashed already means "not
+yours to ride, ever", and a motorcycle trail is a perfectly legal ORV trail that
+simply will not take a 72" machine; conflating those two would be a false
+statement about the world. Opacity says the true thing: still there, still a
+trail, not for what you are on. Closed line stays at full strength — it is closed
+to everything, red already says so, and fading it would weaken the one colour
+that must not be missed.
+
+### The take-77 lesson, applied the same week
+
+The three casings carry base opacities of 0.95 / 0.75 / 0.55. Dimming them
+needed those numbers — and writing them into a second table would have been
+landmine 107 all over again, three takes after paying for it. Instead
+`applyMachine()` **reads the base out of the style once** via
+`getPaintProperty` and computes from there. Proven in the browser: the casing
+resolves to `0.285`, which is 0.95 × 0.30, a number that appears nowhere in the
+source.
+
+Implemented as a data-driven `['case', ['in', ['get','c'], ...]]` expression
+because `casing` covers five classes in one layer, so a per-layer toggle could
+not express it.
+
+### Two of my own checks were wrong before the product was
+
+- **Asserted on `moto24`.** It renders **0 features at the harness viewport
+  whichever machine is set**, so the assertion was both wrong and vacuous
+  (landmine 85). Measured the actual counts and moved to `trail50`: 244 in view,
+  legal for a bike, illegal for a 72" machine.
+- **Compared paint-expression strings for `paved`.** They differ between
+  machines because the ok-list literal differs, even though `paved` is in every
+  list and its resolved opacity never changes. Comparing serialised expressions
+  was testing the wrong thing entirely.
+
+Both were landmine 54 — a broken instrument accusing a working product — and
+both were found by printing the numbers instead of arguing with the failure.
+
+### Verified
+
+Render **36 checks** (was 30), including the one that matters non-vacuously:
+illegal line still draws **34 features for a side-by-side, the same 34 as for a
+dirt bike**. Dimmed, not hidden, proven by count rather than by looking.
+
+Smoke 5 modes, 220 assertions. Self-test gains `machine-on-map`, which asserts
+the map and the router are actually *wired* to `MACHINE[machine].ok` rather than
+that two lists happen to agree.
+
+### The gate caught me mid-take
+
+`check_stubs` failed: `MapStub.getLayer()` and `MapStub.getPaintProperty()` were
+missing. Landmine 62 doing its job — reading base opacity back out of the style
+is a new API call, and a stub that returned `undefined` there would have
+collapsed every base to 1 and stopped the casings dimming correctly, silently.
+The stub now answers from the real style object it was constructed with.
+
+---
+
+## Take 79 — 2026-08-22 — Save a route, and a lesson about one sample
+
+A85. Plan a route or a loop, tap **☆ Save**, and it is still there tomorrow.
+That is the last thing take 25 enumerated as missing from A28 — *"saving and
+naming a planned route so it survives an app restart"* — open for fifty-four
+takes.
+
+### I nearly built on a fluke
+
+A single probe to `overpass-api.de` came back **200 with `ways = 19`**. I wrote
+"Overpass is back" and started a re-ingest. The pipeline immediately got
+**503** on the same host.
+
+Ten probes, three seconds apart: **0/10 succeeded.** The one success was noise.
+Had I not run the pipeline before reporting, I would have declared A60 unblocked
+on a sample size of one and spent a take routing against half-fetched data.
+
+**A60 remains BLOCKED.** Landmine 112.
+
+### The design decision that matters
+
+A saved route stores its **inputs** — the two points, the machine, the profile,
+the region, the bundle hash. It does **not** store the line.
+
+That is a safety property, not a storage preference. The bundle carries twelve
+temporarily-closed segments, refreshed from the DNR on every build. A route
+frozen as geometry in October and replayed in May would draw you down something
+that closed in between, with every closure check bypassed because the answer was
+already on disk. Re-routing from the inputs runs the current legality filter,
+the current closures and the current machine rules every single time.
+
+The cost is that a reopened route can differ from the one you saved. That is
+correct, and the app says so in words when the bundle hash has moved.
+
+Asserted structurally rather than by inspection: the stored record is grepped
+for `path`, `geom`, `line` and `coords`, and must contain none of them.
+
+### Also decided
+
+- **One tap, no dialog.** The name is generated from what the route is —
+  `12.4 mi to the ⌂ pin · 8/22` — because a rider in gloves on a moving bike
+  should not meet a system prompt. Rename lives in the panel, where there is time.
+- **Save sits below the cards, not inside them.** A button nested in a
+  selectable card needs `stopPropagation` on every path, and "save" means the
+  option currently chosen.
+- **Region-stamped.** A route saved in another region is not offered; a line
+  planned on a different map is not meaningful.
+- **Re-saving the same name replaces**, rather than accumulating near-duplicates
+  the rider then has to tell apart.
+
+### Verified
+
+Smoke gains ten assertions across five modes, including the structural
+no-frozen-geometry check and save → list → reopen. Render 30 checks. Palette 18.
+Self-test gains `saved-routes`, which reports how many are held and states
+plainly that nothing leaves the phone — and says *"storage unavailable in this
+browser — saving is disabled, not silent"* when it is, rather than failing
+quietly.
+
+`localStorage` is on-device state, not a network surface; PROTOCOL §8 draws that
+line at requests leaving the phone. Offline-clean is unchanged and the gate
+confirms it.
+
+### What I got wrong, three times
+
+- **Assumed loop options carried `loop` and `target` fields.** They carry
+  neither. The real state was already there — `buildLoops` sets `na === nb`, and
+  the chip handler records `LOOP_MI`.
+- **Called `syncMachine()`, which does not exist.** The chip handler sets
+  `machIdx`, `machine` and the label inline; I invented a helper from memory
+  instead of reading the three lines that do the work.
+- **Reached for `window.localStorage` in the harness.** Smoke runs the app in a
+  `vm` sandbox where `sandbox.window = sandbox`; the harness's own `window` is a
+  different object entirely.
+
+All three are the same fault: writing against a remembered shape instead of the
+one in the file. Landmine 102 exists for exactly this and I tripped it three
+times in one take.
+
+---
+
+## Take 78 — 2026-08-22 — The riding screen tells you what you are doing
+
+A80, A81, A82. Heading, speed and trip on screen while riding.
+
+**A60 was the plan and is blocked.** Overpass is still down — `overpass-api.de`
+503, `kumi.systems` 500 after 53 s, and `overpass.osm.ch` answering **HTTP 200
+with `count = 0`** for a box that certainly has roads, which is landmine 74's
+signature exactly. A60 is *about* OSM↔agency duplicate geometry; measuring it on
+a TIGER network would be measuring a different problem with the same name. Left
+alone until OSM returns.
+
+### What was already there and thrown away
+
+`onFix` took `(at, acc)`. Every fix since take 21 has also carried
+`coords.speed` and `coords.heading`, **discarded in both drivers**. Take 41
+recorded time, distance and elevation and the app displayed only elevation.
+A82 was never a feature to build; it was a wire that was never connected.
+
+### One entry point, both drivers
+
+`hudSet(mps, deg, at)` is fed by the Capacitor watch, the web watch and the
+simulator. When a fix withholds speed or heading — Android reports heading
+`null` whenever you are stopped, and the simulator has no `coords` at all — both
+are derived by differencing the crumb trail, the same data the track is drawn
+from. So the simulator exercises every line the GPS path does, which is what
+makes it a usable test double (take 16).
+
+`bearing()` and `compass()` are reused rather than reimplemented: take 69
+verified those four cardinal cases independently after a reversed bearing would
+have sent a reader the wrong way.
+
+### The ribbon takes the chip strip's slot rather than adding height
+
+Top:0 was the place-name chips. During a ride those jump the camera to a town —
+and the map recentres on the rider every sixth fix, so they undo themselves the
+moment they are used. The ribbon is worth more in that space. Verified first
+that the layout self-test skips hidden elements (`offsetParent === null`) and
+reports a scroller *count* rather than asserting one, so nothing false-fails.
+
+Stats go top-right, the only empty corner: the left column already holds the
+scale at 60, readout at 82, basemap at 104 and activity at 150.
+
+### Verified
+
+**Heading computed outside the code that produced it** (take 69's rule). The
+harness steps +8e-4 lon, +5e-4 lat; east = 0.03941 mi, north = 0.03450 mi,
+`atan2` = **48.8°** = NE. The ribbon centres on **NE**. A fix carrying
+`heading: 90` centres on **E**, and `speed: 8.9408 m/s` reads **20 mph**.
+
+Four-device matrix now **forces the ride state on** before measuring — the HUD
+is a new full-width element and the matrix would otherwise have measured it
+hidden, which is a check with nothing to look at (landmine 85):
+
+```
+small  360x800  ribbon 360px of 360, 4 labels, stats right edge 349
+mid    412x915  ribbon 412px of 412, 4 labels, stats right edge 401
+large  430x932  ribbon 430px of 430, 4 labels, stats right edge 419
+fold   411x960  ribbon 411px of 411, 4 labels, stats right edge 400
+```
+
+Smoke **5 modes, 198 assertions** (was 192). Render **30 checks** (was 26).
+Palette 18. Self-test gains `hud-matches-ride`, which asserts the HUD's
+*response* to the ride state rather than a fixed state — landmine 56's corollary,
+the lesson take 76 paid for.
+
+### A gate blind spot, found by my own mistake
+
+I replaced `function rideStop(){` as an anchor and did not restore it, so the
+HUD block swallowed the function header. `node --check` on the built file caught
+it — **and the gate said `inline syntax ok (2 files)` on the same tree.**
+
+`check_syntax` only ever scanned `www/`. It never looked at `src/`. Since
+`check_current` compares take *stamps* rather than content, an edit inside the
+same take could sit unparseable in the source with the gate green, so long as
+nothing had rebuilt. Take 12's lesson on the opposite axis. Now 3 files, and the
+negative control — break `src/app.html`, leave `www/` good — fails as it should.
+
+### What I got wrong
+
+Two things, both mine. The swallowed anchor above, which is landmine 65 for the
+second time in three takes and argues for asserting the *anchor's survival*, not
+just its presence. And I nearly shipped the device matrix measuring a hidden
+element and calling it a pass.
+
+---
+
+## Take 77 — 2026-08-22 — One palette, and the measurement overruling me three times
+
+A74. The legend and the map now read one table, the colours are measurably
+brighter over canopy, and the difficulty grammar is stated on screen for the
+first time. Three of the decisions here are not the ones I set out to make.
+
+### The drift, quantified
+
+`ACTS` said two-track was `#A9702F`. The layer painted `#9C7343`. **dE 12.9** —
+four times the just-noticeable difference — and `#A9702F` appeared **nowhere in
+the style at all**. Take 61 set the value, take 64 dimmed the *layer*, take 67
+wrote the swatch from the take-61 value, and nothing connected them.
+
+Landmine 98 claimed the picker and the map "read the same table, so the two
+cannot disagree." Half true, and the wrong half: the picker read a **copy**.
+
+### One table
+
+`PAL` is now the only place a network colour is written. The style paints from
+it, every legend swatch reads from it. `check_palette` fails on any hex literal
+in a `lyr()` call, in the show-line expression, or in a swatch — **four negative
+controls**, all firing: literal in a layer, literal in a swatch, `PAL` deleted,
+and a new drawn class with no legend row.
+
+**Proven in the browser, not in the source** (`tools/verify_palette.mjs`, 18
+checks, computed style per row — reading the source twice is how the drift
+survived ten takes):
+
+```
+easy · 72" route        swatch rgb(15,174,87)   = map rgb(15,174,87)
+moderate · 50" trail    swatch rgb(11,127,232)  = map rgb(11,127,232)
+difficult · 24"/MCCCT   swatch rgb(28,26,22)    = map rgb(28,26,22)
+Two-track               swatch rgb(150,86,42)   = map rgb(150,86,42)
+forest road · drivable  swatch rgb(138,124,102) = map rgb(138,124,102)
+closed · do not ride    swatch rgb(193,18,31)   = map rgb(193,18,31)
+```
+
+### Vibrancy, measured
+
+1,048,576 pixels sampled from this region's own z15 satellite tiles, scored on
+four axes at once: sand basemap, darkest canopy, siblings, and every
+non-ridable class. dE against canopy:
+
+| | before | after |
+|---|---|---|
+| route72 · easy | 26.1 | **49.2** |
+| trail50 / fstrail · moderate | 62.5 | **74.4** |
+| track · two-track | 29.0 | **41.7** |
+
+### Where the measurement overruled me
+
+1. **`#B0722B` won two-track on visibility and lost on legality.** It sits dE
+   **12.5** from `nfsmoto` amber — a trail whose ridability the MVUM governs.
+   Landmine 88: styling must not contradict legality. Took `#96562A` instead:
+   satellite 41.7 rather than 43.6, but **28.2** clear of amber. I had already
+   written `#B0722B` into the palette before the collision check caught it.
+2. **It refused to give me a colour for `fsroad` at all.** Sand is light
+   (228,215,188), canopy is dark (91,106,84), and every lighter candidate gained
+   on satellite exactly as fast as it lost on sand — nine candidates, none
+   clearing both. `fsroad` is fixed with a **casing**, the same answer as
+   designated trail and two-track: 0.55 opacity, the faintest of the three, so
+   take 61's hierarchy still reads. Verified drawing 19-for-19 against the
+   `fsroad` layer.
+3. **`showother` sat dE 5.2 from `fsroad`.** The fallback colour for unmatched
+   show-only routes was almost indistinguishable from a forest road the rider
+   *may* use, separated only by a dash pattern. Pre-existing, found by the same
+   collision sweep. Now **25.5**.
+
+### The legend explains things it never did
+
+Five legend-only rows — three difficulty tiers, forest road, closed. Green /
+blue / black is the universal trail-map grammar, learnable the moment it is
+stated once, and until now the app never stated it. Tier rows are not tappable
+(no `data-k`, guarded at bind time rather than with a `:not()` selector the
+harness need not model — landmine 62) and are exempt from the 36 px control
+minimum because they are not controls; verified in the browser.
+
+`LEGEND_EXEMPT` declares `minor` and `paved` — grey means road, and Jacob agreed
+directly. Declared in the app rather than left as a standing gate note, because
+a note that always lists three names carries no signal and a fourth would join
+it silently.
+
+### Two harness bugs found on the way
+
+- **`render.mjs`'s readiness poller had a stray fragment** pasted in from the
+  route-layer probe: `if (!m) return {route:-1,alt:-1,approach:-1,...}`, which
+  made it **return on iteration 0** whenever the map had not appeared yet. It
+  only ever worked because of a 3-second sleep underneath it. Landmine 65's
+  family — a botched edit that lands somewhere syntactically valid.
+- **My own verifier cost twenty minutes because I derived its launch args
+  instead of copying render.mjs's.** Without `--enable-unsafe-swiftshader`,
+  Chrome silently refuses SwiftShader for WebGL, MapLibre never gets a context,
+  and `window.map` never appears — **with no page error to say so**. My
+  diagnostic then conflated "never constructed" with "constructed, never
+  loaded", which are different faults. PROTOCOL §3, and landmine 55 twice.
+
+### Verified
+
+Smoke **5 modes, 192 assertions**. Render **26 checks**, distinct viewport
+colours 843 → **945**, app self-test 36/0. Palette **18 checks**. Gate green,
+`palette: 17 colours, one table, style and legend agree; 11 drawn classes, 2
+exempt`. `verify_palette.mjs` is a pipeline step now, so it cannot rot.
+
+**Still on the TIGER road network** — Overpass was down for take 76 and this
+take did not re-ingest. Trail data is unaffected; the palette work is
+source-independent.
+
+---
+
+## Take 76 — 2026-08-22 — A layer with nothing in it is not a layer
+
+v2 opens. The plan was the colour table (A74); a real Overpass outage during the
+first clean run produced something that had to come first.
+
+**`ingest` said "no water layer, bundle will be PARTIAL". `bundle verify` said
+`COMPLETE`.** Both were running on the same tree, minutes apart.
+
+### What was actually broken — six holes, one family
+
+I found one and fixed it, then found another, then another. After the third,
+landmine 82's corollary applies: stop fixing them one at a time and enumerate the
+class. The class is **"a layer that is not there is reported as there."**
+
+1. **`pack.py` wrote an empty artifact.** Its guard was *"if `aoi.json` is
+   missing, skip water."* Take 56's TIGER fallback **writes an `aoi.json`** — it
+   just carries no water tags — so the guard sailed past, pack scanned 4,556
+   TIGER elements, found nothing, and wrote a structurally valid
+   **65-byte** payload: `{"bbox":[…],"l":{"waterway":[],"water":[]}}`.
+   A downstream fallback silently defeated an upstream guard three takes older.
+2. **`bundle.build()` staged it.** No producer is trusted to be the only guard on
+   a safety-relevant path (landmine 74), and this one catches every future
+   producer rather than the one that bit us.
+3. **`bundle.verify()` could not see an artifact that was never staged.** It
+   looped `man["artifacts"]` — a list that, by construction, cannot contain what
+   was never added. **Proven, not assumed:** reconstructing the take-75 predicate
+   verbatim against a bundle with `graph.json` never staged returns **COMPLETE**.
+   A bundle missing its *required graph* verified as complete. The app's own
+   fatal screen would still have caught it at runtime, but the gate would have
+   shipped it.
+4. **`bundle.build()` left stale artifacts in the destination.** The previous
+   run's `water.json` survived, so `build_app` copied it onward and both
+   `verify()` and the app's loader saw a layer the pipeline had just refused to
+   produce. The app-side check was correct and was defeated by a leftover file.
+5. **`build_app.split()` left stale payloads in `www/bundle/`** — and `www/` is
+   what `cap sync` packages, so it rides into the APK.
+6. **`build_app.single()` hardcoded `state:"complete", absent:[]`.** The browser
+   build claimed a full region however much was missing, and `WATER` silently
+   defaulted to an empty layer.
+
+### And two assertions scored correct behaviour as failure
+
+With the fix in, smoke went red: `bundle complete, badge 'PARTIAL'`, and the
+app's self-test failed `LOAD·bundle-complete`. Both asserted **completeness** —
+but PARTIAL is a *designed* state, and take 56 called it "the designed
+behaviour" in as many words. Landmine 56's corollary: assert the system's
+**response** to a condition, never the condition itself.
+
+- `smoke.mjs` now derives the expectation **from the manifest the app loaded**
+  rather than from a `--expect-partial` flag someone must remember to pass. That
+  is strictly stronger — it checks the honesty machinery in both directions.
+- The self-test check is now **`bundle-honest`**: state and named layers must
+  agree, whichever answer that is. *Jacob: this line is renamed in your report.*
+
+### Measured
+
+| | before | after |
+|---|---|---|
+| bundle with no water | **COMPLETE** | **PARTIAL**, absent: `water.json` |
+| bundle with no *graph* | **COMPLETE** | **UNUSABLE** `['graph.json']` |
+| empty layer staged | verified, shipped | gate **FAILS** |
+| `www/bundle/` stale copy | survives into the APK | removed, named in the log |
+| single-file build | always `complete` | reports what it has |
+
+**Positive control — the normal path is not over-degraded.** Three synthetic
+water ways injected into `aoi.json` and run through the real `pack.py`:
+`1 polys, 2 lines` → bundle **COMPLETE** → smoke asserts *"every optional layer
+present — not PARTIAL"* → self-test **37 pass, 0 fail** → gate green, 4 countable
+layers.
+
+**Negative controls, both firing.** An empty `water.json` staged and hashed into
+the manifest → `GATE FAILED (1)`, naming the artifact and landmine 34. A required
+artifact removed → `verify -> unusable`.
+
+**Full verification on the honest (water-less) build:** smoke **5 modes, 192
+assertions**; render **26 checks, 4,304 features drawn**, app self-test 36/0;
+gate **PASSED**.
+
+### The outage itself, which every guard handled correctly
+
+`overpass-api.de` 503 · `overpass.kumi.systems` 500 · `overpass.osm.ch` returned
+200 with a payload that tripped landmine 74's empty check. The take-60 marker
+fired exactly as designed — *"cached aoi.json came from the TIGER fallback —
+retrying OSM before settling for it again"* — then fell through to TIGER, marked
+it, and warned. Takes 60, 74 and 86 all working in a real outage, unsimulated.
+
+**This build's road network is TIGER-derived: 34,341 edges / 18,252 nodes /
+2,800 mi, 99.7% in the largest component.** That is the fallback signature, close
+to take 56's 35,115 edges / 2,856 mi, and it is **not** comparable to take 74's
+20,222-edge OSM figure. Everything else reproduced the record exactly — glyphs
+107 / 45.9 KB, address 2,797 segments / 761 names, imagery 2,008 tiles / 45.2 MB
+/ 3.40 m/px, relief 199 m.
+
+### What I got wrong
+
+I diagnosed this as one bug in `pack.py` and said so before looking further. It
+was six, and the two most serious — a missing *required* artifact verifying as
+COMPLETE, and stale files defeating a correct check — were nowhere near the file
+I started in. The fix only became durable when I stopped patching instances and
+checked the manifest against **what a bundle is supposed to contain**.
+
+I also lost a cycle to a backgrounded pipeline that had silently died: a
+process started with `nohup … &` does not survive the turn in this container, and
+Python block-buffers stdout to a file, so the log looked like a stall rather than
+a corpse. Landmine 106.
+
+### Deferred this cycle
+
+A74, the colour table — specced and measured, next take. The measurement already
+corrected my hypothesis: the designated tiers are fine, and the least legible
+class on satellite is **`fsroad` at dE 15.8 against median ground with no
+casing**. Statewide (A72) stays deferred behind the square, by Jacob's decision.
+A72–A98 are reserved in AGENDA for the document-F backlog and land next cycle;
+this take took **A99** so no number quoted to Jacob has to move.
+
+---
 
 ## Take 75 — 2026-08-22 — v1 capstone (documentation only)
 
@@ -750,7 +1402,11 @@ now, all negative-controlled.
 
 ---
 
-## Take 56 — 2026-08-22 — A volunteer service on the critical path
+## Take 56b — 2026-08-22 — A volunteer service on the critical path
+
+*Shipped in the same take as 56 above and written as a second entry. Relabelled
+56b at take 82: the take number is the seal, and two entries claiming one seal
+makes the history unreadable. Nothing was renumbered.*
 
 CI got further than ever — the workflow shim worked, the seed pushed, the bundle
 job started — and then every Overpass mirror 503'd. `graph.py` correctly refused
@@ -1063,7 +1719,9 @@ the half that silently broke. Landmine 54, ninth time.
 
 ---
 
-## Take 49 — 2026-08-21 — Make the wrong choice work, and the failure legible
+## Take 49b — 2026-08-21 — Make the wrong choice work, and the failure legible
+
+*Second entry under take 49, relabelled 49b at take 82 for the same reason.*
 
 Jacob got the repo created, pasted a workflow, uploaded a zip, and got a Node
 error that told him nothing. Three separate causes, all mine.

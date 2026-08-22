@@ -137,7 +137,201 @@ def check_style():
                  f"{len(syms)} symbol")
 
 
-# ── 5. AGENDA discipline ────────────────────────────────────────────────────
+# ── 4b. One palette, read by both the map and the legend ────────────────────
+# Take 77. The activity picker carried its OWN copy of the colours and had
+# drifted: it said two-track was #A9702F while the layer painted #9C7343 — dE
+# 12.9, four times the just-noticeable difference — and #A9702F appeared nowhere
+# in the style at all. Take 61 set the value, take 64 dimmed the LAYER, take 67
+# wrote the swatch from the take-61 value, and nothing connected them.
+#
+# "Generated from the same table" was the claim in landmine 98 and it was only
+# half true: generated from a COPY of the table is a hand-written legend with
+# extra steps. This gates the mechanical part — no literal may appear where a
+# palette reference belongs — so the two cannot drift again.
+def check_palette():
+    src = read("src", "app.html")
+    if not src:
+        return          # check_current already fails on this
+    m = re.search(r"var PAL=\{(.*?)\n\};", src, re.S)
+    if not m:
+        return fails.append(
+            "src/app.html has no PAL table — the style and the legend would "
+            "each carry their own colours, which is how they drifted (take 77)")
+    keys = set(re.findall(r"^\s*([a-z0-9]+)\s*:\s*'#", m.group(1), re.M))
+    keys |= set(re.findall(r"\b([a-z0-9]+)\s*:\s*'#[0-9A-Fa-f]{6}'", m.group(1)))
+    if not keys:
+        return fails.append("PAL exists but declares no colours")
+
+    bad = []
+    # 1. every lyr() call paints from PAL
+    for lid, cls, col in re.findall(r"lyr\('([a-z0-9]+)','([a-z0-9]+)',([^,]+),", src):
+        if not col.strip().startswith("PAL."):
+            bad.append(f"layer '{lid}' paints {col.strip()} instead of a PAL entry")
+    # 2. the show-only match expression carries no literal
+    sl = re.search(r"id:'show-line'.*?\}\}", src, re.S)
+    if sl and re.search(r"#[0-9A-Fa-f]{6}", sl.group(0)):
+        bad.append("show-line paints a hex literal instead of PAL entries")
+    # 3. every legend swatch reads PAL
+    for row, sw in re.findall(r"\{k:'([a-z0-9_]+)'.*?sw:([^,}]+)", src):
+        if not sw.strip().startswith("PAL."):
+            bad.append(f"legend row '{row}' uses {sw.strip()} — a copy of the "
+                       f"palette, not the palette")
+    if bad:
+        fails.append("palette drift (landmine 98): " + "; ".join(bad[:6]))
+        return
+
+    # Coverage, now gated rather than noted. A class is explained if the legend
+    # names it, if a tier row shows its colour, or if it PAINTS THE SAME COLOUR
+    # as something already explained — fsclosed is closed-red, and the red row
+    # explains both. Anything left must be declared exempt in the app with a
+    # reason, so a new drawn class cannot slip in unexplained.
+    drawn = {c for _l, c, _p in re.findall(r"lyr\('([a-z0-9]+)','([a-z0-9]+)',([^,]+),", src)}
+    acts = re.search(r"var ACTS=\[(.*?)\n\];", src, re.S)
+    explained = set()
+    if acts:
+        for cl in re.findall(r"cls:\[([^\]]*)\]", acts.group(1)):
+            explained |= set(re.findall(r"'([a-z0-9]+)'", cl))
+        for sw in re.findall(r"sw:PAL\.([a-z0-9]+)", acts.group(1)):
+            explained.add(sw)
+    pal = dict(re.findall(r"([a-z0-9]+)\s*:\s*'(#[0-9A-Fa-f]{6})'", m.group(1)))
+    shown_cols = {pal[k] for k in explained if k in pal}
+    explained |= {k for k, v in pal.items() if v in shown_cols}
+    ex = re.search(r"var LEGEND_EXEMPT=\[([^\]]*)\]", src)
+    exempt = set(re.findall(r"'([a-z0-9]+)'", ex.group(1))) if ex else set()
+    gap = sorted(drawn - explained - exempt)
+    if gap:
+        return fails.append(
+            f"drawn but unexplained: {', '.join(gap)} — every colour on the map "
+            f"needs a legend row, or a declared reason in LEGEND_EXEMPT saying "
+            f"why it does not (take 77)")
+    notes.append(f"palette: {len(keys)} colours, one table, style and legend "
+                 f"agree; {len(drawn)} drawn classes, {len(exempt)} exempt "
+                 f"({', '.join(sorted(exempt))})")
+
+
+# ── 4c. Per-vehicle legality, not just per-class ─────────────────────────────
+# Take 80. MACHINE[m].ok is a CLASS allow-list, which encodes the DNR's rules
+# correctly because the DNR puts width in the layer a feature comes from. The
+# Forest Service does not: it publishes one trail class and states the rules per
+# vehicle in the attributes. 25 fstrail edges here read `moto: open` with `atv`
+# unset — "Trails open to motorcycles, Yearlong" — and class-only routing put a
+# quad on them, while the feature card printed "Moto open" alongside.
+#
+# Required to be non-vacuous: if no built bundle carries a rule that
+# distinguishes one machine from another, this check is looking at nothing and
+# says so rather than passing quietly (landmine 85).
+def check_machine_legality():
+    src = read("src", "app.html")
+    if not src:
+        return
+    if "function machineLegal(" not in src:
+        return fails.append(
+            "src/app.html has no machineLegal() — machine legality would be "
+            "decided by class alone, and the Forest Service states its rules "
+            "per vehicle (take 80)")
+    for fn in ("function route(from,to,cost)", "function nearestNode(ll)"):
+        i = src.find(fn)
+        if i < 0:
+            fails.append(fn.split("(")[0] + " missing")
+            continue
+        # Bound the window at the NEXT top-level function, not at a character
+        # count. A fixed 2600-char window from nearestNode() ran past its end
+        # and into route(), which does call machineLegal — so the check passed
+        # on a nearestNode that had been reverted to class-only. Found by the
+        # negative control, which is what they are for (landmine 54).
+        j = src.find("\nfunction ", i + 1)
+        body = src[i:j if j > 0 else i + 2600]
+        if "machineLegal(" not in body:
+            fails.append(
+                fn.split("(")[0] + "() does not call machineLegal — the router "
+                "and the snapper must apply the SAME rule, or a snap lands on a "
+                "node the router will not leave (take 24)")
+    if re.search(r"var ok=\{\};MACHINE\[machine\]\.ok\.forEach", src):
+        fails.append("a raw class allow-list is still built for routing; "
+                     "per-vehicle rules would be bypassed")
+    import glob as _g
+    paths = _g.glob(os.path.join(ROOT, "bundles", "*", "graph.json"))
+    if not paths:
+        return notes.append("no bundles built — machine legality check deferred")
+    seen = 0
+    for gp in paths:
+        try:
+            g = json.load(open(gp))
+        except Exception:
+            continue
+        bk = g.get("bk") or []
+        mi = bk.index("moto") if "moto" in bk else -1
+        ai = bk.index("atv") if "atv" in bk else -1
+        if mi < 0 and ai < 0:
+            continue
+        for b in g.get("b") or []:
+            m = b[mi] if 0 <= mi < len(b) else None
+            a = b[ai] if 0 <= ai < len(b) else None
+            if (m or a) and not (m and a):
+                seen += 1
+    if not seen:
+        return notes.append(
+            "machine legality: wired, but no built bundle contains a rule that "
+            "distinguishes one machine from another — nothing to enforce yet")
+    notes.append("machine legality: per-vehicle rules honoured, %d attribute "
+                 "bundle(s) distinguish machines" % seen)
+
+
+
+
+# ── 4d. Ledger integrity ────────────────────────────────────────────────────
+# A93. Take 43 deduped these by hand ("42 handoff entries, 70 landmines, no gaps,
+# no duplicates") and by take 81 it had re-accumulated: two Take 49s, two Take
+# 56s, A46 and A52 twice each, and landmines 78 and 85 defined twice — 78 being
+# two DIFFERENT lessons sharing a number that mkapex.py and gate.py both cite.
+#
+# These three files are what a successor is told to read first, and the project's
+# own rule is that a number is citable and never reused. A duplicate breaks
+# citability silently: nothing errors, the reader simply gets the wrong lesson.
+def check_ledgers():
+    import collections
+    def dups(seq):
+        return sorted(x for x, c in collections.Counter(seq).items() if c > 1)
+
+    h = read("docs", "HANDOFF.md") or ""
+    takes = [int(x) for x in re.findall(r"^## Take (\d+) ", h, re.M)]
+    if not takes:
+        return fails.append("HANDOFF.md has no take entries")
+    d = dups(takes)
+    if d:
+        fails.append("HANDOFF.md: take %s appears more than once — the take number "
+                     "is the seal, and two entries claiming one seal makes the "
+                     "history unreadable" % ", ".join(map(str, d)))
+    gaps = [t for t in range(min(takes), max(takes) + 1) if t not in takes]
+    if gaps:
+        fails.append("HANDOFF.md: no entry for take %s" % ", ".join(map(str, gaps)))
+
+    a = read("docs", "AGENDA.md") or ""
+    ids = re.findall(r"^## (A\d+[a-z]?)", a, re.M)
+    d = dups(ids)
+    if d:
+        fails.append("AGENDA.md: %s used by more than one item — an id that means "
+                     "two things cannot be cited" % ", ".join(d))
+
+    l = read("docs", "LANDMINES.md") or ""
+    nums = [int(x) for x in re.findall(r"^\*\*(\d+)[.,]", l, re.M)]
+    if not nums:
+        return fails.append("LANDMINES.md has no numbered entries")
+    d = dups(nums)
+    if d:
+        fails.append("LANDMINES.md: landmine %s defined more than once — citations "
+                     "in the code resolve to whichever one you read first"
+                     % ", ".join(map(str, d)))
+    gaps = [n for n in range(1, max(nums) + 1) if n not in nums]
+    if gaps:
+        fails.append("LANDMINES.md: no landmine %s" % ", ".join(map(str, gaps)))
+
+    if not any("HANDOFF.md" in f or "AGENDA.md" in f or "LANDMINES.md" in f
+               for f in fails):
+        notes.append("ledgers: %d takes, %d agenda ids, %d landmines — "
+                     "no duplicates, no gaps" % (len(takes), len(ids), len(nums)))
+
+
 # Items without a ruled-out line get re-derived from scratch every session.
 def check_agenda():
     a = read("docs", "AGENDA.md")
@@ -163,10 +357,20 @@ def check_syntax():
     if not os.path.isdir(www):
         return
     n = 0
-    for fn in sorted(os.listdir(www)):
-        if not fn.endswith((".js", ".html")):
-            continue
-        src = read("www", fn)
+    # BOTH the source and the built output. This scanned www/ only, so a
+    # src/app.html that did not parse was invisible until something rebuilt —
+    # and check_current compares take stamps, not content, so an edit within the
+    # same take could sit broken in the source with the gate green. Found at
+    # take 78 by breaking src/app.html and watching "inline syntax ok (2 files)"
+    # go by. Take 12's lesson on the other axis: the repo must also be able to
+    # build the app it claims to.
+    targets = [("src", fn) for fn in sorted(os.listdir(os.path.join(ROOT, "src")))
+               if fn.endswith((".js", ".html"))] if os.path.isdir(
+                   os.path.join(ROOT, "src")) else []
+    targets += [("www", fn) for fn in sorted(os.listdir(www))
+                if fn.endswith((".js", ".html"))]
+    for where, fn in targets:
+        src = read(where, fn)
         if fn.endswith(".html"):
             # EVERY bare inline block, not "last open tag to last close tag" —
             # that slice swallowed the following <script src> and reported a
@@ -183,7 +387,7 @@ def check_syntax():
         os.unlink(tmp)
         if r.returncode:
             first = [l for l in r.stderr.splitlines() if "Error" in l]
-            fails.append(f"{fn} inline script does not parse: "
+            fails.append(f"{where}/{fn} inline script does not parse: "
                          f"{(first[0] if first else r.stderr)[:90]}")
         else:
             n += 1
@@ -626,6 +830,24 @@ def check_render():
         n = sum(1 for l in r.stdout.splitlines() if l.strip().startswith("ok"))
         notes.append(f"render: real browser drew the map, {n} checks green")
 
+    # The palette verifier runs under the SAME policy, in the same place, for the
+    # same reason. It is a pipeline step too — but `ci/bundle.sh` runs the
+    # pipeline BEFORE `npm ci`, so that step finds no puppeteer, prints "absent,
+    # skipping" and exits 0. A check that skips is not a check (landmine 53), and
+    # this one exists to stop the legend drifting from the map again.
+    vp = os.path.join(HERE, "verify_palette.mjs")
+    if not os.path.exists(vp):
+        return fails.append(
+            "tools/verify_palette.mjs missing — nothing proves the legend "
+            "swatches match the colours the map paints (take 77)")
+    r = subprocess.run(["node", vp], capture_output=True, text=True, timeout=300)
+    if r.returncode:
+        bad = [l.strip() for l in r.stdout.splitlines() if "FAIL" in l][:2]
+        fails.append("palette render failed: " + ("; ".join(bad) or r.stderr[-120:]))
+    else:
+        n = sum(1 for l in r.stdout.splitlines() if l.strip().startswith("ok"))
+        notes.append(f"palette: browser confirms swatch == map paint, {n} checks")
+
 
 # ── 6b2. The repo must build the app it claims to ────────────────────────────
 # Take 12: www/ still held the take-2 spike while eleven takes of work lived only
@@ -730,6 +952,64 @@ def check_bundles():
                  f"{built} built")
 
 
+# ── 6c1. A layer with nothing in it is not a layer ──────────────────────────
+# Take 76. pack.py wrote a structurally valid EMPTY water payload — 65 bytes,
+# both buckets [] — because take 56's TIGER fallback creates an aoi.json that
+# satisfied its "was OSM missing" guard. bundle.verify() checks existence, size
+# and SHA-256, and all three pass on an empty file, so the bundle reported
+# COMPLETE with no water in it while ingest had already printed "bundle will be
+# PARTIAL". The rider gets a map with no lakes and is told nothing, which is
+# precisely what the three-state model exists to prevent (landmines 34, 74).
+#
+# Checked against the BUILT bundle rather than against the producers, because
+# the next empty artifact will come from a producer nobody has written yet
+# (landmine 73's corollary).
+def check_empty_artifacts():
+    import importlib.util, glob
+    bp = os.path.join(HERE, "bundle.py")
+    if not os.path.exists(bp):
+        return          # check_bundles already fails on this
+    spec = importlib.util.spec_from_file_location("_be", bp)
+    m = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(m)
+    except Exception as e:
+        return fails.append(f"bundle.py will not load: {e}")
+    # A check with nothing to look at reports success (landmine 85). If the
+    # counters are gone, this check is theatre and should say so loudly.
+    if not getattr(m, "COUNTERS", None):
+        return fails.append(
+            "bundle.py has no COUNTERS — nothing can tell an empty layer from "
+            "a full one, and an empty artifact verifies as COMPLETE (take 76)")
+    bd = os.path.join(ROOT, "bundles")
+    if not os.path.isdir(bd):
+        return notes.append("no bundles built — empty-artifact check deferred")
+    seen, judged = 0, 0
+    for mp in sorted(glob.glob(os.path.join(bd, "*", "manifest.json"))):
+        rid = os.path.basename(os.path.dirname(mp))
+        try:
+            man = json.load(open(mp))
+        except Exception as e:
+            fails.append(f"bundle {rid}: manifest unreadable: {e}")
+            continue
+        seen += 1
+        for e in man.get("artifacts", []):
+            p = os.path.join(os.path.dirname(mp), e["path"])
+            n = m.features(e.get("kind"), p) if os.path.exists(p) else None
+            if n is None:
+                continue
+            judged += 1
+            if n == 0:
+                fails.append(
+                    f"bundle {rid}: {e['path']} is staged but holds ZERO "
+                    f"features — the bundle claims a layer it does not have "
+                    f"(landmine 34). It must be absent so the state degrades "
+                    f"to PARTIAL and the app names it.")
+    if seen and not any("holds ZERO" in f for f in fails):
+        notes.append(f"empty artifacts: {judged} countable layer(s) across "
+                     f"{seen} bundle(s), every one has content")
+
+
 # ── 6d. Regions ─────────────────────────────────────────────────────────────
 # Take 14: the AOI was hardcoded in ten places across seven files. One
 # definition now, and nothing may reintroduce a literal.
@@ -820,7 +1100,8 @@ def check_manifest():
 
 
 for fn in (check_handoff, check_stamps, check_offline,
-           check_style, check_agenda, check_syntax, check_stubs,
+           check_style, check_palette, check_machine_legality,
+           check_ledgers, check_agenda, check_syntax, check_stubs,
            check_orphan_sources, check_class_legality, check_workflow_yaml,
            check_checkout_ref,
            check_ci_deps,
@@ -828,7 +1109,7 @@ for fn in (check_handoff, check_stamps, check_offline,
            check_smoke, check_render,
            check_current,
            check_provision,
-           check_regions, check_bundles,
+           check_regions, check_bundles, check_empty_artifacts,
            check_tools,
            check_manifest):
     try:

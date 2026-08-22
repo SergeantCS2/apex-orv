@@ -74,11 +74,33 @@ def main():
     Was an ad-hoc snippet until take 13; a clean checkout produced no water at
     all and the bundle silently verified as PARTIAL.
     """
+    out = 'water_payload.json'
+
+    def nothing(why):
+        """No water is a legitimate outcome. An EMPTY ARTIFACT is not.
+
+        Take 76: this guard used to test only whether aoi.json existed. Take
+        56's TIGER fallback WRITES an aoi.json — it just carries no water tags —
+        so the guard sailed past, pack wrote a structurally valid empty payload
+        (65 bytes of {"l":{"waterway":[],"water":[]}}), and bundle.verify passed
+        it on existence, size and hash. The bundle reported COMPLETE while the
+        map had no water and the app never named the gap. Landmine 74 in a new
+        place, defeating landmine 34.
+
+        A stale payload from an earlier run must go too, or the artifact simply
+        survives on disk and the hole reopens (landmines 32, 36).
+        """
+        print(f"water: {why} Skipping the water layer; the bundle will be "
+              f"PARTIAL and the app will name it.")
+        if os.path.exists(out):
+            os.remove(out)
+            print(f"water: removed a stale {out} from an earlier run")
+
     if not os.path.exists('aoi.json'):
-        print("water: no aoi.json — OSM was unavailable at ingest. "
-              "Skipping the water layer; the bundle will be PARTIAL.")
-        return
-    els = json.load(open('aoi.json'))['elements']
+        return nothing("no aoi.json — OSM was unavailable at ingest.")
+    aoi = json.load(open('aoi.json'))
+    src = aoi.get('source')
+    els = aoi['elements']
     buckets = {'waterway': [], 'water': []}
     for e in els:
         geom = e.get('geometry')
@@ -100,8 +122,15 @@ def main():
             continue
         buckets[key].append(encode(pts))
 
+    if not buckets['water'] and not buckets['waterway']:
+        return nothing(
+            "aoi.json came from the Census TIGER fallback, which carries no "
+            "water at all — OSM is the only source for this layer."
+            if src == 'tiger' else
+            f"OSM returned no water in this box ({len(els)} elements scanned).")
+
     blob = json.dumps({'bbox': list(BBOX), 'l': buckets}, separators=(',', ':'))
-    open('water_payload.json', 'w').write(blob)
+    open(out, 'w').write(blob)
     print(f"water: {len(buckets['water'])} polys, {len(buckets['waterway'])} lines, "
           f"{len(blob)/1024:.0f} KB")
 
