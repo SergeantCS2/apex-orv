@@ -67,6 +67,21 @@ def encode(pts):
     return out
 
 
+
+def _near(a, b, tol=2.5e-5):
+    """~2.5 m at this latitude — endpoints that OSM split apart, not distinct ones."""
+    return abs(a[0] - b[0]) <= tol and abs(a[1] - b[1]) <= tol
+
+
+def decode_ring(enc):
+    """Inverse of encode(): delta ints back to lon/lat pairs."""
+    out, x, y = [], 0, 0
+    for i in range(0, len(enc), 2):
+        x += enc[i]; y += enc[i + 1]
+        out.append((x / 1e5, y / 1e5))
+    return out
+
+
 def main():
     """Water for the basemap. Everything else the app draws comes from the
     routable graph, so this is the only thing still taken straight from OSM.
@@ -102,6 +117,13 @@ def main():
     src = aoi.get('source')
     els = aoi['elements']
     buckets = {'waterway': [], 'water': []}
+    # A77. 175 of these carry a name in OSM and the payload threw every one of
+    # them away, so the app drew Shaw Lake and the Au Sable as anonymous blue
+    # shapes. A lake you can name is a landmark; a blue blob is scenery.
+    # Names ride in a PARALLEL list, one entry per geometry, null where unnamed —
+    # the geometry encoding is untouched, so an older app reading this payload
+    # simply ignores a key it does not know.
+    names = {'waterway': [], 'water': []}
     for e in els:
         geom = e.get('geometry')
         if not geom or len(geom) < 2:
@@ -121,6 +143,54 @@ def main():
         if len(pts) < 2:
             continue
         buckets[key].append(encode(pts))
+        nm = (e.get('tags', {}).get('name') or '').strip() or None
+        names[key].append(nm)
+
+    # A77. OSM splits a waterway at every confluence, bridge and county line, so
+    # "Au Sable River" arrives as dozens of fragments with a median length of
+    # 139 m. A line label needs roughly 1,200 m at riding zoom, and only 16 of
+    # 133 named streams were that long — which is why the river drew and its
+    # name never did.
+    #
+    # The app already solves this for trails: chainStrokes() joins consecutive
+    # edges sharing a label into one long stroke. Water has no node ids to chain
+    # on, only coordinates — but it can be done ONCE here at build time instead
+    # of on every app start, which is cheaper and keeps the client simple.
+    def chain_named(geoms, nms):
+        by = {}
+        for i, (g, n) in enumerate(zip(geoms, nms)):
+            if n:
+                by.setdefault(n, []).append(i)
+        keep = [True] * len(geoms)
+        merged_g, merged_n = [], []
+        for name, idxs in by.items():
+            frags = [list(decode_ring(geoms[i])) for i in idxs]
+            for i in idxs:
+                keep[i] = False
+            while frags:
+                cur = frags.pop(0)
+                joined = True
+                while joined:
+                    joined = False
+                    for j, f in enumerate(frags):
+                        if _near(cur[-1], f[0]):
+                            cur = cur + f[1:]; frags.pop(j); joined = True; break
+                        if _near(cur[-1], f[-1]):
+                            cur = cur + list(reversed(f))[1:]; frags.pop(j); joined = True; break
+                        if _near(cur[0], f[-1]):
+                            cur = f[:-1] + cur; frags.pop(j); joined = True; break
+                        if _near(cur[0], f[0]):
+                            cur = list(reversed(f))[:-1] + cur; frags.pop(j); joined = True; break
+                merged_g.append(encode(cur)); merged_n.append(name)
+        out_g = [g for i, g in enumerate(geoms) if keep[i]] + merged_g
+        out_n = [n for i, n in enumerate(nms) if keep[i]] + merged_n
+        return out_g, out_n
+
+    before = len([x for x in names['waterway'] if x])
+    buckets['waterway'], names['waterway'] = chain_named(
+        buckets['waterway'], names['waterway'])
+    after = len([x for x in names['waterway'] if x])
+    print(f"water: chained {before} named stream fragments into {after} strokes")
 
     if not buckets['water'] and not buckets['waterway']:
         return nothing(
@@ -129,10 +199,12 @@ def main():
             if src == 'tiger' else
             f"OSM returned no water in this box ({len(els)} elements scanned).")
 
-    blob = json.dumps({'bbox': list(BBOX), 'l': buckets}, separators=(',', ':'))
+    blob = json.dumps({'bbox': list(BBOX), 'l': buckets, 'nm': names},
+                      separators=(',', ':'))
     open(out, 'w').write(blob)
+    named = sum(1 for v in names.values() for x in v if x)
     print(f"water: {len(buckets['water'])} polys, {len(buckets['waterway'])} lines, "
-          f"{len(blob)/1024:.0f} KB")
+          f"{named} named, {len(blob)/1024:.0f} KB")
 
 
 if __name__ == '__main__':

@@ -9,6 +9,14 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 
 ## Downloaded to the device
 
+### Geofabrik OpenStreetMap extract
+
+- **Host** `download.geofabrik.de`
+- **Provides** Michigan .osm.pbf — the same OSM ways ingest.py asks Overpass for, from the sanctioned bulk download path
+- **Licence** ODbL (OpenStreetMap contributors)
+- **Fetched by** `osm_local.py`
+- **Refresh** only when every Overpass mirror fails — tier 2 of the OSM fallback chain, ahead of Census TIGER (A108, take 85)
+
 ### Michigan DNR trails
 
 - **Host** `gisagodnr.state.mi.us`
@@ -70,14 +78,6 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 
 - **Host** `overpass.kumi.systems`
 - **Provides** same OSM database as the primary; used only when it is down
-- **Licence** ODbL (OpenStreetMap contributors)
-- **Fetched by** `ingest.py`
-- **Refresh** same as the primary
-
-### Overpass mirror (Swiss OSM)
-
-- **Host** `overpass.osm.ch`
-- **Provides** second fallback. The primary 503'd through two builds; a single volunteer endpoint should not stop a map someone rides with.
 - **Licence** ODbL (OpenStreetMap contributors)
 - **Fetched by** `ingest.py`
 - **Refresh** same as the primary

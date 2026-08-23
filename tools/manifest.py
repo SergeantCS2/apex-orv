@@ -14,6 +14,17 @@ ROOT = os.path.dirname(HERE)
 
 SOURCES = [
     {
+        "host": "download.geofabrik.de",
+        "name": "Geofabrik OpenStreetMap extract",
+        "what": "Michigan .osm.pbf — the same OSM ways ingest.py asks Overpass "
+                "for, from the sanctioned bulk download path",
+        "licence": "ODbL (OpenStreetMap contributors)",
+        "tool": "osm_local.py",
+        "phase": "provision",
+        "refresh": "only when every Overpass mirror fails — tier 2 of the OSM "
+                   "fallback chain, ahead of Census TIGER (A108, take 85)",
+    },
+    {
         "host": "gisagodnr.state.mi.us",
         "name": "Michigan DNR trails",
         "what": "ORV routes, trails, motorcycle trails, MCCCT, closures, reroutes",
@@ -86,16 +97,6 @@ SOURCES = [
         "host": "overpass.kumi.systems",
         "name": "Overpass mirror (Kumi Systems)",
         "what": "same OSM database as the primary; used only when it is down",
-        "licence": "ODbL (OpenStreetMap contributors)",
-        "tool": "ingest.py",
-        "phase": "provision",
-        "refresh": "same as the primary",
-    },
-    {
-        "host": "overpass.osm.ch",
-        "name": "Overpass mirror (Swiss OSM)",
-        "what": "second fallback. The primary 503'd through two builds; a single "
-                "volunteer endpoint should not stop a map someone rides with.",
         "licence": "ODbL (OpenStreetMap contributors)",
         "tool": "ingest.py",
         "phase": "provision",

@@ -5,7 +5,7 @@
 # belongs here, where seeding a new zip updates it (landmine 84).
 set -euo pipefail
 
-python3 -m pip install --quiet pillow numpy scipy pyyaml
+python3 -m pip install --quiet pillow numpy scipy pyyaml osmium
 
 python3 tools/pipeline.py
 

@@ -1,4 +1,496 @@
-# HANDOFF — through Take 82 · V2
+# HANDOFF — through Take 88 · V2
+
+## Take 88 — 2026-08-22 — Posted route numbers
+
+A75, the other half of the orientation furniture from Jacob's onX screenshots.
+"Two east of M 33" is how a rider says where they are, and the number is on
+every sign where the street name often is not. We had it in the data and threw
+it away twice.
+
+### Dropped in two places
+
+`ref` was discarded at the OSM ingest into the graph, and again by the noding
+step, which rebuilds edges from an explicit key list. Both had to be fixed to
+get one field through — the second only became visible because the first
+measured **0 edges with a route number** after the first fix looked correct.
+
+**4,470 edges carry one, across 183 distinct refs**: `M 33`, `M 72`, `F-28`,
+`489`, `H57-7`, and Forest Road numbers. Packed through the same name dictionary
+as trail names, since 183 strings shared across 4,470 edges is far smaller than
+repeating them.
+
+### A60 had already done the right thing
+
+**2,318 of the 4,470 are hidden** as cross-source duplicates — 1,693 of them
+tracks, which are the OSM copy of a Forest Service road we already label with
+its FS number from the authoritative source. Left drawn: **2,152** — paved 760,
+minor 527, track 865. Had A75 landed before A60, the map would have carried the
+same number twice on two parallel lines.
+
+### Chained, because a routing edge is too short to label
+
+Median routing edge is 76 m; a line label needs several hundred. `chainStrokes()`
+already solves this for trail names, so it was **parameterised by key** rather
+than copied — a second walker is a second thing to keep in step, and they would
+drift the way the palette did (landmine 107). Trail names chain by `labelFor`,
+route numbers by the posted ref. 703 ref strokes result.
+
+Multi-value refs (`M 33;M 72;F-32`) are split where they are drawn, not at
+ingest — the raw value is what the source said and is worth keeping intact
+upstream. Two fit along a road at riding zoom; a third is dropped rather than
+truncated into nonsense.
+
+### Priority, gated
+
+`lbl-trail 29 < lbl-ref 33 < lbl-lake 34 < lbl-stream 35`. MapLibre places
+symbols in layer order, so the trail you are riding wins, a road number beats a
+pond, and both are now asserted rather than assumed.
+
+Verified on the map centred on M 33 — coordinates read out of the payload, not
+guessed: **`H58-1, M 33`**.
+
+### What I could not settle
+
+Trail names at the z14.5 Bull Gap anchor read 2 before this take and 1 after. I
+could not establish whether that is real: two attempts at an A/B both landed on
+runs where **no trail geometry drew at all**, and the headless placement varies
+run to run. What the check now reports is the denominator — **1 label from 1,708
+labelable strokes** — which says the viewport is small, not that labels are being
+crowded out. The structural guarantee is the layer order, which is gated. Only a
+ride settles the rest.
+
+### What I got wrong
+
+Bundled three edits to `render.mjs` in one script with an assert on each. The
+third anchor was stale, the assert fired, and **the whole patch was discarded
+including the two good edits** — the file is only written at the end. Landmine 99,
+which is in the file, which I had read. Applied separately afterwards and all
+three landed.
+
+### Verified
+
+Smoke 5 modes, 236 assertions. Render **48 checks** including route numbers
+placed, the ref layer's position, and the new trail-label denominator. Palette
+18. Gate green.
+
+---
+
+
+## Take 87 — 2026-08-22 — Naming the water, and four hours of blaming the product
+
+A77. The map drew Shaw Lake and the Au Sable as anonymous blue shapes. It now
+names them. A lake you can name is a landmark you navigate by; a blue blob is
+scenery — Jacob's onX screenshots labelled Lake Saint Helen, Cooke Dam Pond and
+Maltbys Swamp, and ours labelled nothing.
+
+### The data was there and being thrown away
+
+`pack.py` kept geometry and dropped every name. **175 of the water features
+carry one.** Names now ride in a parallel list, one entry per geometry, null
+where unnamed — the geometry encoding is untouched, so an older app reading the
+payload simply ignores a key it does not know. Cost: 38 KB -> 41 KB.
+
+### Rivers needed chaining, and that was measurable
+
+Lakes labelled immediately. Streams placed nothing, and the reason was not
+styling:
+
+```
+named streams 133 · length median 139 m · text needs ~1200 m at z13.5
+long enough to carry a label: 16 of 133
+max turn angle: median 38 deg, p90 104 deg · my text-max-angle was 45,
+                                             which rejected 61 of 133
+```
+
+OSM splits a waterway at every confluence, bridge and county line. The app
+already solves this for trails — `chainStrokes()` joins consecutive edges
+sharing a label — so water is chained the same way, but **once at build time**
+rather than on every app start, because water has no node ids to chain on and
+coordinates are cheaper to match in Python than in the client.
+
+**133 fragments became 28 strokes. Median length 139 m -> 2,361 m.** The Au
+Sable is now one 68.9 km line. Long enough to label: 16 of 133 -> 20 of 28.
+`text-max-angle` raised 45 -> 70, matching `lbl-road`.
+
+Verified on the map: **Shaw Lake, Twin Lake, Briggs Lake, Muleshoe Lake** and
+**Wolf Creek, Au Sable River**.
+
+### Trail names win collisions by construction, not by hope
+
+MapLibre resolves symbol collisions in layer order, so the water layers sit
+after every trail-name layer: `lbl-trail 29, lbl-lake 33, lbl-stream 34`, and
+the gate asserts that ordering. I tried to prove it empirically first and could
+not — see below.
+
+### What actually happened, which is the part worth reading
+
+I spent most of this take convinced the layers were broken. They were working
+almost from the start. Every "0 labels" reading came from an instrument fault:
+
+1. A throwaway probe reported zero labels of **every** kind, trail names
+   included. It was failing to load glyphs. Deleted rather than debugged.
+2. An A/B said water labels *increased* trail names from 0 to 2 — impossible.
+   That run had `trails = 0`: nothing drew at all.
+3. `getSource("wlbl")._data` is private and undefined in MapLibre 5, so the
+   diagnostic threw and reported `-2`, which reads as "no source" when the
+   source had 175 features.
+4. Then two probes in a row centred on viewports **with no named water in
+   them**. Loon Lake is at 44.518; the Au Sable runs at 44.61–44.68. I was
+   probing Bull Gap at 44.50 and 44.57 and concluding the layer was dead.
+
+The thing that finally located it was changing the check from a verdict to an
+observation: `0 label(s) of 175 in the source` plus a sample feature. Every
+earlier reading said only "0", which is compatible with a dozen causes.
+
+### Also fixed
+
+`render.mjs` printed **`0 trail NAME labels — a rider can identify the trail`**
+and marked it `ok`, because of an escape clause for runs where nothing drew. The
+preceding check does fail in that case so the gate still goes red, but that
+sentence is actively wrong in a log someone reads later. It now says
+`NOT MEASURABLE — no trail geometry drew in this run`.
+
+### Verified
+
+Smoke 5 modes, 236 assertions. Render 46 checks including the two new water
+assertions. Palette 18. Gate green.
+
+---
+
+
+## Take 86 — 2026-08-22 — A60: route both, draw one
+
+The doubled parallel lines Jacob reported at take 62 — *"some paths don't match
+the road properly"* — are gone. Open since take 60, blocked on measurement until
+take 84 fixed the instrument.
+
+### What ships
+
+**20,222 edges routable, 16,972 drawn.** 3,250 edges (16% of the network,
+111 miles of 2,244) stay in the graph and stay routable, and are not painted.
+Every routing profile, loop, snap, retrace and cost function sees the identical
+network it saw before.
+
+### The predicate is source, not distance
+
+Take 60's note says "duplicate geometry: route both, draw one" and does not say
+what a duplicate is. At 17 m there are 8,103 near-parallel pairs, and **2,934 of
+them share a source** — 861 are `mccct+moto24`, the Cross Country Cycle Trail
+running along a motorcycle trail. That is two legal designations on one
+corridor, not one road drawn twice. Collapsing on proximity would have deleted
+861 pairs of legal designation and nobody would have seen an error.
+
+Only **cross-source** pairs are duplicates. Of the 3,250 suppressed, **3,040 are
+the OSM copy** and 210 are USFS line losing to a designated DNR trail.
+
+### Which copy survives is by priority, never by length
+
+```
+closed / fsclosed        never hidden — a closure must always be visible
+designated ORV classes   carry legality the OSM copy does not
+fsroad                   agency road with MVUM per-vehicle rules
+track / minor / paved    advisory OSM context
+```
+
+**Every designated class came through untouched**: `trail50` 0 hidden,
+`mccct` 0, `moto24` 0, `route72` 0, `closed` 0, `fsclosed` 0. The suppression
+falls where it should — `track` −2,194 edges / 70.8 mi, `minor` −811 / 35.1 mi.
+
+### Two places, not one
+
+`nf2` filters the drawn features. **`chainStrokes()` had to be filtered too** —
+it walks `EDGES` and chains consecutive edges sharing a label into strokes for
+line labels. Left unfiltered, a chain walks straight through geometry that is
+not on the map and the trail name lands on empty ground. A60's note does not
+mention this and it would have shipped as an invisible regression.
+
+Old payloads with no eighth field are treated as all-drawn, so a stale bundle
+degrades to the pre-A60 picture rather than to a blank map.
+
+### A gate hole the APP found first
+
+Mid-take the self-test failed `LOAD·terrain`: `terrain.json` had **18,252** node
+elevations while `graph.json` had **12,236**. Terrain was stale from the
+previous TIGER run — and it hash-verified perfectly, because nothing had ever
+compared two artifacts to *each other*. `check_artifacts_agree` now does.
+
+A runtime check catching an incoherent bundle before the gate does is the wrong
+way round.
+
+### Verified
+
+`check_drawn` gates the invariants: no class entirely undrawn, and nothing in
+`NEVER_HIDE` suppressed. **Five negative controls** — a whole class hidden, a
+closure hidden, designated trail hidden, terrain from a different run, and the
+eighth field stripped (which correctly degrades rather than fails).
+
+Smoke **236 assertions** including both halves of the promise: every suppressed
+edge still present in the routing adjacency, and no closure or designated line
+among them. Render 44. Palette 18. Self-test 38.
+
+---
+
+
+## Take 85 — 2026-08-22 — Geofabrik becomes a real fallback tier
+
+A108, with Jacob's agreement. The chain is now:
+
+```
+Overpass mirrors  ->  Geofabrik extract  ->  Census TIGER roads
+```
+
+### Why the order is the whole point
+
+The tiers are not equivalent, and treating them as interchangeable is what cost
+the last nine takes their water layer:
+
+| tier | edges | water | topology |
+|---|---|---|---|
+| Overpass | 20,222 | yes | the shipping network |
+| **Geofabrik** | **20,222** | **yes** | **identical** |
+| TIGER | 34,341 | **no** | different shape |
+
+Geofabrik is the same OSM ways, same tags, pulled through the sanctioned bulk
+path instead of a volunteer query API. Before this take, one Overpass outage
+cost the water layer and changed what the map was made of. Now it costs a
+297 MB download and nothing else.
+
+TIGER stays as the last tier: Geofabrik needs a compiled PBF reader and a large
+download, and a build that can still finish with neither is worth keeping.
+
+### The clean run, which is the proof
+
+From a pristine unpack, no caches, Overpass down for both mirrors, the extract
+downloaded from scratch:
+
+```
+osm: overpass-api.de HTTPError 503
+osm: overpass.kumi.systems HTTPError 502
+osm: every mirror failed (HTTPError)
+osm: trying the Geofabrik extract (sanctioned bulk path, ~300 MB on first use)
+osm: aoi.json written from Geofabrik (4849 ways) — real OSM data, water included
+water: 244 polys, 180 lines          graph 20,222 edges / 12,236 nodes / 99.7%
+verify -> COMPLETE                   smoke: badge 'GRAPH 20222', not PARTIAL
+```
+
+**The first COMPLETE bundle from a clean run in this container since take 76**,
+with Overpass unreachable throughout. The same clean run one take ago produced
+34,341 TIGER edges and no water.
+
+### overpass.osm.ch removed
+
+It is the Swiss chapter's instance: a Bern bbox returns 4,176 ways, a Bull Gap
+bbox returns 0. It sat in the mirror list for twenty-six takes as a fallback
+that could not once have worked, answering HTTP 200 with an empty set — which is
+precisely why landmine 74's empty-result guard exists. The guard was right; the
+mirror was never valid. Its PROVISION declaration went with it, and the
+declared-but-never-reached check caught the leftover immediately.
+
+Two mirrors now, not three, and the gate refuses to let it back in by name.
+
+### Verified
+
+`check_osm_fallback` gates the chain: Geofabrik reachable, TIGER present,
+Geofabrik tried **first**, `osm_local.py` present, and osm.ch not in the mirror
+list. **Four negative controls**, all firing — tier removed, tiers genuinely
+reordered, Swiss mirror reinstated, `osm_local.py` deleted.
+
+`ci/bundle.sh` installs `osmium`. `check_ci_deps` was narrowed at take 84 to
+read `pipeline.py`'s STEPS table, so it now correctly demands osmium — because
+`ingest.py` genuinely reaches it — while still ignoring the local-only
+instruments. That narrowing paid for itself one take later.
+
+### What I got wrong
+
+Wrote the chain-order check as `ing.find("tiger_roads()")`, which matches
+`def tiger_roads():` — the definition, near the top of the file. It reported the
+tiers out of order on correct code. Then my first attempt at the reorder control
+mutated `els = osm_local.build()` into `XX_osm_local.build()`, which still
+contains the string being searched for, so the control passed without testing
+anything and the reorder branch was dead until I wrote a mutation that genuinely
+reorders. Both faults were in the checking, not the checked.
+
+---
+
+
+## Take 84 — 2026-08-22 — Fixing the instrument, and A60 measured at last
+
+No change to the app. This take repairs the thing that made takes 76–83 partly
+blind, and then uses it.
+
+### The instrument
+
+Take 83 established that CI reaches Overpass and this container does not:
+Jacob's take-82 APK came back with 20,428 edges and a complete bundle while
+every local probe returned 0/24. That is a broken instrument, not a broken
+product — but it blocked anything that must be MEASURED against the OSM road
+network, which is most of A60.
+
+`tools/osm_local.py` builds `aoi.json` from the Geofabrik Michigan extract:
+the sanctioned bulk download path, 297 MB, reachable from here at 16 MB/s. Same
+output file, same element shape, and the same tag set — verified by reading the
+Overpass query string out of `ingest.py` and diffing it, because a copy of a
+table is not the table (landmine 107). That self-check earned its place
+immediately by WARNing on my first run: my regex looked for
+`way["highway"]~"…"` and the real query is `way["highway"~"…"]`.
+
+**Validated against the record**, which is the only thing that makes it usable:
+
+| | take-74 record | this instrument | Jacob's take-82 APK |
+|---|---|---|---|
+| edges | 20,222 | **20,222** | 20,428 |
+| nodes | 12,236 | **12,236** | 12,338 |
+| routable | 99.7% | **99.7%** | — |
+| water | 242 polys / 180 lines | 244 / 180 | complete |
+
+`emit_graph` returns the take-74 numbers exactly. The local network is the
+network that ships.
+
+**This is not a pipeline step and not a fallback tier.** `ingest.py` still uses
+Overpass and still falls back to TIGER; nothing in `ci/` runs it. Promoting it
+would mean a 297 MB download and a compiled dependency in the build, which is a
+decision to make deliberately rather than smuggle in behind a measurement tool
+(A107).
+
+### A60, measured on real geometry for the first time
+
+8,103 near-parallel edge pairs at take 64's safe 17 m threshold. Split by source,
+which nobody had done:
+
+```
+osm  + usfs  4177   CROSS-SOURCE — the A60 case
+dnr  + dnr   1493   same source — NOT a duplicate
+osm  + osm    897   same source — NOT a duplicate
+dnr  + osm    638   CROSS-SOURCE
+usfs + usfs   544   same source — NOT a duplicate
+dnr  + usfs   354   CROSS-SOURCE
+```
+
+**5,169 cross-source pairs, 222.7 mi** — `fsroad+track` 2,651, `fsroad+minor`
+1,314. That is Jacob's complaint exactly: the OSM copy jittering alongside the
+agency copy.
+
+**And 2,934 same-source pairs that must NOT be collapsed.** The largest group is
+`mccct+moto24` at 861 — the Michigan Cross Country Cycle Trail running along a
+motorcycle trail. That is not one road drawn twice; it is two designations on
+one corridor, and hiding either would hide a legal fact. `track+track` at 601
+is two genuinely parallel two-tracks.
+
+**So the rule is not "collapse near-parallel edges". It is "collapse a pair only
+when the two edges come from different sources."** Nobody had written that down,
+and the take-60 note does not say it. Building A60 on proximity alone would have
+erased 861 pairs of co-designated trail.
+
+### Two gate changes, both negative-controlled
+
+`check_ci_deps` assumed `tools/pipeline.py` runs every tool in `tools/`. True
+when every tool was a step; false now that three are local instruments — it
+demanded CI install a compiled PBF reader to build an APK. It now reads the
+STEPS table in `pipeline.py` rather than guessing, and fails loudly if it cannot
+parse it. Controls: a pipeline tool gaining an uninstalled import, and
+`bundle.sh` dropping pillow — both still caught.
+
+`download.geofabrik.de` is declared in PROVISION with phase `local`. 10 hosts,
+all declared and reached.
+
+### What I got wrong
+
+Ran the source-split measurement against `www/bundle/graph.json` — which was
+still the **TIGER** build, because I had run `graph emit_graph` without
+rebuilding the bundle. It reported 25,210 pairs where the first run reported
+8,103. Two measurements of the same thing disagreeing is the signal; I checked
+the inputs and found I had measured the wrong network. The corrected run asserts
+its edge count before doing anything.
+
+---
+
+
+## Take 83 — 2026-08-22 — Three faults from the first real ride, and a sandbox that was lying to me
+
+Jacob rode take 82 and sent a self-test report and two screenshots. Everything
+below came from that, and the most important finding is one I could not have got
+from here.
+
+### His build has OSM data. Mine never could.
+
+| | edges / nodes | bundle |
+|---|---|---|
+| **his take-82 APK** | **20,428 / 12,338** | **complete — nothing absent** |
+| my sandbox | 34,341 / 18,252 | PARTIAL, `water.json` absent |
+| take-74 record (OSM) | 20,222 / 12,236 | complete |
+
+His numbers are the OSM profile. **CI reached Overpass fine.** Every "OSM is
+down" line in takes 76–82 was an artefact of this container's egress and
+nothing else — his screenshots show Shaw Lake and the lakes around Bull Gap
+drawn exactly as they should be. Take 82's release notes told him his build had
+no water. **It did have water.** Landmine 120 was written one take too late.
+
+The practical consequence: I cannot measure A60 locally, but CI can build it.
+That is a constraint on my instruments, not on the product.
+
+### Fault 1 — no way to clear a route
+
+> *"I'm a bit confused how to end directions, I closed the interface for
+> directions/my trip I was planning and I still see the lines on the map."*
+
+`clearRoute()` has existed since take 33 and clears all three sources — route,
+alternates, approach legs. It was **never bound to anything a rider could
+press**, only to side effects of changing machine or moving a pin. Now
+`✕ Clear route` sits beside `☆ Save this route` on the route panel.
+
+Deliberately explicit rather than automatic: dismissing a panel is not the same
+gesture as discarding a plan, and you may well want the line up while you look
+at the map.
+
+### Fault 2 — the self-test turned the compass on and left it there
+
+> *"When I did the self test I think the compass popped up at the top… Either
+> way it doesn't work whatever it is."*
+
+The safety drill calls `startRecording()` to test breadcrumb and retrace, and
+`startRecording()` turns the ride HUD on. The restore block put back `TRUCK`,
+`crumbs`, `crumbMi`, `posMode`, `ME`, `RIDE` and `LASTRIDE` — everything it was
+written to think about — and left the ribbon showing over the place chips with
+no heading, permanently.
+
+**A drill must put back everything it moved, not just the state it was written
+to consider.** It now saves and restores the HUD and chip visibility too.
+
+And the ribbon no longer shows a bare needle: with no heading it says
+*"waiting for heading — start moving"*, because a control that renders nothing
+looks broken rather than honest.
+
+### Fault 3 — `avg 2 fps · worst 39402ms` was a screenshot, not a device
+
+That was the single FAIL in his report. A **39-second frame**: `requestAnimationFrame`
+stops when the app leaves the foreground, so the first frame after you come
+back is the length of your absence. One frame in seventy was over 33 ms; the
+other sixty-nine were fine.
+
+`stPerf` now watches `visibilitychange` and treats a >2 s frame as absence,
+reporting it as info rather than scoring it. Landmine 56's corollary for the
+third time: correct behaviour must not be scored as failure.
+
+### Where the checks had to live, and why
+
+I first asserted the HUD fault in `smoke.mjs`. It passed — **`was false, now
+false`** — because the stub does not model the initial `hidden` attribute, so
+both readings were the stub's default and neither came from the app. Landmine 85
+in a harness I had just written. The checks moved to `render.mjs`, where
+`hidden` is real, and all nine pass there.
+
+Then the Clear-route check failed while the clear itself demonstrably worked
+(226 features → 0). I had measured the button's existence **after** clicking it,
+and clearing calls `show()`, which replaces the panel's innerHTML and takes the
+button with it. My check was the broken one, again.
+
+### Verified
+
+Smoke 5 modes. Render **45 checks** including nine new field-fault assertions.
+Palette 18. Gate green.
+
+---
+
 
 ## Take 82 — 2026-08-22 — Audit before testing, and the ledgers I broke
 

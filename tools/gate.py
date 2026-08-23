@@ -332,6 +332,141 @@ def check_ledgers():
                      "no duplicates, no gaps" % (len(takes), len(ids), len(nums)))
 
 
+
+
+# ── 4e. The OSM fallback chain, in order ────────────────────────────────────
+# A108, take 85. The three tiers are NOT equivalent and the order is the whole
+# point: Overpass and Geofabrik both give real OSM ways with water and the same
+# topology (20,222 edges); TIGER gives roads only, no water, 34k edges and a
+# different shape. Reordering them, or losing the middle tier, silently changes
+# what a rider's map is made of on any build where Overpass is down — and
+# Overpass has been down for every local build since take 76.
+def check_osm_fallback():
+    ing = read("tools", "ingest.py")
+    if not ing:
+        return fails.append("tools/ingest.py missing")
+    # Compare CALL SITES, not definitions. `find("tiger_roads()")` matches
+    # `def tiger_roads():` — the definition sits near the top of the file, so
+    # the first version of this check reported the tiers out of order on
+    # correct code (landmine 54, and the check was the broken one).
+    i_geo = ing.find("osm_local.build()")
+    i_tig = ing.find("els = tiger_roads()")
+    if i_geo < 0:
+        return fails.append(
+            "ingest.py never calls osm_local.build() — it no longer reaches "
+            "the Geofabrik tier — one Overpass "
+            "outage would cost the water layer and change the shape of the "
+            "network (A108)")
+    if i_tig < 0:
+        return fails.append("ingest.py no longer reaches the TIGER tier")
+    if i_geo > i_tig:
+        return fails.append(
+            "the OSM fallback tiers are out of order: TIGER is tried before "
+            "Geofabrik. TIGER has no water and a different topology; it is the "
+            "LAST resort, not the first")
+    # the tool the middle tier depends on must exist and be importable in CI
+    if not os.path.exists(os.path.join(HERE, "osm_local.py")):
+        return fails.append("tools/osm_local.py missing — the Geofabrik tier "
+                            "cannot run")
+    mirrors = re.search(r"OVERPASS_MIRRORS = \[(.*?)\]", ing, re.S)
+    n = len(re.findall(r"https://", mirrors.group(1))) if mirrors else 0
+    if not n:
+        return fails.append("no Overpass mirrors declared")
+    # a mirror that cannot serve the region is worse than no mirror: it answers
+    # 200 with an empty set and looks like data (A102)
+    if "overpass.osm.ch" in mirrors.group(1):
+        return fails.append(
+            "overpass.osm.ch is back in the mirror list — it is the Swiss "
+            "chapter's instance and returns 0 ways for this region (A102)")
+    notes.append(f"osm fallback: {n} Overpass mirror(s) -> Geofabrik extract "
+                 f"-> Census TIGER, in that order")
+
+
+
+
+# ── 4f. A60 · route both, draw one, and never hide the wrong thing ──────────
+# Both copies of a duplicated road stay routable; only one is drawn. Two things
+# can go wrong and neither shows up as an error:
+#   - a class loses ALL its drawn representation and vanishes from the map
+#   - a SAFETY class gets hidden: a closure, or designated ORV line
+# Checked against the built graph, per class, because the next bad rank is one
+# someone will add to DRAW_RANK without thinking about closures.
+NEVER_HIDE = {"closed", "fsclosed", "route72", "trail50", "moto24", "mccct"}
+
+
+def check_drawn():
+    import glob as _g
+    paths = _g.glob(os.path.join(ROOT, "bundles", "*", "graph.json"))
+    if not paths:
+        return notes.append("no bundles built — drawn-set check deferred")
+    for gp in paths:
+        rid = os.path.basename(os.path.dirname(gp))
+        try:
+            g = json.load(open(gp))
+        except Exception as e:
+            fails.append(f"bundle {rid}: graph unreadable: {e}")
+            continue
+        E, CLS = g.get("e") or [], g.get("cls") or []
+        if not E:
+            fails.append(f"bundle {rid}: graph has no edges")
+            continue
+        if len(E[0]) < 8:
+            notes.append(f"drawn set: {rid} predates A60 — every edge drawn")
+            continue
+        tot, hid = {}, {}
+        for e in E:
+            c = CLS[e[3]] if e[3] < len(CLS) else "?"
+            tot[c] = tot.get(c, 0) + 1
+            if not e[7]:
+                hid[c] = hid.get(c, 0) + 1
+        gone = sorted(c for c in tot if hid.get(c, 0) == tot[c])
+        if gone:
+            fails.append(f"bundle {rid}: {', '.join(gone)} is entirely undrawn — "
+                         f"a class that is routable but invisible is a lie about "
+                         f"what is on the ground")
+        unsafe = sorted(c for c in NEVER_HIDE if hid.get(c, 0))
+        if unsafe:
+            fails.append(f"bundle {rid}: hid {sum(hid[c] for c in unsafe)} edge(s) "
+                         f"of {', '.join(unsafe)} — closures and designated ORV "
+                         f"line must never be the copy that gets hidden")
+        nh = sum(hid.values())
+        if not gone and not unsafe:
+            notes.append(f"drawn set: {rid} routes {len(E)} edges, draws "
+                         f"{len(E)-nh} ({100.0*nh/len(E):.0f}% suppressed as "
+                         f"cross-source duplicates), no class lost")
+
+
+# ── 4g. A bundle's artifacts must describe the SAME graph ───────────────────
+# terrain.json carries one elevation per graph node. A stale terrain from an
+# earlier run hash-verifies perfectly and passes every existing check, because
+# nothing compared two artifacts to each other. The APP caught it at take 86
+# (`TR.ne.length === NODES.length`) after the gate had waved it through — a
+# runtime check should not be the first thing to notice an incoherent bundle.
+def check_artifacts_agree():
+    import glob as _g
+    n = 0
+    for gp in _g.glob(os.path.join(ROOT, "bundles", "*", "graph.json")):
+        d = os.path.dirname(gp)
+        rid = os.path.basename(d)
+        tp = os.path.join(d, "terrain.json")
+        if not os.path.exists(tp):
+            continue
+        try:
+            gn = len(json.load(open(gp))["n"]) // 2
+            tn = len(json.load(open(tp)).get("ne") or [])
+        except Exception as e:
+            fails.append(f"bundle {rid}: unreadable comparing graph to terrain: {e}")
+            continue
+        n += 1
+        if gn != tn:
+            fails.append(f"bundle {rid}: terrain has {tn} node elevations but the "
+                         f"graph has {gn} nodes — these came from different runs "
+                         f"and every hash still matches")
+    if n and not any("node elevations but" in f for f in fails):
+        notes.append(f"artifacts agree: graph and terrain describe the same "
+                     f"{n} bundle(s)")
+
+
 # Items without a ruled-out line get re-derived from scratch every session.
 def check_agenda():
     a = read("docs", "AGENDA.md")
@@ -645,8 +780,20 @@ def check_ci_deps():
                 need = set()
                 for m in re.finditer(r"python3?\s+tools/(\w+)\.py", runs):
                     need |= closure(m.group(1))
-                if "tools/pipeline.py" in runs:            # pipeline runs them all
-                    for mod in direct:
+                if "tools/pipeline.py" in runs:
+                    # The pipeline dispatches steps by name, so this used to
+                    # assume it runs EVERY tool. That was true when every tool
+                    # was a step. It is not: colour_probe, colour_sweep and
+                    # osm_local are local measurement instruments that CI never
+                    # invokes, and demanding their dependencies would have CI
+                    # install a compiled PBF reader to build an APK (take 84).
+                    # Read the STEPS table instead of guessing at it.
+                    ps = read("tools", "pipeline.py") or ""
+                    steps = set(re.findall(r'"(\w+)\.py"', ps))
+                    if not steps:
+                        fails.append("cannot read the STEPS table in pipeline.py "
+                                     "— CI dependency attribution would be a guess")
+                    for mod in steps:
                         need |= closure(mod)
                 miss = sorted(p for p in {PKG.get(x, x) for x in need}
                               if p not in runs)
@@ -1101,7 +1248,8 @@ def check_manifest():
 
 for fn in (check_handoff, check_stamps, check_offline,
            check_style, check_palette, check_machine_legality,
-           check_ledgers, check_agenda, check_syntax, check_stubs,
+           check_ledgers, check_osm_fallback, check_drawn,
+           check_artifacts_agree, check_agenda, check_syntax, check_stubs,
            check_orphan_sources, check_class_legality, check_workflow_yaml,
            check_checkout_ref,
            check_ci_deps,

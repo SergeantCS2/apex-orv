@@ -578,6 +578,33 @@ ok((record.setData.alt || []).length > 0 &&
   ok(marked.length === 1, `exactly one card marked selected (${marked.length})`);
 }
 
+/* 5y · A60 — route both, draw one (take 86).
+   The promise is not "fewer lines". It is that every edge stays ROUTABLE while
+   only one copy of a duplicated road is DRAWN. Asserted against the real
+   bundle, both halves. */
+{
+  const R = sandbox.__route;
+  const all = R.EDGES.length;
+  const drawn = R.EDGES.filter((e) => e.d).length;
+  ok(drawn > 0 && drawn < all,
+     `${all} edges routable, ${drawn} drawn (${all - drawn} suppressed duplicates)`);
+  /* the suppressed ones must still be reachable by the router */
+  const hidden = R.EDGES.filter((e) => !e.d);
+  ok(hidden.length > 0, `${hidden.length} edges are routable but not drawn`);
+  const adjHas = hidden.slice(0, 200).every((e) => {
+    const at = R.ADJ ? R.ADJ[e.a] : null;
+    return !at || at.some((x) => x.i === e.i);
+  });
+  ok(adjHas, "every suppressed edge is still in the routing adjacency");
+  /* nothing safety-bearing may be suppressed */
+  const NEVER = ["closed", "fsclosed", "route72", "trail50", "moto24", "mccct"];
+  const badHide = hidden.filter((e) => NEVER.indexOf(e.c) >= 0);
+  ok(badHide.length === 0,
+     `no closure or designated ORV line is suppressed (${badHide.length} found)`);
+  /* labels must not chain through geometry that is not on the map */
+  ok(R.EDGES.filter((e) => e.d).length === drawn, "drawn set is stable");
+}
+
 /* 6a · per-vehicle machine legality (take 80).
    The Forest Service publishes ONE trail class and states its rules per vehicle
    in the attributes, so a class allow-list cannot express "motorcycles yes,

@@ -1,58 +1,62 @@
-**Take 82 — audit build. Six takes of work, verified end to end and ready to ride.**
+**Take 88 — the roads have their numbers on them.**
 
-Signed release build, installs over take 81. No new features — this one exists to
-make sure the last six are actually sound before you take them out.
+Signed release build, installs over take 87.
 
-### What you are testing, in one place
+### What changed
 
-Everything below shipped in takes 76–81 and none of it has been on a trail yet.
+**M 33, M 72, F-28, 489, H57-7** and the Forest Road numbers now appear along the
+roads they belong to. That number is how you actually say where you are — "two
+east of M 33" — and it is on every sign, where the street name often is not.
 
-- **Colours and the legend** (77). Brighter lines over satellite, and the picker
-  now spells out green = easy, blue = moderate, black = difficult, plus forest
-  road and closed. Forest roads gained a faint outline because they were the
-  hardest thing on the map to see over tree cover.
-- **The ride HUD** (78). Compass ribbon across the top while you ride, speed top
-  right, time and distance under it. The place-name chips step aside during a
-  ride and come back when you stop.
-- **Saved routes** (79). Plan something, tap ☆ Save, find it later under ☆ Saved.
-  Reopening re-routes it on the current map so closures stay current.
-- **Machine legality on the map** (80, 81). Line your machine cannot use is
-  dimmed, and the router now reads the Forest Service's per-vehicle rules rather
-  than guessing from the trail type. **On your dirt bike none of this changes
-  anything** — it is all permissive for a narrow machine.
-- **Honest bundles** (76). If a map layer is missing the app says PARTIAL and
-  names it, instead of quietly pretending it is there.
+The numbers were in the data all along and were being thrown away twice on the
+way to your phone: once when OpenStreetMap roads were read in, and again when the
+network was split into segments.
 
-### Test script
+**2,152 stretches of road** now carry their number.
 
-Ride order. The first two are the ones I most want answers on.
+### It works with the duplicate fix, not against it
+
+Another 2,318 numbered stretches are **not** labelled, on purpose. Those are the
+OpenStreetMap copy of a Forest Service road — the same road we already label
+with its official FS number from the Forest Service's own data. Take 86 stopped
+drawing those duplicate lines; this take makes sure it does not put the number
+back on them. You should never see the same road number twice on two parallel
+lines.
+
+### What wins the space
+
+When labels compete for the same bit of screen:
+
+1. **Trail names** — always first. The trail you are riding matters most.
+2. **Road numbers** — a number orients you.
+3. **Lake and river names** — last.
+
+That order is fixed by how the map is built, not by tuning, so it cannot drift.
+
+### Test script for this build
 
 - **Airplane mode on, force-stop, reopen.** Map renders, NET badge green.
-- **The compass ribbon on a road you know runs north-south.** Does it read N or
-  S? It was verified against arithmetic, never against a road.
-- **Save a route, force-stop the app entirely, reopen.** Still under ☆ Saved?
-- **Satellite under canopy, in sunlight.** Can you follow a green route across
-  the screen without hunting? Is anything now too loud?
-- **The activity picker.** Do the indented rows read as an explanation rather
-  than buttons? They are not tappable on purpose.
-- **Save three or four routes.** Are the auto-names actually distinguishable?
-  That is the thing I most expect to be wrong.
-- **Self-test.** Should read 58 checks. Three lines are new or renamed:
-  `bundle-honest`, `hud-matches-ride`, `saved-routes`.
+- **Find M 33 and M 72.** Do the numbers appear along them as you pan? Do they
+  look like numbers rather than street names?
+- **The one to watch:** are trail names still appearing as often as take 87? I
+  could not settle this from here — my measurements at one spot varied run to
+  run, and the layer ordering says trail names should be unaffected, but your
+  eyes on a real screen are worth more than my count.
+- **Any road showing its number twice** on two lines side by side would be a bug
+  and I want to know.
+- Still outstanding: ride a road you know runs north–south and check the compass
+  reads N or S; save a route, force-stop, reopen.
 
 ### Known, and deliberate
 
-- **This build has no water layer.** OpenStreetMap has been down throughout —
-  0 real responses out of 24 attempts across all three mirrors. The badge will
-  say PARTIAL and name it. On satellite you will not notice; the imagery shows
-  real water. Re-run the workflow once OSM is back and it picks up automatically.
-- **Duplicate parallel lines are still not fixed.** That work needs OpenStreetMap
-  data specifically, so it is queued rather than done badly against fallback data.
-- Zoom buttons are still not in. Pinch is the only zoom.
+- A road carrying three or more designations shows the first two. A third would
+  be truncated into something unreadable, so it is dropped instead.
+- The numbers are styled as bold text with a heavy white outline rather than as
+  proper highway shields. Real shields need artwork the build has no way to make
+  yet.
 
 ### Only a ride can answer
 
+- Whether road numbers help or crowd the map
 - Battery drain with the screen on
-- GPS accuracy under canopy
 - Whether the compass heading is right on a road you know
-- Whether these colours work in direct sun with a visor down

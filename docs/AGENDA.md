@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 82.* Ranked by blocking-ness, not by interest.
+*Current as of take 88.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -697,7 +697,7 @@ item above. Disambiguated at take 82, not renumbered.*
   GPU work and hides the cost.
 - **Open:** whether this shows up in the A18 battery figure. Only a ride tells.
 
-## A60 — Duplicate agency/OSM geometry · OPEN
+## A60 — Duplicate agency/OSM geometry · SHIPPED take 86
 
 - **PROVEN:** 5,390 spans carry >1 edge; 1,957 are fsroad+track. Visible as
   jagged parallel lines at riding zoom.
@@ -1104,3 +1104,225 @@ Recorded so it is not re-derived, and so it is not mistaken for a null result.
 - **Ruled out:** special-casing the checker so a "restated" landmine parses as
   not-a-definition. 85 was merged into one entry instead; one definition per
   number is the rule the checker exists to enforce.
+
+## A102 — Overpass is unreachable here; OSM is not · CORRECTED take 83
+
+- **PROVEN:** `api.openstreetmap.org/api/0.6/map?bbox=` → 200, 660,710 bytes of
+  real data for the Bull Gap bbox. `openstreetmap.org` 200, tile server 200.
+- **PROVEN:** `overpass-api.de` → 503 on `GET /`, Envoy body, three headers, DNS
+  resolving correctly to 162.55.144.139. The host is unreachable from the build
+  environment; its own health is unknown from here.
+- **PROVEN:** `overpass.osm.ch` is region-limited — Bern 4,176 ways, Bull Gap 0.
+  It cannot serve this project and never could.
+- **PROVEN:** `overpass.private.coffee` returns a real 500/502 (host reached);
+  `osm.jp`, `openstreetmap.ru`, `nchc.org.tw` all give the same Envoy 503.
+- **Ruled out:** "OpenStreetMap is down." It is not, and was not.
+- **Ruled out:** keeping `overpass.osm.ch` in the mirror list. A fallback that
+  cannot serve the region is worse than no fallback — it answers 200 and looks
+  like data.
+- **Open:** A60 is *not* unblocked by this. It needs the OSM road network for
+  this region, and no reachable Overpass instance currently serves it.
+
+## A103 — Water from TIGER when the OSM path is unavailable · PROPOSED take 83
+
+The bundle has shipped PARTIAL since take 76 because water comes only from OSM.
+It does not have to.
+
+- **PROVEN:** Census TIGER publishes `AREAWATER` and `LINEARWATER` per county.
+  All eight files for the region's four address counties return 200 —
+  139–643 KB each — from `www2.census.gov`, **already declared in PROVISION and
+  already working** while Overpass is not.
+- **PROVEN:** `tools/context.py` already contains a working `parse_shp()`; the
+  TIGER road fallback (take 56) already fetches and clips county shapefiles.
+- **Shape:** when `aoi.json` carries `source: tiger`, fetch water from TIGER for
+  the same counties, clip to the bbox as the road fallback does (landmine 89),
+  and emit the existing water payload. Bundle returns to COMPLETE honestly.
+- **Ruled out:** copying `parse_shp` into `pack.py`. Import it — a copy of a
+  table is not the table (landmine 107).
+- **Ruled out:** the OSM main API as a bulk source. It works from here, but the
+  region exceeds its bbox limit and it is an editing API, not a download path.
+- **Open:** whether TIGER water and OSM water differ enough to be worth marking
+  provenance on. The app already stamps `src` per feature elsewhere.
+
+## A104 — Clear a route · SHIPPED take 83
+
+- **PROVEN, field:** Jacob closed the directions panel and the route line stayed
+  on the map with no way to remove it.
+- **PROVEN:** `clearRoute()` has existed since take 33 and clears route,
+  alternates and approach legs. It was bound only to side effects — machine
+  change, home move, pin move — never to a control.
+- **PROVEN, real browser:** 226 route features → 0 on tap.
+- **Ruled out:** clearing automatically when the panel is dismissed. Dismissing a
+  panel is not the same gesture as discarding a plan; you may want the line up
+  while you read the map.
+
+## A105 — The self-test left the HUD on · FIXED take 83
+
+- **PROVEN, field:** the compass ribbon appeared during the self-test and stayed,
+  over the place chips, with no heading.
+- **PROVEN:** the safety drill calls `startRecording()`, which turns the HUD on;
+  the restore block restored seven variables and no visible state.
+- **Ruled out:** asserting this in `smoke.mjs`. The stub does not model the
+  initial `hidden` attribute, so the check read false before and false after and
+  passed vacuously (landmine 85). It lives in `render.mjs` where `hidden` is real.
+- **Open:** the drill still calls `startRecording()` directly rather than going
+  through the ride start/stop path a rider uses. Driving it through the real path
+  would have made this impossible instead of merely fixed.
+
+## A106 — fps scored a backgrounded app as a failure · FIXED take 83
+
+- **PROVEN, field:** take-82 report read `avg 2 · worst 39402ms` — a 39-second
+  frame — while 69 of 70 frames were under 33 ms. That is a screenshot being
+  taken, not a device struggling.
+- **Ruled out:** judging the frame rate at all when the page has been hidden.
+  `requestAnimationFrame` pauses in the background; the worst frame is the length
+  of the absence. Reported as info, not scored (landmine 56's corollary).
+
+## A107 — Local OSM extract as a measurement instrument · SHIPPED take 84
+
+- **PROVEN:** Overpass is unreachable from the development container and fine
+  from CI (take 83). `download.geofabrik.de` is reachable at 16 MB/s; the
+  Michigan extract is 297 MB.
+- **PROVEN, validated against the record:** `emit_graph` returns 20,222 edges /
+  12,236 nodes / 99.7% routable — the take-74 numbers exactly — and water
+  returns at 244 polys / 180 lines.
+- **PROVEN:** the tag set is read out of `ingest.py`'s Overpass query and
+  compared, so the two cannot drift silently. It caught my own regex error on
+  the first run.
+- **Ruled out:** making it a pipeline step or a fallback tier. That means a
+  297 MB download and a compiled dependency inside the build, which is a
+  separate decision with real costs — see A108.
+- **Ruled out:** tiling `api.openstreetmap.org/api/0.6/map`. It works from here
+  but caps at 10,000 elements per request and is an editing API, not a bulk path.
+- **Open:** the extract is cached in `osm_cache/` (gitignored). Nothing prunes it.
+
+## A108 — Should Geofabrik become a real fallback tier? · OPEN, raised take 84
+
+- The current chain is three Overpass mirrors then Census TIGER, which has no
+  water and a different topology. One of those three mirrors is Swiss-only and
+  can never serve Michigan (A102).
+- **For:** Geofabrik is the sanctioned bulk path, carries real OSM data with
+  water, and would mean the build essentially never degrades.
+- **Against:** 297 MB per fallback build and a compiled PBF reader as a CI
+  dependency, for a path exercised only on failure — and a refusal that never
+  fires is a hope, not a safety property (landmine 45).
+- **Ruled out for now:** doing it silently as part of A107. It changes what CI
+  downloads and installs on every degraded build, and that is Jacob's call to
+  make rather than mine to slip in.
+
+### A60 measured on real geometry · take 84 (see A60 above)
+
+- **PROVEN:** 8,103 near-parallel pairs at 17 m; **5,169 cross-source
+  (222.7 mi)** — `fsroad+track` 2,651, `fsroad+minor` 1,314, `track+trail50` 438.
+- **PROVEN:** 2,934 same-source pairs must NOT be collapsed, led by
+  **`mccct+moto24` 861** — two designations on one corridor, not one road twice.
+- **Ruled out:** a proximity-only predicate. It cannot distinguish a duplicate
+  from a co-designation, and would erase 861 pairs of legal designation
+  (landmine 125).
+- **Next:** the eighth field on `E[i]`, `nf2` and `chainStrokes()` filtered
+  together, gated on connectivity unchanged at 99.7%.
+
+### A108 resolved at take 85 — SHIPPED (see A108 above)
+
+*Third time I have appended a `## ` heading for an id that already existed (A60 at take 78, A72 at take 82, A108 here). The ledger check caught it twice; the habit is mine and the fix is to grep the agenda for the id before writing the entry, not after the gate says no.*
+
+- **DECIDED by Jacob, take 85:** promote it. The chain is Overpass mirrors →
+  Geofabrik extract → Census TIGER.
+- **PROVEN, clean run from a pristine unpack with Overpass down:** extract
+  downloaded from scratch, `verify -> COMPLETE`, 20,222 edges / 12,236 nodes /
+  99.7%, water 244 polys / 180 lines, smoke reads `GRAPH 20222, not PARTIAL`.
+  The same clean run one take earlier gave 34,341 TIGER edges and no water.
+- **PROVEN, four negative controls:** tier removed, tiers genuinely reordered,
+  Swiss mirror reinstated, `osm_local.py` deleted — all fail the gate.
+- **Ruled out:** treating TIGER as an equivalent next-thing-to-try. It is roads
+  only, no water, different topology; it is the last resort and the gate now
+  enforces that it is tried last (landmine 126).
+- **Ruled out:** keeping `overpass.osm.ch`. Swiss-only, 0 ways for this region,
+  answering 200 with an empty set. Removed from the mirror list and from
+  PROVISION; the gate refuses it by name.
+- **Open:** the 297 MB extract is re-downloaded on every fallback build in CI —
+  nothing caches it between runs. Only matters if Overpass stays down.
+- **Open:** the Geofabrik tier is exercised on every local build (Overpass is
+  unreachable here) but never in CI, where Overpass works. A path that only runs
+  in one environment is one nobody watches (landmine 45).
+
+## A109 — Bundle artifacts must describe the same graph · SHIPPED take 86
+
+- **PROVEN:** a bundle shipped with `terrain.json` holding 18,252 node
+  elevations and `graph.json` holding 12,236 nodes. Every hash matched, the
+  manifest was correct, and the gate passed it. The app's self-test caught it.
+- **PROVEN, negative control:** truncating terrain's `ne` array by five entries
+  now fails the gate by name.
+- **Ruled out:** relying on hashes for this. A hash proves a file is intact, not
+  that it belongs with the file beside it (landmine 128).
+- **Open:** only graph↔terrain is compared. Address, context and glyphs are not
+  cross-checked against anything, though none is indexed by node id.
+
+
+### A60 shipped at take 86 — route both, draw one (see A60 above)
+
+- **PROVEN:** 20,222 edges routable, 16,972 drawn; 3,250 suppressed (16% of
+  edges, 111 mi of 2,244).
+- **PROVEN:** every designated class untouched — `trail50` 0 hidden, `mccct` 0,
+  `moto24` 0, `route72` 0, `closed` 0, `fsclosed` 0. Suppression falls on
+  `track` (−2,194) and `minor` (−811); 3,040 of 3,250 hidden edges are the OSM
+  copy.
+- **PROVEN, smoke:** every suppressed edge is still in the routing adjacency,
+  and no closure or designated line is among them.
+- **PROVEN, five negative controls:** whole class hidden, closure hidden,
+  designated trail hidden, terrain mismatched, eighth field stripped.
+- **Ruled out:** a proximity-only predicate. 2,934 of 8,103 near-parallel pairs
+  share a source, 861 being `mccct+moto24` — two designations on one corridor,
+  not one road twice (landmine 125).
+- **Ruled out:** deleting the duplicate. Take 64 measured 558 mi and
+  99.7% -> 97.4% connectivity lost at 45 m.
+- **Ruled out:** choosing the survivor by length. It is a safety decision and is
+  ranked explicitly, with closures and designated line unhideable (landmine 129).
+- **Open:** `chainStrokes()` is filtered, but nothing yet asserts that a placed
+  label lies on drawn geometry — only that the chain is built from drawn edges.
+- **Open:** only a ride confirms the map now matches the road.
+
+## A77 — Name the water · SHIPPED take 87
+
+- **PROVEN:** 175 named water features existed in the OSM data and `pack.py`
+  dropped every name. Payload 38 KB -> 41 KB to carry them.
+- **PROVEN, measured:** named streams had a median length of 139 m against a
+  ~1,200 m requirement for a line label at riding zoom — only 16 of 133 were
+  long enough, and `text-max-angle: 45` rejected 61 of 133 as too sinuous.
+- **PROVEN:** chaining fragments by name turned 133 into 28 strokes, median
+  139 m -> 2,361 m, Au Sable River one 68.9 km line, 20 of 28 labelable.
+- **PROVEN on the map:** Shaw Lake, Twin Lake, Briggs Lake, Muleshoe Lake,
+  Wolf Creek, Au Sable River.
+- **PROVEN, structurally:** `lbl-trail 29 < lbl-lake 33 < lbl-stream 34`, so
+  trail names win collisions by layer order rather than by measurement.
+- **Ruled out:** chaining in the client. Water has no node ids, so chaining
+  means coordinate matching — cheaper once at build time than on every start.
+- **Ruled out:** proving label priority by counting labels at one zoom. Headless
+  placement is unstable enough that an A/B showed water labels *increasing*
+  trail names, which is impossible (landmine 130).
+- **Open:** 8 of 28 chained strokes are still too short to label. They are
+  genuinely short creeks, not fragments.
+- **Open:** only a ride says whether named water helps or clutters.
+
+## A75 — Posted route numbers · SHIPPED take 88
+
+- **PROVEN:** `ref` was dropped twice — at the OSM ingest into the graph, and
+  again by the noding step's explicit key list. 4,470 edges carry one across
+  183 distinct refs (`M 33`, `M 72`, `F-28`, `489`, `H57-7`, Forest Road numbers).
+- **PROVEN:** 2,318 of those are already suppressed by A60 as cross-source
+  duplicates — 1,693 tracks that duplicate USFS road we label authoritatively.
+  2,152 remain drawn: paved 760, minor 527, track 865.
+- **PROVEN:** 703 chained ref strokes; rendered `H58-1, M 33` centred on M 33 at
+  coordinates read from the payload.
+- **PROVEN, gated:** `lbl-trail 29 < lbl-ref 33 < lbl-lake 34 < lbl-stream 35`.
+- **Ruled out:** a second copy of `chainStrokes`. It is parameterised by key —
+  trail names chain by `labelFor`, route numbers by the ref (landmine 107).
+- **Ruled out:** splitting multi-value refs at ingest. The raw `M 33;M 72;F-32`
+  is what the source said; splitting happens where it is drawn.
+- **Ruled out:** true shields. They need a sprite sheet the build has no
+  pipeline for; a badge-styled text label is legible and costs nothing.
+- **Open:** trail names at the z14.5 Bull Gap anchor read 2 before and 1 after.
+  Two A/B attempts landed on runs where no trail geometry drew at all. The
+  denominator (1 of 1,708 labelable strokes) says small viewport rather than
+  crowding, but only a ride settles it.
+- **Open:** third and later refs on a multi-value road are dropped, not shown.

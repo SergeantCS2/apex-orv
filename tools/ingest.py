@@ -19,10 +19,15 @@ S_, W_, N_, E_ = R.overpass_bbox
 # 503. Mirrors serve the same database, so try them in turn before giving up —
 # a single volunteer endpoint should not be a single point of failure for a map
 # someone rides with. All three are declared in PROVISION.md.
+# overpass.osm.ch was removed at take 85. It is the Swiss chapter's instance and
+# carries Swiss data only: a Bern bbox returns 4,176 ways, a Bull Gap bbox
+# returns 0. It sat here for twenty-six takes as a fallback that could not once
+# have worked, answering HTTP 200 with an empty set — which is exactly why
+# landmine 74's empty-result guard exists. The guard was right; the mirror was
+# never valid. A fallback needs the same reachability test as a primary (A102).
 OVERPASS_MIRRORS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
-    "https://overpass.osm.ch/api/interpreter",
 ]
 OVERPASS = OVERPASS_MIRRORS[0]
 # MapServer, NOT FeatureServer. The FeatureServer silently serves FEWER features
@@ -258,8 +263,32 @@ out geom;"""
                 # says which layer is missing (landmine 34). Take 43: a clean run
                 # died here on an Overpass 503 and took the whole pipeline with
                 # it, including a graph that had already been fetched fine.
-                print(f"osm: every mirror failed ({type(e).__name__}) — "
-                      f"falling back to Census TIGER roads")
+                print(f"osm: every mirror failed ({type(e).__name__})")
+                # TIER 2 — the Geofabrik extract. Real OSM data: same ways, same
+                # tags, water included, and it reproduces the Overpass network
+                # edge for edge. TIGER below is roads only, with no water and a
+                # different topology, so trying this first is not a preference,
+                # it is the difference between a complete bundle and a degraded
+                # one (A108, Jacob's call at take 85).
+                try:
+                    # Steps run with cwd=ROOT, so tools/ is not on sys.path.
+                    # Same pattern android.py uses to reach icon.py — copied,
+                    # not derived (PROTOCOL §3).
+                    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+                    import osm_local
+                    print("osm: trying the Geofabrik extract "
+                          "(sanctioned bulk path, ~300 MB on first use)")
+                    els = osm_local.build()
+                    if els:
+                        json.dump({"source": "geofabrik", "elements": els},
+                                  open("aoi.json", "w"))
+                        print(f"osm: aoi.json written from Geofabrik "
+                              f"({len(els)} ways) — real OSM data, water included")
+                        return
+                    print("osm: Geofabrik returned nothing for this region")
+                except Exception as ge:
+                    print(f"osm: Geofabrik unavailable ({type(ge).__name__}: "
+                          f"{str(ge)[:80]}) — falling back to Census TIGER roads")
                 els = tiger_roads()
                 if els:
                     # marked, so a later run knows to try OSM again

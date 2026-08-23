@@ -215,7 +215,13 @@ const zoomed = await page.evaluate(async (at) => {
   await sleep(2500);
   const q = (ids) => { try { return m.queryRenderedFeatures({ layers: ids }).length; }
                        catch (e) { return -1; } };
+  /* The denominator: how many labelable strokes exist at all. A count of placed
+     labels with no denominator cannot tell "crowded out" from "there were only
+     two to begin with" (landmine 131). */
+  let strokeN = -1;
+  try { strokeN = m.getStyle().sources.strokes.data.features.length; } catch (e) { }
   const out = { trailLabels: q(["lbl-trail"]), placeLabels: q(["lbl-place"]),
+                strokeN,
                 trails: q(["trail50", "route72", "moto24", "fstrail", "mccct"]) };
   m.jumpTo({ center: [c.lng, c.lat], zoom: 11.4 });
   await sleep(1200);
@@ -223,8 +229,92 @@ const zoomed = await page.evaluate(async (at) => {
 }, site ? [site[1], site[2]] : null);
 ok(zoomed.trails > 0,
    `z14.5 at ${site ? site[0] : 'centre'}: ${zoomed.trails} trail segments drawn`);
-ok(zoomed.trails === 0 || zoomed.trailLabels > 0,
-   `z14.5 at ${site ? site[0] : 'centre'}: ${zoomed.trailLabels} trail NAME labels — a rider can identify the trail`);
+/* The escape clause exists because a run where nothing drew must not be read as
+   a labelling failure — the check above already fails on that. But it printed
+   "0 trail NAME labels — a rider can identify the trail", which is an actively
+   wrong sentence to leave in a log someone will read later. Say which case it
+   is (take 87, landmine 55). */
+if (zoomed.trails === 0) {
+  console.log("  ..   z14.5 trail NAME labels: NOT MEASURABLE — no trail geometry "
+              + "drew in this run, see the failure above");
+} else {
+  ok(zoomed.trailLabels > 0,
+     `z14.5 at ${site ? site[0] : 'centre'}: ${zoomed.trailLabels} trail NAME labels `
+     + `from ${zoomed.strokeN} labelable strokes — a rider can identify the trail`);
+}
+
+/* A77 · water names must never outrank trail names. MapLibre resolves symbol
+   collisions in LAYER ORDER, so this is guaranteed by construction rather than
+   measured — an empirical count at one zoom on one flaky headless run cannot
+   prove it, and I tried (take 87). */
+{
+  const order = await page.evaluate(() =>
+    window.map.getStyle().layers.map((l) => l.id));
+  const iTrail = order.indexOf("lbl-trail");
+  const iLake = order.indexOf("lbl-lake");
+  const iStream = order.indexOf("lbl-stream");
+  const wl = await page.evaluate(async () => {
+    const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const c = m.getCenter();
+    m.jumpTo({ center: [-84.09, 44.57], zoom: 13.2 });
+    await sleep(2600);
+    const q = (id) => { try { return m.queryRenderedFeatures({ layers: [id] })
+                                .map((f) => f.properties.n); } catch (e) { return []; } };
+    /* `_data` is private and undefined in MapLibre 5 — the supported route is
+       the style spec, which holds the geojson we handed it (take 87). */
+    let srcN = -1, sample = null;
+    try {
+      const d = m.getStyle().sources.wlbl.data;
+      srcN = d.features.length;
+      sample = d.features.length ? JSON.stringify(d.features[0]).slice(0, 130) : null;
+    } catch (e) { srcN = -2; sample = String(e).slice(0, 80); }
+    /* queryRenderedFeatures returns only PLACED symbols. querySourceFeatures
+       ignores collision, so the two together say whether the data reached the
+       tiler or merely failed to win space (take 87). */
+    const qs = () => { try { return m.querySourceFeatures("wlbl").length; }
+                       catch (e) { return -1; } };
+    /* Centre on a KNOWN named lake (Loon Lake, the largest in the region) — a
+       probe centred on the riding area may simply have no lake in view, which
+       looks identical to a broken layer. */
+    /* Measure at a zoom where the layers are ACTIVE. The previous version
+       returned the map to z11.4 first — below lbl-lake's 11.6 minzoom — so this
+       reading was guaranteed zero regardless of the product (take 87). */
+    m.jumpTo({ center: [-84.10916, 44.66529], zoom: 13.2 });
+    await sleep(2400);
+    const out = { lake: q("lbl-lake"), stream: q("lbl-stream"), srcN, sample };
+    m.jumpTo({ center: [c.lng, c.lat], zoom: 11.4 });
+    await sleep(1000);
+    return out;
+  });
+  /* A75 · posted route numbers. Centred on M 33, which the payload says runs
+     through -84.1295,44.5810 — picked from the data, not from where I happen to
+     be looking (landmine 130). */
+  const rf = await page.evaluate(async () => {
+    const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    m.jumpTo({ center: [-84.12954, 44.58098], zoom: 12.6 });
+    await sleep(2400);
+    let srcN = -1;
+    try { srcN = m.getStyle().sources.refs.data.features.length; } catch (e) { srcN = -2; }
+    let placed = [];
+    try { placed = m.queryRenderedFeatures({ layers: ["lbl-ref"] })
+                    .map((f) => f.properties.lb); } catch (e) { }
+    return { srcN, placed: [...new Set(placed)] };
+  });
+  ok(rf.placed.length > 0,
+     `route numbers on the map: ${rf.placed.length} of ${rf.srcN} strokes — `
+     + `${rf.placed.slice(0, 5).join(", ") || "(none placed)"}`);
+  const names = [...new Set([...wl.lake, ...wl.stream])];
+  ok(names.length > 0,
+     `water is named on the map: ${names.length} label(s) of ${wl.srcN} in the `
+     + `source — ${names.slice(0, 4).join(", ") || "(none rendered) " + (wl.sample || "")}`);
+  const iRef = order.indexOf("lbl-ref");
+  ok(iTrail >= 0 && iLake > iTrail && iStream > iTrail && iRef > iTrail,
+     `trail names outrank everything added since (lbl-trail ${iTrail}, `
+     + `lbl-ref ${iRef}, lbl-lake ${iLake}, lbl-stream ${iStream})`);
+  ok(iRef > 0 && iLake > iRef,
+     `route numbers outrank water names (lbl-ref ${iRef} < lbl-lake ${iLake}) — `
+     + `a road number orients you, a pond does not`);
+}
 
 /* Satellite has never been proven to draw. It is a separate source type (image,
    blob url) from everything above, so it fails independently. */
@@ -369,6 +459,64 @@ for (const dev of DEVICES) {
      + `${fit.hud.labels} labels, stats right edge ${fit.hud.statsRight}`);
 }
 await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } catch (e) {} });
+
+/* Field faults from Jacob's take-82 ride, asserted where `hidden` is REAL.
+   The smoke stub does not model the initial hidden attribute, so the same
+   checks there passed vacuously — false before, false after (landmine 85). */
+{
+  const r = await page.evaluate(async () => {
+    const sleep = (ms) => new Promise((x) => setTimeout(x, ms));
+    const out = {};
+    const hb = () => document.getElementById("hudbar");
+    const ch = () => document.getElementById("chips");
+    out.hudHiddenAtRest = !!hb().hidden;
+    out.chipsShownAtRest = !ch().hidden;
+    // the self-test runs a ride drill; it must put the HUD back
+    document.getElementById("c-selftest").click();
+    for (let i = 0; i < 60 && !/PASS/.test(document.getElementById("panel").innerHTML); i++)
+      await sleep(250);
+    out.hudHiddenAfterSelftest = !!hb().hidden;
+    out.chipsShownAfterSelftest = !ch().hidden;
+    // the compass must say something when it has no heading
+    window.hudShow(true);
+    out.hintShownNoHeading = !document.getElementById("hudhint").hidden;
+    window.hudSet(9, 90, null);
+    out.hintHiddenWithHeading = !!document.getElementById("hudhint").hidden;
+    window.hudShow(false);
+    return out;
+  });
+  ok(r.hudHiddenAtRest, "compass ribbon is off before any ride");
+  ok(r.hudHiddenAfterSelftest,
+     "self-test leaves the compass ribbon OFF — the drill puts back what it moved");
+  ok(r.chipsShownAfterSelftest,
+     "self-test gives the place chips back");
+  ok(r.hintShownNoHeading,
+     "with no heading the ribbon says so instead of showing a bare needle");
+  ok(r.hintHiddenWithHeading, "with a heading the hint gets out of the way");
+}
+
+/* Clearing a route must clear every line the rider can see. */
+{
+  const r = await page.evaluate(async () => {
+    const sleep = (ms) => new Promise((x) => setTimeout(x, ms));
+    document.getElementById("btn-home").click();
+    for (let i = 0; i < 40 && !document.getElementById("btn-clear"); i++) await sleep(250);
+    const q = (id) => { try { return window.map.queryRenderedFeatures({ layers: [id] }).length; } catch { return -1; } };
+    await sleep(1200);
+    const before = q("routeline");
+    /* Measure the button BEFORE clicking it: clearing calls show(), which
+       replaces the panel's innerHTML and takes the button with it. Asserting
+       afterwards reported "no Clear control" on a Clear control that had just
+       worked (landmine 54, and my check was the broken one). */
+    const hasBtn = !!document.getElementById("btn-clear");
+    document.getElementById("btn-clear").click();
+    await sleep(1200);
+    return { before, after: q("routeline"), hasBtn };
+  });
+  ok(r.hasBtn, "a Clear route control exists on the route panel");
+  ok(r.before > 0, `a route was drawn first (${r.before} features)`);
+  ok(r.after === 0, `Clear route removes the line (${r.before} -> ${r.after})`);
+}
 
 /* Machine legality on the map (take 80, A86). Assert the PAINT the browser
    actually resolved, per machine, not that a function ran. */

@@ -125,8 +125,16 @@ function machineLegal(e){
   return String(val||'').toLowerCase()==='open'}
 
 var NODES=decode(GR.n), CLS=GR.cls, NM=GR.nm, BK=GR.bk, B=GR.b;
+/* A60: `d` is "draw this one". Every edge stays in EDGES and in ADJ, so
+   routing, snapping, loops, retrace and every cost function see the whole
+   network exactly as before — route both, draw one. Older payloads have no
+   eighth field; treat their absence as "draw", so a stale bundle degrades to
+   the pre-A60 picture rather than to a blank map. */
 var EDGES=GR.e.map(function(e,i){return {a:e[0],b:e[1],L:e[2],c:CLS[e[3]],
-  n:e[4]>=0?NM[e[4]]:null,id:e[5]>=0?NM[e[5]]:null,bi:e[6],i:i}});
+  n:e[4]>=0?NM[e[4]]:null,id:e[5]>=0?NM[e[5]]:null,bi:e[6],i:i,
+  d:e.length<8||e[7]!==0,
+  /* A75: the posted route number. Older payloads have no ninth field. */
+  rf:(e.length>8&&e[8]>=0)?NM[e[8]]:null}});
 function attrs(e){var o={};if(e.bi<0)return o;
   var v=B[e.bi];for(var k=0;k<BK.length;k++)if(v[k])o[BK[k]]=v[k];return o}
 
@@ -163,10 +171,36 @@ var PAVED={paved:1,minor:1};
 var HARD=['paved','minor','route72','fsroad','track','trail50','fstrail','mccct','moto24'];
 
 /* ── render straight off the graph — one source of truth, conflation applied ── */
-var wf=[];Object.keys(WATER.l).forEach(function(c){var poly=(c==='water');
-  WATER.l[c].forEach(function(e){var r=decode(e);
+var wf=[],wlab=[];
+Object.keys(WATER.l).forEach(function(c){var poly=(c==='water');
+  var nms=(WATER.nm&&WATER.nm[c])||[];
+  WATER.l[c].forEach(function(e,ix){var r=decode(e);
     wf.push({type:'Feature',properties:{c:c},
-      geometry:poly?{type:'Polygon',coordinates:[r]}:{type:'LineString',coordinates:r}})})});
+      geometry:poly?{type:'Polygon',coordinates:[r]}:{type:'LineString',coordinates:r}});
+    /* A77. 175 of these carry a name and the payload used to drop every one, so
+       the map drew Shaw Lake and the Au Sable as anonymous blue shapes. A lake
+       you can name is a landmark you can navigate by; a blue blob is scenery.
+       Lakes get a point at the centroid, rivers get the line itself — a river
+       label has to follow the water or it reads as belonging to something else.
+       Older payloads have no `nm`, so this simply produces nothing. */
+    var nm=nms[ix];
+    if(!nm)return;
+    if(poly){
+      /* area-weighted centroid, so a long crooked lake labels near its bulk
+         rather than at the average of its vertices */
+      var A=0,cx=0,cy=0;
+      for(var k=0;k<r.length-1;k++){
+        var f=r[k][0]*r[k+1][1]-r[k+1][0]*r[k][1];
+        A+=f;cx+=(r[k][0]+r[k+1][0])*f;cy+=(r[k][1]+r[k+1][1])*f}
+      var pt;
+      if(Math.abs(A)>1e-12){pt=[cx/(3*A),cy/(3*A)]}
+      else{pt=r[(r.length/2)|0]}          /* degenerate ring: fall back to a vertex */
+      wlab.push({type:'Feature',properties:{n:nm,c:c},
+        geometry:{type:'Point',coordinates:pt}});
+    }else{
+      wlab.push({type:'Feature',properties:{n:nm,c:c},
+        geometry:{type:'LineString',coordinates:r}});
+    }})});
 
 /* Map labels use what the sign says, not the database name. "The Meadows
    Motorcycle Trail (TMM)" will not fit along a two-track at z14; "TMM · H58-1"
@@ -180,8 +214,18 @@ function labelFor(e){
   else if(n.length>24)n=n.replace(/\s+(Trail|Route|Road)$/i,'');
   if(e.id&&e.id!==n&&n)return n+' · '+e.id;
   return n||e.id}
-var nf2=EDGES.map(function(e){return {type:'Feature',
-  properties:{c:e.c,i:e.i,lb:labelFor(e)},
+/* "M 33;M 72;F-32" is how OSM records a road carrying three designations.
+   Splitting happens HERE, where it is drawn, rather than at ingest — the raw
+   value is what the source said and is worth keeping intact upstream. Two is
+   the most that fits along a road at riding zoom; a third would be truncated
+   into nonsense, so it is dropped rather than clipped. */
+function refLabel(r){
+  if(!r)return null;
+  var parts=r.split(';').map(function(x){return x.trim()}).filter(Boolean);
+  return parts.length?parts.slice(0,2).join(' · '):null}
+
+var nf2=EDGES.filter(function(e){return e.d}).map(function(e){return {type:'Feature',
+  properties:{c:e.c,i:e.i,lb:labelFor(e),rf:refLabel(e.rf)},
   geometry:{type:'LineString',coordinates:decode(GR.g[e.i])}}});
 
 /* ══ LABEL STROKES ══════════════════════════════════════════════════════════
@@ -204,10 +248,20 @@ function strokeLen(pts){
     m+=Math.sqrt(dx*dx+dy*dy)}
   return Math.round(m)}
 
-function chainStrokes(){
+/* `key` picks what a stroke is chained BY. Trail names use labelFor(); route
+   numbers use the posted ref. Parameterised rather than copied, because a
+   second walker is a second thing to keep in step and they would drift the way
+   the palette did (landmine 107). */
+function chainStrokes(key){
+  key=key||labelFor;
   var byKey={};
   EDGES.forEach(function(e){
-    var lb=labelFor(e); if(!lb)return;
+    /* Undrawn edges must be excluded HERE too. A label chain built from the
+       full set walks through geometry that is not on the map, and the name
+       lands on empty ground — the failure A60's note does not mention and the
+       reason this take touches two places, not one. */
+    if(!e.d)return;
+    var lb=key(e); if(!lb)return;
     var k=e.c+'\u0000'+lb;
     (byKey[k]||(byKey[k]=[])).push(e)});
   var feats=[];
@@ -259,6 +313,10 @@ var showFeats=(SHOW&&SHOW.r?SHOW.r:[]).map(function(r){
     geometry:{type:'LineString',coordinates:r.g}}});
 
 var strokes=chainStrokes();
+/* A75. Route numbers chain by the posted ref, so "M 33" becomes one long line
+   instead of 157 routing edges none of which is long enough to carry a label.
+   Same walker, different key. */
+var refstrokes=chainStrokes(function(e){return refLabel(e.rf)});
 /* "M-33 Bull Gap Trailhead" is 23 characters and its feature is 740 ft — about
    90 px at riding zoom. No line label of any size fits, so line-center drew
    nothing and Jacob had to TAP the trailhead to find out what it was. A POINT
@@ -402,6 +460,8 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     hs:{type:'image',url:SHADE,
       coordinates:[[TR.b[0],TR.b[3]],[TR.b[2],TR.b[3]],[TR.b[2],TR.b[1]],[TR.b[0],TR.b[1]]]},
     wtr:{type:'geojson',data:{type:'FeatureCollection',features:wf}},
+    wlbl:{type:'geojson',data:{type:'FeatureCollection',features:wlab}},
+    refs:{type:'geojson',data:{type:'FeatureCollection',features:refstrokes}},
     net:{type:'geojson',data:{type:'FeatureCollection',features:nf2}},
     strokes:{type:'geojson',data:{type:'FeatureCollection',features:strokes}},
     shortpts:{type:'geojson',data:shortPts},
@@ -586,6 +646,42 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-font':['APEX'],'text-size':w(8.5,10,12),
         'text-max-angle':70,'symbol-spacing':180,'text-padding':2},
       paint:{'text-color':'#4A423A','text-halo-color':'#EFE6D2','text-halo-width':1.5}},
+    /* A75 · posted route numbers. "Two east of M 33" is how a rider says where
+       they are, and the number is on every sign where the street name often is
+       not. Placed after trail names — the trail you are riding still wins — but
+       ahead of water, because a road number orients you and a pond does not.
+       Styled as a badge rather than a name: tighter letter spacing, a heavier
+       halo, and a colour of its own so a number reads as a number at a glance.
+       Real shields would need a sprite sheet the build does not have. */
+    {id:'lbl-ref',type:'symbol',source:'refs',minzoom:11.2,
+      layout:{'symbol-placement':'line','text-field':['get','lb'],
+        'text-font':['APEX'],'text-size':w(9,10.5,12.5),
+        'text-max-angle':70,'symbol-spacing':340,'text-padding':4,
+        'text-letter-spacing':0.02},
+      paint:{'text-color':'#1C1A16','text-halo-color':'#FFFFFF',
+        'text-halo-width':2.2,'text-halo-blur':0.2}},
+    /* A77 · water names. Placed AFTER every trail-name layer, because MapLibre
+       resolves symbol collisions in layer order and the trail you are riding
+       must always win against a pond. minzoom holds them back until the trail
+       labels have stopped competing for space (take 57 tuned that density and
+       this must not undo it — render.mjs counts trail names and would say so).
+       Italic-feeling letter spacing and the water blue, so they read as terrain
+       rather than as something you can ride. */
+    {id:'lbl-lake',type:'symbol',source:'wlbl',minzoom:11.6,
+      filter:['==',['get','c'],'water'],
+      layout:{'text-field':['get','n'],'text-font':['APEX'],
+        'text-size':w(8,9.5,11.5),'text-max-width':8,
+        'text-letter-spacing':0.06,'text-padding':3},
+      paint:{'text-color':'#3E6A80','text-halo-color':'#EFE6D2','text-halo-width':1.6,
+        'text-opacity':0.95}},
+    {id:'lbl-stream',type:'symbol',source:'wlbl',minzoom:12.6,
+      filter:['==',['get','c'],'waterway'],
+      layout:{'symbol-placement':'line','text-field':['get','n'],
+        'text-font':['APEX'],'text-size':w(7.5,9,10.5),
+        'text-max-angle':70,'symbol-spacing':420,'text-padding':4,
+        'text-letter-spacing':0.04},
+      paint:{'text-color':'#3E6A80','text-halo-color':'#EFE6D2','text-halo-width':1.6,
+        'text-opacity':0.9}},
     {id:'lbl-road',type:'symbol',source:'strokes',minzoom:11.0,
       filter:['in',['get','c'],['literal',['paved','minor']]],
       layout:{'symbol-placement':'line','text-field':['get','lb'],
@@ -1089,9 +1185,21 @@ function renderRoutes(out){
   /* Below the cards, not inside them: a button nested in a selectable card
      needs stopPropagation on every path, and the thing a rider means by "save"
      is the option currently chosen. */
+  /* Jacob, take 82 in the field: "I closed the interface for directions and I
+     still see the lines on the map for the last selected path." clearRoute()
+     has existed since take 33 and was never bound to anything a rider could
+     press — only to side effects of changing machine or moving a pin. Dismissing
+     a panel is not the same gesture as discarding a plan, so this is explicit
+     rather than automatic. */
   html+='<div class="sub" style="margin-top:7px">'+
-    '<button class="chip" id="btn-save">\u2606 Save this route</button></div>';
+    '<button class="chip" id="btn-save">\u2606 Save this route</button> '+
+    '<button class="chip" id="btn-clear">\u2715 Clear route</button></div>';
   el('panel').className='';el('panel').innerHTML=html;
+  var cb2=el('btn-clear');
+  if(cb2)cb2.addEventListener('click',function(){
+    logAct('act  cleared route');
+    clearRoute();last=null;sel=null;
+    show('Route cleared. The map is back to just the network.','')});
   var sb=el('btn-save');
   if(sb)sb.addEventListener('click',function(){
     var rec=svCurrent(svName());
@@ -1674,6 +1782,10 @@ function hudShow(on){
 function hudPaint(){
   var b=el('hudbar');
   if(!b||b.hidden)return;
+  /* A ribbon with no heading is a bare orange needle over an empty bar — it
+     looks broken because it IS telling you nothing. Say so instead (take 84). */
+  var hint=el('hudhint');
+  if(hint)hint.hidden=(HUD.hdg!==null);
   var w=b.clientWidth||360,SPAN=180,ppd=w/SPAN,h=HUD.hdg;
   var t=el('hudticks');
   if(t){
@@ -2259,7 +2371,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.__geo={addressAt:addressAt,geocode:geocode,
                   get ADDR(){return ADDR}};
     window.__route={buildLoops:buildLoops,nearestNode:nearestNode,
-                    machineLegal:machineLegal,EDGES:EDGES,attrs:attrs,
+                    machineLegal:machineLegal,EDGES:EDGES,ADJ:ADJ,attrs:attrs,
                     setMachine:function(m){if(MACHINE[m])machine=m},
                     get ME(){return ME}};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
@@ -2640,8 +2752,16 @@ function stSafety(){
      telemetry and a 20 s interval. A self-test that leaves a live ride running
      is worse than one that skips the check — it would report the DRILL as the
      rider's last ride, and leak a timer for the life of the app. */
+  /* The drill calls startRecording(), which turns the ride HUD on. It restored
+     TRUCK, crumbs, RIDE and posMode and left the compass ribbon showing —
+     over the place chips, with no heading, forever. Jacob ran the self-test in
+     the field and got exactly that: "the compass popped up at the top… it
+     doesn't work whatever it is." A drill must put back EVERYTHING it moved,
+     not just the state it was written to think about (take 84). */
   var save={T:TRUCK,c:crumbs.slice(),m:crumbMi,p:posMode,me:ME.slice(),
-            ride:RIDE,lastride:LASTRIDE};
+            ride:RIDE,lastride:LASTRIDE,
+            hud:!!(el('hudbar')&&el('hudbar').hidden),
+            chips:!!(el('chips')&&el('chips').hidden)};
   try{
     var c=CTR,pts=[];
     for(var i=0;i<25;i++)pts.push([c[0]+i*0.0008,c[1]+i*0.0005]);
@@ -2664,11 +2784,15 @@ function stSafety(){
   if(RIDE&&RIDE!==save.ride){try{clearInterval(RIDE.pulse)}catch(e){}}
   RIDE=save.ride;LASTRIDE=save.lastride;
   TRUCK=save.T;crumbs=save.c;crumbMi=save.m;posMode=save.p;ME=save.me;
+  hudShow(!save.hud);
+  if(el('chips'))el('chips').hidden=save.chips;
   try{syncSafety()}catch(e){}
 }
 
 function stPerf(cb){
-  var n=0,t0=performance.now(),d=[],last=t0;
+  var n=0,t0=performance.now(),d=[],last=t0,bgSeen=false;
+  function _vis(){if(document.hidden)bgSeen=true}
+  try{document.addEventListener('visibilitychange',_vis)}catch(e){}
   var c=CTR;
   map.jumpTo({center:c,zoom:12.6});
   function step(){
@@ -2692,8 +2816,18 @@ function stPerf(cb){
       var detail='avg '+avg+' · p99 min '+p99+' · '+slow+'/'+d.length+
         ' frames over 33ms · worst '+Math.round(worst)+'ms · '+drew+' features';
       var soft=/swiftshader|llvmpipe|software/i.test(glInfo().r||'');
-      if(soft)stInfo('PERF','fps',detail+' · SOFTWARE RASTERISER, not a verdict');
+      /* requestAnimationFrame STOPS when the app leaves the foreground, so the
+         first frame after you come back is the length of your absence. Jacob's
+         take-82 report read "avg 2 fps · worst 39402ms" — a 39-SECOND frame —
+         which is a screenshot being taken, not a device struggling. Scoring
+         that as a performance failure is landmine 56's corollary: correct
+         behaviour must not be scored as failure. Report it, do not judge it. */
+      if(bgSeen||worst>2000)
+        stInfo('PERF','fps',detail+' · APP LEFT THE FOREGROUND during the '+
+          'sample (rAF pauses; the worst frame is your absence), not a verdict');
+      else if(soft)stInfo('PERF','fps',detail+' · SOFTWARE RASTERISER, not a verdict');
       else stAdd('PERF','fps',avg>=30&&drew>0&&slow<=d.length*0.1,detail);
+      try{document.removeEventListener('visibilitychange',_vis)}catch(e){}
       cb()}}
   requestAnimationFrame(step);
 }

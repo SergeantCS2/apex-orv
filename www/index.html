@@ -103,6 +103,10 @@
   #hudticks b{position:absolute;top:11px;transform:translateX(-50%);
     font:700 11px/1 Roboto,system-ui,sans-serif;color:#fff;letter-spacing:.04em;
     text-shadow:0 1px 2px rgba(0,0,0,.9)}
+  #hudhint{position:absolute;inset:0;display:flex;align-items:center;
+    justify-content:center;font:700 10.5px/1 Roboto,system-ui,sans-serif;
+    color:rgba(255,255,255,.72);letter-spacing:.04em}
+  #hudhint[hidden]{display:none}
   #hudneedle{position:absolute;left:50%;top:0;width:2px;height:30px;
     margin-left:-1px;background:#E2570F;box-shadow:0 0 4px rgba(0,0,0,.6)}
   #hudstats{position:absolute;right:11px;top:38px;z-index:4;pointer-events:none;
@@ -202,7 +206,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 82</span>
+    <span id="title"><b>APEX</b> ORV · Take 88</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -231,7 +235,7 @@
          chips jump the camera to a town, and during a ride the map recentres on
          the rider every sixth fix, so they are already undone the moment they
          are used. Stats go top-RIGHT, which is the only empty corner. -->
-    <div id="hudbar" hidden><div id="hudticks"></div><div id="hudneedle"></div></div>
+    <div id="hudbar" hidden><div id="hudticks"></div><div id="hudneedle"></div><div id="hudhint" hidden>waiting for heading — start moving</div></div>
     <div id="hudstats" hidden>
       <div id="hud-spd">—<span class="hu">mph</span></div>
       <div id="hud-trip"><span id="hud-time">—</span> · <span id="hud-dist">—</span></div>

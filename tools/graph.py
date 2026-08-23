@@ -238,8 +238,13 @@ for e in json.load(open("aoi.json"))["elements"]:
     if c not in SHOW_ONLY and _covered(_coords) >= 0.85:
         osm_dupe += 1
         continue
+    # A75. OSM carries the posted route number in `ref` — "M 33", "F-28",
+    # "H45", "614" — and we dropped it. That number is how a rider says where
+    # they are ("two east of M 33") and it is on every sign; the street name
+    # often is not. Multi-value refs arrive semicolon-separated ("M 33;M 72")
+    # and are split later, at the point where they are drawn.
     (show if c in SHOW_ONLY else net).append({"c": c, "src": "osm", "auth": "advisory",
-                "n": t.get("name"),
+                "n": t.get("name"), "ref": (t.get("ref") or "").strip() or None,
                 "geometry": {"type": "LineString",
                              "coordinates": [[p["lon"], p["lat"]] for p in g]}})
     osm_n += 1
@@ -288,6 +293,7 @@ for f, pts in polys:
                                   "st": f.get("st"), "w": f.get("w"),
                                   "moto": f.get("moto"), "atv": f.get("atv"),
                                   "lic": f.get("lic"), "sym": f.get("sym"),
+                                  "ref": f.get("ref"),      # A75, take 88
                                   "pts": run[:]})
             cur, run = n2, [p]
 print(f"noded: {len(nodes)} nodes, {len(edges)} edges")

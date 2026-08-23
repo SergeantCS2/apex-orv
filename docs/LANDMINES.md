@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 82.*
+*Current as of take 88.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -1603,3 +1603,189 @@ past its end into `route()` — which does call it — and the check passed on a
 `nearestNode` reverted to class-only. Bound at the next top-level definition.
 
 Found by the negative control, which is the entire argument for writing them.
+
+**120. Name the thing that is actually broken.** Four takes shipped on the claim
+"OpenStreetMap is down", measured as 0/24 real responses across three Overpass
+mirrors. Jacob asked whether it was an outage or the build environment being
+blocked. It was neither, quite:
+
+- `api.openstreetmap.org/api/0.6/map?bbox=` returns **200 with 660 KB of real
+  data for the Bull Gap box**. `openstreetmap.org` and the tile server: 200.
+  OSM was never down.
+- `overpass-api.de` returns **503 on `GET /`** — the whole host, not the API —
+  with an Envoy proxy body and only three response headers. DNS resolves to the
+  correct address. That is the egress path failing to reach that host, and
+  nothing to do with Overpass's own health.
+- `overpass.osm.ch` is the **Swiss chapter's instance**: Bern returns 4,176 ways,
+  Bull Gap returns 0. It is not intermittently empty. It is permanently the
+  wrong instance for this project, and landmine 74 was written about it as if
+  the problem were flakiness.
+
+Three different faults were collapsed into one wrong headline, and the headline
+went into four handoff entries and four sets of release notes. A rate is not
+enough (landmine 112) if the thing being rated is misnamed: check whether the
+HOST answers at all, look at the response headers, and test the same data from a
+second path before naming a source dead.
+
+**Corollary — a fallback needs the same reachability test as the primary.**
+Nothing ever checked that `overpass.osm.ch` could serve this region. It sat third
+in the mirror list for twenty-six takes as a fallback that could never once have
+worked.
+
+**121. A drill must put back everything it moved, not just the state it was
+written to think about.** The self-test's safety drill calls `startRecording()`
+to exercise breadcrumb and retrace. It carefully saved and restored `TRUCK`,
+`crumbs`, `crumbMi`, `posMode`, `ME`, `RIDE` and `LASTRIDE` — and left the ride
+HUD switched on, over the place chips, showing no heading, for the life of the
+app. Jacob found it on the first real ride.
+
+The restore list was written when `startRecording()` had five side effects. A
+sixth was added at take 78 and nothing connected them. Save the VISIBLE state
+too, or better, drive the drill through the same stop path a rider would.
+
+**122. My sandbox is not the build environment, and its failures are not the
+product's.** Four takes shipped saying "OpenStreetMap is down", measured at 0/24.
+Jacob's take-82 APK came back with **20,428 edges and a complete bundle** — the
+OSM profile, water and all. CI reached Overpass without difficulty the whole
+time. The release notes told him his build had no water; it did.
+
+Before writing an environmental fault into the record, check whether the thing
+that actually ships is affected. A build machine, a runner and a container are
+three different places (landmine 40's family), and the one that matters is the
+one the artifact is built on.
+
+**123. A control that renders nothing looks broken.** With no heading the
+compass ribbon drew its needle and no ticks — technically correct, and
+indistinguishable from a bug. Jacob's words were "it doesn't work whatever it
+is." Say what is missing: *"waiting for heading — start moving."* An empty state
+is a state, and it needs the same care as a full one.
+
+**124. Fix the instrument before you distrust the product.** Four takes were
+shipped believing OpenStreetMap was unavailable, on 0/24 local probes, while
+CI built complete bundles from it the whole time. The correct response was not
+to work around the outage — there was no outage — but to notice that the thing
+doing the measuring was the thing that was broken, and repair it.
+
+A 297 MB sanctioned bulk download and eighty lines of tool restored the ability
+to measure. Everything that had been "blocked" for four takes was measurable in
+one. When a measurement and the shipped artifact disagree, the artifact is the
+evidence.
+
+**Corollary — a new instrument is worthless until it reproduces a known
+result.** `osm_local.py` is trusted because it returns 20,222 edges and 12,236
+nodes, which is the take-74 record exactly. Had it returned something close but
+different, everything measured with it would have carried an unknown error.
+Validate against a recorded number before using a tool to decide anything.
+
+**125. Near is not the same as duplicated.** A60 is "two sources mapped the same
+road, so draw one." Measuring proximity alone finds 8,103 near-parallel pairs at
+17 m — and 2,934 of them are the SAME source, including 861 `mccct+moto24`
+pairs. Those are the Michigan Cross Country Cycle Trail running along a
+motorcycle trail: not one road drawn twice, but two legal designations on one
+corridor. Collapsing them would delete a fact about what a rider may ride.
+
+The predicate is not "these lines are close". It is "these lines are the same
+physical way, reported by two different sources" — so the source pair is part of
+the test, not metadata. Geometry alone cannot tell a duplicate from a
+co-designation.
+
+**126. Fallback tiers are not interchangeable, so the ORDER is part of the
+contract.** The OSM chain was "three Overpass mirrors, then Census TIGER", and
+TIGER was treated as simply the next thing to try. It is not: it carries roads
+only, no water, and a different topology — 34,341 edges where OSM gives 20,222.
+Nine takes shipped a map made of different data because one volunteer service
+was unreachable, and nothing in the code said the tiers differed.
+
+Where a fallback produces a *different product* rather than the same product
+more slowly, say so in the code and gate the order. A tier that silently changes
+what the artifact is made of is not a fallback, it is a second product.
+
+**127. Search for the CALL, not the name.** A check meant to prove Geofabrik is
+tried before TIGER compared `ing.find("osm_local.build()")` against
+`ing.find("tiger_roads()")` — and `"tiger_roads()"` is a substring of
+`def tiger_roads():`, so it matched the definition near the top of the file and
+reported correct code as broken.
+
+The same shape as landmine 118's window bug one take earlier: a source scan that
+matches more than it means. Anchor on something that only appears at the site
+you care about — `els = tiger_roads()`, not `tiger_roads()`.
+
+**Corollary — a mutation that leaves the searched string intact tests nothing.**
+The control for the reorder branch renamed `els = osm_local.build()` to
+`XX_osm_local.build()`, which still contains `osm_local.build()` at the same
+offset. The control passed, the branch was dead, and only writing a mutation
+that genuinely reorders the tiers proved the branch worked. A negative control
+must change the thing the check looks at.
+
+**128. Two artifacts can each be perfect and still describe different things.**
+`terrain.json` carries one elevation per graph node. A stale terrain from an
+earlier run sat in a bundle whose every SHA-256 matched, whose manifest was
+correct, and which passed every gate check — because nothing had ever compared
+two artifacts to EACH OTHER. The app's own self-test caught it at runtime
+(`TR.ne.length === NODES.length`) after the gate had waved it through.
+
+Integrity checks answer "is this file intact". They do not answer "do these
+files agree". Where one artifact is indexed by another's contents, check the
+relationship, not just the hashes — and notice when a runtime check is the first
+thing to find an incoherent build, because that is the wrong way round.
+
+**129. Suppressing something from the map is a safety decision.**
+A60 draws one copy of a duplicated road and hides the other. Whichever copy is
+hidden, a rider stops seeing it — so the choice cannot be "whichever is
+shorter", or arbitrary, or a side effect of iteration order. Closures must never
+be the hidden one. Designated ORV line, which carries legality the OSM copy does
+not, must never be the hidden one.
+
+Rank the candidates explicitly, gate the ranking against the built artifact, and
+name the classes that may never be suppressed in a list the check reads. A rule
+that only exists in the shape of the code is a rule nobody can see.
+
+**130. A probe pointed at empty ground reports the same thing as a broken
+feature.** Water labels were called dead for most of a take. Two probes in a row
+centred on viewports containing **no named water**: Loon Lake is at 44.518, the
+Au Sable runs at 44.61–44.68, and both probes sat at Bull Gap, 44.50 and 44.57.
+"0 labels rendered" was true and meant nothing.
+
+Before concluding a layer does not work, prove the thing it draws is IN THE
+VIEWPORT. Pick the probe target out of the data — the largest named feature, by
+coordinates read from the payload — rather than from the place you happen to be
+looking at.
+
+**Corollary — measure where the layer is switched on.** The same check then read
+its final result at z11.4, below `lbl-lake`'s 11.6 minzoom, so it was guaranteed
+zero whatever the product did.
+
+**131. A verdict is not a diagnosis.** Four separate readings said "0 labels"
+and every one was compatible with a dozen causes: no data, bad geometry, wrong
+filter, missing glyphs, collision, wrong zoom, or an empty viewport. Nothing
+moved until the check was changed to report what it OBSERVED —
+`0 label(s) of 175 in the source` plus a sample feature — at which point the
+source was visibly fine and the search narrowed in one run.
+
+Landmine 55 restated for the case where the check passes its own sanity test: a
+number on its own is not evidence. Print the denominator and an example.
+
+**Corollary — private API is not API.** `getSource(id)._data` is undefined in
+MapLibre 5, so the diagnostic threw and reported `-2`. That read as "the source
+does not exist" when the source held 175 features. Use the documented route —
+`getStyle().sources[id].data` — or the probe becomes another suspect.
+
+**132. A field can be dropped more than once on its way through.** Adding OSM's
+`ref` to the graph looked done after one edit to the ingest block, and measured
+**0 edges with a route number**. The noding step rebuilds every edge from an
+explicit key list, and `ref` was not in it, so a correct first fix produced a
+correct-looking diff and no data.
+
+Where a pipeline stage reconstructs records rather than passing them through,
+every new field must be added at every reconstruction. Measure the count at the
+END of the chain, not after the edit that seemed to be the point.
+
+**133. Order the features so the later one cannot undo the earlier one.**
+A75 puts posted route numbers on the map. 2,318 of the 4,470 edges carrying one
+are the OSM copy of a Forest Service road that A60 already suppressed — and
+which we already label with its authoritative FS number. Had A75 shipped before
+A60, the map would have drawn the same number twice along two parallel lines,
+and the fix would have looked like a labelling bug rather than a duplication one.
+
+A60 first was luck, not judgement. When two agenda items touch the same
+geometry, work out which one changes what the other one sees.
