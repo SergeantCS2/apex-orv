@@ -66,6 +66,37 @@ HIGHWAY = {"motorway", "trunk", "primary", "secondary", "tertiary",
 WATERWAY = {"river", "stream"}
 
 
+
+def poi_tags():
+    """A110's tag set, IMPORTED from ingest.py rather than copied.
+
+    The two OSM paths must fetch the same things or a fallback build ships a
+    different map than a normal one — and that difference would be invisible,
+    because both produce a valid aoi.json. ingest.py builds its Overpass query
+    from this same dict, so there is one definition and no drift (landmine 107).
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_ing", os.path.join(HERE, "ingest.py"))
+    m = importlib.util.module_from_spec(spec)
+    # ingest.py runs its whole pipeline at import, so read the literal instead.
+    import ast
+    src = open(os.path.join(HERE, "ingest.py"), encoding="utf-8").read()
+    tree = ast.parse(src)
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == "POI_TAGS":
+            return ast.literal_eval(node.value)
+    sys.exit("ingest.py has no POI_TAGS — the two OSM paths would fetch "
+             "different things and nothing would say so")
+
+
+POI = poi_tags()
+# Kept in step with the extra clauses at the bottom of ingest.py's Overpass
+# query. `peak` is NOT a POI — poi.py's KINDS does not classify it, so it rides
+# through aoi.json and is picked up by contour.py, which owns terrain (A76).
+POI_EXTRA = {"leisure": ["slipway"], "natural": ["beach", "peak"]}
+
+
 def region(rid=None):
     cfg = json.load(open(os.path.join(ROOT, "regions.json")))
     rid = rid or cfg.get("default")
@@ -104,12 +135,32 @@ def build(rid=None):
             self.out = []
             self.seen = 0
 
+        def _poi(self, t):
+            for k, vals in list(POI.items()) + list(POI_EXTRA.items()):
+                if t.get(k) in vals:
+                    return True
+            return False
+
+        def node(self, n):
+            """POIs are often nodes. Overpass `nwr ... out geom` gives a node a
+            lat/lon rather than a geometry array, so match that shape exactly —
+            graph.py and pack.py both skip elements with no geometry, which is
+            how a node passes through them untouched."""
+            if not self._poi(n.tags):
+                return
+            lon, lat = n.location.lon, n.location.lat
+            if not (W <= lon <= E and S <= lat <= N):
+                return
+            self.out.append({"type": "node", "id": n.id,
+                             "tags": dict(n.tags), "lon": lon, "lat": lat})
+
         def way(self, w):
             t = w.tags
             hw = t.get("highway")
             ww = t.get("waterway")
             nat = t.get("natural")
-            if not (hw in HIGHWAY or ww in WATERWAY or nat == "water"):
+            if not (hw in HIGHWAY or ww in WATERWAY or nat == "water"
+                    or self._poi(t)):
                 return
             self.seen += 1
             geom, inside = [], False

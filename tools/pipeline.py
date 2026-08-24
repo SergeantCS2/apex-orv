@@ -20,9 +20,12 @@ ROOT = os.path.dirname(HERE)
 STEPS = [
     ("ingest",     ["ingest.py"],      "DNR + USFS + OSM"),
     ("pack",       ["pack.py"],        "water layer"),
+    ("poi",        ["poi.py"],         "places you can ride to"),
     ("graph",      ["graph.py"],       "conflate and node the network"),
     ("emit_graph", ["emit_graph.py"],  "client payload"),
     ("terrain",    ["terrain.py"],     "DEM, climb, hillshade"),
+    ("contour",    ["contour.py"],     "contour lines from the same DEM"),
+    ("corridor",   ["corridor.py"],    "a river beyond the box, ordered downstream"),
     ("glyphs",     ["glyphs.py"],      "SDF label pack"),
     ("context",    ["context.py"],     "state outline for orientation"),
     ("address",    ["address.py"],     "offline address index"),

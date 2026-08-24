@@ -79,10 +79,37 @@ except ValueError as _e:
 #
 # The marker makes the workspace single-region: switch, and everything derived
 # is cleared first.
-DERIVED = ["aoi.json", "authoritative.json", "graph_raw.json",
-           "graph_payload.json", "terrain_payload.json", "water_payload.json",
-           "glyphs_payload.json", "imagery_meta.json", "imagery_budget.json",
-           "hillshade.jpg", "imagery.jpg", "payload.json"]
+# Everything a region leaves behind. Switching regions must clear ALL of it, or
+# the next build inherits the last one's data with every hash correct — right
+# data, wrong place, which is landmine 37 and the reason this function exists.
+#
+# This was a hand-kept list of twelve. By take 96 the pipeline produced seven
+# artifacts it did not mention — address, context, other, poi, contour,
+# imagery_tiles/ and dem_meta — two of them added by me at takes 89 and 91
+# without a thought for the list meant to clear them. It also still listed
+# `payload.json`, which stopped existing long ago.
+#
+# So it is not a list any more. Every payload this pipeline writes is named
+# `*_payload.json` — that convention is the source of truth, and globbing it
+# means a new payload is cleared the day it is invented rather than the day
+# someone notices. Only the artifacts that do NOT follow the convention are
+# named here, and they are all imagery or ingest intermediates.
+#
+# Fourth time a copied set has drifted from the set it copies: the palette
+# (take 77), the CI dependency map (84), the label layers (90), and this.
+DERIVED_EXTRA = ["aoi.json", "authoritative.json", "graph_raw.json",
+                 "imagery_meta.json", "imagery_budget.json",
+                 "imagery_tiles.json", "dem_meta.json",
+                 "hillshade.jpg", "imagery.jpg"]
+DERIVED_DIRS = ["imagery_tiles"]
+
+
+def derived_files():
+    """Every per-region artifact currently on disk, by convention plus the list."""
+    import glob as _g
+    out = sorted(os.path.basename(p)
+                 for p in _g.glob(os.path.join(ROOT, "*_payload.json")))
+    return out + [f for f in DERIVED_EXTRA if f not in out]
 
 
 def ensure_workspace(rid=None, quiet=False):
@@ -91,11 +118,20 @@ def ensure_workspace(rid=None, quiet=False):
     prev = open(mark).read().strip() if os.path.exists(mark) else None
     if prev == rid:
         return False
+    import shutil as _sh
     wiped = 0
-    for f in DERIVED:
+    for f in derived_files():
         p = os.path.join(ROOT, f)
         if os.path.exists(p):
             os.remove(p)
+            wiped += 1
+    # imagery_tiles/ is 2,008 files of the PREVIOUS region's ground. It survived
+    # every region switch because os.remove cannot delete a directory and nobody
+    # had listed it anyway.
+    for d in DERIVED_DIRS:
+        p = os.path.join(ROOT, d)
+        if os.path.isdir(p):
+            _sh.rmtree(p)
             wiped += 1
     open(mark, "w").write(rid)
     if not quiet and prev:

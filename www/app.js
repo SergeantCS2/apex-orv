@@ -51,9 +51,18 @@ j('bundle/manifest.json').then(function(man){
     Promise.resolve({b:man.imagery_bounds||[0,0,0,0]}),
     have.context?j('bundle/'+have.context):Promise.resolve(null),
     have.address?j('bundle/'+have.address):Promise.resolve(null),
-    have.other?j('bundle/'+have.other):Promise.resolve(null)]);
+    have.other?j('bundle/'+have.other):Promise.resolve(null),
+    /* A110. Optional and absent-safe: an older bundle has no places artifact
+       and the app simply draws no pins, rather than refusing the region. */
+    have.places?j('bundle/'+have.places):Promise.resolve(null),
+    /* A87. Optional and absent-safe, exactly like places: an older bundle has
+       no contour artifact and the map simply has no contour lines. */
+    have.contour?j('bundle/'+have.contour):Promise.resolve(null),
+    /* A115. Optional and absent-safe like the rest. */
+    have.paddle?j('bundle/'+have.paddle):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -105,8 +114,58 @@ function decode(a){var p=[],x=0,y=0;for(var i=0;i<a.length;i+=2){x+=a[i];y+=a[i+
    conservative rather than wrong. Recorded as open — see A86. */
 var MACH_FLAG={bike:'moto',quad:'atv',sxs:null};
 
+/* ══ SPECIAL RESTRICTIONS (A101) ════════════════════════════════════════════
+   The DNR publishes a free-text restriction on 180 features statewide. It is
+   real law: 67 of them read "Off road motorcycles are prohibited", which is
+   Jacob's machine.
+
+   ENUMERATED, not pattern-matched. There are exactly nine distinct strings in
+   the whole state — a table I can read and check by eye, against a regex on
+   legal prose that would silently mis-classify the tenth. When the DNR adds
+   one, it lands in `unknown` below and is SHOWN to the rider rather than
+   guessed at.
+
+   THE RULE: this table may only ever take access away, never grant it. A string
+   we do not recognise restricts nothing and is displayed verbatim, because
+   telling a rider what the sign says is honest and inventing a reading of it is
+   not. Zero features in the Bull Gap box carry one — this exists so the
+   machinery is here before A72 widens the region, not after. */
+var RESTRICT=[
+  {m:'Off road motorcycles are prohibited',
+   ban:['bike'], season:'May 1 – Nov 1',
+   say:'Off-road motorcycles are prohibited. ORVs under 65 inches, May 1 – Nov 1.'},
+  {m:'including off road motorcycles only between the dates of May 16th and March 14th',
+   ban:['sxs'], season:'May 16 – Mar 14',
+   say:'ORVs under 65 inches including motorcycles, May 16 – Mar 14.'},
+  {m:'including off road motorcycles only',
+   ban:['sxs'], say:'ORVs under 65 inches, including motorcycles.'},
+  {m:'ORVs Less Than 65 Inches Only',
+   ban:['sxs'], say:'ORVs under 65 inches only.'},
+  {m:'MDOT ROW',
+   ban:[], season:'May 1 – Nov 30',
+   say:'Highway right-of-way connector, open May 1 – Nov 30.'},
+  {m:'4x4 And High Clearance Required',
+   ban:[], say:'4x4 and high clearance required — rough going.'},
+  {m:'High Clearance Required',
+   ban:[], say:'High clearance required — rough going.'},
+  {m:'Snowmobile Season',
+   ban:[], say:'Snowmobile season December 1 – March 31.'}
+];
+
+function restrictOf(e){
+  var a=attrs(e),t=a.rst;
+  if(!t)return null;
+  for(var i=0;i<RESTRICT.length;i++)
+    if(t.indexOf(RESTRICT[i].m)>=0)return RESTRICT[i];
+  /* Unrecognised: show the source's own words. Never guess. */
+  return {m:null,ban:[],say:t,unknown:true}}
+
 function machineLegal(e){
   if(MACHINE[machine].ok.indexOf(e.c)<0)return false;
+  /* A101: a published restriction may only ever take access away. An
+     unrecognised one bans nothing and is displayed instead (take 95). */
+  var _r=restrictOf(e);
+  if(_r&&_r.ban&&_r.ban.indexOf(machine)>=0)return false;
   if(e.c==='closed'||e.c==='fsclosed')return false;
   var fl=MACH_FLAG[machine];
   if(!fl)return true;                       /* no per-vehicle field for it */
@@ -252,6 +311,14 @@ function strokeLen(pts){
    numbers use the posted ref. Parameterised rather than copied, because a
    second walker is a second thing to keep in step and they would drift the way
    the palette did (landmine 107). */
+/* A110. "0.8 mi NE of you" is the question a rider actually has about a pin.
+   Reuses mi() and compass(), both verified outside the code that produced them
+   at take 69 — a bearing nobody checked is how you send someone the wrong way. */
+function placeDist(p){
+  if(!ME)return '';
+  var d=mi(ME,p);
+  return d.toFixed(d<10?1:0)+' mi '+compass(bearing(ME,p))+' of you';}
+
 function chainStrokes(key){
   key=key||labelFor;
   var byKey={};
@@ -311,6 +378,364 @@ var SHOWN={foot:'foot / hike',horse:'equestrian',snow:'ski',snowmob:'snowmobile'
 var showFeats=(SHOW&&SHOW.r?SHOW.r:[]).map(function(r){
   return {type:'Feature',properties:{c:r.c,n:r.n||'',u:r.u||SHOWN[r.c]||r.c},
     geometry:{type:'LineString',coordinates:r.g}}});
+
+/* ══ PLACES (A110) ══════════════════════════════════════════════════════════
+   Somewhere to ride TO. Kinds are ordered by how much a rider in trouble cares:
+   fuel and a trailhead are useful when the day is going wrong, a picnic table
+   is not. That order drives both the colour and which pin wins a collision.
+
+   No icons: the glyph pack is ASCII 32-126 (glyphs.py CHARS), so an emoji or a
+   sprite would render as a box. A coloured dot with a text label costs nothing,
+   scales on the GPU, and is legible at 2 px — landmine 30 in advance rather
+   than after. */
+var POIKIND={
+  fuel:     {c:'#C1121F', h:'Fuel',        r:1},
+  trailhead:{c:'#E2570F', h:'Trailhead',   r:1},
+  camp:     {c:'#2F7D4F', h:'Campground',  r:2},
+  launch:   {c:'#1E6FA8', h:'Boat launch', r:2},
+  beach:    {c:'#C9A227', h:'Beach',       r:3},
+  dayuse:   {c:'#2F7D4F', h:'Day use',     r:3},
+  store:    {c:'#7A4FA3', h:'Store',       r:3},
+  food:     {c:'#7A4FA3', h:'Food',        r:4},
+  view:     {c:'#4A443B', h:'Viewpoint',   r:4},
+  info:     {c:'#4A443B', h:'Information', r:5},
+  water:    {c:'#1E6FA8', h:'Drinking water', r:5},
+  toilet:   {c:'#4A443B', h:'Toilets',     r:6},
+  shelter:  {c:'#4A443B', h:'Shelter',     r:6}
+};
+var poif=((POIS&&POIS.p)||[]).map(function(r,i){
+  var k=POIKIND[r.k]||{c:'#4A443B',h:r.k,r:7};
+  return {type:'Feature',
+    properties:{i:i,k:r.k,h:k.h,c:k.c,r:k.r,
+      /* A beach has no name in OSM and is still a destination — it ships
+         unnamed and is labelled by KIND. Saying "Beach" is honest; inventing
+         "Island Lake Beach" from the day-use area 6 m away is not
+         (poi.py explains the exception). */
+      n:r.n||k.h,named:r.n?1:0},
+    geometry:{type:'Point',coordinates:r.p}}});
+
+/* A87 · contour lines, a fifth product of the DEM ingest that already runs.
+   Delta-encoded exactly like water and graph geometry, so decode() reads it
+   with no new code. Index contours (every 200 ft) carry the elevation label;
+   the intermediates are drawn thinner and unlabelled, which is how every topo
+   map is read. */
+/* A76 · named summits. Four in this region, and three of them match the figures
+   on a commercial map to within three feet — Auger Hill, Mio Mountain, Wagon
+   Wheel Hill. The name is OSM's; the elevation is OUR DEM's, the same source as
+   every other height the app shows, so a summit label cannot disagree with the
+   readout under your wheels. Bull Gap is hill-climb country; named high ground
+   is the landmark people actually navigate by here. */
+/* ══ PADDLE CORRIDORS (A115/A112) ══════════════════════════════════════════
+   Six rivers, 390 miles, chosen by evidence rather than by anyone's list: every
+   named river in Michigan scored by how many boat and canoe access points people
+   have built on it, and those with three or more near this region kept.
+
+   A corridor is drawn as SEPARATE REACHES because that is what it is. The river
+   way stops at each impoundment and resumes below it, so the breaks land exactly
+   on the dams — and joining them would draw a river you cannot paddle.
+
+   THE PORTAGES ARE NOT DECORATION. Seven dams sit on the Au Sable. A map that
+   drew one continuous blue line from Grayling to Lake Huron without marking them
+   would be actively dangerous, and A112 makes that a ship-blocker, not a
+   nice-to-have. They are drawn on top of everything, in the closure colour, and
+   they are never hidden by anything else on this layer. */
+var padf=[],padpin=[];
+((PADDLE&&PADDLE.c)||[]).forEach(function(c){
+  (c.g||[]).forEach(function(reach,i){
+    padf.push({type:'Feature',properties:{n:c.n,reach:i},
+      geometry:{type:'LineString',coordinates:reach}})});
+  /* The impoundment midpoints are NOT drawn. A portage marker a kilometre from
+     the dam it belongs to is two pins for one hazard, and the dam is the thing
+     you must not miss. The distances are in the payload and printed at build
+     time; they belong on the dam's card, not as a second pin. */
+  (c.f||[]).forEach(function(f){
+    padpin.push({type:'Feature',
+      properties:{k:f.k,n:f.n||null,mi:f.mi,riv:c.n,
+        lb:(f.n||({dam:'Dam',launch:'Boat launch',access:'Canoe access',
+                   camp:'Campground',parking:'Parking'}[f.k]||f.k))},
+      geometry:{type:'Point',coordinates:f.p}})})});
+
+/* ══ THE PADDLE CARD (A115) ═════════════════════════════════════════════════
+   A pin that only says its own name answers nothing. What a shuttle needs is
+   what is ABOVE and BELOW it, and whether there is a dam in between — because
+   you drop boats at one access and pick them up at another, and getting that
+   order wrong is the whole trip.
+
+   The mileage is the mapped centreline's, which under-measures (0.53x the local
+   outfitter above Mio, 0.78x near it). It is shown as "about" and the card says
+   so once, plainly, rather than the app pretending to a precision it does not
+   have. The ORDER, which is what the card is really for, is exact. */
+var PADKIND={dam:'Dam',launch:'Boat launch',access:'Canoe access',
+             camp:'Campground',parking:'Parking'};
+
+/* ══ HOW LONG IT TAKES (A122) ══════════════════════════════════════════════
+   Take 102 shipped these distances with an apology: they came out about 0.55x
+   the local outfitter's published table, so the card said they ran short and
+   only the ORDER could be trusted.
+
+   The apology was wrong. Take 106 pulled the same river from USGS NHD — the
+   federal authoritative hydrography, an entirely independent survey — and it
+   agrees with OpenStreetMap to within 4%:
+
+       Burtons -> Wakeley     NHD  9.2   OSM  9.3   outfitter 16
+       Wakeley -> Camp Ten    NHD 26.2   OSM 26.3   outfitter 50
+       Camp Ten -> Comins     NHD 11.1   OSM 10.7   outfitter 15
+
+   Two independent surveys agreeing that closely are not both wrong by 45%. The
+   outfitter's MILEAGES run high — and Jacob, who has paddled these floats with
+   them, says their HOURS are about right. Both can be true, and together they
+   settle the pace:
+
+       Burtons->Mio   38.5 mi / 15 hrs   = 2.57 mph
+       Stephan->Mio   33.7 mi / 13 hrs   = 2.59 mph
+       Wakeley->Mio   29.2 mi / 11.5 hrs = 2.54 mph
+       McMasters->Mio 21.4 mi / 8.5 hrs  = 2.51 mph
+
+   2.5 mph is what a canoe does on a river with light current. Their own figures
+   imply 4.7, which nobody paddles. So the distances were right all along and the
+   card was apologising for the wrong number.
+
+   The estimate is shown as a RANGE and the assumption is stated, because pace is
+   the part we are guessing at — flow, wind, how much you stop. What we are not
+   guessing at is the distance. */
+var PADDLE_MPH=2.5, PADDLE_SPREAD=0.5;
+
+function paddleHours(miles){
+  var slow=miles/(PADDLE_MPH-PADDLE_SPREAD), fast=miles/(PADDLE_MPH+PADDLE_SPREAD);
+  var fmt=function(h){
+    if(h<1)return Math.round(h*60)+' min';
+    var w=Math.floor(h),mn=Math.round((h-w)*60);
+    if(mn===60){w+=1;mn=0}
+    return w+' hr'+(mn?' '+mn+' min':'')};
+  return fmt(fast)+'\u2013'+fmt(slow)}
+
+/* ══ THE RUN (A121) ═════════════════════════════════════════════════════════
+   The card answers one hop. A shuttle needs the whole float: pick a put-in, pick
+   a take-out, and get what is between them — every dam you must portage, every
+   campground you could stop at, and which way round it goes.
+
+   You cannot paddle upstream, so tap order does not decide direction: the
+   upstream stop is the put-in whichever you picked first, and the card says so
+   rather than refusing a reasonable gesture. */
+var RUNFROM=null;
+
+function runClear(){RUNFROM=null}
+
+/* ══ COMPASS (A119) ═════════════════════════════════════════════════════════
+   The ride HUD has carried a compass ribbon since take 78, but only while a
+   ride is running. Standing at a junction with the engine off — which is when
+   you actually get out the map — the app had no heading at all and no bearing
+   to anything but the truck.
+
+   This is a rose you can read at a glance plus the bearings that matter: the
+   truck, home, and every waypoint you have saved. It is a TOOL, not a widget:
+   it opens from Tools, it says plainly when it has no heading rather than
+   drawing a needle pointing at nothing, and it updates as fixes arrive.
+
+   A phone lying flat has no heading until it moves. Android reports
+   `coords.heading` as null when stationary and the crumb-trail fallback needs
+   two fixes apart — so "no heading yet" is the normal state at a standstill and
+   is said in those words. */
+var CMP_ON=false;
+
+function cmpRose(deg){
+  var ticks='',i,a,x1,y1,x2,y2,r=46;
+  for(i=0;i<16;i++){
+    a=(i*22.5-(deg||0))*Math.PI/180;
+    var major=(i%4===0),len=major?9:5;
+    x1=50+Math.sin(a)*r; y1=50-Math.cos(a)*r;
+    x2=50+Math.sin(a)*(r-len); y2=50-Math.cos(a)*(r-len);
+    ticks+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+
+      '" y2="'+y2.toFixed(1)+'" stroke="'+(major?'#F2ECE0':'#9C9384')+
+      '" stroke-width="'+(major?1.6:1)+'"/>'}
+  var lbl='',C=['N','E','S','W'];
+  for(i=0;i<4;i++){
+    a=(i*90-(deg||0))*Math.PI/180;
+    lbl+='<text x="'+(50+Math.sin(a)*31).toFixed(1)+'" y="'+(50-Math.cos(a)*31+3.4).toFixed(1)+
+      '" text-anchor="middle" font-size="10" font-weight="700" fill="'+
+      (i===0?'#E2570F':'#F2ECE0')+'">'+C[i]+'</text>'}
+  return '<svg viewBox="0 0 100 100" width="128" height="128" aria-hidden="true">'+
+    '<circle cx="50" cy="50" r="47" fill="none" stroke="rgba(255,255,255,.22)"/>'+
+    ticks+lbl+
+    (deg===null?'':'<path d="M50 8 L45 20 L55 20 Z" fill="#E2570F"/>')+
+    '<circle cx="50" cy="50" r="2.4" fill="#F2ECE0"/></svg>'}
+
+function cmpRows(){
+  var out=[],hdg=HUD.hdg;
+  function row(label,at){
+    if(!at||!ME)return;
+    var b=bearing(ME,at),d=mi(ME,at);
+    /* A bearing to where you are standing is not a bearing. Marking this spot
+       and then opening the compass produced "N 0 deg · 0.00 mi · 49 deg left",
+       which is true, looks like an answer and is noise — the same shape as the
+       0.0 mi neighbour on the paddle card (landmine 164). Under ~100 ft you are
+       on it, and the row says that instead. */
+    if(d<0.02){out.push('<b>'+label+'</b> <span style="color:#9C9384">'+
+      'you are here</span>');return}
+    var rel=hdg===null?null:((b-hdg+540)%360-180);
+    out.push('<b>'+label+'</b> '+compass(b)+' '+Math.round(b)+'\u00B0 · '+
+      (d<10?d.toFixed(2):Math.round(d))+' mi'+
+      (rel===null?'':' · '+(Math.abs(rel)<8?'straight ahead'
+        :(rel<0?Math.round(-rel)+'\u00B0 left':Math.round(rel)+'\u00B0 right'))))}
+  row('Truck',TRUCK);
+  row('Home',HOME);
+  wpLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region})
+    .slice(0,6).forEach(function(x){row(x.n,x.p)});
+  return out}
+
+function cmpPaint(){
+  var box=el('cmpbox');
+  if(!box||!CMP_ON)return;
+  var hdg=HUD.hdg,rows=cmpRows();
+  box.innerHTML='<div style="text-align:center">'+cmpRose(hdg)+
+    '<div style="font:700 var(--t-lg)/1 Roboto,system-ui,sans-serif;margin-top:4px">'+
+    (hdg===null?'<span style="color:#9C9384;font-size:var(--t-sm)">'+
+       'no heading yet \u2014 a phone lying still has none; start moving</span>'
+     :compass(hdg)+' <span style="color:#9C9384">'+Math.round(hdg)+'\u00B0</span>')+
+    '</div></div>'+
+    (rows.length?'<div style="margin-top:9px;line-height:1.7">'+rows.join('<br>')+'</div>'
+     :'<div class="sub" style="margin-top:9px">Nothing to take a bearing to yet — '+
+      'pin the truck, set home, or save a waypoint.</div>')}
+
+function runCard(a,b,riv){
+  var c=null,i;
+  for(i=0;i<((PADDLE&&PADDLE.c)||[]).length;i++)
+    if(PADDLE.c[i].n===riv){c=PADDLE.c[i];break}
+  if(!c)return;
+  var lo=Math.min(a.mi,b.mi),hi=Math.max(a.mi,b.mi);
+  var putIn=(a.mi<=b.mi?a:b), takeOut=(a.mi<=b.mi?b:a);
+  var swapped=(a!==putIn);
+  var mid=c.f.filter(function(f){return f.mi>lo+0.05&&f.mi<hi-0.05});
+  var dams=mid.filter(function(f){return f.k==='dam'});
+  var camps=mid.filter(function(f){return f.k==='camp'});
+  var acc=mid.filter(function(f){return f.k==='launch'||f.k==='access'});
+  var nm=function(f){return f.n||PADKIND[f.k]||f.k};
+
+  var rows=[];
+  rows.push('Put in <b>'+nm(putIn)+'</b>');
+  rows.push('Take out <b>'+nm(takeOut)+'</b>');
+  rows.push('About <b>'+(hi-lo).toFixed(1)+' mi</b> of river between them');
+  if(dams.length)
+    rows.push('<b style="color:#C1121F">'+dams.length+' dam'+(dams.length>1?'s':'')+
+      ' on the way — '+dams.map(nm).join(', ')+'. You must take out and portage '+
+      (dams.length>1?'each one':'it')+'.</b>');
+  else
+    rows.push('<b>No dams between them.</b>');
+  if(acc.length)
+    rows.push(acc.length+' other access point'+(acc.length>1?'s':'')+
+      ' on the way'+(acc.length<=4?': '+acc.map(nm).join(', '):''));
+  if(camps.length)
+    rows.push(camps.length+' campground'+(camps.length>1?'s':'')+
+      (camps.length<=4?': '+camps.map(nm).join(', '):' along it'));
+  if(swapped)
+    rows.push('<span class="sub">Tapped in the other order — a river only runs '+
+      'one way, so this is the run.</span>');
+  rows.push('Roughly <b>'+paddleHours(hi-lo)+'</b> of paddling'+
+    (dams.length?' plus the portage'+(dams.length>1?'s':''):'')+
+    ' <span class="sub">at 2\u20133 mph, which is what these floats work out at '+
+    'against the liveries\u2019 own times</span>');
+  logAct('act  run '+nm(putIn)+' -> '+nm(takeOut));
+  show('<div class="tn">The run \u2014 <span class="sub">'+riv+'</span></div>'+
+    rows.join('<br>')+
+    '<div class="sub" style="margin-top:8px">'+
+    '<button class="chip" id="pd-clear">'+ic('close')+'<span>Clear</span></button></div>',
+    dams.length?'fail':'pass');
+  var cb=el('pd-clear');
+  if(cb)cb.addEventListener('click',function(){runClear();show('Run cleared.','')});
+  RUNFROM=null}
+
+function paddleCard(ft){
+  var pr=ft.properties, riv=pr.riv||pr.n, mi=+pr.mi;
+  var c=null,i;
+  for(i=0;i<((PADDLE&&PADDLE.c)||[]).length;i++)
+    if(PADDLE.c[i].n===riv){c=PADDLE.c[i];break}
+  if(!c)return show('<b>'+(pr.lb||'On the river')+'</b>','');
+  logAct('tap  paddle '+(pr.n||pr.k));
+
+  var stops=c.f.filter(function(f){return f.k!=='parking'});
+  var here=null,bi=-1;
+  for(i=0;i<stops.length;i++){
+    if(Math.abs(stops[i].mi-mi)<0.02&&(stops[i].n||null)===(pr.n||null)){here=stops[i];bi=i;break}}
+  if(bi<0){for(i=0;i<stops.length;i++)if(Math.abs(stops[i].mi-mi)<0.02){here=stops[i];bi=i;break}}
+
+  var isDam=pr.k==='dam';
+  var head=(pr.n?pr.n:(PADKIND[pr.k]||'On the river'))+
+    ' <span class="sub">'+riv+'</span>';
+  var rows=[];
+  if(isDam){
+    rows.push('<b style="color:#C1121F">DAM — you must take out and portage.</b>');
+    var atDam=stops.filter(function(f){
+      return f.k!=='dam'&&Math.abs(f.mi-mi)<0.35});
+    if(atDam.length)
+      rows.push('At the dam: '+atDam.map(function(f){
+        return f.n||PADKIND[f.k]||f.k}).slice(0,3).join(', '));
+  }
+  rows.push((PADKIND[pr.k]||pr.k)+' · about <b>'+mi.toFixed(1)+' mi</b> down the river');
+
+  /* what is upstream and downstream, and what is between */
+  function between(a,b){
+    var d=[];
+    for(var j=Math.min(a,b)+1;j<Math.max(a,b);j++)
+      if(stops[j].k==='dam')d.push(stops[j].n||'a dam');
+    return d}
+  function side(dir){
+    var j=bi+dir;
+    /* Skip dams — they are reported separately as the thing between — and skip
+       anything at the SAME point. A dam usually has an access on each bank
+       projecting to the same river mile, so the first neighbour was "about
+       0.0 mi" in both directions, which answers nothing (take 103). */
+    while(j>=0&&j<stops.length&&
+          (stops[j].k==='dam'||Math.abs(stops[j].mi-mi)<0.06))j+=dir;
+    if(j<0||j>=stops.length)return null;
+    var t=stops[j],gap=Math.abs(t.mi-mi),dams=between(bi,j);
+    return (dir<0?'Above: ':'Below: ')+'<b>'+(t.n||PADKIND[t.k]||t.k)+'</b> · '+
+      (gap<0.1?'at the same spot':gap.toFixed(1)+' mi · '+paddleHours(gap))+
+      (dams.length?' · <b style="color:#C1121F">'+dams.join(', ')+' in between — portage</b>'
+                 :' · no dam between')}
+  if(bi>=0){
+    var up=side(-1),dn=side(1);
+    if(up)rows.push(up);
+    if(dn)rows.push(dn);
+    if(!up)rows.push('<span class="sub">Nothing mapped above this — it is the top of the run.</span>');
+    if(!dn)rows.push('<span class="sub">Nothing mapped below this — it is the end of the run.</span>');
+  }
+  rows.push('<span class="sub">River miles from OpenStreetMap, cross-checked '+
+    'against the USGS survey — they agree within 4%.</span>');
+
+  /* Pick two and get the float between them. Only offered where it can mean
+     something: a stop we found on the river, with a mile to measure from. */
+  var acts='';
+  if(here){
+    acts=RUNFROM&&RUNFROM.riv===riv&&Math.abs(RUNFROM.mi-here.mi)>0.05
+      ? '<button class="chip" id="pd-to">'+ic('route')+'<span>Run from '+
+        (RUNFROM.n||PADKIND[RUNFROM.k]||'there')+' to here</span></button> '+
+        '<button class="chip" id="pd-cancel">'+ic('close')+'<span>Cancel</span></button>'
+      : '<button class="chip" id="pd-from">'+ic('route')+'<span>Plan a run from here</span></button>';}
+  show('<div class="tn">'+head+'</div>'+rows.join('<br>')+
+    (acts?'<div class="sub" style="margin-top:8px">'+acts+'</div>':''),
+    isDam?'fail':'');
+  var f1=el('pd-from');
+  if(f1)f1.addEventListener('click',function(){
+    RUNFROM={mi:here.mi,n:pr.n,k:pr.k,riv:riv};
+    logAct('act  run from '+(pr.n||pr.k));
+    show('<b>'+(pr.n||PADKIND[pr.k]||'Here')+'</b> is the first end.<br>'+
+      'Now tap the other end of the run on the '+riv+'.','')});
+  var f2=el('pd-to');
+  if(f2)f2.addEventListener('click',function(){
+    runCard(RUNFROM,{mi:here.mi,n:pr.n,k:pr.k},riv)});
+  var f3=el('pd-cancel');
+  if(f3)f3.addEventListener('click',function(){runClear();show('Run cancelled.','')});
+}
+
+var peakf=((CONT&&CONT.pk)||[]).map(function(p){
+  return {type:'Feature',
+    properties:{n:p.n,ft:p.ft,lb:p.n+'\n'+p.ft.toLocaleString()+' ft'},
+    geometry:{type:'Point',coordinates:p.p}}});
+
+var contf=((CONT&&CONT.l)||[]).map(function(l){
+  return {type:'Feature',
+    properties:{ft:l.ft,i:l.i,lb:l.ft+' ft'},
+    geometry:{type:'LineString',coordinates:decode(l.c)}}});
 
 var strokes=chainStrokes();
 /* A75. Route numbers chain by the posted ref, so "M 33" becomes one long line
@@ -462,6 +887,13 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     wtr:{type:'geojson',data:{type:'FeatureCollection',features:wf}},
     wlbl:{type:'geojson',data:{type:'FeatureCollection',features:wlab}},
     refs:{type:'geojson',data:{type:'FeatureCollection',features:refstrokes}},
+    poi:{type:'geojson',data:{type:'FeatureCollection',features:poif}},
+    cont:{type:'geojson',data:{type:'FeatureCollection',features:contf}},
+    wpts:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
+    peaks:{type:'geojson',data:{type:'FeatureCollection',features:peakf}},
+    paddle:{type:'geojson',data:{type:'FeatureCollection',features:padf}},
+    padpin:{type:'geojson',data:{type:'FeatureCollection',features:padpin}},
+
     net:{type:'geojson',data:{type:'FeatureCollection',features:nf2}},
     strokes:{type:'geojson',data:{type:'FeatureCollection',features:strokes}},
     shortpts:{type:'geojson',data:shortPts},
@@ -485,6 +917,22 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        so trails stay the loudest thing on screen. */
     {id:'hillshade',type:'raster',source:'hs',
       paint:{'raster-opacity':0.42,'raster-contrast':0.12,'raster-fade-duration':0}},
+    /* A87 · contours sit directly above the hillshade and BELOW water and the
+       network — terrain is the thing you read the map on top of, never the
+       thing competing with the trail you are riding. Off by default: this is a
+       reference layer, and the map should open the way it always has.
+       Brown, because contours have been brown since the USGS decided so, and a
+       rider who has seen a paper quad reads it without being told. */
+    {id:'cont-line',type:'line',source:'cont',minzoom:12.4,
+      layout:{visibility:'none','line-join':'round'},
+      filter:['==',['get','i'],0],
+      paint:{'line-color':'#9A7B52','line-width':w(0.4,0.9,1.7),
+        'line-opacity':0.62}},
+    {id:'cont-index',type:'line',source:'cont',minzoom:11.6,
+      layout:{visibility:'none','line-join':'round'},
+      filter:['==',['get','i'],1],
+      paint:{'line-color':'#8A6A42','line-width':w(0.9,1.7,2.8),
+        'line-opacity':0.8}},
     {id:'water',type:'fill',source:'wtr',filter:['==',['get','c'],'water'],
       paint:{'fill-color':'#8FA9B8'}},
     {id:'wway',type:'line',source:'wtr',filter:['==',['get','c'],'waterway'],
@@ -646,6 +1094,95 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-font':['APEX'],'text-size':w(8.5,10,12),
         'text-max-angle':70,'symbol-spacing':180,'text-padding':2},
       paint:{'text-color':'#4A423A','text-halo-color':'#EFE6D2','text-halo-width':1.5}},
+    /* A110 · places. Circle plus label, no sprite sheet — see POIKIND. The
+       dot appears before the name so a pin is visible at a zoom where its
+       label will not fit, and `symbol-sort-key` puts fuel and trailheads ahead
+       of picnic tables when they compete for space. */
+    {id:'poi-dot',type:'circle',source:'poi',minzoom:11.4,
+      paint:{'circle-color':['get','c'],
+        'circle-radius':w(2.6,4.2,6.5),
+        'circle-stroke-color':'#FFFFFF','circle-stroke-width':w(0.8,1.4,2)}},
+    {id:'poi-label',type:'symbol',source:'poi',minzoom:12.8,
+      layout:{'text-field':['get','n'],'text-font':['APEX'],
+        'text-size':w(8.5,10,11.5),'text-max-width':9,
+        'text-offset':[0,0.85],'text-anchor':'top','text-padding':3,
+        'symbol-sort-key':['get','r']},
+      paint:{'text-color':'#241F19','text-halo-color':'#FFFFFF',
+        'text-halo-width':1.9}},
+    /* Only the INDEX contour carries a number. Labelling every 40 ft line puts
+       sixteen numbers on one hillside; labelling every 200 ft is what a paper
+       quad does and is readable. */
+    {id:'cont-label',type:'symbol',source:'cont',minzoom:13.2,
+      layout:{visibility:'none','symbol-placement':'line',
+        'text-field':['get','lb'],'text-font':['APEX'],
+        'text-size':w(7.5,8.5,9.5),'text-max-angle':30,
+        'symbol-spacing':600,'text-padding':6,'text-letter-spacing':0.04},
+      filter:['==',['get','i'],1],
+      paint:{'text-color':'#7A5C36','text-halo-color':'#EFE6D2',
+        'text-halo-width':1.6}},
+    /* A115 · the paddle corridor. Off by default — this is a different activity
+       from the one the app opens on, and a river drawn over the trail network
+       uninvited is clutter. Under the water layers so it reads as the river it
+       is, above the contours that describe the ground it cuts through. */
+    {id:'pad-case',type:'line',source:'paddle',minzoom:8,
+      layout:{visibility:'none','line-join':'round','line-cap':'round'},
+      paint:{'line-color':'#FFFFFF','line-width':w(3.2,5.5,9),'line-opacity':0.75}},
+    {id:'pad-line',type:'line',source:'paddle',minzoom:8,
+      layout:{visibility:'none','line-join':'round','line-cap':'round'},
+      paint:{'line-color':'#1E6FA8','line-width':w(1.8,3.2,5.5)}},
+    /* A76 · summits. A triangle because that is what a summit is on every map a
+       rider has ever seen. Terrain, so it sits below the places you ride to and
+       below your own marks — but above the contours that describe it. */
+    {id:'peak-dot',type:'symbol',source:'peaks',minzoom:10.6,
+      layout:{visibility:'none','text-field':'\u25B2','text-font':['APEX'],
+        'text-size':w(8,10,12),'text-allow-overlap':true,'text-padding':0},
+      paint:{'text-color':'#3A352E','text-halo-color':'#FFFFFF','text-halo-width':1.8}},
+    {id:'peak-label',type:'symbol',source:'peaks',minzoom:11.4,
+      layout:{visibility:'none','text-field':['get','lb'],'text-font':['APEX'],
+        'text-size':w(8,9.5,11),'text-offset':[0,0.85],'text-anchor':'top',
+        'text-max-width':10,'text-padding':4,'text-line-height':1.15},
+      paint:{'text-color':'#3A352E','text-halo-color':'#FFFFFF','text-halo-width':1.9}},
+    /* Access, launches and camps ON the river, each carrying its river mile so
+       a shuttle can be planned from the map: which put-in is above which. */
+    {id:'pad-dot',type:'circle',source:'padpin',minzoom:9.5,
+      layout:{visibility:'none'},
+      filter:['!=',['get','k'],'dam'],
+      paint:{'circle-radius':w(3,4.6,6.4),
+        'circle-color':['match',['get','k'],
+          'launch','#1E6FA8','access','#2E8B99','camp','#2F7D4F','parking','#6E665B','#1E6FA8'],
+        'circle-stroke-color':'#FFFFFF','circle-stroke-width':1.6}},
+    {id:'pad-lbl',type:'symbol',source:'padpin',minzoom:12.4,
+      layout:{visibility:'none','text-field':['get','lb'],'text-font':['APEX'],
+        'text-size':w(8,9.5,11),'text-offset':[0,1],'text-anchor':'top',
+        'text-max-width':9,'text-padding':4},
+      filter:['!=',['get','k'],'dam'],
+      paint:{'text-color':'#1C1A16','text-halo-color':'#FFFFFF','text-halo-width':1.9}},
+    /* THE HAZARD LAYER. Dams and the impoundments above them, in the closure
+       colour, on top of everything else this layer draws. Never filtered, never
+       thinned by zoom, never hidden behind a pin. A112: if paddle mode cannot
+       show these it does not ship. */
+    {id:'pad-dam',type:'circle',source:'padpin',minzoom:8,
+      layout:{visibility:'none'},
+      filter:['==',['get','k'],'dam'],
+      paint:{'circle-radius':w(4,6,8),'circle-color':'#C1121F',
+        'circle-stroke-color':'#FFFFFF','circle-stroke-width':2}},
+    {id:'pad-damlbl',type:'symbol',source:'padpin',minzoom:10.5,
+      layout:{visibility:'none','text-field':['get','lb'],'text-font':['APEX'],
+        'text-size':w(9,10.5,12),'text-offset':[0,1.1],'text-anchor':'top',
+        'text-allow-overlap':false,'text-padding':2},
+      filter:['==',['get','k'],'dam'],
+      paint:{'text-color':'#8E0F19','text-halo-color':'#FFFFFF','text-halo-width':2.2}},
+    /* A84 · your own marks. Drawn above the world's places: a POI is something
+       that is there, a waypoint is something YOU decided mattered, and when
+       they collide yours wins. */
+    {id:'wpt-dot',type:'circle',source:'wpts',minzoom:10.5,
+      paint:{'circle-radius':w(3.4,5.2,7),'circle-color':'#E2570F',
+        'circle-stroke-color':'#FFFFFF','circle-stroke-width':1.8}},
+    {id:'wpt-label',type:'symbol',source:'wpts',minzoom:12.2,
+      layout:{'text-field':['get','n'],'text-font':['APEX'],
+        'text-size':w(8,9.5,11),'text-offset':[0,1.05],'text-anchor':'top',
+        'text-max-width':9,'text-padding':4},
+      paint:{'text-color':'#2A2620','text-halo-color':'#FFFFFF','text-halo-width':1.9}},
     /* A75 · posted route numbers. "Two east of M 33" is how a rider says where
        they are, and the number is on every sign where the street name often is
        not. Placed after trail names — the trail you are riding still wins — but
@@ -699,6 +1236,81 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     customAttribution:'© OpenStreetMap · Michigan DNR · USDA Forest Service · USGS'}});
 
 /* ── pins ──────────────────────────────────────────────────────────────── */
+/* ══ ICONS (take 99) ════════════════════════════════════════════════════════
+   Thirty-eight emoji were doing the work of an icon set. 😖 for "Wrong turn"
+   renders as a different picture on every phone, 🏍 is a different bike on
+   Samsung than on Pixel, and none of them share a weight or a grid — which is
+   most of why the app read as unfinished next to a commercial one.
+
+   Drawn instead: one 24x24 grid, 1.75 stroke, round caps, `currentColor` so an
+   icon inherits whatever the control it sits in is doing. Inline SVG — no
+   sprite sheet, no font, no fetch, and nothing to go missing offline.
+
+   Deliberately NOT drawn: the machine (bike/quad/side-by-side). A recognisable
+   motorcycle at 24 px in stroke is beyond what I can draw well, and a bad one
+   is worse than none — the label already says "Dirt bike 24\"". It gets a
+   generic vehicle mark and the words carry the meaning. */
+var ICONS={
+  layers:'M12 3 3 8l9 5 9-5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5',
+  vehicle:'M4 15h16M6.5 15a1.6 1.6 0 1 0 0 .1M17.5 15a1.6 1.6 0 1 0 0 .1M5 15l1.5-5h8l3 5',
+  home:'M4 11.5 12 4l8 7.5M6.5 10v9h11v-9',
+  here:'M12 3v3M12 18v3M3 12h3M18 12h3M12 8a4 4 0 1 0 .1 0',
+  fuel:'M4 20V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v15M3 20h12M5.5 9h6M16 8l2.5 2.5V17a1.5 1.5 0 0 0 3 0v-6',
+  play:'M8 5.5 19 12 8 18.5z',
+  stop:'M7 7h10v10H7z',
+  alert:'M12 4 2.5 20h19zM12 10v4.5M12 17.2v.1',
+  locate:'M12 2v3M12 19v3M2 12h3M19 12h3M12 7a5 5 0 1 0 .1 0M12 11.5a.5.5 0 1 0 .1 0',
+  clock:'M12 3a9 9 0 1 0 .1 0M12 7v5.5l3.5 2',
+  info:'M12 3a9 9 0 1 0 .1 0M12 11v6M12 7.6v.1',
+  loop:'M20 12a8 8 0 1 1-2.6-5.9M20 3v4h-4',
+  star:'M12 3.5l2.6 5.6 6 .8-4.4 4.2 1.1 6.1L12 17.3 6.7 20.2l1.1-6.1L3.4 9.9l6-.8z',
+  shield:'M12 3 5 6v6c0 4.5 3 7.6 7 9 4-1.4 7-4.5 7-9V6zM9.5 12h5M12 9.5v5',
+  search:'M11 4a7 7 0 1 0 .1 0M16.2 16.2 21 21',
+  map:'M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5zM9 4v13M15 6.5v13',
+  sat:'M12 3a9 9 0 1 0 .1 0M3.5 9.5h17M3.5 14.5h17M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18',
+  target:'M12 3a9 9 0 1 0 .1 0M12 7.5a4.5 4.5 0 1 0 .1 0M12 11.6a.4.4 0 1 0 .1 0',
+  phone:'M6 3.5h3.5l1.8 4.3-2.2 1.4a12 12 0 0 0 5.7 5.7l1.4-2.2 4.3 1.8V18a2.5 2.5 0 0 1-2.7 2.5C10.5 20 4 13.5 3.5 6.2A2.5 2.5 0 0 1 6 3.5z',
+  close:'M6 6l12 12M18 6L6 18',
+  check:'M4.5 12.5 9.5 18 20 6.5',
+  pin:'M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11zM12 8.2a2 2 0 1 0 .1 0',
+  truck:'M3 7h11v9H3zM14 10.5h3.6L21 14v2h-7M6.5 16a1.7 1.7 0 1 0 .1 0M17 16a1.7 1.7 0 1 0 .1 0',
+  route:'M6 20a3 3 0 1 0 .1 0M18 7a3 3 0 1 0 .1 0M18 10v3a5 5 0 0 1-5 5H9'
+};
+
+function ic(n,sz){
+  var d=ICONS[n];
+  if(!d)return '';
+  return '<svg class="ic" width="'+(sz||15)+'" height="'+(sz||15)+'" viewBox="0 0 24 24" '+
+    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" '+
+    'stroke-linejoin="round" aria-hidden="true"><path d="'+d+'"/></svg>'}
+
+/* Twelve places rewrite a chip's label with textContent, which would wipe the
+   icon inside it. One helper, so a chip's icon survives every state change. */
+/* The markup carries __IC_name__ placeholders so the SVG is defined once, in
+   ICONS, rather than pasted into fifteen buttons. */
+function paintIcons(){
+  /* Replace each BUTTON'S OWN children, never a shared parent's innerHTML.
+     The first version rewrote #shell.innerHTML, which would have destroyed
+     every event listener in the app — a fresh DOM with the same markup and
+     nothing wired to it, and the map would still have drawn perfectly. */
+  Array.prototype.forEach.call(document.querySelectorAll('#shell button'),
+    function(b){
+      if(b.innerHTML.indexOf('__IC_')<0)return;
+      b.innerHTML=b.innerHTML.replace(/__IC_([a-z]+)__/g,
+        function(_,n){return ic(n)})})}
+
+function setChip(id,icon,label,on){
+  var b=el(id);
+  if(!b)return;
+  b.innerHTML=ic(icon)+'<span>'+label+'</span>';
+  /* The app already tests classes with indexOf on className everywhere else;
+     using classList here would have added an API to the harness stub for a
+     single call. Follow the convention the codebase has (take 99). */
+  var base=(' '+b.className+' ').indexOf(' basebtn ')>=0?'basebtn':'chip';
+  b.className=base+(on?' on':'')+(b.id==='c-act'?' actbtn':'')}
+
+try{paintIcons()}catch(e){}
+
 function mk(cls,txt){var d=document.createElement('div');d.className='pin '+cls;
   d.textContent=txt;return d}
 /* Start pins on real anchors from whichever region loaded. */
@@ -729,7 +1341,7 @@ el('c-saved').addEventListener('click',function(){
 
 el('c-machine').addEventListener('click',function(){
   machIdx=(machIdx+1)%ORDER.length;machine=ORDER[machIdx];
-  el('c-machine').textContent=MACHINE[machine].lbl;
+  setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''));
   applyMachine();
   var no=machineIllegal();
   clearRoute();show('Machine set to <b>'+MACHINE[machine].lbl.replace(/^\S+\s/,'')+
@@ -740,7 +1352,7 @@ el('c-machine').addEventListener('click',function(){
 
 var FUELS=[30,50,80,120,0],fi=1;
 el('c-fuel').addEventListener('click',function(){fi=(fi+1)%FUELS.length;
-  el('c-fuel').textContent=FUELS[fi]?'⛽ '+FUELS[fi]+' mi':'⛽ off';
+  setChip('c-fuel','fuel',FUELS[fi]?FUELS[fi]+' mi':'off');
   if(last)renderRoutes(last)});
 
 /* ── Dijkstra ──────────────────────────────────────────────────────────── */
@@ -874,6 +1486,47 @@ var PROFILES=[
    which PROTOCOL §8 draws the line around explicitly. Nothing here is sent
    anywhere. */
 var SVKEY='apex.routes.v1';
+/* ══ WAYPOINTS (A84) ════════════════════════════════════════════════════════
+   A dropped pin was ephemeral: one at a time, no name, gone the moment you
+   dropped another. "Mark the spot and get back to it" is the whole point of a
+   pin on a trail — the truck, the washout, the good hill, where you left the
+   gate open.
+
+   Unlike a saved ROUTE, a waypoint IS stored as geometry, and the difference is
+   worth stating. A route stores its inputs because closures move and a frozen
+   line would replay a legality decision made against stale data (landmine 113).
+   A point on the ground does not move and encodes no decision — it is an
+   observation, and freezing an observation is what saving it means. */
+var WPKEY='apex.waypoints.v1';
+
+function wpLoad(){
+  if(!svAvailable())return [];
+  try{var a=JSON.parse(localStorage.getItem(WPKEY)||'[]');
+      return Array.isArray(a)?a:[]}catch(e){return []}}
+
+function wpWrite(a){
+  if(!svAvailable())return false;
+  try{localStorage.setItem(WPKEY,JSON.stringify(a));return true}catch(e){return false}}
+
+function wpAdd(rec){
+  var a=wpLoad().filter(function(x){return x.n!==rec.n});
+  a.unshift(rec);
+  if(a.length>200)a=a.slice(0,200);
+  return wpWrite(a)?a:null}
+
+function wpDel(n){return wpWrite(wpLoad().filter(function(x){return x.n!==n}))}
+
+function wpName(at){
+  /* One tap, no dialog — gloves, moving bike (take 79). Named from what is
+     actually there: the address if we have one, else the nearest trail, else
+     the coordinates, which are never a guess. */
+  var a=null;
+  try{a=addressAt(at)||addressAt(at,true)}catch(e){}
+  if(a&&a.line)return a.line.replace(/^Nearest address\s*/i,'').slice(0,42);
+  try{
+    var e=nearestEdge(at);
+    if(e&&e.e&&e.e.n)return e.e.n.slice(0,38)}catch(e2){}
+  return at[1].toFixed(4)+', '+at[0].toFixed(4)}
 
 function svAvailable(){
   /* file:// in some browsers throws on ACCESS, not on use, so probe rather than
@@ -947,7 +1600,7 @@ function svOpen(rec){
   if(rec.m&&MACHINE[rec.m]){
     machine=rec.m;
     var _mi=ORDER.indexOf(rec.m);if(_mi>=0)machIdx=_mi;
-    el('c-machine').textContent=MACHINE[machine].lbl}
+    setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''))}
   ME=rec.f.slice();if(mM)mM.setLngLat(ME);
   var note=stale?'<br><span class="sub">The map has been rebuilt since you saved '+
     'this — it has been routed again on the current data, so closures and '+
@@ -982,15 +1635,25 @@ function svPrefer(k){
 
 function buildSavedPanel(){
   var a=svLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region});
+  var wp=wpLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region});
   if(!svAvailable())
     return show('<b>Saved routes are unavailable here.</b> This browser will not '+
       'let the page store anything. In the app they work normally.','fail');
-  if(!a.length)
-    return show('<b>No saved routes yet.</b><br>Plan a route or a loop, then tap '+
+  if(!a.length&&!wp.length)
+    return show('<b>Nothing saved yet.</b><br>Plan a route or a loop, then tap '+
       '<b>☆ Save</b> on the card you want to keep. It is stored on this phone '+
       'only — nothing is sent anywhere — and reopening it routes again on the '+
       'current map, so closures stay up to date.','');
   var h='<div id="routes">';
+  if(wp.length){
+    h+='<div class="sub" style="margin:2px 0 6px">'+wp.length+' waypoint'+
+       (wp.length===1?'':'s')+'</div>';
+    wp.forEach(function(x,i){
+      h+='<div class="rc" data-wp="'+i+'"><h5>\u2691 '+x.n+'</h5>'+
+         '<div class="sub">'+x.p[1].toFixed(5)+', '+x.p[0].toFixed(5)+'</div>'+
+         '<div class="sub"><button class="chip" data-wpgo="'+i+'">Go to</button> '+
+         '<button class="chip" data-wpren="'+i+'">Rename</button> '+
+         '<button class="chip" data-wpdel="'+i+'">Delete</button></div></div>'})}
   a.forEach(function(r,i){
     h+='<div class="rc" data-sv="'+i+'"><h5>'+r.n+'</h5>'+
        '<div class="sub">'+(r.k==='loop'?'loop · '+r.mi+' mi target':'point to point')+
@@ -1004,6 +1667,23 @@ function buildSavedPanel(){
       b.addEventListener('click',function(e){
         if(e&&e.stopPropagation)e.stopPropagation();
         fn(a[+b.getAttribute(attr)])})})};
+  var bindw=function(attr,fn){
+    Array.prototype.forEach.call(document.querySelectorAll('['+attr+']'),function(b){
+      b.addEventListener('click',function(e){
+        if(e&&e.stopPropagation)e.stopPropagation();
+        fn(wp[+b.getAttribute(attr)])})})};
+  bindw('data-wpgo',function(x){
+    logAct('act  go to waypoint '+x.n);
+    map.easeTo({center:x.p,zoom:Math.max(map.getZoom(),14),duration:500});
+    placeCard(x.p,'wpt','\u2691 '+x.n)});
+  bindw('data-wpdel',function(x){
+    logAct('act  delete waypoint '+x.n);wpDel(x.n);wpDraw();buildSavedPanel()});
+  bindw('data-wpren',function(x){
+    var n=null;
+    try{n=window.prompt?window.prompt('Name this waypoint',x.n):null}catch(e){n=null}
+    if(!n)return;
+    var all=wpLoad().map(function(y){return y.n===x.n?(y.n=n,y):y});
+    wpWrite(all);wpDraw();buildSavedPanel()});
   bind('data-svopen',function(r){logAct('act  open saved '+r.n);svOpen(r)});
   bind('data-svdel',function(r){logAct('act  delete saved '+r.n);
     svDel(r.n);buildSavedPanel()});
@@ -1551,7 +2231,7 @@ var act='all';
 
 function actLabel(){
   var a=ACTS.filter(function(x){return x.k===act})[0];
-  el('c-act').textContent=(act==='all'?'🏍 ':'🎯 ')+a.h;
+  setChip('c-act',act==='all'?'vehicle':'target',a.h);
   el('c-act').className='basebtn actbtn'+(act==='all'?'':' on')}
 
 function applyAct(){
@@ -1597,7 +2277,7 @@ function buildActPanel(){
 
 var BASEMAPS=['Map','Satellite','Hybrid'],bmi=0;
 function setBasemap(i){
-  if(!SAT_OK){bmi=0;el('c-base').textContent='🗺 Map';el('c-base').className='basebtn';
+  if(!SAT_OK){bmi=0;setChip('c-base','map','Map');
     map.setLayoutProperty('sat','visibility','none');
     return}
   bmi=i%BASEMAPS.length;
@@ -1610,7 +2290,11 @@ function setBasemap(i){
      uploaded and drawn every frame — real GPU work for something invisible, and
      battery is the one thing about this app still unmeasured (A18). Relief is
      off by default, so that cost was being paid on every frame by default. */
-  var reliefOn=el('c-relief').className.indexOf('on')>=0;
+  /* Ask the map, not a chip that no longer exists. This read the className of
+     an element the layers panel replaced and threw on every basemap change
+     (take 90). */
+  var reliefOn=false;
+  try{reliefOn=map.getLayoutProperty('hillshade','visibility')!=='none'}catch(e){}
   map.setLayoutProperty('hillshade','visibility',reliefOn?'visible':'none');
   if(reliefOn)map.setPaintProperty('hillshade','raster-opacity',sat?0.16:0.42);
   /* Satellite used to force every label off — from before labels had a dark
@@ -1618,10 +2302,19 @@ function setBasemap(i){
      a halo now and survive it. Worse, lbl-show was NOT in LBL, so on satellite
      the only names left were trails you may NOT ride: "Shore To Shore Trail"
      labelled, the loop under your wheels not (take 57). */
-  LBL.forEach(function(id){
-    map.setLayoutProperty(id,'visibility',
-      el('c-labels').className.indexOf('on')<0?'none':'visible')});
-  el('c-base').textContent=(sat?'🛰 ':'🗺 ')+m;
+  /* Derived, not listed — and note the comment above records this exact bug
+     already happening once at take 57, when lbl-show was missing from the array.
+     It happened again at takes 87-89 with six more layers. A copy of a set
+     drifts from the set; ask the map (take 90, landmine 107). */
+  /* This used to re-apply lbl-trail's visibility to EVERY symbol layer on every
+     basemap change. The reason is in the comment above and it expired: labels
+     have a dark halo now and survive satellite, so the sync was a no-op in the
+     normal case — and a bug for any symbol layer with its own default, which it
+     switched on at load. Summits (A76) default OFF and were being turned on by
+     this line, one take after the layers panel gave them an off switch.
+     Removed rather than special-cased: the Labels control still governs every
+     symbol layer through labelLayers(), which is where that belongs (take 94). */
+  setChip('c-base',sat?'sat':'map',m);
   el('c-base').className='basebtn'+(sat?' on':'');
 }
 
@@ -1755,6 +2448,9 @@ function rideFix(acc){
 var HUD={spd:null,hdg:null,at:null,t:null};
 
 function hudSet(mps,deg,at){
+  /* The compass reads the same heading the ride ribbon does, so it updates on
+     every fix without a second source of truth (take 105). */
+  try{if(CMP_ON)setTimeout(cmpPaint,0)}catch(e){}
   var now=Date.now();
   /* derive from the trail when the fix withholds either — heading is null on
      Android whenever you are stopped, and the simulator has no coords at all */
@@ -1979,7 +2675,7 @@ function simPath(){
 
 function stopRide(){if(riding){clearInterval(riding);riding=null;
   hudShow(false);
-  el('c-ride').textContent='▶ Ride it';el('c-ride').className='chip'}}
+  setChip('c-ride','play','Ride it')}}
 
 /* ── real GPS ────────────────────────────────────────────────────────────
    One recording path, two drivers. On the phone, watchPosition feeds the same
@@ -2043,7 +2739,7 @@ function gpsStop(){
   watchId=null}
 function stopReal(){gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=false;
   hudShow(false);
-  el('c-ride').textContent='▶ Ride it';el('c-ride').className='chip';
+  setChip('c-ride','play','Ride it');
   var R=rideStop();
   if(!R)return show('Recording stopped. <b>'+crumbMi.toFixed(2)+
     ' mi</b> on the track. <b>Retrace</b> follows it back.','');
@@ -2077,7 +2773,7 @@ function onFix(at,acc,mps,deg){
   if(posMode==='gps')hudSet(mps,deg,at);
   if(posMode==='away'){                     /* honest, and still useful */
     gpsStop();rideMode=null;
-    el('c-ride').textContent='▶ Ride it';el('c-ride').className='chip';
+    setChip('c-ride','play','Ride it');
     paint();return}
   if(!gotFix){gotFix=true;startRecording(at);ME=at.slice();mM.setLngLat(ME);
     map.easeTo({center:ME,zoom:14.5,duration:600});
@@ -2093,7 +2789,7 @@ el('c-ride').addEventListener('click',function(){
     stopReal();
     show('GPS unavailable here — browsers block it on <b>file://</b>. Running the <b>simulator</b> instead; in the APK this is your real track.','');
     startSim()});
-  if(rideMode){el('c-ride').textContent='■ Stop (GPS)';el('c-ride').className='chip on';return}
+  if(rideMode){setChip('c-ride','stop','Stop (GPS)',1);return}
   startSim()});
 
 function startSim(){
@@ -2108,7 +2804,7 @@ function startSim(){
   if(pts.length&&mi(ME,pts[0])>mi(ME,pts[pts.length-1]))pts.reverse();
   startRecording(pts[0]);ME=pts[0].slice();mM.setLngLat(ME);
   lost=false;var i=0;
-  el('c-ride').textContent='■ Stop';el('c-ride').className='chip on';
+  setChip('c-ride','stop','Stop',1);
   map.easeTo({center:ME,zoom:14.2,duration:600});
   riding=setInterval(function(){
     if(lost){
@@ -2122,16 +2818,151 @@ function startSim(){
     hudSet(null,null,ME);
     if(i%6===0)map.easeTo({center:ME,duration:280})},170)}
 
+/* ══ LAYERS PANEL (A91) ═════════════════════════════════════════════════════
+   Every row reads the map's ACTUAL state when the panel opens, and writes to
+   the map when tapped. It never keeps its own copy of what is on — a copy of a
+   set is what let six label layers escape the Labels chip (landmine 107).
+   Overlay rows are declared by the layer ids they govern, so adding a layer to
+   a group is one entry here rather than a new toggle scattered in the strip. */
+var LYRGROUPS=[
+  {k:'places', h:'Places',      s:'campgrounds, fuel, launches, trailheads',
+   ids:['poi-dot','poi-label']},
+  {k:'water',  h:'Lakes & rivers', s:'water and its names',
+   ids:['water','wway','lbl-lake','lbl-stream']},
+  {k:'contour',h:'Contours',    s:'40 ft, labelled every 200 ft',
+   ids:['cont-line','cont-index','cont-label']},
+  {k:'peaks',  h:'Named hills', s:'summits with their height',
+   ids:['peak-dot','peak-label']},
+  {k:'paddle', h:'Rivers & paddling', s:'runs, launches, campgrounds and dams',
+   ids:['pad-case','pad-line','pad-dot','pad-lbl','pad-dam','pad-damlbl']},
+  {k:'relief', h:'Relief',      s:'hillshade', ids:['hillshade']},
+  {k:'labels', h:'All labels',  s:'every name on the map', ids:null}
+];
+
+function lyrOn(g){
+  var ids=g.ids||labelLayers();
+  for(var i=0;i<ids.length;i++){
+    try{if(map.getLayer(ids[i])&&
+        map.getLayoutProperty(ids[i],'visibility')!=='none')return true}catch(e){}}
+  return false}
+
+function lyrSet(g,on){
+  var ids=g.ids||labelLayers();
+  ids.forEach(function(id){
+    try{if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'visible':'none')}catch(e){}});
+  /* Relief carries an opacity that depends on the basemap; setBasemap and the
+     old chip both knew this and disagreed once (see setBasemap). One place now. */
+  if(on&&g.k==='relief'){
+    try{map.setPaintProperty('hillshade','raster-opacity',
+      BASEMAPS[bmi]==='Map'?0.42:0.16)}catch(e){}}
+  var c=el('c-relief');
+  if(c&&g.k==='relief')c.className='chip'+(on?' on':'');
+  var l=el('c-labels');
+  if(l&&g.k==='labels')l.className='chip'+(on?' on':'')}
+
+function buildLyrPanel(){
+  var p=el('lyrpanel'),h='<div class="sect">Basemap</div>';
+  BASEMAPS.forEach(function(nm,i){
+    var sel=(i===bmi),dis=(i>0&&!SAT_OK);
+    h+='<button class="actrow'+(sel?' on':'')+'" data-bm="'+i+'"'+
+       (dis?' disabled':'')+'>'+
+       '<span class="sw" style="background-color:'+(i===0?'#E4D7BC':'#4E6A4A')+'"></span>'+
+       '<span>'+nm+(dis?' — not in this bundle':'')+'</span></button>'});
+  h+='<div class="sect">Layers</div>';
+  LYRGROUPS.forEach(function(g,i){
+    var on=lyrOn(g);
+    h+='<button class="actrow'+(on?' on':'')+'" data-lg="'+i+'">'+
+       '<span class="sw" style="background-color:'+(on?'#E2570F':'transparent')+
+       ';border:1px solid rgba(255,255,255,.5)"></span>'+
+       '<span>'+g.h+'</span></button>'});
+  p.innerHTML=h;
+  Array.prototype.forEach.call(p.querySelectorAll('[data-bm]'),function(b){
+    b.addEventListener('click',function(){
+      if(b.disabled)return;
+      setBasemap(+b.dataset.bm);logAct('act  basemap '+BASEMAPS[bmi]);
+      buildLyrPanel()})});
+  Array.prototype.forEach.call(p.querySelectorAll('[data-lg]'),function(b){
+    b.addEventListener('click',function(){
+      var g=LYRGROUPS[+b.dataset.lg],on=!lyrOn(g);
+      lyrSet(g,on);logAct('act  layer '+g.k+' '+(on?'on':'off'));
+      buildLyrPanel()})})}
+
+/* c-base stays a ONE-TAP CYCLE. Replacing it with a menu cost a rider two taps
+   and a hunt to reach satellite, in gloves, and the render harness said so
+   immediately — its basemap checks encode behaviour worth keeping (take 90).
+   The panel is a separate chip. */
 el('c-base').addEventListener('click',function(){setBasemap(bmi+1)});
+/* ══ DESTINATIONS (A113) ════════════════════════════════════════════════════
+   Which chips are on screen, and nothing else. Every handler, id and DOM
+   position is untouched — a chip in a closed destination is `hidden`, which the
+   layout self-test already skips (it measures elements with height) and which
+   click() ignores, so the harness needs no changes either.
+
+   Deliberately NOT a router: there are no separate screens to get lost between,
+   and the map stays visible in every destination because on a trail the map is
+   the thing you are looking at. */
+var TAB='map';
+function showTab(t){
+  TAB=t;
+  Array.prototype.forEach.call(document.querySelectorAll('.chip[data-tab]'),function(c){
+    c.hidden=(c.dataset.tab!==t)});
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'),function(b){
+    /* className, not innerHTML — the tab's icon lives in its children and a
+       label rewrite would take it with them (the same trap setChip exists for). */
+    b.className='tab'+(b.dataset.go===t?' on':'')});
+  /* the panels belong to specific destinations; leaving one open across a
+     switch is how a UI starts feeling arbitrary */
+  var dp=el('diagpanel'); if(dp&&t!=='tools')dp.hidden=true;
+  var cp=el('cmppanel'); if(cp&&t!=='tools'){cp.hidden=true;CMP_ON=false}
+  var lp=el('lyrpanel'); if(lp&&t!=='map')lp.hidden=true;
+  var ap=el('actpanel'); if(ap&&t!=='map')ap.hidden=true;
+  logAct('tap  tab '+t)}
+
+Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'),function(b){
+  b.addEventListener('click',function(){showTab(b.dataset.go)})});
+
+el('c-compass').addEventListener('click',function(){
+  var p=el('cmppanel');CMP_ON=p.hidden;p.hidden=!p.hidden;
+  if(CMP_ON){el('diagpanel').hidden=true;cmpPaint()}
+  logAct('tap  c-compass')});
+
+/* One tap where you are, rather than long-pressing a map you may not be able to
+   see. Same store and same auto-naming as a dropped waypoint (take 92). */
+el('c-markme').addEventListener('click',function(){
+  if(!ME)return show('<b>No position yet.</b> Wait for a fix, or long-press the '+
+    'map to mark a spot by hand.','fail');
+  var nm=wpName(ME);
+  if(!wpAdd({n:nm,p:ME.slice(),r:BUNDLE.region||null,ts:Date.now()}))
+    return show('<b>Could not save.</b> This browser will not let the page store '+
+      'anything; in the app it works normally.','fail');
+  logAct('act  marked this spot '+nm);
+  wpDraw();
+  show('Marked <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
+    'Find it again under \u2606 Saved.</span>','pass')});
+
+el('c-diag').addEventListener('click',function(){
+  var p=el('diagpanel');p.hidden=!p.hidden;logAct('tap  c-diag')});
+
+el('c-layers').addEventListener('click',function(){
+  var p=el('lyrpanel');buildLyrPanel();p.hidden=!p.hidden;
+  if(!p.hidden)el('actpanel').hidden=true;
+  logAct('tap  c-layers')});
 el('c-act').addEventListener('click',function(){
   var p=el('actpanel');buildActPanel();p.hidden=!p.hidden});
 el('c-about').addEventListener('click',function(){show(ABOUT,'')});
-/* every label layer, so the Labels chip governs all of them */
-var LBL=['lbl-trail','lbl-show','lbl-fsroad','lbl-road','lbl-place'];
-el('c-labels').addEventListener('click',function(){
-  var on=el('c-labels').className.indexOf('on')<0;
-  el('c-labels').className='chip'+(on?' on':'');
-  LBL.forEach(function(id){map.setLayoutProperty(id,'visibility',on?'visible':'none')})});
+/* Every label layer, DERIVED from the style rather than listed here.
+   This was a hand-kept array of five and the comment above it claimed it was
+   all of them. By take 89 the style had eleven: lake-label, lbl-trail-short,
+   poi-label, lbl-ref, lbl-lake and lbl-stream all escaped the Labels chip, four
+   of them added by me in takes 87-89 without a thought for the list that was
+   supposed to govern them.
+   A copy of a set drifts from the set (landmine 107, and this is the third
+   place it has happened). Ask the map what symbol layers it has. */
+function labelLayers(){
+  try{
+    return map.getStyle().layers.filter(function(l){return l.type==='symbol'})
+              .map(function(l){return l.id})
+  }catch(e){return []}}
 var glErr=null;
 map.on('error',function(e){var m=(e&&e.error&&e.error.message)||String(e&&e.error||'');
   if(m&&!glErr){glErr=m;try{window.__mapErr=m}catch(_){}renderHealth()}});
@@ -2313,8 +3144,8 @@ function nearestEdgeTo(at){
 function placeCard(at,kind,title){
   var e=elevAt(at),ne=nearestEdgeTo(at),b=bearingTo(ME,at),d=mi(ME,at);
   var rows=[];
-  rows.push('<b style="font-size:15px">'+title+'</b>');
-  rows.push('<span class="mono" style="font-size:15px">'+at[1].toFixed(5)+' '+
+  rows.push('<b style="font-size:var(--t-lg)">'+title+'</b>');
+  rows.push('<span class="mono" style="font-size:var(--t-lg)">'+at[1].toFixed(5)+' '+
     at[0].toFixed(5)+'</span> <span class="unit">DD'+
     (e!==null?' · '+ft(e)+' ft':'')+'</span>');
   if(kind!=='me')rows.push('<span class="unit">'+d.toFixed(2)+' mi '+b.pt+
@@ -2329,7 +3160,9 @@ function placeCard(at,kind,title){
   if(kind!=='me')acts.push('<button class="chip" id="pc-start">◉ Start from here</button>');
   if(kind==='me'&&posMode==='gps')acts.push('<button class="chip" id="pc-disp">☎ Dispatch card</button>');
   acts.push('<button class="chip" id="pc-go">⤢ Centre</button>');
-  if(kind==='drop')acts.push('<button class="chip" id="pc-drop">✕ Remove pin</button>');
+  if(kind==='drop'){
+    acts.push('<button class="chip" id="pc-wpt">☆ Save as waypoint</button>');
+    acts.push('<button class="chip" id="pc-drop">✕ Remove pin</button>')}
   show(rows.join('<br>')+'<div style="margin-top:9px">'+acts.join(' ')+'</div>','');
   var on=function(id,fn){var b=el(id);if(b)b.addEventListener('click',fn)};
   on('pc-route',function(){routeToPoint(at,title)});
@@ -2350,8 +3183,25 @@ function placeCard(at,kind,title){
   on('pc-disp',function(){el('btn-disp').click()});
   on('pc-go',function(){map.easeTo({center:at,zoom:Math.max(map.getZoom(),14),
     duration:600,essential:true})});
+  on('pc-wpt',function(){
+    var nm=wpName(at);
+    if(!wpAdd({n:nm,p:at.slice(),r:BUNDLE.region||null,ts:Date.now()}))
+      return show('<b>Could not save.</b> This browser will not let the page '+
+        'store anything; in the app it works normally.','fail');
+    logAct('act  saved waypoint '+nm);
+    wpDraw();clearDrop();
+    show('Saved as <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
+      'Find it again under \u2606 Saved.</span>','pass')});
   on('pc-drop',function(){clearDrop();show('Pin removed.','')});
 }
+
+function wpDraw(){
+  var a=wpLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region});
+  try{map.getSource('wpts').setData({type:'FeatureCollection',
+    features:a.map(function(x){return {type:'Feature',
+      properties:{n:x.n,ts:x.ts||0},
+      geometry:{type:'Point',coordinates:x.p}}})})}catch(e){}
+  return a}
 
 function clearDrop(){
   if(DROP)logAct('pin  removed');
@@ -2368,8 +3218,24 @@ function dropPin(at){
   placeCard(DROP,'drop','Dropped pin')}
 
 try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
+    window.paddleCard=paddleCard;window.PADDLE_MPH=PADDLE_MPH;
     window.__geo={addressAt:addressAt,geocode:geocode,
                   get ADDR(){return ADDR}};
+    /* A96: the dispatch card runs six full scans on one tap and has never been
+       timed. Exposed so the harness can measure them individually rather than
+       measuring "the card felt slow" (take 93). */
+    window.__restrict={of:restrictOf,table:RESTRICT,legal:machineLegal,
+                       setMachine:function(m){if(MACHINE[m])machine=m},
+                       /* the region carries none, so the only way to test the
+                          refusal is to make one (landmine 45) */
+                       inject:function(e,txt){
+                         var b=B[e.bi>=0?e.bi:0];
+                         if(e.bi<0){B.push(new Array(BK.length).fill(null));e.bi=B.length-1;b=B[e.bi]}
+                         else{b=B[e.bi]=b.slice()}
+                         b[BK.indexOf('rst')]=txt;return e}};
+    window.__disp={nearestEdge:nearestEdge,nearestJunction:nearestJunction,
+                   nearestPavement:nearestPavement,countyAt:countyAt,
+                   addressAt:addressAt,get ME(){return ME}};
     window.__route={buildLoops:buildLoops,nearestNode:nearestNode,
                     machineLegal:machineLegal,EDGES:EDGES,ADJ:ADJ,attrs:attrs,
                     setMachine:function(m){if(MACHINE[m])machine=m},
@@ -2567,6 +3433,25 @@ function stLayout(){
   Array.prototype.forEach.call(document.querySelectorAll('.chip,.act,.rc'),function(e){
     var r=e.getBoundingClientRect();
     if(r.height>0&&r.height<36)small.push((e.id||e.textContent||'').slice(0,14)+' '+Math.round(r.height)+'px')});
+  /* A96. The dispatch card runs six full scans on one tap — nearestEdge alone
+     decodes every edge polyline in the region. It is the highest-stakes screen
+     in the app and had never been timed on a phone, only reasoned about. This
+     puts the real number in Jacob's next report instead of my extrapolation
+     from a desktop, which is the same mistake as measuring a 900x1400 viewport
+     (landmine 87). */
+  (function(){
+    try{
+      var at=ME&&ME.slice?ME.slice():null;
+      if(!at)return;
+      var t0=performance.now();
+      nearestEdge(at);nearestJunction(at);nearestPavement(at);
+      countyAt(at);addressAt(at);addressAt(at,true);
+      var ms=performance.now()-t0;
+      stAdd('PERF','dispatch-scan',ms<600,
+        Math.round(ms)+' ms to assemble the dispatch card ('+EDGES.length+
+        ' edges scanned) — this is what you wait for after tapping Dispatch');
+    }catch(e){stInfo('PERF','dispatch-scan','could not time: '+e)}
+  })();
   stAdd('UI','tap-targets',small.length===0,
     small.length?small.length+' under 36 px: '+small.slice(0,3).join(', '):
       'every control at least 36 px tall');
@@ -2947,12 +3832,12 @@ function stRenderPanel(rep){
     var mk=r.ok===null?'·':(r.ok?'✓':'✕');
     return '<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid #241F1A">'+
       '<span style="color:'+col+';font-weight:700;width:12px">'+mk+'</span>'+
-      '<span style="color:#F5EFE2;min-width:112px;font:600 11px ui-monospace,monospace">'+
+      '<span style="color:#F5EFE2;min-width:112px;font:600 var(--t-sm) ui-monospace,monospace">'+
       r.g+'·'+r.id+'</span>'+
-      '<span style="color:#C9C0B2;font-size:11.5px;flex:1">'+
+      '<span style="color:#C9C0B2;font-size:var(--t-sm);flex:1">'+
       String(r.d).replace(/[<>]/g,'')+'</span></div>'}).join('');
   var bad=rep.fail>0;
-  show('<b style="font-size:15px">Self-test · '+
+  show('<b style="font-size:var(--t-lg)">Self-test · '+
     '<span style="color:'+(bad?'#C1121F':'#8FAE63')+'">'+rep.pass+' passed, '+
     rep.fail+' failed</span></b><br>'+
     '<div style="max-height:46vh;overflow:auto;margin:8px 0">'+rows+'</div>'+
@@ -3037,11 +3922,11 @@ el('c-loop').addEventListener('click',function(){
         presentRoutes(out)},30)})})});
 
 el('c-selftest').addEventListener('click',function(){
-  el('c-selftest').textContent='⛑ Running…';
+  setChip('c-selftest','shield','Running…');
   show('<b>Self-test running…</b><br>Exercising load, render, data, routing, '+
     'safety, haptics and performance, then waiting up to 20s for a GPS fix.','');
   setTimeout(function(){selfTest({},function(rep){
-    el('c-selftest').textContent='⛑ Self-test';
+    setChip('c-selftest','shield','Self-test');
     stRenderPanel(rep)})},60)});
 
 [[hM,'home',function(){return HOME},function(){return 'Home / truck'}],
@@ -3093,7 +3978,7 @@ map.on('load',collapseAttrib);map.on('idle',collapseAttrib);
 
 map.on('idle',function(){if(!healthOK)renderHealth()});
 map.on('move',refreshReadout);map.on('load',refreshReadout);
-map.on('load',function(){el('c-labels').className='chip on';setBasemap(0);buildActPanel();actLabel();
+map.on('load',function(){setBasemap(0);wpDraw();showTab('map');buildActPanel();actLabel();
   setTimeout(renderHealth,1800);
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Geolocation;
   if(C){try{C.requestPermissions().then(locateOnce).catch(locateOnce)}catch(e){locateOnce()}}
@@ -3136,15 +4021,9 @@ function showAway(acc){
     '<br><br>Tap <b>◉ Locate</b> to jump to your real position, or a chip above to '+
     'jump to the riding area.','')}
 
-el('c-relief').addEventListener('click',function(){
-  var on=el('c-relief').className.indexOf('on')<0;
-  el('c-relief').className='chip'+(on?' on':'');
-  /* visibility, not just opacity — see setBasemap. Both places must agree or
-     the toggle looks dead: setBasemap hid the layer and this only faded it. */
-  map.setLayoutProperty('hillshade','visibility',on?'visible':'none');
-  if(on)map.setPaintProperty('hillshade','raster-opacity',
-    BASEMAPS[bmi]==='Map'?0.42:0.16)});
-
+/* Relief and Labels moved into the layers panel at take 90; the strip was at
+   sixteen chips with layer toggles scattered among ride actions. lyrSet() still
+   updates these elements if they exist, so re-adding a chip needs no new code. */
 el('c-lost').addEventListener('click',function(){
   if(rideMode)return show('Live GPS is driving — the alert fires from your actual track, not a button.','');
   if(!riding)return show('Start <b>▶ Ride it</b> first, then take a wrong turn and watch the alert fire.','');
@@ -3163,6 +4042,38 @@ map.on('click',function(e){
     if(arm==='home'){HOME=ll;hM.setLngLat(ll)}else{ME=ll;mM.setLngLat(ll);syncSafety()}
     arm=null;syncArm();clearRoute();
     return show('Placed. Tap <b>Return home</b> to route.','')}
+  /* A115 · a paddle pin is checked before anything else it may be sitting on.
+     A dam is checked before a launch, because if both are under the finger the
+     hazard is the answer. */
+  var box=[[e.point.x-13,e.point.y-13],[e.point.x+13,e.point.y+13]];
+  var dam=map.queryRenderedFeatures(box,{layers:['pad-dam']});
+  var padf2=dam.length?dam:map.queryRenderedFeatures(box,{layers:['pad-dot']});
+  if(padf2.length&&padf2[0].geometry&&padf2[0].geometry.coordinates)
+    return paddleCard(padf2[0]);
+
+  /* A110 · a place is checked FIRST. A pin sits on top of the line it is beside,
+     so tapping it and getting the road underneath would be the wrong answer to
+     an unambiguous gesture. */
+  var pf=map.queryRenderedFeatures([[e.point.x-11,e.point.y-11],[e.point.x+11,e.point.y+11]],
+    {layers:['poi-dot']});
+  /* A feature with no geometry crashes the whole click handler, and a click
+     handler that throws takes every other tap with it — the trail identify, the
+     pin drop, everything. MapLibre always supplies geometry; a harness might
+     not, and neither is a reason to be one bad object away from a dead map. */
+  if(pf.length&&pf[0].geometry&&pf[0].geometry.coordinates){
+    /* There is no fmt() — I called one that does not exist. Coordinates are
+       printed lat-then-lon at five places everywhere else in this file, and
+       dispatch reads them aloud in that order (landmine 102: read the code,
+       not your memory of it). */
+    var pr=pf[0].properties,pp=pf[0].geometry.coordinates,
+        pc='<span class="tn">'+pp[1].toFixed(5)+'  '+pp[0].toFixed(5)+'</span>';
+    logAct('tap  place '+(pr.n||pr.k));
+    return show('<b>'+(pr.named?pr.n:pr.h)+'</b>'+
+      (pr.named?'<div class="sub">'+pr.h+'</div>':
+                '<div class="sub">Unnamed in the source \u2014 shown by what it is</div>')+
+      '<div class="k">WHERE</div>'+pc+
+      '<div class="sub">'+placeDist(pf[0].geometry.coordinates)+'</div>','');
+  }
   var f=map.queryRenderedFeatures([[e.point.x-9,e.point.y-9],[e.point.x+9,e.point.y+9]],
     {layers:HIT.concat(HIT_SHOW)});
   if(!f.length){
@@ -3198,6 +4109,16 @@ map.on('click',function(e){
   if(a.atv)bits.push('ATV <b>'+a.atv+'</b>');
   if(a.lic)bits.push(a.lic);
   bits.push((ed.L/1609.34).toFixed(2)+' mi segment');
+  /* A101 · a published restriction goes LAST and on its own line, because it is
+     the thing that decides whether you may be here at all. If we recognise it we
+     say it plainly; if we do not, the source's own words are printed unedited —
+     telling a rider what the sign says is honest, inventing a reading is not. */
+  var _rs=restrictOf(ed);
+  if(_rs){
+    var banned=_rs.ban&&_rs.ban.indexOf(machine)>=0;
+    bits.push('<br><b'+(banned?' style="color:#C1121F"':'')+'>'+
+      (banned?'NOT for your machine — ':'Restriction: ')+'</b>'+_rs.say+
+      (_rs.unknown?' <span class="sub">(as published; not interpreted)</span>':''));}
   if(UP[ed.i]||DN[ed.i])bits.push('+'+ft(UP[ed.i])+' / -'+ft(DN[ed.i])+' ft');
   show(out+bits.join(' · '),'')});
 

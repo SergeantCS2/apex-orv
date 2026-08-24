@@ -1,4 +1,1371 @@
-# HANDOFF — through Take 88 · V2
+# HANDOFF — through Take 108 · V2
+
+## Take 108 — 2026-08-23 — Wiring audit before the ride
+
+Jacob, before testing: *"Ensure all new features have buttons... ensure
+everything is connected properly and tie up any loose ends."*
+
+Done mechanically rather than by eye — every button in the source cross-checked
+against every handler binding, in all four shapes this file uses.
+
+```
+buttons 40 · handlers 47
+unwired buttons: none
+handlers with no button: none
+```
+
+### Two loose ends, both real
+
+**`I'm here` was in the wrong destination.** It arms *"tap the map to place where
+you are"* — the twin of `Set home`. `syncArm()` literally treats them as one
+gesture and sets both classNames together, and they were split across **Ride**
+and **Plan**. Moved to Plan, beside its pair, and the render check now asserts
+they share a destination rather than trusting me to keep them together.
+
+**Two dead handler blocks.** `c-relief` and `c-labels` had their chips removed at
+take 90 when the layers panel absorbed them, and their `addEventListener` blocks
+survived behind `if(el(...))` guards — code that can never run and reads as live
+wiring. Removed. `lyrSet`'s guarded writes to the same ids stay: those are
+deliberate, so re-adding a chip needs no new code.
+
+### Reachable is not the same as wired
+
+A handler on a button nobody can find is a feature nobody has, so the check walks
+all four destinations and confirms every action actually appears in one:
+
+```
+every action is reachable from a destination
+Set home and I'm here are in the same destination (plan)
+diagnostics reachable behind one entry (c-about, c-selftest, c-pan)
+7 layer groups reachable from Map
+action row always available: btn-disp, btn-retrace, btn-steps, btn-home
+```
+
+### Final shape
+
+```
+map     layers, locate, search
+plan    machine, home, me, fuel, loop, saved
+ride    ride, lost
+tools   compass, mark this spot, diagnostics
+always  Dispatch · Retrace · Directions · Return home
+map     basemap cycle · activity filter (floating)
+```
+
+Ride holds two chips, which is correct: on a bike you press **Ride it** and
+**Wrong turn**. Everything else is setup and belongs before you start.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **109 checks**, five new on reachability.
+All four device sizes clean. Gate green across all 28 checks.
+
+---
+
+
+## Take 107 — 2026-08-23 — Full audit before Michigan
+
+Jacob has not ridden since **take 82**. Twenty-four takes have landed since. He
+asked for a full audit before committing to statewide, and set the scope:
+Michigan only, permanently.
+
+### What is actually in the build
+
+**23 of 23 claimed app features present**, verified against `www/app.js` and
+`www/index.html` rather than against the handoff. Nothing claimed that is not
+there.
+
+```
+handoff    106 takes, no duplicates, no gaps
+agenda     116 ids,   no duplicates
+landmines  169,       no duplicates, no gaps
+stamps     all 106
+bundle     12 artifacts, 3.33 MB
+self-test  59 checks across 10 sections
+```
+
+Destinations and what is in them:
+
+```
+map     layers, locate, search
+plan    machine, home, fuel, loop, saved
+ride    me, ride, lost
+tools   compass, mark this spot, diagnostics
+layers  Places · Lakes & rivers · Contours · Named hills · Rivers & paddling
+        · Relief · All labels
+```
+
+### The audit found a real regression I had shipped without noticing
+
+**The CI cache list is hand-written**, and it had drifted exactly as
+`region.DERIVED` did before take 96 and `LBL` did before take 90. Missing:
+`poi_payload.json` (take 89), `contour_payload.json` (91),
+`corridor_payload.json` (102), and **`osm_cache`** — so every CI build was
+re-downloading the 297 MB Michigan extract and re-running the ~285-second
+corridor step for a result it already had.
+
+**Fifth occurrence** of the same failure: a set copied by hand drifts from the
+set it copies. Now expressed as `./*_payload.json` — the same convention
+`region.py` clears by — and gated, with four negative controls.
+
+### And my check matched its own comment. Again.
+
+Two of three controls passed on a gutted cache list, because the check tested the
+whole file and the words it was looking for were **in its own explanatory
+comment**. Third time (takes 96, 98, 107).
+
+The lesson is not "beware comments". It is **scan the structure, not the text**:
+the check now parses the `path: |` block and strips comment lines before looking
+at anything.
+
+### What I could not verify, stated plainly
+
+**I could not complete a cold clean run in this environment.** Ingest via
+Geofabrik reads the 297 MB extract with an in-memory node index and exceeds a
+tool window; `corridor` then reads it a second time.
+
+That is a sandbox constraint rather than a CI one — CI reaches Overpass, so
+ingest there is fast — but the corridor step's cost is real and it is mine: it
+reads the whole state to build six rivers, on every uncached build. The cache fix
+makes that once rather than every time. **A cold CI build is slower than it was
+at take 96 and I have not measured by how much.**
+
+### Michigan only, recorded as A123
+
+The Geofabrik Michigan extract is now the permanent source rather than a
+stepping stone. Statewide is the end goal, not a phase. Every place the code
+could have been made state-agnostic should stay concrete instead.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render 104 checks. Gate green, ledgers clean,
+stamps consistent, 23/23 features present.
+
+---
+
+
+## Take 106 — 2026-08-23 — The apology was wrong, and how long the float takes
+
+Take 102 shipped the river miles with an apology: they came out about 0.55x the
+local outfitter's table, so every card said they ran short and only the ORDER
+could be trusted.
+
+I went to USGS NHD — the federal authoritative hydrography, an entirely
+independent survey — expecting it to fix ours. **It agreed with OpenStreetMap to
+within 4%:**
+
+```
+                     NHD    OSM   outfitter
+Burtons  -> Wakeley   9.2    9.3     16
+Wakeley  -> Camp Ten 26.2   26.3     50
+Camp Ten -> Comins   11.1   10.7     15
+```
+
+Two independent surveys do not agree that closely and both come out 45% wrong.
+**Our distances were right all along.** The outfitter's mileages run high, and
+the app had been apologising for the correct number.
+
+### Which is exactly what makes a time estimate possible
+
+Jacob has paddled these floats and says the outfitter's HOURS are about right.
+Both can be true, and together they settle the pace:
+
+```
+Burtons   -> Mio  38.5 mi / 15 hrs   = 2.57 mph
+Stephan   -> Mio  33.7 mi / 13 hrs   = 2.59 mph
+Wakeley   -> Mio  29.2 mi / 11.5 hrs = 2.54 mph
+McMasters -> Mio  21.4 mi / 8.5 hrs  = 2.51 mph
+```
+
+**2.5 mph** — what a canoe does on a river with light current. Their own figures
+imply 4.7, which nobody paddles. Generous miles, accurate hours.
+
+The run card now reads *"Roughly 9 hr 45 min–14 hr 38 min of paddling at 2–3
+mph"*, shown as a range because pace is the part being guessed at. The distance
+is not.
+
+Checked against two floats with published times, 8.5 hrs and 11.5 hrs — the
+range brackets both.
+
+### Their short trips are rounded, and that matters
+
+```
+Camp Ten  ->Mio   3.0 mi /  2 hr = 1.50 mph
+Parmalee  ->Mio  12.5 mi /  6 hr = 2.08 mph
+Mio->Comins       7.8 mi / 2.5hr = 3.10 mph
+```
+
+The long floats converge to within 0.08 mph. The short ones scatter across
+1.5–3.1 — booking figures rounded to convenient numbers, not measurements. I
+calibrated on the consistent ones and tested against those, rather than widening
+the range until it swallowed the noise.
+
+### Two checks had to be corrected because the product got better
+
+`the card states once that the distances under-measure` asserted the apology I
+had just disproved. `Mio to Comins brackets 2.5 hrs` tested against one of the
+rounded short trips.
+
+Both were right when written and wrong once the facts changed. A check encodes a
+belief; when the belief is disproved the check has to move with it, and quietly
+loosening the product to keep a check green would have been the other way round.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **104 checks**, five new on the estimate.
+Gate green.
+
+---
+
+
+## Take 105 — 2026-08-23 — The Tools bucket gets tools
+
+Take 101 made Tools a bucket by putting About, Self-test and Pan test behind one
+Diagnostics entry. It has been nearly empty since. Jacob: *"additional tools to
+the tools bucket, like compass"*.
+
+### Compass
+
+The ride HUD has carried a compass ribbon since take 78 — **only while a ride is
+running.** Standing at a junction with the engine off, which is exactly when you
+get the map out, the app had no heading and no bearing to anything but the truck.
+
+```
+[rose]
+NE 49°
+Home WNW 300° · 5.99 mi · 109° left
+Bull Gap Hill Climb  you are here
+```
+
+A drawn rose that turns with you, the heading in words and degrees, and a
+bearing to the truck, home and every waypoint — each with **which way to turn**,
+which is the number you actually use.
+
+It reads `HUD.hdg`, the same heading the ride ribbon does, so there is no second
+source of truth and it updates on every fix.
+
+**Standing still it says so**: *"no heading yet — a phone lying still has none;
+start moving"*. Android reports `coords.heading` as null when stationary and the
+crumb-trail fallback needs two fixes apart, so no-heading is the normal state at
+a standstill. A needle pointing somewhere arbitrary would be worse than none.
+
+### Mark this spot
+
+One tap saves a waypoint where you are, rather than long-pressing a map you may
+not be able to see in the sun. Same store and same auto-naming as take 92 — the
+harness marked one and it came back **"Bull Gap Hill Climb"**.
+
+### Reading the output caught the same bug in a new place
+
+I printed the panel before writing any assertion. It read:
+
+```
+Bull Gap Hill Climb N 0° · 0.00 mi · 49° left
+```
+
+A bearing to where you are standing. True, would have passed every check I was
+about to write, and noise — the identical shape to the 0.0 mi neighbour on the
+paddle card two takes ago (landmine 164). Under ~100 ft the row now says **"you
+are here"**.
+
+Third take running where printing the thing a person reads found what the checks
+could not have. The order — print, read, then assert — is now the habit.
+
+### A check that had aged into being wrong
+
+`Tools shows one entry, not three diagnostics` passed for four takes and failed
+the moment tools were added. It asserted the bucket held exactly ONE chip, which
+was true only while it was empty — and filling it was the entire point.
+
+What it *meant* was that the three diagnostics sit behind one entry. That is what
+it tests now. A check written against a temporary state will eventually accuse
+the change that was the goal.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **98 checks**, seven new on the compass:
+the rose, the no-heading state, reading a heading, bearing-and-turn to home, "you
+are here", one-tap marking, and closing when you leave Tools. Gate green.
+
+---
+
+
+## Take 104 — 2026-08-23 — Two pins make a run
+
+Take 103's card answers one hop. A shuttle needs the whole float, and all the
+machinery for it was already there — ordered stops and dams between.
+
+Tap a stop, **Plan a run from here**, tap another:
+
+```
+The run — Au Sable River
+Put in  Burtons Landing
+Take out  Wakeley Bridge Landing
+About 9.3 mi of river between them
+No dams between them.
+3 other access points on the way: Canoe access, Keystone Landing, Stephan Landing
+```
+
+And one that crosses a dam — **tapped downstream-first on purpose**:
+
+```
+The run — Au Sable River
+Put in  Camp Ten Bridge Boat Launch
+Take out  Comins Flats Boat Access
+About 10.7 mi of river between them
+1 dam on the way — Mio Dam. You must take out and portage it.
+7 other access points on the way
+3 campgrounds: Paddle-In Group Camp, River Dune Campground, Meadow Springs
+· Tapped in the other order — a river only runs one way, so this is the run.
+```
+
+**A river only runs one way, so tap order does not decide direction.** The
+upstream stop is the put-in whichever was picked first, and the card says it
+swapped them rather than refusing a perfectly reasonable gesture. The whole card
+turns red when a dam is in the way.
+
+### Read the output first, again
+
+Take 103's lesson held: I printed both cards and read them before writing a
+single assertion. The dam run and the backwards tap were both right first time
+*because* the printing came first — the checks were written to lock in what I
+had already seen work, which is the right order.
+
+### The icon check caught me
+
+`no emoji left in a control: pd-clear`. I put a bare `✕` on the new buttons
+instead of the drawn set from take 99, five takes after building that set and
+the check that guards it. Converted; the guard did its job on its author.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **92 checks**, five new: put-in and
+take-out with a distance, a clear run saying so, a dam run naming the portage,
+the upstream stop staying the put-in when tapped backwards, and the card
+admitting the swap. Gate green, and **zero leaked temp directories** after a full
+run — take 103's fix holds.
+
+---
+
+
+## Take 103 — 2026-08-23 — The pins answer the shuttle question
+
+Take 102 drew the rivers. The pins did nothing when tapped, which is the part
+Jacob actually asked for — *"drop offs, pickups and campgrounds in pins I can
+click"*.
+
+### A pin that says its own name answers nothing
+
+What a two-car shuttle needs is what is **above**, what is **below**, and
+whether a **dam** sits between. Jacob's description: drop the boats at a put-in,
+drive both cars to the take-out, one car back. Get the order wrong and the trip
+is wrong.
+
+```
+Klacking Creek Canoe Launch · Rifle River
+Canoe access · about 8.7 mi down the river
+Above: Boat launch · about 4.2 mi · no dam between
+Below: Ogemaw County Fairgrounds Camping · about 5.8 mi · no dam between
+```
+
+A dam taps differently, in the closure colour:
+
+```
+Mio Dam · Au Sable River
+DAM — you must take out and portage.
+At the dam: Mio Pond T-Dock, Canoe access, Canoe access
+Above: Canoe access · at the same spot · no dam between
+Below: Boat launch · about 0.3 mi · no dam between
+```
+
+That last card **is** the portage: take out at the T-Dock, put in 0.3 miles
+below. A dam is checked before a launch when both are under the finger, because
+if both are there the hazard is the answer.
+
+### Two bugs the printed output found that the checks did not
+
+All four assertions passed while the Mio Dam card read **"Above: Canoe access ·
+about 0.0 mi"** in both directions. A dam usually has an access on each bank,
+and both project to the same river mile — so the nearest neighbour either way
+was the same spot, and "0.0 mi" answers nothing.
+
+The checks asked whether the card *said* what was above and below. It did. They
+could not ask whether the answer was any use. Printing the card and reading it
+took one command and found what four passing assertions could not.
+
+Fixed twice over: neighbours within 0.06 mi are skipped so the row names a
+genuinely different place, a gap under 0.1 mi reads "at the same spot" rather
+than "about 0.0 mi", and a dam now lists what sits AT it — which is the take-out
+you are looking for.
+
+### The caveat travels with the number
+
+Every card states once, in plain words, that the distances are measured along
+the mapped line and run short of a real float, and that the ORDER is what to
+trust. The honesty from take 102 is not in a document somewhere; it is on the
+card a paddler reads.
+
+### And the gate went red on something that was not this take
+
+`render failed: net::ERR_INSUFFICIENT_RESOURCES` and a puppeteer crash. Not a
+code fault — **the disk was at 100%, 19 MB free**.
+
+`smoke-fatal` copies `www/` to a temp directory to corrupt its manifest and prove
+the app refuses a broken bundle. The copy carries 45 MB of imagery and was never
+deleted. **189 of them had accumulated, 11 GB.** The drill that proves the app is
+safe had been quietly filling the machine since take 15, and it surfaced as a
+rendering failure — landmine 101's corollary from a direction nobody watched.
+
+It now sweeps stale copies before creating one and removes its own on exit, so a
+run that dies still cleans up and the next run does not trust that the last one
+did. Verified: zero left behind after a run.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **87 checks**, four of them on the card:
+above and below, dam-between, take-out-and-portage, and the caveat. Gate green.
+
+---
+
+
+## Take 102 — 2026-08-23 — Rivers, chosen by evidence
+
+Jacob wants to paddle. He named the Au Sable, Rifle, Black, Pine and others, and
+then said the thing that shaped this take: *"this would get crazy for every
+river. We need a filter."*
+
+### The filter is derived, not typed
+
+A hand-written list of famous rivers is opinion, it goes stale, and it does not
+survive going statewide. **A river is paddled if people have built places to put
+boats on it** — which is evidence, and it is already in the data.
+
+Measured across Michigan: **574 named rivers, 2,645 boat and canoe access
+points.** Score each river by access points within 500 m:
+
+```
+>= 3 access:  83 rivers, 5,139 mi        >= 8:  28 rivers, 2,872 mi
+>= 5 access:  52 rivers, 4,162 mi        >=12:  17 rivers, 1,985 mi
+```
+
+The ranking falls out as Michigan's canonical paddling list with nobody choosing
+it: Huron 78, Au Sable 54, Manistee 51, Grand 44, Clinton 40, Muskegon 33. Every
+river Jacob named clears the threshold — Rifle 6, Black 9, Pine 15.
+
+**Six corridors near this region, 390 river miles, 265 KB.** The Rifle came back
+at rank four, unnamed by me, with The Ranch Canoe Launch at mile 0.2, Klacking
+Creek at 8.7, and six campgrounds from 35.5 to 57.3 — the shuttle Jacob
+described, on a river that has **zero points inside the region bbox**.
+
+Extrapolated, all 83 paddled rivers statewide is roughly 3 MB.
+
+### The gaps ARE the dams
+
+Chaining left the Au Sable in 17 pieces and the longest was 86.6 of 123 miles. I
+assumed a tolerance bug. It is not: the river way **stops at each impoundment and
+resumes below it**, because a pond is a polygon and not a river. Fragment 0 ends
+just above Alcona Dam; fragment 1 begins just below it. The same at Loud, Five
+Channels, Cooke and Foote.
+
+So a corridor is **reaches separated by portages**, which is what a paddler
+actually does. Joining them would have drawn a river you cannot paddle. Five
+reaches, four portages of 2.9–7.7 km, every break on a dam.
+
+**A 200 km gap is not a portage.** Michigan reuses river names — one "Black
+River" group spans 170 miles of several distinct rivers. Beyond 15 km the
+reaches are split into separate rivers rather than joined by an invented
+impoundment.
+
+Every corridor runs east with **0 reversed joins**, so "above" and "below" mean
+something — which is the whole basis of a shuttle.
+
+### The distances under-measure, and they say so
+
+Validated against the local outfitter's published table for nine access points:
+ours runs about **0.53× theirs above Mio and 0.78× near it**. OSM's centreline is
+drawn at 62 m point spacing and cannot hold the meanders of the upper river.
+
+Not corrected by a factor — the shortfall is not constant, and a made-up
+multiplier applied to a number someone plans a day around is exactly the
+confident guess this app exists to refuse. The payload carries the caveat in its
+own field so the app cannot forget it.
+
+**What is exact: the order, and every dam.** That is what the shuttle needs.
+
+USGS NHD is reachable and gave 11.2 mi where OSM gave 7.8 and the livery says 10
+— markedly closer. It is a per-river web query where OSM is already on disk, so
+it is a refinement for later, recorded rather than done.
+
+### The hazard layer is not decoration
+
+Seven dams sit on the Au Sable. A map drawing one blue line from Grayling to Lake
+Huron without marking them is dangerous, and A112 makes that a ship-blocker.
+They draw in the closure colour, above everything else the layer draws, never
+thinned by zoom. Verified: **Mio Dam draws and is named**, 13 dams in the payload.
+
+### The gate caught two things I would not have
+
+`sources with no layer to draw them: padport` — I built a portage-midpoint source
+and never drew it. Removed rather than given a layer: a portage pin a kilometre
+from its dam is two pins for one hazard, and the dam is the one you must not miss.
+
+`hardcoded coordinates outside regions.json: corridor.py:13` — a coordinate pair
+in my own docstring. The check is right to be strict; the docstring was reworded
+rather than the guard loosened.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **83 checks** including the corridor
+drawing, the layer being off by default, and the dams named. Gate green.
+
+---
+
+
+## Take 101 — 2026-08-23 — Tools becomes a bucket
+
+Jacob, on being told the Tools destination held About, Self-test and Pan test:
+*"Add those under a different bucket, under tools. Under tools, there could be a
+diagnostic button that opens another menu."*
+
+Exactly right, and it took one entry. **Diagnostics** now opens a sub-menu
+holding the three; the Tools tab has room for what a rider actually reaches for.
+
+```
+Tools shows one entry, not three diagnostics (c-diag)
+diagnostics holds 3: c-about, c-selftest, c-pan
+the diagnostics sub-menu starts closed
+leaving Tools closes the sub-menu
+```
+
+The three buttons kept their **ids and handlers** and simply live somewhere
+else, so nothing that clicks them — the smoke harness included — noticed. Same
+discipline as the destination bar at take 98, and the reason 274 assertions
+passed untouched again.
+
+Leaving Tools closes the sub-menu. A panel left open across a destination switch
+is how a UI starts feeling arbitrary.
+
+### A check that was testing its own stale assumption
+
+The destination check used `c-selftest` as its example of "a hidden chip that
+still works". That chip **moved into the sub-panel** and no longer carries
+`data-tab`, so the check failed on correct code. It now picks whichever chip is
+genuinely in a closed destination rather than naming one that could move —
+landmine 127's family: a check that hard-codes a specific thing tests the
+hard-coding as much as the behaviour.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **78 checks**. Gate green.
+
+---
+
+
+## Take 100 — 2026-08-23 — Type scale and motion, and the overhaul closes
+
+Third of three. The gap Jacob felt against onX, measured at take 98, is now shut:
+
+| | take 98 | take 100 |
+|---|---|---|
+| controls on screen | 14 in one scroller | **≤5**, four destinations |
+| icons | 38 emoji | **20 drawn, 0 emoji** |
+| transitions | **1** in 3,667 lines | 6 + reduced-motion |
+| font sizes | **16** | 6 |
+
+### Type
+
+Sixteen sizes across 44 declarations — 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12,
+12.5, 13, 14, 15, 17, 18, 30. That is not a scale, it is 44 separate decisions,
+and it reads as one.
+
+Six steps, every size moved to its **nearest** so nothing shifted more than a
+pixel, and the four-device matrix could catch anything that did. 44 declarations
+now reference the scale; **zero hard-coded sizes remain**.
+
+Map label sizes are deliberately excluded. They are MapLibre `text-size`
+expressions tuned against satellite imagery at take 57, and forcing them into a
+CSS scale would quietly undo real measurement.
+
+### Motion
+
+One transition existed in the whole app. Panels appeared and vanished between
+frames, which is most of what "feels cheap" actually is.
+
+150 ms, ease-out, **transform and opacity only** — both composite on the GPU, so
+this costs no layout work on a phone that is simultaneously drawing a map.
+Nothing loops, nothing bounces, and nothing on the map moves: a rider glancing
+down mid-trail does not want the interface animating.
+
+`prefers-reduced-motion` is honoured. Someone who asked their phone to stop
+animating had a reason, and on a bike in the sun that reason may be legibility.
+
+### The risk that came with it, and the check for it
+
+To animate, a hidden panel must stay in the layout — `display:block` with
+`visibility:hidden`. That risks **invisible controls still catching taps**, which
+is worse than blinking. Asserted with `elementFromPoint` rather than assumed:
+
+```
+ok  an OPEN panel is reachable by tap
+ok  a closed panel catches no taps (visibility hidden, pointer-events none)
+ok  a closed panel is fully transparent (0)
+ok  panels transition rather than blink (0.15s)
+```
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **74 checks**, up from 61 when the
+overhaul began. Gate green.
+
+---
+
+
+## Take 99 — 2026-08-23 — Drawn icons, and two bugs that would have been invisible
+
+Second of three takes closing the presentation gap measured at take 98. Thirty-
+eight emoji were doing the work of an icon set: 😖 for "Wrong turn" renders as a
+different picture on every phone, 🏍 is a different bike on Samsung than on
+Pixel, and none of them share a weight or a grid.
+
+**20 controls now carry a drawn icon. No emoji remains in any control.** One
+24×24 grid, 1.75 stroke, round caps, `currentColor` so an icon inherits whatever
+the control it sits in is doing. Inline SVG — no sprite sheet, no icon font, no
+fetch, nothing to go missing offline. The tab bar gets icons above labels.
+
+### Deliberately not drawn
+
+The machine. A recognisable motorcycle at 24 px in stroke is beyond what I can
+draw well, and a bad one is worse than an emoji — it gets a generic vehicle mark
+and the words "Dirt bike 24\"" carry the meaning. Knowing what not to attempt is
+part of the job.
+
+### The bug that would have shipped silently
+
+`paintIcons()` expands `__IC_name__` placeholders so the SVG is defined once in
+`ICONS` rather than pasted into fifteen buttons. My first version did it by
+replacing **`#shell.innerHTML`** — which rebuilds the entire DOM and leaves
+nothing wired to it.
+
+The map would still have drawn perfectly. Every screenshot would have looked
+right. **Not one button would have worked.** It now replaces each button's own
+children, which leaves the button element — and its listener — untouched, and a
+render check asserts a handler still fires after the icon pass.
+
+### And one that would have shipped visibly
+
+**Twelve places rewrite a chip's label with `textContent`**, which discards the
+icon inside it. Press *Ride it* and the icon disappears; change machine, change
+fuel range, switch basemap, run the self-test — all of them. One `setChip()`
+helper owns that now, and a thirteenth turned up after the first pass.
+
+### The harness caught the last one
+
+`check_stubs` flagged `El.contains()`. I had reached for `classList.contains()`
+when **the codebase already tests classes with `className.indexOf()` everywhere
+else**. The right fix was to follow the convention that exists, not to add stub
+API surface for a single call — so the stub I had just written came back out.
+
+### Verified
+
+`no icon placeholder reached the screen (0)` · `no emoji left in a control` ·
+`20 controls carry a drawn icon` · `handlers survived the icon pass`.
+Smoke 5 modes, 274 assertions. Render **70 checks**. Gate green.
+
+---
+
+
+## Take 98 — 2026-08-23 — Four destinations instead of fourteen chips
+
+Jacob, after asking why onX feels more premium: *"I know how to use the
+application but I fear others would get quite confused with the current UI —
+trips, loops and saved stuff."*
+
+He was right about the feeling and wrong about the cause. Measured, the gap is
+not the architecture — onX is client-server with accounts because it bills
+millions of people, not because that makes it feel good. The gap is presentation:
+
+```
+14 chips in one horizontally scrolling row
+38 emoji used as icons
+ 1 CSS transition in 3,667 lines
+15 distinct font sizes
+```
+
+None of that needs a server. This take is the first of three that close it.
+
+### The shell
+
+Four destinations — **Map · Plan · Ride · Tools** — and the numbers are the point:
+
+```
+14 actions split across destinations — at most 5 on screen at once
+every action belongs to exactly one destination — none orphaned
+```
+
+Loop, Saved, Set home, Machine and Fuel now sit together under **Plan**, which is
+precisely the grouping Jacob said nobody could infer. Self-test and Pan test are
+under **Tools**, where nobody presses them on a trail.
+
+### Deliberately the most boring implementation available
+
+Every chip keeps its **id, its handler and its position in the DOM**. A closed
+destination's chips are `hidden` — which `click()` ignores, and which the layout
+self-test already skips because it measures elements with height. Nothing in the
+app or in either harness had to learn that the tab bar exists, which is why 274
+smoke assertions passed untouched on the first run.
+
+It is deliberately **not a router**. There are no separate screens to get lost
+between, and the map stays visible in every destination, because on a trail the
+map is the thing you are looking at.
+
+### The cost, stated
+
+The bar takes **~52 px of map height**. That broke the contour-label check —
+which had been finding exactly **one** label at one viewport, so it was measuring
+the edge rather than the feature. I checked whether labels still work before
+touching the check: they do, at z14.4 and z15.2. It now probes three zooms.
+
+A check that flips on an unrelated change is testing a boundary. That is worth
+more attention than the 52 px.
+
+### On the mode selector Jacob asked for
+
+The container is built; the selector is not. **A mode selector with one mode is
+a promise, not a feature.** Paddle needs the river network, the corridor model
+(A115) and the dam-portage rule that A112 makes a ship-blocker. When there are
+two real modes the selector goes at the top of this shell and the destination bar
+stays exactly as it is.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **66 checks**, including four new ones on
+the destination bar and clean layout at all four device sizes. Gate green.
+
+---
+
+
+## Take 97 — 2026-08-23 — A27 measured, and headings that lied
+
+### A27, open since take 21, measured at last
+
+Take 21 shipped the CSP MapLibre build to fix a `blob:` worker problem that
+**take 23 disproved**. It was kept as insurance and the entry said: *decide when
+the Fold renders.* It renders, so I decided — or rather, measured, and then did
+not decide.
+
+```
+CSP build      1,396 KB  (engine + separate worker)
+standard build 1,032 KB  (worker inlined as blob:)
+saving           364 KB
+```
+
+Built against the standard engine the app draws **identically** in headless:
+3,198 rendered features, no page errors, no map errors, self-test 37/0, all
+render checks green.
+
+**And that proves nothing about the phone.** Headless Chrome is not the Android
+WebView, and whether a Capacitor WebView permits a `blob:` worker is exactly the
+question take 21 could not answer. Reverted to CSP.
+
+It is not one-sided either. The CSP build needs `setWorkerUrl` pointing at a file
+that must exist, and `ci/bundle.sh` carries `test -s
+www/vendor/maplibre-gl-csp-worker.js` **because that file went missing once**.
+The standard build has no such failure mode. 364 KB is 0.7% of a ~50 MB APK
+against a possible dead map. Jacob's call, recorded with both numbers.
+
+### Three headings were lying
+
+`A103` read PROPOSED for work superseded eleven takes earlier. `A108` read OPEN
+for something that shipped the take after it was raised. `A27` read OPEN.
+
+Nothing errors on a stale status line — a successor simply reads it and believes
+it. `check_ledgers` catches duplicate ids and gaps and had no opinion on a
+heading that contradicts its own body. It does now.
+
+**My check was wrong twice before it was right.** First it matched
+`**Ruled out:**` — the evidence line `check_agenda` *requires on every item* — so
+it flagged all nine open proposals. Then it missed A103, because resolution
+sub-entries are appended at the END of the file rather than beside their parent,
+so it must search the whole document.
+
+Three controls: both real cases fire, and a genuinely open item correctly stays
+silent. That last one matters most — a status check with false positives would be
+turned off within a week.
+
+## Take 96 — 2026-08-23 — Making the region model safe to widen
+
+A94 and A95, the two remaining preconditions for statewide. Neither changes
+anything a rider sees; both are the difference between A72 working and A72
+producing a map made of the wrong place.
+
+### A94 · a region switch left seven artifacts behind
+
+`region.DERIVED` was a hand-kept list of twelve. The pipeline produces seven
+more it never mentioned — `address`, `context`, `other`, `poi`, `contour`,
+`imagery_tiles/` and `dem_meta` — **two of them added by me** at takes 89 and 91
+without a thought for the list meant to clear them. It also still listed
+`payload.json`, which stopped existing long ago.
+
+A leftover payload is the previous region's data wearing this region's name,
+with every hash correct. Landmine 37, and silent.
+
+**`imagery_tiles/` is the worst of them**: 2,008 tiles of the last region's
+ground, which survived every switch because `os.remove` cannot delete a
+directory and nobody had listed it anyway.
+
+The fix is not seven more names. Every payload this pipeline writes is called
+`*_payload.json`, and that convention is now the source of truth — globbed, so a
+new payload is cleared the day it is invented rather than the day someone
+notices. Only artifacts that do not follow the convention are named, and they
+are all imagery or ingest intermediates. **18 files and one directory**, up from
+twelve.
+
+Fourth time a copied set has drifted from the set it copies: the palette (77),
+the CI dependency map (84), the label layers (90), this.
+
+### A95 · two anchors outside their own region
+
+Flagged UNKNOWN at take 75 as "not traced". Traced now: tapping a place chip
+runs `map.easeTo` to that coordinate. `sthelen` listed **Roscommon 2.5 km** and
+**Houghton Lake 16.2 km** outside its bbox, so those chips pan the rider to
+blank ground — no imagery, no network, no explanation — and both were in the
+search index doing the same.
+
+That is landmine 34's family: a map with holes is worse than no map, because you
+trust it.
+
+Removed from `sthelen` rather than widening the bbox, and the reason is written
+into the region's own note: widening changes what that region *downloads*, which
+is Jacob's judgement, not a bug fix. A region that has never been built or
+ridden is not the place to make that call unasked.
+
+### The checks, and one that was its own control
+
+`check_region_clean` compares the clear-list against **what the tools actually
+write**, by scanning `tools/` for the filenames they emit — so the next payload
+someone invents is caught the day it is written. Three negative controls, all
+firing, including NC3: a tool starts writing `trailcam_payload.json` and nothing
+clears it. That is takes 89 and 91 reproduced deliberately.
+
+The anchor check needed no negative control, because **it failed on the real
+defect the moment it was written**:
+
+```
+FAIL anchors outside their own region: sthelen/Roscommon 2.5 km outside;
+     sthelen/Houghton Lake 16.2 km outside
+```
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render 61 checks. Gate green.
+
+---
+
+
+## Take 95 — 2026-08-23 — A legal field, built before the data arrives
+
+A101, an A72 precondition. The DNR publishes a free-text restriction on 180
+features statewide and **67 of them read "Off road motorcycles are prohibited"**
+— Jacob's exact machine. **Zero are inside the Bull Gap box**, which is the
+whole reason to build it now: the machinery should exist before A72 widens the
+region, not be discovered missing afterwards.
+
+### The recon changed the design
+
+I expected free-form legal prose and budgeted for a parser. Querying the actual
+values found **nine distinct strings in the entire state**:
+
+```
+67  ORV Routes B BK… ORVs <65in, May 1–Nov 1. Off road motorcycles are prohibited
+36  High Clearance Required
+23  MDOT ROW Seasonal Connector Open May 1 To November 30
+16  4x4 And High Clearance Required
+15  ORV A and AG… including off road motorcycles only
+13  Restricted ORV Route… May 16th to March 14th
+ 8  ORVs Less Than 65 Inches Only
+ 1  MDOT ROW - Seasonal Connector, Open May 1 - November 30
+ 1  Snowmobile Season December 1-March 31
+```
+
+Nine strings is a **table**, not a parsing problem. It is enumerated — a list
+that can be read and checked by eye — rather than a regex on legal prose that
+would silently mis-classify the tenth.
+
+Note strings 3 and 8: the same rule written twice with different punctuation.
+That alone is the argument against pattern-matching cleverness.
+
+### The rule that makes it safe
+
+**The table may only ever take access away, never grant it.** An unrecognised
+string bans nobody and is printed *verbatim* on the feature card, marked
+"(as published; not interpreted)". Telling a rider what the sign says is honest;
+inventing a reading of it is not.
+
+Caught in the same recon: **`-1` is the DNR's null sentinel** and appears on
+1,877 of 1,889 routes. Treating it as a restriction would have flagged almost
+the entire state network as restricted.
+
+### The drill, because nothing here carries one
+
+A refusal that has never fired is a hope (landmine 45). With zero restricted
+edges in the region the only proof is to make one, so the harness injects the
+verbatim DNR strings onto real edges:
+
+```
+ok  a DIRT BIKE is refused a segment the DNR says prohibits off-road motorcycles
+ok  a QUAD is NOT refused it — the restriction bans one machine, not all
+ok  an unrecognised restriction bans nobody
+ok  and does not silently remove access — it is displayed, not interpreted
+```
+
+### Four places, again
+
+`rst` had to be added to **four** stages to survive: the DNR field list, the
+noding key list in `graph.py`, `bundle_id()`'s tuple, and the `bk` names beside
+it. Landmine 132 says to measure at the END of the chain, which is the only
+reason this surfaced in one pass instead of three.
+
+### A89 · cell coverage, ruled out
+
+`broadbandmap.fcc.gov` returns **403** and the bulk download path 404s. OSM has
+10 communication masts in the region — and a mast is **not coverage**. Whether a
+phone works depends on terrain, power and band, and the terrain here is exactly
+what blocks it. Drawing masts as a signal proxy would be the app making a
+safety-relevant claim it cannot support, which is the one thing the honesty
+rules exist to prevent.
+
+Ruled out on availability, not on value. The honest alternative is recorded:
+the app could log where *you* had signal along your own recorded tracks — ground
+truth rather than a model — but it ships empty until there are rides, and A18 is
+still open.
+
+### Verified
+
+Smoke 5 modes, **274 assertions**. Render 61 checks. Palette 18. Gate green.
+
+---
+
+
+## Take 94 — 2026-08-23 — Named summits, and a sweep whose reason had expired
+
+A76, the last piece of the orientation set — shields at 88, water names at 87,
+places at 89, and now the high ground. Bull Gap is hill-climb country; a named
+hill is the landmark people navigate by here.
+
+### Four summits, and the cross-check is the good part
+
+```
+Wagon Wheel Hill 1464 ft · Auger Hill 1382 ft
+Mio Mountain 1290 ft     · Timberline Mountain 1267 ft
+```
+
+**Three of the four match onX's own figures to within three feet** — Auger Hill
+1,378 against 1,382; Mio Mountain 1,283 against 1,290; Wagon Wheel Hill 1,460
+against 1,460. Two independent maps agreeing is worth more than either alone.
+
+The **name** is OSM's. The **elevation is our DEM's**, because every other
+height the app shows comes from that DEM, and a summit label disagreeing with
+the readout under your wheels would be its own small lie. Checked before
+choosing: our DEM agrees with OSM's surveyed `ele` within 1 m on three of four,
+8 m on Timberline.
+
+GNIS 404'd on the path I tried. It did not matter — OSM had the names and our
+DEM had better provenance for the numbers.
+
+Summits ride in the **contour payload**, because both are terrain derived from
+the same region, and they share a home in the layers panel. Off by default,
+drawn as a triangle, which is what a summit is on every map a rider has seen.
+
+### Three faults, all caught by the harness
+
+**The glyph pack had no triangle.** U+25B2 was not in the 107-character set, and
+a character the map draws but the pack lacks renders as a box or as nothing,
+announced only in a console warning nobody reads (landmine 30). Now 108 glyphs.
+
+**`natural=peak` was dropped in two places** — the Overpass query in `ingest.py`
+and the tag set in `osm_local.py` — so `aoi.json` held **zero** peaks while the
+code that consumed them looked correct. Exactly the shape of `ref` at take 88,
+and landmine 132 says to measure at the end of the chain, which is the only
+reason it surfaced in one step rather than three.
+
+**And the one worth keeping.** Summits kept appearing despite defaulting off.
+`setBasemap` was re-applying `lbl-trail`'s visibility to **every symbol layer**
+on every basemap change, including at load. Its own comment explained why that
+existed and why it no longer needed to:
+
+> *Satellite used to force every label off — from before labels had a dark halo,
+> when dark-on-light was unreadable over jack pine. They are white on a halo now
+> and survive it.*
+
+A no-op in the normal case, and a bug for any symbol layer with its own default
+— which is precisely what the layers panel started creating one take earlier.
+Removed rather than special-cased; the Labels control still governs every symbol
+layer through `labelLayers()`, which is where that belongs.
+
+### Clean run (PROTOCOL §6b)
+
+Three pipeline steps changed, so: pristine unpack, every generated artifact
+absent, `osm_cache` and `dem_cache` symlinked because they are external
+downloads that CI caches between runs — the test is of the code, not of a
+400 MB download.
+
+```
+noded 12,649 nodes / 20,546 edges     duplicates 3,250 suppressed (16.1%)
+emit  12,236 nodes / 20,222 edges     contour 3,204 lines, 423 KB
+summits Wagon Wheel 1464 · Auger 1382 · Mio Mountain 1290 · Timberline 1267
+glyphs 108                            verify -> COMPLETE
+gate PASSED — 260 smoke assertions, 61 render checks
+```
+
+Every number reproduces the working copy.
+
+### Housekeeping
+
+Disk hit **95%** mid-take, which is landmine 101's corollary waiting to happen —
+it masquerades as a GPU or render failure. The 1.5 GB `uv` cache is nothing this
+project uses; clearing it returned to 86%.
+
+### Verified
+
+Smoke 5 modes, 260 assertions. Render **61 checks** including summits off by
+default, summits drawing, and the label carrying a height. Palette 18. Gate
+green on both trees.
+
+---
+
+
+## Take 93 — 2026-08-23 — The dispatch card, timed at last
+
+A96, flagged UNKNOWN at take 75 and carried for eighteen takes without anyone
+putting a number on it.
+
+The concern was real on its face: tapping Dispatch runs **six full scans** —
+`nearestEdge` (which decodes every edge polyline in the region), plus
+`nearestJunction`, `nearestPavement`, `countyAt` and `addressAt` twice. The code
+already had a `setTimeout(…, 20)` and a *"Locating you on the network…"*
+message, which says the predecessor suspected it too.
+
+### Measured, per scan
+
+```
+nearestEdge 17ms · nearestJunction 1ms · nearestPavement 4ms
+countyAt 0ms · addressAt 1ms · addressNear 0ms          = 23 ms
+```
+
+`nearestEdge` dominates at roughly three quarters of the cost, exactly as
+expected. The total does not. **23 ms** is imperceptible, and a second run gave
+10 ms.
+
+Per scan rather than as one number, because "the dispatch card is slow" is not a
+diagnosis and would not have told anyone which of six things to look at
+(landmine 131).
+
+### But that is a desktop, and I nearly stopped there
+
+Extrapolating a phone number from headless Chrome is the same mistake as
+measuring label density on a 900×1400 viewport that does not exist (landmine
+87). So the timing now runs **on the device**, as a self-test line:
+
+```
+PERF  dispatch-scan   N ms to assemble the dispatch card (20222 edges scanned)
+                      — this is what you wait for after tapping Dispatch
+```
+
+Jacob's next report carries the real number instead of my arithmetic. Threshold
+600 ms — generous, because the question is whether a rider notices, not whether
+it is fast.
+
+### Not optimised, deliberately
+
+`nearestEdge` could be indexed. It is not going to be, on this evidence: it
+costs 17 ms on the machine that can measure it, the app is the same code on both,
+and rewriting a working safety path against a number that says it is fine is the
+wrong trade. If the device reports something different, that is when it changes.
+
+### Verified
+
+Smoke 5 modes, 260 assertions. Render 57 checks including the per-scan timing.
+Palette 18. Gate green.
+
+---
+
+
+## Take 92 — 2026-08-22 — Waypoints, and a slope layer ruled out by measurement
+
+### A88 first, because it did not get built
+
+Before starting, I measured the slope distribution across the region from the
+DEM already on disk:
+
+```
+ 0-3  deg   65.6%   ################################
+ 3-6  deg   18.6%   #########
+ 6-10 deg   10.3%   #####
+10-15 deg    4.2%   ##
+15-20 deg    1.0%
+20-90 deg    0.2%
+median 1.7 deg · mean 3.0 deg · max 47.9 deg
+```
+
+onX's slope-angle layer uses avalanche bands — 27, 30, 35, 45 degrees. **99.9%
+of this region is under 22 degrees.** A conventional slope layer here renders one
+flat colour across 1,060 km². Ruled out with numbers rather than carried as a
+maybe. The 1.2% above 15 degrees is the interesting part — the hill climbs — and
+contours already show it through line spacing, one take ago.
+
+### A84 · waypoints
+
+A dropped pin was ephemeral: one at a time, no name, gone the moment you dropped
+another. It can now be **saved**. Tap a pin, tap ☆ Save as waypoint, and it is
+there tomorrow — drawn in orange above the world's places, listed under ☆ Saved
+alongside routes, with Go to / Rename / Delete.
+
+Auto-named without a dialog, from what is actually there: the address if there
+is one, else the nearest trail, else the coordinates. The harness saved one at
+the region centre and it came back **"Curtisville Road"**.
+
+### The design decision, and it is the opposite of the last one
+
+A saved ROUTE stores its inputs and is re-routed on open, because closures move
+between builds and a frozen line replays a legality decision made against stale
+data (take 79, landmine 113).
+
+**A waypoint stores its coordinate.** A point on the ground does not move and
+encodes no decision — it is an observation, and freezing an observation is what
+saving it means.
+
+Both rules are asserted in the same smoke run, deliberately, so the difference
+reads as intentional rather than as an inconsistency somebody later "fixes":
+
+```
+ok  a waypoint DOES store its coordinate — a point on the ground encodes no
+    decision that could go stale, unlike a route
+ok  and a saved ROUTE still stores no geometry — the two rules differ on purpose
+```
+
+### Drawn above the places
+
+`wpt-dot` and `wpt-label` sit above the POI layer. A POI is something that is
+there; a waypoint is something **you** decided mattered, and when they collide
+yours wins.
+
+### What I got wrong
+
+Fired `contextmenu` at `grab("map")`, which is the DOM element stub. The map
+events live on `theMap`, the MapLibre stub — two different objects with the same
+informal name. Same family as reaching for `window.localStorage` when the app
+runs in a `vm` sandbox (take 79): the harness has more than one thing that could
+plausibly be called "the map".
+
+### Verified
+
+Smoke 5 modes, **260 assertions**. Render 56 checks. Palette 18. Gate green.
+
+---
+
+
+## Take 91 — 2026-08-22 — Contours, a fifth product of a DEM already downloaded
+
+A87. `terrain.py` fetches 110 Terrarium tiles at z13 and makes four things from
+them — node elevations, per-edge climb, elevation profiles, a rendered
+hillshade. Contours are the fifth. **No new source, no new host, no extra
+fetch**: the tiles are already in `dem_cache/` when the step runs.
+
+The hillshade shows you there is a hill. A contour tells you how big it is and
+carries a **number**, which matters where the whole region has 199 m of relief
+and the difference between a rideable sand hill and a wall is fifty feet.
+
+### Measured before choosing, not after
+
+```
+interval   levels   lines    points   payload
+  20 ft        33    6551    118192    1154 KB
+  40 ft        16    3204     42944     423 KB   <- shipped
+ 100 ft         7    1355     24259     237 KB
+```
+
+40 ft is the USGS interval for this relief and puts about seven lines on Wagon
+Wheel Hill. Index contours every 200 ft — 1000, 1200, 1400 ft — draw heavier and
+carry the label; intermediates are thinner and unlabelled, which is how a paper
+quad is read. Bundle 2.59 -> 3.07 MB, about 1% of an APK that already carries
+45 MB of imagery.
+
+**Off by default**, in the layers panel built one take earlier. That panel
+existed precisely so this would not arrive as another chip.
+
+### Clean run (PROTOCOL §6b)
+
+From a pristine unpack with no DEM cache: `contour: 3204 lines (880 index),
+42944 points, 423 KB` and `contour.json fb6d41b680cf` — **byte-identical to the
+working copy**. `verify -> COMPLETE`, gate green on the clean tree with 244
+smoke assertions and 56 render checks.
+
+### Three mistakes
+
+**The size estimate was for an encoding I then did not use.** 419 KB assumed
+delta-encoded ints; the first version wrote raw floats and cost 946 KB. Applying
+the same encoding water and graph already use brought it to 423 KB — and the
+client's existing `decode()` reads it with no new code. An estimate is only
+worth what its assumptions are, and mine were not written down until they were
+contradicted.
+
+**A two-line declaration broke the build silently.** `DECLS` entries are
+stripped from the source by EXACT STRING MATCH. Splitting the declaration across
+two lines with different indentation in `src/app.html` and `build_app.py` left
+`CONT = __CONT__` in the shipped app as a literal token, and the map never
+constructed — every render check returned `-1` or `undefined`. One line in both
+now, with the reason beside it.
+
+**"1 intermediate vs 10 index" was not a bug.** It looked backwards and I nearly
+went hunting. Measuring the payload against the actual viewport: the ground
+there sits at **1,200 ft**, so that index level genuinely dominates — 59 index
+lines against 31 intermediates across 1160 and 1240. Landmine 102 again; the
+expectation was wrong, not the feature.
+
+### The gate caught a dependency, then had to be taught
+
+`scikit-image` is a real new CI dependency and `check_ci_deps` flagged it. It
+flagged it **again** after `ci/bundle.sh` installed it, because the check
+compares IMPORT names and `skimage` is not `scikit-image`. A `PIL -> pillow`
+mapping already existed and simply did not know this one. Extended rather than
+worked around, with `sklearn` added while I was there.
+
+### Verified
+
+Smoke 5 modes, 244 assertions. Render **56 checks** including contours off by
+default, contours drawing, and index lines carrying an elevation. Palette 18.
+Gate green on both the working tree and a clean one.
+
+---
+
+
+## Take 90 — 2026-08-22 — One place that owns what is on the map
+
+A91. The tools strip had reached sixteen chips with basemap, relief and labels
+scattered among ride actions, and the 59 places added one take earlier had no
+toggle at all. There is now a **▤ Layers** panel: three basemaps and four layer
+groups — Places, Lakes & rivers, Relief, All labels.
+
+### The defect it was hiding
+
+`LBL` was a hand-kept array of five layer ids under a comment reading *"every
+label layer, so the Labels chip governs all of them"*. By take 89 the style had
+**eleven** symbol layers and **six escaped it** — `lake-label`,
+`lbl-trail-short`, `poi-label`, `lbl-ref`, `lbl-lake`, `lbl-stream`. Four of
+those I added myself in takes 87–89 without a thought for the list meant to
+govern them.
+
+The comment beside its *second* use records the same bug happening once before:
+*"lbl-show was NOT in LBL, so on satellite the only names left were trails you
+may NOT ride"* — take 57. It happened, was fixed by adding one id to the array,
+and then happened again with six.
+
+The array is gone. `labelLayers()` asks the map which symbol layers it has.
+Third place a copy of a set has drifted from the set: the palette (take 77), the
+CI dependency attribution (take 84), and this.
+
+### The harness told me I was making it worse
+
+Three separate checks caught three separate mistakes, each before I could
+convince myself it was fine:
+
+- **`one tap shows satellite (none)`** — I had replaced the basemap button with
+  a menu, costing a rider two taps and a hunt to reach satellite, in gloves. The
+  render harness's basemap checks encode behaviour worth keeping. `c-base` is a
+  one-tap cycle again; the panel got its own chip.
+- **`Cannot set properties of null`** — `setBasemap` read `c-relief.className`
+  to decide whether relief was on. I had deleted that chip. Layer state now
+  comes from the map, which is the only copy that cannot be stale.
+- **`harness stubs are missing APIs the app calls: MapStub.getStyle()`** — the
+  gate's own stub-coverage check, landmine 62's guard, noticed that deriving
+  labels from the style meant calling an API the stub had never offered. It held
+  the layers already and simply did not expose them.
+
+### And the gate check I wrote was wrong twice
+
+First version matched `var LBL=[`, and passed a tree where the declaration was
+gone and a **second call site still stood** — `LBL is not defined`, caught by
+the browser, not by the check meant to prevent exactly this. Second version
+matched the word anywhere and failed on the comment describing the old bug.
+It now matches a use: `LBL` followed by `.`, `[` or `=`.
+
+### Verified
+
+`check_layer_control` gates it: no hand-kept array, `labelLayers()` present,
+`LYRGROUPS` present, and **every layer a group claims to govern must exist in
+the style** — a toggle that moves nothing reads as a bug. Four negative
+controls, all firing.
+
+In a real browser: the panel opens with 3 basemaps and 4 groups; turning Places
+off hides both the pins and their labels; **All labels reaches route numbers,
+water names and place names — the six layers the old list missed.** Basemap
+cycling still works in one tap.
+
+Smoke 5 modes. Render 53 checks. Palette 18. Gate green.
+
+---
+
+
+## Take 89 — 2026-08-22 — Places you can ride to
+
+A110. The map drew lines. It now draws destinations: **59 places** — 14
+campgrounds, 10 places to eat, 9 stores, 5 fuel stations, 5 boat launches,
+5 information boards, 4 trailheads, 4 beaches, 2 day-use areas, 1 viewpoint.
+
+All of it comes out of the Geofabrik extract the build already downloads. No new
+source, no new host, 4 KB.
+
+### The one that matters most is fuel
+
+The app has costed routes against a fuel range since take 36 — the ⛽ chip — and
+has never shown where fuel **is**. Same shape as A82, where telemetry was
+recorded from take 41 and only elevation was displayed: the capability was
+present and the last wire was missing. Five stations, five names.
+
+### A78 closes for free
+
+The trailhead markers wanted since take 43 turn out to be `amenity=parking`
+carrying a name — **Bull Gap Trailhead, East Bull Gap Trailhead, Bull Gap Hill
+Climb Trailhead**. No new work, no new query; they were in the data the whole
+time behind a tag nobody had looked at.
+
+### What is deliberately NOT shipped
+
+205 unnamed parking areas, 15 unnamed shelters and 13 unnamed toilets are in the
+region. Shipping them would be clutter, not information, so `amenity=parking`
+ships only when it carries a name — which is how a trailhead identifies itself.
+
+Beaches are the documented exception: all four are unnamed in OSM and a beach is
+still a destination, so they ship and are labelled **"Beach"** by kind. Jacob's
+Island Lake beach sits 6 m from the named `Island Lake Day Use Area`, and it
+would be easy to borrow that name. That is inference dressed as fact and the
+answer is no — both are drawn, and the day-use name sits beside it.
+
+### Verified
+
+Smoke: places payload 59 entries, fuel among the kinds, **every place inside the
+region bbox**. Render: 16 pins of 59 drawn at the test viewport, named
+`Family Fare, Mio Hydro, Paddle-In Group Camp, Beach, Mio Pizza Shop` — note
+`Beach` labelled by kind, which is the honesty rule visible in the output.
+Gate green. Self-test 38.
+
+### What I got wrong
+
+I opened this take believing the app side was unbuilt, because
+`grep -c "POI\b" src/app.html` returned 0 — and `\b` does not match `POIS`,
+`POIKIND` or `poif`. The whole feature was already there. Before that I had
+written a second `POI` table into `osm_local.py`, which the existing
+`POI = poi_tags()` silently shadowed; that table reads `POI_TAGS` out of
+`ingest.py` by AST precisely so the two OSM paths cannot diverge, which is the
+correct mechanism and better than what I was adding. Removed as dead code.
+
+Second session in a row where work I had done earlier had left my working
+memory and reading the file was the only thing that caught it — take 80 was the
+first. The habit that saves it is grepping before writing, and the grep has to
+be right.
+
+---
+
 
 ## Take 88 — 2026-08-22 — Posted route numbers
 

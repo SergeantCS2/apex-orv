@@ -1,62 +1,55 @@
-**Take 88 — the roads have their numbers on them.**
+**Take 108 — everything connected, checked button by button. Go ride it.**
 
-Signed release build, installs over take 87.
+Signed release build, installs over take 107. You have not been out since take
+82; twenty-six builds have landed. This is the one.
 
-### What changed
+### Where everything lives
 
-**M 33, M 72, F-28, 489, H57-7** and the Forest Road numbers now appear along the
-roads they belong to. That number is how you actually say where you are — "two
-east of M 33" — and it is on every sign, where the street name often is not.
+```
+Map     Layers · Locate · Search
+Plan    Machine · Set home · I'm here · Fuel range · Loop · Saved
+Ride    Ride it · Wrong turn
+Tools   Compass · Mark this spot · Diagnostics
+Always  Dispatch · Retrace · Directions · Return home
+On map  Basemap (one tap) · Activity filter
+```
 
-The numbers were in the data all along and were being thrown away twice on the
-way to your phone: once when OpenStreetMap roads were read in, and again when the
-network was split into segments.
+**Ride has two buttons on purpose.** On a bike you press *Ride it* and *Wrong
+turn*. Everything else is setup and belongs before you start.
 
-**2,152 stretches of road** now carry their number.
+### What the check found
 
-### It works with the duplicate fix, not against it
+Every button in the app was cross-referenced against every handler: **40 buttons,
+47 handlers, none unwired, none orphaned.**
 
-Another 2,318 numbered stretches are **not** labelled, on purpose. Those are the
-OpenStreetMap copy of a Forest Service road — the same road we already label
-with its official FS number from the Forest Service's own data. Take 86 stopped
-drawing those duplicate lines; this take makes sure it does not put the number
-back on them. You should never see the same road number twice on two parallel
-lines.
+Two things were wrong and are fixed:
 
-### What wins the space
+- **"I'm here" was on the wrong tab.** It is the other half of "Set home" — the
+  app sets them together internally — and they were on different tabs. Both in
+  Plan now.
+- **Two handlers for buttons that no longer exist**, left behind when Relief and
+  Labels moved into the Layers panel. Removed.
 
-When labels compete for the same bit of screen:
+Then a second, different check: not "is it wired" but **"can you actually get to
+it"** — walking all four tabs and confirming every action appears. All present,
+7 layer groups reachable, diagnostics behind one button, action row always there.
 
-1. **Trail names** — always first. The trail you are riding matters most.
-2. **Road numbers** — a number orients you.
-3. **Lake and river names** — last.
+### Under the Layers button
 
-That order is fixed by how the map is built, not by tuning, so it cannot drift.
+Places · Lakes & rivers · Contours · Named hills · Rivers & paddling · Relief ·
+All labels
 
-### Test script for this build
+### Test script
 
 - **Airplane mode on, force-stop, reopen.** Map renders, NET badge green.
-- **Find M 33 and M 72.** Do the numbers appear along them as you pan? Do they
-  look like numbers rather than street names?
-- **The one to watch:** are trail names still appearing as often as take 87? I
-  could not settle this from here — my measurements at one spot varied run to
-  run, and the layer ordering says trail names should be unaffected, but your
-  eyes on a real screen are worth more than my count.
-- **Any road showing its number twice** on two lines side by side would be a bug
-  and I want to know.
-- Still outstanding: ride a road you know runs north–south and check the compass
-  reads N or S; save a route, force-stop, reopen.
+- **Walk all four tabs.** Anything where you would not look for it?
+- **Self-test** — 59 checks. The `dispatch-scan` number is one I still want.
+- **Ride a road you know runs north–south** and check the compass. Asked for
+  many builds now; it has never been verified against real ground.
+- **▤ Layers** — every one on and off.
+- **Plan a float you have done**, check the time range covers it.
+- **Save a waypoint, force-stop, reopen.**
+- **Route somewhere and press ✕ Clear route.**
 
-### Known, and deliberate
-
-- A road carrying three or more designations shows the first two. A third would
-  be truncated into something unreadable, so it is dropped instead.
-- The numbers are styled as bold text with a heavy white outline rather than as
-  proper highway shields. Real shields need artwork the build has no way to make
-  yet.
-
-### Only a ride can answer
-
-- Whether road numbers help or crowd the map
-- Battery drain with the screen on
-- Whether the compass heading is right on a road you know
+Anything at all that looks wrong. There is a lot of new surface here and yours
+are the only eyes that have seen the actual ground.

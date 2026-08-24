@@ -20,7 +20,10 @@ ROOT = os.path.dirname(HERE)
 SRC = os.path.join(ROOT, "src", "app.html")
 WWW = os.path.join(ROOT, "www")
 
-DECLS = ('var WATER = __WATER__, GR = __GRAPH__, TR = __TERRAIN__;',
+# One line, and it must match src/app.html BYTE FOR BYTE — these are stripped
+# by exact string match, so a two-line form with different indentation left
+# `CONT = __CONT__` in the shipped app and the map never constructed (take 91).
+DECLS = ('var WATER = __WATER__, GR = __GRAPH__, TR = __TERRAIN__, POIS = __POIS__, CONT = __CONT__, PADDLE = __PADDLE__;',
          'var SHADE = "__SHADE__";', 'var SAT = "__SAT__";',
          'var SATB = __SATB__;', 'var GLYPHS = __GLYPHS__;')
 
@@ -32,6 +35,9 @@ IN_BUNDLE = {"graph_payload.json": "graph.json",
              "water_payload.json": "water.json",
              "imagery_meta.json": "imagery-meta.json",
              "context_payload.json": "context.json",
+             "poi_payload.json": "poi.json",
+             "contour_payload.json": "contour.json",
+             "corridor_payload.json": "corridor.json",
              "address_payload.json": "address.json",
              "other_payload.json": "other.json",
              "hillshade.jpg": "hillshade.jpg",
@@ -122,9 +128,18 @@ j('bundle/manifest.json').then(function(man){
     Promise.resolve({b:man.imagery_bounds||[0,0,0,0]}),
     have.context?j('bundle/'+have.context):Promise.resolve(null),
     have.address?j('bundle/'+have.address):Promise.resolve(null),
-    have.other?j('bundle/'+have.other):Promise.resolve(null)]);
+    have.other?j('bundle/'+have.other):Promise.resolve(null),
+    /* A110. Optional and absent-safe: an older bundle has no places artifact
+       and the app simply draws no pins, rather than refusing the region. */
+    have.places?j('bundle/'+have.places):Promise.resolve(null),
+    /* A87. Optional and absent-safe, exactly like places: an older bundle has
+       no contour artifact and the map simply has no contour lines. */
+    have.contour?j('bundle/'+have.contour):Promise.resolve(null),
+    /* A115. Optional and absent-safe like the rest. */
+    have.paddle?j('bundle/'+have.paddle):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -184,17 +199,12 @@ def split():
     # beside a www/ that no longer had it, and the app hit the fatal screen on a
     # perfectly good bundle (take 76). The step that assembles www/ owns
     # everything in www/.
-    named = {"manifest.json": "manifest.json",
-             "graph_payload.json": "graph.json",
-             "terrain_payload.json": "terrain.json",
-             "glyphs_payload.json": "glyphs.json",
-             "water_payload.json": "water.json",
-             "hillshade.jpg": "hillshade.jpg",
-             "imagery.jpg": "imagery.jpg",
-             "imagery_meta.json": "imagery-meta.json",
-             "context_payload.json": "context.json",
-             "address_payload.json": "address.json",
-             "other_payload.json": "other.json"}
+    # This was a SECOND copy of IN_BUNDLE, and adding the places artifact to one
+    # and not the other produced a bundle that verified COMPLETE while www/
+    # served a 404 for a file its own manifest referenced. One table, read by
+    # both (landmine 107, take 89).
+    named = dict(IN_BUNDLE)
+    named["manifest.json"] = "manifest.json"
     copied = []
     for src, dst in named.items():
         p = find(src)
@@ -253,7 +263,10 @@ def single(out):
     if _absent:
         print(f"  single: PARTIAL — absent: {', '.join(_absent)}")
     decl = (f'var WATER = {rd("water_payload.json") or "{\"l\":{}}"}, '
-            f'GR = {rd("graph_payload.json")}, TR = {rd("terrain_payload.json")};\n'
+            f'GR = {rd("graph_payload.json")}, TR = {rd("terrain_payload.json")}, '
+            f'POIS = {rd("poi_payload.json") or "null"};\n'
+            f'CONT = {rd("contour_payload.json") or "null"};\n'
+            f'PADDLE = {rd("corridor_payload.json") or "null"};\n'
             f'var SHADE = "{uri("hillshade.jpg")}";\n'
             f'var SAT = "{uri("imagery.jpg")}";\n'
             f'var SATB = {json.dumps(json.loads(meta)["b"]) if meta else "[0,0,0,0]"};\n'

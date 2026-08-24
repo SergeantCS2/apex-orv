@@ -77,20 +77,28 @@ jobs:
         id: tilecache
         uses: actions/cache@v4
         with:
+          # EVERY per-region payload, by the same *_payload.json convention
+          # region.py clears by — plus the input caches. This was a hand-written
+          # list and it had drifted exactly as region.DERIVED did: poi (take 89),
+          # contour (91) and corridor (102) were all missing, so every build
+          # re-ran them. osm_cache was missing too, so every build re-downloaded
+          # the 297 MB Michigan extract and spent ~5 minutes on the corridor step
+          # for a result it already had. Found by the take-107 audit, not by
+          # anything watching (landmine 170).
           path: |
-            graph_payload.json
-            terrain_payload.json
-            glyphs_payload.json
-            water_payload.json
+            ./*_payload.json
             hillshade.jpg
             imagery.jpg
             imagery_meta.json
+            imagery_budget.json
+            imagery_tiles.json
+            imagery_tiles
+            dem_meta.json
             aoi.json
             authoritative.json
-            context_payload.json
-            address_payload.json
             dem_cache
             img_cache
+            osm_cache
           key: region-${{ env.TILES_KEY }}
 
       - uses: actions/setup-python@v5

@@ -112,7 +112,11 @@ def build(font_path, stack_name, chars):
 
 
 if __name__ == "__main__":
-    CHARS = "".join(chr(c) for c in range(32, 127)) + "°′″–—‘’“”…×·"
+    # U+25B2 BLACK UP-POINTING TRIANGLE is the summit marker (A76, take 94).
+    # A character the map draws and the pack does not carry renders as a box or
+    # as nothing at all, and MapLibre says so only in a console warning nobody
+    # reads (landmine 30).
+    CHARS = "".join(chr(c) for c in range(32, 127)) + "°′″–—‘’“”…×·▲"
     packs = {}
     # NationalPark is the typeface cut for National Park Service routed signage.
     # On a map of the Huron National Forest that is the actual vernacular of the

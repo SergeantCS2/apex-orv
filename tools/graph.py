@@ -294,6 +294,7 @@ for f, pts in polys:
                                   "moto": f.get("moto"), "atv": f.get("atv"),
                                   "lic": f.get("lic"), "sym": f.get("sym"),
                                   "ref": f.get("ref"),      # A75, take 88
+                                  "rst": f.get("rst"),      # A101, take 95
                                   "pts": run[:]})
             cur, run = n2, [p]
 print(f"noded: {len(nodes)} nodes, {len(edges)} edges")

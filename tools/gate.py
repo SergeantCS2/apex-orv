@@ -326,6 +326,44 @@ def check_ledgers():
     if gaps:
         fails.append("LANDMINES.md: no landmine %s" % ", ".join(map(str, gaps)))
 
+    # A heading that says OPEN over a body that says SHIPPED is worse than a
+    # duplicate id: nothing errors, and a successor reads the status line and
+    # believes it. A103 said PROPOSED for work superseded eleven takes earlier;
+    # A108 said OPEN for something that shipped the take after it was raised
+    # (take 97).
+    stale = []
+    for blk in re.split(r"\n(?=## )", a):
+        head = blk.split("\n", 1)[0]
+        m2 = re.match(r"## (A\d+[a-z]?)\b(.*)", head)
+        if not m2:
+            continue
+        # Strip parenthetical history — "SHIPPED take 98 (proposed take 89)" is
+        # a resolved item recording where it came from, not an open one. The
+        # first version read the whole line and flagged it (take 98, and the
+        # same shape as matching a keyword inside a comment).
+        status = re.sub(r"\([^)]*\)", "", m2.group(2)).upper()
+        if not re.search(r"\bOPEN\b|\bPROPOSED\b|\bUNKNOWN\b", status):
+            continue
+        body = blk[len(head):].upper()
+        # a body that reports a completed outcome under an open heading
+        # NOT "Ruled out:" — check_agenda REQUIRES that line on every item, so
+        # matching it flagged every open proposal in the file (take 97). The
+        # signal is a completed-outcome marker or a resolution sub-heading.
+        # A resolution sub-entry is appended at the END of the file by
+        # convention, not beside its parent, so it is not inside this block —
+        # search the whole document for one naming this id (take 97).
+        rid = m2.group(1)
+        resolved_elsewhere = re.search(
+            r"^### " + re.escape(rid) +
+            r" (shipped|superseded|resolved|measured|closed)", a, re.M | re.I)
+        if re.search(r"\*\*SHIPPED\b|\*\*SUPERSEDED\b|\*\*CLOSED\b", body) \
+           or resolved_elsewhere:
+            stale.append(m2.group(1))
+    if stale:
+        fails.append("AGENDA.md: %s reads OPEN in its heading but its body "
+                     "records a completed outcome — the status line is what a "
+                     "successor trusts" % ", ".join(sorted(set(stale))))
+
     if not any("HANDOFF.md" in f or "AGENDA.md" in f or "LANDMINES.md" in f
                for f in fails):
         notes.append("ledgers: %d takes, %d agenda ids, %d landmines — "
@@ -465,6 +503,193 @@ def check_artifacts_agree():
     if n and not any("node elevations but" in f for f in fails):
         notes.append(f"artifacts agree: graph and terrain describe the same "
                      f"{n} bundle(s)")
+
+
+
+
+# ── 4h. What is on the map must be governed from one place ──────────────────
+# A91, take 90. The Labels chip was driven by a hand-kept array of five layer
+# ids under a comment claiming it was "every label layer". By take 89 the style
+# had eleven symbol layers and six escaped it — lake-label, lbl-trail-short,
+# poi-label, lbl-ref, lbl-lake, lbl-stream — four of them added two takes
+# earlier without a thought for the list meant to govern them.
+#
+# Third time a copy of a set has drifted from the set (landmine 107): the
+# palette, the CI dep attribution, and now this.
+def check_layer_control():
+    src = read("src", "app.html")
+    if not src:
+        return
+    # Match any USE of LBL, not only its declaration. The first version looked
+    # for `var LBL=[` and passed a tree where the declaration was gone and a
+    # second call site survived — `LBL is not defined` at runtime, caught by the
+    # browser and not by this check (take 90).
+    # Match a USE of LBL, not the letters. The first version looked only for
+    # `var LBL=[` and passed a tree whose declaration was gone with a call site
+    # still standing (`LBL is not defined` at runtime). The second matched the
+    # word anywhere and failed on a COMMENT describing the old bug.
+    if re.search(r"\bLBL\s*[.\[=]", src.replace("DESTLBL", "")):
+        return fails.append(
+            "src/app.html has a hand-kept LBL array again — a copy of the label "
+            "set drifts from the style the moment a layer is added (take 90)")
+    if "function labelLayers(" not in src:
+        return fails.append(
+            "src/app.html has no labelLayers() — the Labels control would be "
+            "driven by a list rather than by the style")
+    m = re.search(r"var LYRGROUPS=\[(.*?)\n\];", src, re.S)
+    if not m:
+        return fails.append("src/app.html has no LYRGROUPS — the layers panel "
+                            "would have nothing to offer")
+    # every layer a group claims to govern must actually exist in the style,
+    # or the toggle is dead and looks like a broken feature
+    have = set(re.findall(r"\{id:'([a-z0-9-]+)',type:'(?:line|fill|symbol|circle|raster)'", src))
+    if not have:
+        return fails.append("cannot read the style's layer ids")
+    bad = []
+    for lst in re.findall(r"ids:\[([^\]]*)\]", m.group(1)):
+        for lid in re.findall(r"'([a-z0-9-]+)'", lst):
+            if lid not in have:
+                bad.append(lid)
+    if bad:
+        return fails.append(
+            f"layers panel governs {', '.join(sorted(set(bad)))}, which the style "
+            f"does not define — a toggle that moves nothing reads as a bug")
+    n = len(re.findall(r"\{k:'", m.group(1)))
+    syms = len(re.findall(r"\{id:'[a-z0-9-]+',type:'symbol'", src))
+    notes.append(f"layer control: {n} group(s) in one panel, label set derived "
+                 f"from the style ({syms} symbol layers)")
+
+
+
+
+# ── 4i. A region switch must leave nothing behind ───────────────────────────
+# A94, take 96. `region.DERIVED` was a hand-kept list of twelve while the
+# pipeline produced seven more — address, context, other, poi, contour,
+# imagery_tiles/ and dem_meta. A leftover payload is the previous region's data
+# wearing this region's name, with every hash correct: landmine 37 exactly, and
+# invisible because nothing errors.
+#
+# Checked against what the TOOLS ACTUALLY WRITE rather than against a list, so
+# the next payload someone invents is caught the day it is written.
+def check_region_clean():
+    import importlib.util, glob as _g
+    rp = os.path.join(HERE, "region.py")
+    if not os.path.exists(rp):
+        return fails.append("tools/region.py missing")
+    spec = importlib.util.spec_from_file_location("_rg", rp)
+    m = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(m)
+    except Exception as e:
+        return fails.append(f"region.py will not load: {e}")
+    if not hasattr(m, "derived_files"):
+        return fails.append(
+            "region.py has no derived_files() — the clear-list would be "
+            "hand-kept, and it has drifted every time it has been (take 96)")
+
+    # what does any tool actually write into the repo root?
+    writes = set()
+    for fn in sorted(os.listdir(HERE)):
+        if not fn.endswith(".py"):
+            continue
+        src = read("tools", fn) or ""
+        for mm in re.finditer(r'["\']([a-z0-9_]+_payload\.json|imagery_tiles\.json|'
+                              r'dem_meta\.json|imagery_meta\.json|imagery_budget\.json|'
+                              r'aoi\.json|authoritative\.json|graph_raw\.json|'
+                              r'hillshade\.jpg|imagery\.jpg)["\']', src):
+            writes.add(mm.group(1))
+    # `derived_files()` globs what is ON DISK, which is right for clearing and
+    # wrong for checking: a seed has no payloads, so the glob returns nothing
+    # and the check reported that nothing would be cleared. It must reason about
+    # the RULE, not the current directory (take 96 — caught by the seed-mode
+    # gate, which is exactly what that mode is for).
+    src_rg = read("tools", "region.py") or ""
+    # Match the GLOB CALL, not the letters — the same pattern appears in the
+    # comment above it, so a plain substring test passed a region.py that had
+    # stopped globbing (take 96, landmine 127's corollary, on both sides: my
+    # check matched the comment and so did my control's mutation).
+    globs_payloads = bool(re.search(r"glob\([^)]*\*_payload\.json", src_rg))
+    if not globs_payloads:
+        return fails.append(
+            "region.py no longer clears by the *_payload.json convention — a "
+            "hand-kept list has drifted every time it has been used (take 96)")
+    extra = set(getattr(m, "DERIVED_EXTRA", []))
+    # anything matching the convention is covered by the glob; the rest must be
+    # named explicitly
+    missed = sorted(f for f in writes
+                    if not f.endswith("_payload.json") and f not in extra)
+    if missed:
+        return fails.append(
+            f"a region switch would leave {', '.join(missed)} behind — the next "
+            f"region inherits the last one's data with every hash correct "
+            f"(landmine 37)")
+    # The CI cache list is the same set as the clear list, and it drifted the
+    # same way: poi, contour and corridor were all absent, so every build re-ran
+    # steps whose output it already had. Checked against the convention rather
+    # than against a list, for the same reason (take 107).
+    yml = read("ci", "build.yml") or ""
+    if yml and "actions/cache" in yml:
+        # Scope to the `path: |` block, not the whole file. Testing the file
+        # matched the words inside THIS CHECK'S OWN COMMENT, so two of three
+        # controls passed on a cache list that had been gutted. Third time that
+        # mistake has been made here (takes 96, 98, 107) — the lesson is not
+        # "beware comments", it is SCAN THE STRUCTURE, NOT THE TEXT.
+        blk = ""
+        mblk = re.search(r"path:\s*\|\n((?:\s{2,}\S.*\n)+)", yml)
+        if mblk:
+            blk = "".join(ln for ln in mblk.group(1).splitlines(True)
+                          if not ln.lstrip().startswith("#"))
+        if not blk:
+            fails.append("ci/build.yml has an actions/cache with no readable "
+                         "path block")
+        elif "*_payload.json" not in blk:
+            fails.append(
+                "ci/build.yml caches payloads by name instead of by the "
+                "*_payload.json convention — it has already missed three "
+                "(landmine 170)")
+        for need in ("osm_cache", "dem_cache", "img_cache"):
+            if blk and need not in blk:
+                fails.append(f"ci/build.yml does not cache {need} — every build "
+                             f"re-fetches it")
+    dirs = getattr(m, "DERIVED_DIRS", [])
+    if "imagery_tiles" not in dirs:
+        return fails.append(
+            "imagery_tiles/ is not cleared on a region switch — 2,008 tiles of "
+            "the previous region's ground, and os.remove cannot delete a "
+            "directory")
+    # A95: an anchor outside its own bbox is a chip that pans the rider to blank
+    # ground with no explanation, and a search hit that does the same. sthelen
+    # carried two — Roscommon 2.5 km out and Houghton Lake 16.2 km out — since
+    # the region was defined. Hand-typed coordinates are exactly what A72 will
+    # multiply, so this is checked at build time rather than found in the field.
+    try:
+        cfg = json.load(open(os.path.join(ROOT, "regions.json")))
+    except Exception as e:
+        return fails.append(f"regions.json unreadable: {e}")
+    stray = []
+    for rid, r in (cfg.get("regions") or {}).items():
+        bb = r.get("bbox")
+        if not bb or len(bb) != 4:
+            fails.append(f"region {rid} has no usable bbox")
+            continue
+        W, S, E, N = bb
+        for a in r.get("anchors") or []:
+            if not isinstance(a, list) or len(a) < 3:
+                continue
+            nm, lo, la = a[0], a[1], a[2]
+            if not (W <= lo <= E and S <= la <= N):
+                dx = max(W - lo, lo - E, 0) * 111.32 * 0.714
+                dy = max(S - la, la - N, 0) * 111.32
+                stray.append(f"{rid}/{nm} {(dx*dx+dy*dy)**0.5:.1f} km outside")
+    if stray:
+        return fails.append(
+            "anchors outside their own region: " + "; ".join(stray) +
+            " — the chip pans the rider off the map to ground the bundle does "
+            "not cover, and says nothing about why (A95)")
+
+    notes.append(f"region switch: clears *_payload.json by convention plus "
+                 f"{len(extra)} named artifact(s) and "
+                 f"{len(dirs)} directory; every anchor inside its bbox")
 
 
 # Items without a ruled-out line get re-derived from scratch every session.
@@ -754,7 +979,11 @@ def check_ci_deps():
             out |= closure(dep, seen)
         return out
 
-    PKG = {"PIL": "pillow", "yaml": "pyyaml", "cv2": "opencv-python"}
+    # Import name -> pip name, for the packages where they differ. Adding a
+    # dependency whose import name is not its package name means adding it here
+    # too, or the check reports it missing when it is installed (take 91).
+    PKG = {"PIL": "pillow", "yaml": "pyyaml", "cv2": "opencv-python",
+           "skimage": "scikit-image", "sklearn": "scikit-learn"}
     problems = []
     dirs = [os.path.join(ROOT, "ci")]
     if not os.environ.get("APEX_GATE_SEED"):
@@ -1249,6 +1478,8 @@ def check_manifest():
 for fn in (check_handoff, check_stamps, check_offline,
            check_style, check_palette, check_machine_legality,
            check_ledgers, check_osm_fallback, check_drawn,
+           check_region_clean,
+           check_layer_control,
            check_artifacts_agree, check_agenda, check_syntax, check_stubs,
            check_orphan_sources, check_class_legality, check_workflow_yaml,
            check_checkout_ref,

@@ -25,6 +25,17 @@ S_, W_, N_, E_ = R.overpass_bbox
 # have worked, answering HTTP 200 with an empty set — which is exactly why
 # landmine 74's empty-result guard exists. The guard was right; the mirror was
 # never valid. A fallback needs the same reachability test as a primary (A102).
+# A110 · the places a rider stops. Fuel closes a loop the app already half-had:
+# it has costed routes against a fuel range since take 36 and never showed where
+# fuel IS. Named features only reach the map (see poi.py) — 205 unnamed parking
+# areas in this region would be clutter, not information.
+POI_TAGS = {
+    "amenity": ["fuel", "parking", "restaurant", "cafe", "toilets",
+                "drinking_water", "shelter"],
+    "tourism": ["camp_site", "picnic_site", "viewpoint", "information"],
+    "shop":    ["convenience", "supermarket", "general"],
+}
+
 OVERPASS_MIRRORS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
@@ -223,11 +234,29 @@ def fetch_osm(path="aoi.json"):
                 return
         except Exception:
             print(f"osm: {path} unreadable — refetching")
+    # A110. Places you can ride TO, not just line to ride on. `nwr` because a
+    # boat launch is usually a node, a campground usually a way, and OSM does
+    # not promise either. Existing consumers are unaffected: graph.py and
+    # pack.py both skip elements with no `geometry`, which is what a node is.
+    #
+    # This list is the ONE definition. tools/osm_local.py reads it back out of
+    # this file and refuses to run if the two have drifted, because the
+    # Geofabrik path must fetch the same tags as the Overpass path or a
+    # fallback build quietly ships a different map (landmine 107).
+    poi = "|".join(sorted(POI_TAGS["amenity"]))
+    tour = "|".join(sorted(POI_TAGS["tourism"]))
+    shop = "|".join(sorted(POI_TAGS["shop"]))
     q = f"""[out:json][timeout:240];
 (
   way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|track|path|footway|bridleway|cycleway|raceway)$"]({S_},{W_},{N_},{E_});
   way["waterway"~"^(river|stream)$"]({S_},{W_},{N_},{E_});
   way["natural"="water"]({S_},{W_},{N_},{E_});
+  nwr["amenity"~"^({poi})$"]({S_},{W_},{N_},{E_});
+  nwr["tourism"~"^({tour})$"]({S_},{W_},{N_},{E_});
+  nwr["shop"~"^({shop})$"]({S_},{W_},{N_},{E_});
+  nwr["leisure"="slipway"]({S_},{W_},{N_},{E_});
+  nwr["natural"="beach"]({S_},{W_},{N_},{E_});
+  node["natural"="peak"]({S_},{W_},{N_},{E_});
 );
 out geom;"""
     # Overpass returns 406 to urllib's default user-agent. Identify properly —
@@ -312,7 +341,12 @@ DNR_LAYERS = [
     (14, "TrailNamePrimary", "mccct"),  # cross-country cycle trail
 ]
 for lid, namefield, cls in DNR_LAYERS:
-    fields = f"{namefield},TrailNamePrimary,TrailWidthFeet,OpenClosedStatusORV,LicenseType,TrailOnRoad"
+    # A101. SpecialRestrictionType carries real law — 180 features statewide,
+    # 67 of which read "Off road motorcycles are prohibited". ZERO are in the
+    # Bull Gap box, so this changes nothing today and is built precisely because
+    # it changes everything the moment A72 widens the region.
+    fields = (f"{namefield},TrailNamePrimary,TrailWidthFeet,OpenClosedStatusORV,"
+              f"LicenseType,TrailOnRoad,SpecialRestrictionType")
     for f in query(DNR, lid, fields):
         a = f["properties"]
         status = clean(a.get("OpenClosedStatusORV")) or "Unknown"
@@ -325,6 +359,10 @@ for lid, namefield, cls in DNR_LAYERS:
             "st": status,
             "lic": clean(a.get("LicenseType")),
             "onroad": clean(a.get("TrailOnRoad")),
+            # "-1" is the DNR's null sentinel and appears on 1,877 of 1,889
+            # routes; it is not a restriction and must not read as one.
+            "rst": (lambda v: v if v and v != "-1" else None)(
+                clean(a.get("SpecialRestrictionType"))),
         })
 
 def pick(a, *names):

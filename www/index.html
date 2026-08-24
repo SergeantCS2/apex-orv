@@ -25,14 +25,68 @@
      screen: the 4th and 5th options existed but were unreachable and the strip
      could not scroll because nothing was overflowing (take 35). */
   #shell>*{min-width:0}
-  #shell{display:grid;grid-template-rows:1fr auto;height:100dvh;
-    padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+  /* A third row for the destination bar. The rail keeps its own scroll; the bar
+     is always reachable without hunting a horizontally scrolling strip. */
+  #tabs{display:grid;grid-template-columns:repeat(4,1fr);
+    border-top:1px solid var(--line);background:rgba(20,18,15,.98)}
+  .tab{appearance:none;border:0;background:none;cursor:pointer;
+    color:#9C9384;font:700 var(--t-sm)/1 Roboto,system-ui,sans-serif;
+    letter-spacing:.14em;text-transform:uppercase;
+    padding:13px 4px calc(13px + env(safe-area-inset-bottom));
+    min-height:52px;border-top:2px solid transparent;
+    transition:color .16s ease, border-color .16s ease}
+  .tab.on{color:var(--bone);border-top-color:var(--flag)}
+  .tab:active{color:var(--bone)}
+  /* chips not belonging to the open destination */
+  .chip[hidden]{display:none}
+  /* ── TYPE SCALE (take 100) ─────────────────────────────────────────────
+     Sixteen distinct font sizes across 44 declarations, each chosen on its own
+     — 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12, 12.5, 13, 14, 15, 17, 18, 30.
+     That is not a scale, it is 44 separate decisions, and it reads as one.
+     Six steps. Every size moved to its NEAREST step, so nothing shifted more
+     than a pixel and the four-device layout matrix could catch anything that
+     did. Map label sizes are a different system — MapLibre text-size
+     expressions, tuned against satellite at take 57 — and are deliberately not
+     forced into this. */
+  :root{--t-xs:9px;--t-sm:11px;--t-md:12.5px;--t-lg:15px;--t-xl:18px;--t-xxl:30px;
+    /* ── MOTION (take 100) ───────────────────────────────────────────────
+       One transition existed in 3,667 lines. Panels appeared and vanished
+       between frames, which is most of what "feels cheap" actually is.
+       Fast and few: 150 ms, ease-out, and only on things that appear, change
+       state or are pressed. Nothing loops, nothing bounces, nothing on the map
+       — a rider glancing down mid-trail does not want the interface moving. */
+    --m-fast:110ms;--m-base:150ms;--m-ease:cubic-bezier(.2,.7,.3,1)}
+
+  /* Panels rise rather than blink. transform+opacity only — both composite on
+     the GPU, so this costs no layout work on a phone that is also drawing a
+     map. */
+  #lyrpanel,#actpanel{transform-origin:top left;
+    transition:opacity var(--m-base) var(--m-ease),
+               transform var(--m-base) var(--m-ease)}
+  #lyrpanel[hidden],#actpanel[hidden]{display:block !important;
+    opacity:0;transform:translateY(-6px) scale(.98);pointer-events:none;
+    visibility:hidden}
+  .chip,.basebtn,.act{transition:background-color var(--m-fast) var(--m-ease),
+    color var(--m-fast) var(--m-ease),border-color var(--m-fast) var(--m-ease)}
+  .chip:active,.act:active{transform:scale(.97)}
+  .actrow{transition:background-color var(--m-fast) var(--m-ease)}
+  #panel{transition:opacity var(--m-fast) var(--m-ease)}
+
+  /* Someone who has asked their phone to stop animating has asked for a
+     reason, and on a bike in the sun that reason may be legibility. */
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{transition-duration:1ms !important;
+      animation-duration:1ms !important}
+    #lyrpanel[hidden],#actpanel[hidden]{display:none !important}
+  }
+  #shell{display:grid;grid-template-rows:1fr auto auto;height:100dvh;
+    padding-top:env(safe-area-inset-top)}
   #bar[hidden]{display:none}
   #bar{display:flex;align-items:center;gap:6px;padding:9px 13px;border-bottom:1px solid var(--line)}
-  #title{font-size:11px;font-weight:700;font-stretch:condensed;letter-spacing:.17em;
+  #title{font-size:var(--t-sm);font-weight:700;font-stretch:condensed;letter-spacing:.17em;
     text-transform:uppercase;margin-right:auto}
   #title b{color:var(--flag)}
-  .badge{font:600 9px/1 ui-monospace,monospace;letter-spacing:.08em;padding:5px 6px;
+  .badge{font:600 var(--t-xs)/1 ui-monospace,monospace;letter-spacing:.08em;padding:5px 6px;
     border-radius:2px;background:var(--line);color:var(--dim);white-space:nowrap}
   .badge.good{background:rgba(143,174,99,.18);color:var(--ok)}
   .badge.bad{background:rgba(226,87,15,.2);color:var(--flag)}
@@ -40,44 +94,77 @@
   #stage{position:relative;min-height:0}
   #map{position:absolute;inset:0;background:var(--sand)}
   .basebtn{position:absolute;left:11px;top:104px;z-index:4;
-    font:700 11.5px/1 Roboto,system-ui,sans-serif;letter-spacing:.02em;
+    font:700 var(--t-sm)/1 Roboto,system-ui,sans-serif;letter-spacing:.02em;
     color:#fff;background:rgba(24,22,18,.82);border:1px solid rgba(255,255,255,.28);
     border-radius:8px;padding:8px 11px;min-height:38px}
   .basebtn.on{background:rgba(226,87,15,.92);border-color:rgba(255,255,255,.5)}
   .actbtn{top:150px}
+  #lyrpanel{position:absolute;left:11px;top:150px;z-index:6;max-width:min(248px,76vw);
+    background:rgba(24,22,18,.96);border:1px solid rgba(255,255,255,.22);
+    border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45);
+    max-height:70vh;overflow-y:auto}
+  #lyrpanel[hidden]{display:none}
+  /* Anchored above the destination bar, where the Tools tab is. */
+  #cmppanel{position:absolute;left:11px;right:11px;bottom:64px;z-index:6;
+    background:rgba(24,22,18,.96);border:1px solid rgba(255,255,255,.22);
+    border-radius:10px;padding:10px 12px;box-shadow:0 6px 22px rgba(0,0,0,.45);
+    color:#F2ECE0;font:600 var(--t-sm)/1.5 Roboto,system-ui,sans-serif;
+    max-height:62vh;overflow-y:auto;transform-origin:bottom left;
+    transition:opacity var(--m-base) var(--m-ease),
+               transform var(--m-base) var(--m-ease)}
+  #cmppanel[hidden]{opacity:0;transform:translateY(6px) scale(.98);
+    pointer-events:none;visibility:hidden}
+  #diagpanel{position:absolute;left:11px;right:11px;bottom:64px;z-index:6;
+    background:rgba(24,22,18,.96);border:1px solid rgba(255,255,255,.22);
+    border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45);
+    display:flex;flex-direction:column;gap:5px;
+    transform-origin:bottom left;
+    transition:opacity var(--m-base) var(--m-ease),
+               transform var(--m-base) var(--m-ease)}
+  #diagpanel[hidden]{opacity:0;transform:translateY(6px) scale(.98);
+    pointer-events:none;visibility:hidden}
+  #diagpanel .sect{font:700 var(--t-xs)/1 Roboto,system-ui,sans-serif;
+    letter-spacing:.14em;text-transform:uppercase;color:#9C9384;padding:6px 8px 2px}
+  #diagpanel .chip{width:100%;justify-content:flex-start}
+  #lyrpanel .sect{font:700 var(--t-xs)/1 Roboto,system-ui,sans-serif;letter-spacing:.14em;
+    text-transform:uppercase;color:#9C9384;padding:8px 8px 5px}
   #actpanel{position:absolute;left:11px;top:196px;z-index:5;max-width:min(232px,72vw);
     background:rgba(24,22,18,.95);border:1px solid rgba(255,255,255,.22);
     border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45)}
   #actpanel[hidden]{display:none}
   .actrow{display:flex;align-items:center;gap:9px;width:100%;min-height:38px;
     padding:5px 8px;background:none;border:0;border-radius:7px;color:#F2ECE0;
-    font:600 12.5px/1.2 Roboto,system-ui,sans-serif;text-align:left}
+    font:600 var(--t-md)/1.2 Roboto,system-ui,sans-serif;text-align:left}
   .actrow.on{background:rgba(226,87,15,.9);color:#fff}
   /* Legend-only rows: they explain a colour, they do not filter by it. Indented
      under the activity they belong to, quieter, and not tappable. The 38 px
      tap-target minimum (take 37) applies to CONTROLS; this is not one, so the
      on-device layout check must not read it as an undersized button. */
   .actrow.tierrow{min-height:26px;padding-left:22px;opacity:.82;
-    font-size:11.5px;cursor:default;background:none}
+    font-size:var(--t-sm);cursor:default;background:none}
   .sw{flex:0 0 auto;width:22px;height:5px;border-radius:3px;
     box-shadow:0 0 0 1.5px rgba(255,255,255,.85)}
   .sw.dash{background-image:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 9px)}
   #readout{position:absolute;left:13px;top:82px;pointer-events:none;z-index:3;
-    font:700 12px/1.25 Roboto,system-ui,sans-serif;color:#fff;
+    font:700 var(--t-md)/1.25 Roboto,system-ui,sans-serif;color:#fff;
     text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 2px rgba(0,0,0,.9)}
   .maplibregl-ctrl-scale{background:transparent!important;border:none!important;
     border-bottom:2px solid rgba(255,255,255,.95)!important;
-    color:#fff!important;font:700 11px/1.2 Roboto,system-ui,sans-serif!important;
+    color:#fff!important;font:700 var(--t-sm)/1.2 Roboto,system-ui,sans-serif!important;
     text-shadow:0 1px 3px rgba(0,0,0,.85);padding:0 0 1px!important;margin:0!important}
   .maplibregl-ctrl-bottom-left{left:9px;bottom:auto;top:60px}
-  .maplibregl-ctrl-attrib{font-size:9px}.maplibregl-ctrl-top-right{display:none}
+  .maplibregl-ctrl-attrib{font-size:var(--t-xs)}.maplibregl-ctrl-top-right{display:none}
   .strip{position:absolute;left:0;right:0;display:flex;gap:6px;padding:8px 11px;
     overflow-x:auto;scrollbar-width:none}
   .strip::-webkit-scrollbar{display:none}
   #chips{top:0;background:linear-gradient(180deg,rgba(228,215,188,.96),rgba(228,215,188,0))}
   #tools{bottom:0;background:linear-gradient(0deg,rgba(228,215,188,.96),rgba(228,215,188,0))}
+  /* An icon inside a control: inherits colour, sits on the text baseline, and
+     never stretches — flex would squash it in a narrow chip. */
+  .ic{flex:0 0 auto;margin-right:6px;vertical-align:-2px;opacity:.9}
+  .tab .ic{display:block;margin:0 auto 4px;opacity:1}
   .chip{flex:0 0 auto;appearance:none;border:1px solid rgba(28,26,23,.22);
-    background:rgba(245,239,226,.94);color:var(--ink);font:600 11px/1 Roboto,system-ui,sans-serif;
+    background:rgba(245,239,226,.94);color:var(--ink);font:600 var(--t-sm)/1 Roboto,system-ui,sans-serif;
     padding:12px 13px;border-radius:16px;cursor:pointer;white-space:nowrap;
     min-height:38px;display:inline-flex;align-items:center}
   .chip:active{background:var(--ink);color:var(--bone)}
@@ -85,7 +172,7 @@
   .chip.arm{background:var(--flag);color:#fff;border-color:var(--flag)}
   .pin{width:26px;height:26px;border-radius:50%;border:3px solid #fff;
     box-shadow:0 1px 4px rgba(0,0,0,.5);display:grid;place-items:center;
-    font:700 12px/1 Roboto,sans-serif;color:#fff}
+    font:700 var(--t-md)/1 Roboto,sans-serif;color:#fff}
   .pin.home{background:#2E5E3E}.pin.you{background:#0A84FF;border-color:#F5EFE2;box-shadow:0 0 0 4px rgba(10,132,255,.28)}
 .pin.me{background:#00A8E8}
   .pin.truck{background:#8A4B14}
@@ -101,10 +188,10 @@
   #hudticks i{position:absolute;top:0;width:1px;background:rgba(255,255,255,.5)}
   #hudticks i.maj{background:rgba(255,255,255,.9)}
   #hudticks b{position:absolute;top:11px;transform:translateX(-50%);
-    font:700 11px/1 Roboto,system-ui,sans-serif;color:#fff;letter-spacing:.04em;
+    font:700 var(--t-sm)/1 Roboto,system-ui,sans-serif;color:#fff;letter-spacing:.04em;
     text-shadow:0 1px 2px rgba(0,0,0,.9)}
   #hudhint{position:absolute;inset:0;display:flex;align-items:center;
-    justify-content:center;font:700 10.5px/1 Roboto,system-ui,sans-serif;
+    justify-content:center;font:700 var(--t-sm)/1 Roboto,system-ui,sans-serif;
     color:rgba(255,255,255,.72);letter-spacing:.04em}
   #hudhint[hidden]{display:none}
   #hudneedle{position:absolute;left:50%;top:0;width:2px;height:30px;
@@ -113,31 +200,31 @@
     text-align:right;color:#fff;
     text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 2px rgba(0,0,0,.9)}
   #hudstats[hidden]{display:none}
-  #hud-spd{font:700 30px/1 Roboto,system-ui,sans-serif}
-  #hud-spd .hu{font-size:12px;font-weight:700;margin-left:3px;opacity:.9}
-  #hud-trip{font:700 11.5px/1.3 Roboto,system-ui,sans-serif;margin-top:2px;opacity:.95}
-  #alert{position:absolute;left:11px;right:11px;top:54px;background:#C1121F;color:#fff;    border-radius:4px;padding:11px 13px;font:700 13px/1.35 Roboto,system-ui,sans-serif;
+  #hud-spd{font:700 var(--t-xxl)/1 Roboto,system-ui,sans-serif}
+  #hud-spd .hu{font-size:var(--t-md);font-weight:700;margin-left:3px;opacity:.9}
+  #hud-trip{font:700 var(--t-sm)/1.3 Roboto,system-ui,sans-serif;margin-top:2px;opacity:.95}
+  #alert{position:absolute;left:11px;right:11px;top:54px;background:#C1121F;color:#fff;    border-radius:4px;padding:11px 13px;font:700 var(--t-md)/1.35 Roboto,system-ui,sans-serif;
     box-shadow:0 3px 12px rgba(0,0,0,.4);display:none}
   #alert.on{display:block}
-  #alert small{display:block;font-weight:400;font-size:11px;opacity:.9;margin-top:3px}
+  #alert small{display:block;font-weight:400;font-size:var(--t-sm);opacity:.9;margin-top:3px}
   .crumb{stroke:#00A8E8}
 
   #rail{border-top:2px solid var(--flag);padding:10px 13px 9px;
     font-family:ui-monospace,"Roboto Mono",monospace}
-  #coords{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
-  #coords .unit{color:var(--dim);font-size:11px}
+  #coords{font-size:var(--t-xl);font-weight:600;font-variant-numeric:tabular-nums}
+  #coords .unit{color:var(--dim);font-size:var(--t-sm)}
   #grid{margin-top:7px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
     background:var(--line);border:1px solid var(--line)}
   .cell{background:var(--rail);padding:6px 8px}
-  .k{font-size:8px;letter-spacing:.13em;color:var(--dim);text-transform:uppercase}
-  .v{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+  .k{font-size:var(--t-xs);letter-spacing:.13em;color:var(--dim);text-transform:uppercase}
+  .v{font-size:var(--t-lg);font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
   .v.warn{color:var(--flag)}.v.good{color:var(--ok)}
-  #panel{margin-top:7px;font-size:11px;line-height:1.5;color:#9A9184;min-height:46px}
+  #panel{margin-top:7px;font-size:var(--t-sm);line-height:1.5;color:#9A9184;min-height:46px}
   #panel b{color:var(--bone);font-weight:600}
   #panel.fail b{color:var(--flag)}#panel.pass b{color:var(--ok)}
-  #panel .tn{font-family:Roboto,system-ui,sans-serif;font-size:14px;color:var(--bone);
+  #panel .tn{font-family:Roboto,system-ui,sans-serif;font-size:var(--t-lg);color:var(--bone);
     font-weight:700}
-  .tag{display:inline-block;font-size:8.5px;letter-spacing:.09em;text-transform:uppercase;
+  .tag{display:inline-block;font-size:var(--t-xs);letter-spacing:.09em;text-transform:uppercase;
     padding:2px 5px;border-radius:2px;margin-right:4px;background:var(--line);color:var(--bone)}
   .tag.legal{background:rgba(46,94,62,.5);color:#B8D9C2}
   .tag.adv{background:rgba(166,153,127,.3);color:#D8CDB6}
@@ -146,25 +233,25 @@
   #srch{display:none;margin-top:8px}
   #srch.on{display:block}
   #q{width:100%;appearance:none;border:1px solid #3A342C;background:#0F0D0B;
-    color:var(--bone);font:600 15px/1 Roboto,system-ui,sans-serif;padding:12px 11px;
+    color:var(--bone);font:600 var(--t-lg)/1 Roboto,system-ui,sans-serif;padding:12px 11px;
     border-radius:3px;outline:none}
   #q:focus{border-color:var(--flag)}
   #hits{max-height:132px;overflow-y:auto;margin-top:6px}
   .hit{padding:9px 10px;border-bottom:1px solid #241F1A;cursor:pointer;
-    font:400 12px/1.35 Roboto,system-ui,sans-serif;color:#9A9184}
+    font:400 var(--t-md)/1.35 Roboto,system-ui,sans-serif;color:#9A9184}
   .hit:active{background:#211E19}
-  .hit b{color:var(--bone);font-weight:700;font-size:13px}
-  .hit i{font-style:normal;color:var(--dim);font-size:9.5px;letter-spacing:.08em;
+  .hit b{color:var(--bone);font-weight:700;font-size:var(--t-md)}
+  .hit i{font-style:normal;color:var(--dim);font-size:var(--t-xs);letter-spacing:.08em;
     text-transform:uppercase;margin-left:6px}
   #steps{max-height:150px;overflow-y:auto;margin-top:4px}
   .st{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid #241F1A}
-  .st .ar{flex:0 0 22px;font:700 15px/1.2 Roboto,system-ui,sans-serif;color:var(--flag);
+  .st .ar{flex:0 0 22px;font:700 var(--t-lg)/1.2 Roboto,system-ui,sans-serif;color:var(--flag);
     text-align:center}
-  .st .tx{flex:1;font:400 11.5px/1.4 Roboto,system-ui,sans-serif;color:#9A9184}
+  .st .tx{flex:1;font:400 var(--t-sm)/1.4 Roboto,system-ui,sans-serif;color:#9A9184}
   .st .tx b{color:var(--bone);font-weight:700}
-  .st .d{flex:0 0 52px;text-align:right;font:600 11px/1.4 ui-monospace,monospace;
+  .st .d{flex:0 0 52px;text-align:right;font:600 var(--t-sm)/1.4 ui-monospace,monospace;
     color:var(--dim)}
-  .st .at{font:600 9.5px/1.3 ui-monospace,monospace;color:#6F6659;margin-top:2px}
+  .st .at{font:600 var(--t-xs)/1.3 ui-monospace,monospace;color:#6F6659;margin-top:2px}
   .st .unn{font-style:italic;color:#8A8175}
   #routes{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;margin-top:2px;
     max-width:100%;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
@@ -177,20 +264,20 @@
      rendered touching (take 68). */
   .prof{margin:6px 0 2px;width:100%}
   .profax{display:flex;justify-content:space-between;align-items:baseline;
-    width:100%;font:600 9.5px/1 ui-monospace,monospace;color:var(--dim);
+    width:100%;font:600 var(--t-xs)/1 ui-monospace,monospace;color:var(--dim);
     margin-top:3px}
   .rc{flex:0 0 152px;background:#1B1813;border:1px solid #332D25;border-radius:4px;
     padding:9px 10px;cursor:pointer}
   .rc.sel{border-color:var(--route);background:#0E2029}
-  .rc h5{margin:0 0 4px;font:700 11px/1.2 Roboto,system-ui,sans-serif;color:var(--bone);
+  .rc h5{margin:0 0 4px;font:700 var(--t-sm)/1.2 Roboto,system-ui,sans-serif;color:var(--bone);
     letter-spacing:.02em}
-  .rc .big{font-size:17px;font-weight:700;color:var(--bone);font-variant-numeric:tabular-nums}
-  .rc .sub{font-size:9px;color:var(--dim);line-height:1.5;margin-top:3px}
+  .rc .big{font-size:var(--t-xl);font-weight:700;color:var(--bone);font-variant-numeric:tabular-nums}
+  .rc .sub{font-size:var(--t-xs);color:var(--dim);line-height:1.5;margin-top:3px}
   .rc .warn{color:var(--flag)}
   .rc .good{color:var(--ok)}
   #actions{display:flex;gap:6px;margin-top:9px}
   button.act{flex:1;appearance:none;border:1px solid #3A342C;background:#211E19;color:var(--bone);
-    font:600 10.5px/1 Roboto,system-ui,sans-serif;font-stretch:condensed;letter-spacing:.11em;
+    font:600 var(--t-sm)/1 Roboto,system-ui,sans-serif;font-stretch:condensed;letter-spacing:.11em;
     text-transform:uppercase;padding:13px 4px;border-radius:3px;cursor:pointer}
   button.act:active{background:var(--line)}
   button.act:focus-visible{outline:2px solid var(--flag);outline-offset:2px}
@@ -206,7 +293,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 88</span>
+    <span id="title"><b>APEX</b> ORV · Take 108</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -220,12 +307,30 @@
     <!-- Map detail sits under the scale, top-left, where onX and every other
          off-road app puts it — not buried in a horizontally scrolling strip
          where you have to find it (take 62). -->
-    <button id="c-base" class="basebtn">🗺 Map</button>
+    <button id="c-base" class="basebtn">__IC_map__<span>Map</span></button>
     <!-- Activity filter, and the legend. Eight colours accumulated with nothing
          telling a rider what any of them mean; this says so and filters at the
          same time (take 67). -->
-    <button id="c-act" class="basebtn actbtn">🏍 All routes</button>
+    <button id="c-act" class="basebtn actbtn">__IC_vehicle__<span>All routes</span></button>
     <div id="actpanel" hidden></div>
+    <!-- A91 · one place that owns what is on the map. The tools strip had
+         reached sixteen chips with basemap, relief and labels scattered among
+         ride actions, and the 59 places added at take 89 had no toggle at all.
+         Layers belong together and ride actions belong together. -->
+    <div id="lyrpanel" hidden></div>
+    <!-- The diagnostics sub-menu. The three buttons keep their ids and their
+         handlers and simply live in here now, so everything that clicks them —
+         the smoke harness included — is unaffected. -->
+    <!-- A119 · the compass. Its own panel rather than a card, because it updates
+         as fixes arrive and the panel is where the app already puts things that
+         stay on screen while you use them. -->
+    <div id="cmppanel" hidden><div id="cmpbox"></div></div>
+    <div id="diagpanel" hidden>
+      <div class="sect">Diagnostics</div>
+      <button class="chip" id="c-about">__IC_info__<span>About this build</span></button>
+      <button class="chip" id="c-selftest">__IC_shield__<span>Self-test</span></button>
+      <button class="chip" id="c-pan">__IC_clock__<span>Pan test</span></button>
+    </div>
     <!-- ── RIDE HUD (take 78) ──────────────────────────────────────────────
          Only on screen while a ride is running. On a bike the two questions are
          "which way am I pointing" and "how fast am I going", and until now the
@@ -243,21 +348,23 @@
     <div class="strip" id="chips"></div>
     <div id="alert"></div>
     <div class="strip" id="tools">
-      <button class="chip" id="c-machine">🏍 Dirt bike 24"</button>
-      <button class="chip" id="c-home">⌂ Set home</button>
-      <button class="chip" id="c-me">◎ I'm here</button>
-      <button class="chip" id="c-fuel">⛽ 50 mi</button>
-      <button class="chip" id="c-ride">▶ Ride it</button>
-      <button class="chip" id="c-lost">😖 Wrong turn</button>
-      <button class="chip" id="c-locate">◉ Locate</button>
-      <button class="chip" id="c-pan">⏱ Pan test</button>
-      <button class="chip" id="c-relief">⛰ Relief</button>
-      <button class="chip" id="c-labels">🏷 Labels</button>
-      <button class="chip" id="c-about">ⓘ About</button>
-      <button class="chip" id="c-loop">◯ Loop</button>
-      <button class="chip" id="c-saved">☆ Saved</button>
-      <button class="chip" id="c-selftest">⛑ Self-test</button>
-      <button class="chip" id="c-search">🔍 Search</button>
+      <!-- A119 · Tools became a real bucket at take 101. About, Self-test and
+           Pan test are DIAGNOSTICS, not tools — they went behind one entry so
+           the tab has room for the things a rider actually reaches for. -->
+      <button class="chip" data-tab="tools" id="c-compass">__IC_locate__<span>Compass</span></button>
+      <button class="chip" data-tab="tools" id="c-markme">__IC_pin__<span>Mark this spot</span></button>
+      <button class="chip" data-tab="tools" id="c-diag">__IC_shield__<span>Diagnostics</span></button>
+      <button class="chip" data-tab="map" id="c-layers">__IC_layers__<span>Layers</span></button>
+      <button class="chip" data-tab="plan" id="c-machine">__IC_vehicle__<span>Dirt bike 24&quot;</span></button>
+      <button class="chip" data-tab="plan" id="c-home">__IC_home__<span>Set home</span></button>
+      <button class="chip" data-tab="plan" id="c-me">__IC_here__<span>I'm here</span></button>
+      <button class="chip" data-tab="plan" id="c-fuel">__IC_fuel__<span>50 mi</span></button>
+      <button class="chip" data-tab="ride" id="c-ride">__IC_play__<span>Ride it</span></button>
+      <button class="chip" data-tab="ride" id="c-lost">__IC_alert__<span>Wrong turn</span></button>
+      <button class="chip" data-tab="map" id="c-locate">__IC_locate__<span>Locate</span></button>
+      <button class="chip" data-tab="plan" id="c-loop">__IC_loop__<span>Loop</span></button>
+      <button class="chip" data-tab="plan" id="c-saved">__IC_star__<span>Saved</span></button>
+      <button class="chip" data-tab="map" id="c-search">__IC_search__<span>Search</span></button>
     </div>
   </div>
 
@@ -282,6 +389,20 @@
       <button class="act primary" id="btn-home">Return home</button>
     </div>
   </div>
+  <!-- ── DESTINATIONS (A113, take 98) ────────────────────────────────────────
+       Fourteen actions lived in one horizontally scrolling row, in whatever
+       order they were written. A rider who did not build the app cannot tell
+       that Loop, Saved and Set home belong together, or that Self-test is not
+       something you press on a trail.
+       Four destinations. Every chip keeps its id, its handler and its place in
+       the DOM — only which ones are ON SCREEN changes, so nothing that clicks a
+       chip needs to know this exists. -->
+  <nav id="tabs">
+    <button class="tab on" data-go="map">__IC_map__<span>Map</span></button>
+    <button class="tab" data-go="plan">__IC_route__<span>Plan</span></button>
+    <button class="tab" data-go="ride">__IC_play__<span>Ride</span></button>
+    <button class="tab" data-go="tools">__IC_layers__<span>Tools</span></button>
+  </nav>
 </div>
 
 <script src="vendor/maplibre-gl-csp.js"></script>

@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 88.*
+*Current as of take 108.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -1789,3 +1789,485 @@ and the fix would have looked like a labelling bug rather than a duplication one
 
 A60 first was luck, not judgement. When two agenda items touch the same
 geometry, work out which one changes what the other one sees.
+
+**134. The same copied set will drift more than once.** `LBL` was a hand-kept
+array of label layer ids. It drifted at take 57 — `lbl-show` was missing, so on
+satellite the only names left were trails you may NOT ride — and was fixed by
+adding one id to the array. By take 89 it had drifted again, six layers behind a
+style with eleven, four of them added by me two takes earlier.
+
+Fixing a drifted copy by updating the copy guarantees a third occurrence. The
+fix is to stop keeping the copy: ask the map what layers it has. Third place
+this has happened here — the palette (77), the CI dependency attribution (84),
+and this — and each was fixed by deriving rather than by syncing.
+
+**Corollary — grep for USES, not for the declaration.** The gate check written
+to prevent a return of the array matched `var LBL=[`, and passed a tree where
+the declaration was gone and a second call site still stood. `LBL is not
+defined` was caught by the browser. Match `NAME` followed by `.`, `[` or `=`;
+and beware matching the word inside a comment describing the old bug, which the
+next version did.
+
+**135. Replacing a control is not the same as moving it.** Tidying three layer
+toggles into a panel, I turned the basemap button from a ONE-TAP CYCLE into a
+menu — two taps and a hunt to reach satellite, in gloves, on a bike. The render
+harness said so within a minute because its basemap checks encode the old
+behaviour.
+
+A control that already works has a cost of use, and a tidier arrangement that
+raises it is a regression however much better the code looks. Keep the fast path
+and add the panel beside it.
+
+**136. An estimate is only worth its assumptions, so write them down.**
+Contours were sized at 419 KB from a measurement that assumed delta-encoded
+integers. The first implementation wrote raw lon/lat floats and cost **946 KB** —
+more than twice the number I had just quoted, from the same geometry. Nothing was
+wrong with the measurement; it described a thing that had not been built yet.
+
+When a measurement informs a design decision, record the encoding, units and
+tolerance it assumed. Otherwise the number survives into the implementation and
+the assumption does not.
+
+**137. A declaration matched by exact string must be written once.**
+`build_app.py` strips its `DECLS` entries out of `src/app.html` by literal
+string match. Splitting one across two lines, with different indentation in the
+two files, meant the strip silently did nothing: `CONT = __CONT__` shipped as a
+literal token, the map never constructed, and every render check returned `-1`
+or `undefined` rather than naming a cause.
+
+Where two files must agree byte for byte, keep the shared text on one line and
+say so beside it. A mechanism that fails by doing nothing is worse than one that
+throws.
+
+**138. A dependency check compares import names, not package names.**
+`check_ci_deps` correctly flagged `skimage` as uninstalled. It then flagged it
+again after `ci/bundle.sh` installed `scikit-image`, because the two names are
+not the same string. A `PIL -> pillow` mapping had existed since take 51 and
+simply did not know this case.
+
+Adding a dependency whose import name differs from its package name means adding
+it to that mapping too. The failure looks like a broken build script and is
+actually an incomplete lookup table.
+
+**139. Two rules that look contradictory need to be asserted together.**
+A saved ROUTE stores its inputs and never its geometry, because closures move
+and a frozen line replays a stale legality decision (landmine 113). A saved
+WAYPOINT stores its coordinate, because a point on the ground does not move and
+encodes no decision.
+
+Left as two separate facts in two takes, the second reads as a violation of the
+first, and the next person to notice will "fix" one of them. Both are asserted
+in the same smoke run with the reasoning in the assertion text. Where a rule has
+a deliberate exception, the exception and the rule belong in the same place.
+
+**140. Measure the terrain before porting a feature built for different
+terrain.** A slope-angle layer is standard in backcountry mapping and onX ships
+one, so it sat on this agenda as an obvious win. Measured against the DEM
+already on disk: **65.6% of this region is under 3 degrees and 99.9% is under
+22**, where the avalanche bands that layer exists to show start at 27. It would
+have rendered 1,060 km² a single colour.
+
+A feature that works elsewhere is a hypothesis about here. The measurement cost
+one query against data already downloaded and closed the item for good instead
+of leaving it as a maybe.
+
+**141. An unmeasured worry is not a finding, and carrying one is a cost.**
+A96 — "the dispatch card decodes 20,222 polylines on the highest-stakes screen"
+— sat on the agenda as UNKNOWN for eighteen takes. It read like a real problem
+and it shaped how the surrounding code was talked about. Measuring it took one
+browser evaluate: **23 ms**, of which `nearestEdge` is 17.
+
+A worry that is cheap to measure and never measured is worse than either
+outcome, because it quietly argues against touching the code near it. Measure
+per component, not in aggregate — "the card is slow" names nothing to fix.
+
+**Corollary — do not optimise on the strength of the worry.** `nearestEdge`
+could be spatially indexed. On this evidence it will not be: rewriting a working
+safety path against a number that says it is fine trades real risk for imagined
+gain.
+
+**142. A number from the machine that can measure is not a number from the
+machine that matters.** The 23 ms above is headless Chrome on a desktop. Turning
+that into a phone figure is arithmetic, and take 57 already paid for that mistake
+once by tuning label density against a 900×1400 viewport nobody had.
+
+Where a device can report the number itself, make it report it. The timing now
+runs as a self-test line, so the next field report carries the real figure rather
+than an extrapolation with a confident tone.
+
+**143. A workaround outlives the problem it was written for, and then becomes
+one.** `setBasemap` re-applied the label layer's visibility to every symbol layer
+on every basemap change. It was written when switching to satellite had to force
+labels off, because dark-on-light text was unreadable over jack pine. Labels
+gained a halo at take 46 and the comment above the loop said so plainly — but
+the loop stayed, doing nothing, for forty-eight takes.
+
+It stopped doing nothing the moment a symbol layer had its OWN default: summits
+default off and were switched on at load by a line whose purpose had expired.
+
+When a comment explains why code is no longer needed, that is the moment to
+delete the code. A no-op is not harmless; it is a rule waiting for a case that
+contradicts it.
+
+**144. Two maps agreeing is worth more than either alone.** The summit
+elevations were checked three ways before shipping: OSM's surveyed `ele`, our
+own DEM, and the figures printed on a commercial map in a screenshot. All three
+agree within three feet on three of four peaks.
+
+Where a cheap independent source exists — even a competitor's screenshot — check
+against it. It costs a minute and it is the difference between "the code ran"
+and "the number is right".
+
+**145. Count the distinct values before writing a parser.** The DNR's
+`SpecialRestrictionType` reads like free-form legal prose — "ORVs less than 65
+inches in width only between the dates of May 1st and November 1st. Off road
+motorcycles are prohibited" — and a parser for it was budgeted. Querying the
+distinct values found **nine strings in the entire state**, two of which are the
+same rule written twice with different punctuation.
+
+Nine is a table. A table can be read, checked by eye and reviewed by someone
+else; a regex over legal text cannot, and it fails silently on the tenth string
+by classifying it as something it is not. Ask the source how many answers it has
+before deciding how to read them.
+
+**Corollary — find the null sentinel.** `-1` appears in that field on 1,877 of
+1,889 routes. Taken at face value it would have flagged almost the entire state
+network as restricted. A field is not populated just because it is non-empty.
+
+**146. A rule derived from data may only ever restrict, never permit.**
+The restriction table decides whether a machine may use a segment. Where it
+recognises a string it applies the ban; where it does not, it bans nobody and
+prints the source's own words unedited.
+
+Both directions are not symmetric. Wrongly restricting costs a rider a detour;
+wrongly permitting puts them somewhere they may not legally be. Where an
+interpretation could be wrong, make the failure mode the one that is merely
+inconvenient — and show the raw text so the rider can out-think the app.
+
+**147. Build the machinery before the data arrives, and drill it with data you
+make.** Zero features in this region carry a restriction, so shipping the field
+unexercised would have been shipping a refusal nobody had ever seen fire
+(landmine 45). The harness injects the verbatim published strings onto real
+edges and proves a dirt bike is refused, a quad is not, and an unrecognised
+string removes nothing.
+
+A precondition built for a region that does not exist yet is still testable —
+by manufacturing the case, from the real values, and saying in the assertion
+that is what you did.
+
+**148. A naming convention is a better source of truth than a list.**
+`region.DERIVED` named twelve artifacts to clear on a region switch while the
+pipeline wrote nineteen. Every payload it writes is called `*_payload.json`, and
+had that convention been globbed from the start, the seven it missed — two of
+them added by me two takes earlier — would have been cleared the day they were
+invented.
+
+Where a set follows a rule, enforce the rule and derive the set. Keep a list only
+for the members that break the rule, and expect that list to be short and stable
+because the exceptions are.
+
+**Corollary — `os.remove` cannot delete a directory.** `imagery_tiles/` is 2,008
+files of the previous region's ground and survived every region switch, partly
+because nobody listed it and partly because the loop that would have listed it
+could not have removed it. A clear-up that handles one kind of thing will
+silently skip the other.
+
+**149. "Not traced" is a decision to find out later, and later is now.**
+A95 was recorded at take 75 as "anchors outside the bbox — not traced, may be a
+deliberate signpost". Tracing it took one grep: a place chip runs `map.easeTo`
+to the anchor, so a chip 16 km outside the region pans the rider to blank ground
+with no imagery, no network and no explanation — and the same anchor is in the
+search index.
+
+Twenty-one takes of "may be deliberate" cost one command to settle. When
+recording an unknown, record the command that would resolve it.
+
+**150. Fix the defect; do not make the judgement call that surrounds it.**
+Two anchors sat outside `sthelen`'s bbox. Removing them fixes the defect.
+Widening the bbox to include them would also fix it — and would change what that
+region downloads, which is a decision about scope, cost and what the region is
+FOR.
+
+Where a fix has an alternative that changes the product rather than correcting
+it, take the correcting one and write the alternative down where the owner will
+see it. The reason went into the region's own note, not just the handoff.
+
+**151. A check that measures the edge will flip on an unrelated change.**
+The contour-label check found exactly ONE label at one viewport. The take-98
+destination bar took ~52 px of map height and it went to zero — reported as a
+failure of contours, which were fine. Probing three zooms found the label
+immediately.
+
+A check sitting on a boundary is not testing the feature, it is testing the
+boundary, and it will accuse whatever change happens to arrive next. When a
+check passes with a count of one, treat the one as a warning: widen the probe
+until the margin is real, or the next take pays for it.
+
+**152. A status line is what a successor trusts, so gate it.**
+`AGENDA.md` had three headings reading OPEN or PROPOSED over bodies recording
+shipped, superseded and measured work. Nothing errors. The ledger check already
+enforced unique ids and no gaps and had no opinion on a heading that contradicts
+its own entry.
+
+An id that means two things is loud — the check fires. A status that is simply
+out of date is silent, and it is read first. Both are ledger integrity.
+
+**Corollary — a status check must not fire on a healthy item.** The first
+version matched `**Ruled out:**`, which every agenda item is REQUIRED to carry,
+so it flagged all nine open proposals. A check with false positives is turned off
+within a week, and then it protects nothing. One of the three controls exists
+purely to prove a genuinely open item stays silent.
+
+**153. Presentation is not architecture, and confusing them costs the product.**
+Asked why a commercial app felt more premium, the honest answer was measurable:
+14 chips in one scrolling row, 38 emoji as icons, ONE CSS transition in 3,667
+lines, 15 distinct font sizes. None of that is the backend.
+
+Copying that app's architecture would have meant adding a server, accounts and a
+subscription — and would have cost the properties this app is actually better at:
+offline routing, provenance on every line, and refusing to guess. Measure the
+gap before agreeing to close it, because "it feels cheap" and "it is built wrong"
+are different diagnoses with opposite treatments.
+
+**154. Never rebuild a shared parent's innerHTML to change a child.**
+Expanding icon placeholders by replacing `#shell.innerHTML` produces a fresh DOM
+with identical markup and **no event listeners on any of it**. The map still
+draws, every screenshot looks right, and not one button works.
+
+Replace the element you actually mean — a button's own children, never a
+container's. And assert it: a render check now clicks a control after the icon
+pass and requires the handler to fire, because "it looks correct" is exactly the
+symptom this failure produces.
+
+**155. Anything written with `textContent` will discard what you put inside it.**
+Twelve places set a chip's label with `textContent`, which was harmless when the
+label was `'▶ Ride it'` and destroys an icon the moment one exists. Press Ride
+it, change machine, change fuel, switch basemap, run the self-test — every one
+of them would have blanked its own icon.
+
+When adding structure inside a control, find every write to that control first.
+One helper should own the rewrite, or the count of places that need updating is
+the count of places that will be missed — a thirteenth turned up after the first
+sweep.
+
+**156. Follow the convention the codebase already has.**
+`setChip` needed to know whether a control was a floating map button or a chip,
+and reached for `classList.contains()`. The stub-coverage check refused it — and
+the app had tested classes with `className.indexOf()` everywhere else since take
+4.
+
+Adding an API to the harness so one new line can use a nicer idiom is the wrong
+trade. The convention is not better, but it is the one that is already proven,
+already stubbed and already understood.
+
+**157. A scale is a decision made once; a list of sizes is a decision made every
+time.** Sixteen distinct font sizes across 44 declarations, each picked in
+isolation — 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12, 12.5, 13, 14, 15, 17, 18, 30.
+No individual choice was wrong and the result read as unfinished, because nothing
+related to anything else.
+
+Six steps, each existing size mapped to its NEAREST, so the change could not move
+anything more than a pixel and the layout matrix could catch it if it did. Map
+label sizes stayed out: they were tuned against satellite imagery by measurement
+and a tidy-up would have silently undone it. Not everything that looks like the
+same problem is.
+
+**158. Anything that animates must stay in the layout, so prove it cannot be
+touched.** A panel that fades has to be `display:block` while hidden, or there is
+nothing to fade. That leaves an invisible, full-size element sitting over the
+map — and an invisible control that still catches a tap is worse than one that
+blinks, because the failure is silent and unattributable.
+
+`visibility:hidden` and `pointer-events:none` fix it; `elementFromPoint` proves
+it. Assert the negative — that a closed panel catches nothing — because the
+positive case looks identical either way.
+
+**159. A check that names a specific element tests the name as much as the
+behaviour.** The destination check proved "a chip in a closed destination is
+hidden but still works" by naming `c-selftest`. When that button moved into the
+diagnostics sub-menu it stopped carrying `data-tab`, and the check failed on
+correct code.
+
+The behaviour it meant to test was still true of every other chip. Select the
+subject by the property under test — *whichever chip is in a closed destination*
+— not by an id that can move for unrelated reasons.
+
+**160. Derive the set from evidence; never type the list.**
+"Which rivers do people paddle?" looked like it needed a hand-written list of
+famous rivers. A list is opinion, it goes stale, and it does not survive going
+statewide — 574 named rivers in Michigan.
+
+The evidence was already in the data: **a river is paddled if people have built
+places to put boats on it.** Scoring by access points within 500 m produced the
+state's canonical paddling ranking — Huron 78, Au Sable 54, Manistee 51 — with
+nobody choosing it, and every river the owner named cleared the threshold
+without being named in the code.
+
+When a feature seems to need a curated list, look for the thing people did on
+the ground that made the list true.
+
+**161. A gap in the data can be the feature.**
+Chaining the Au Sable left 17 fragments and the longest held 86 of 123 miles.
+Two obvious readings — a tolerance too tight, or a name mismatch — were both
+wrong. The river way **stops at every impoundment**, because a pond is mapped as
+a polygon and a river as a line.
+
+The fragmentation was not noise obscuring the river; it was the dams, which are
+the one thing a paddler must not miss. Joining the pieces would have produced a
+continuous line nobody can paddle and erased the hazards in the same operation.
+
+Before smoothing over a discontinuity, ask what put it there.
+
+**Corollary — a gap has a maximum size.** Michigan reuses river names; one
+"Black River" group spans several distinct rivers. Under 15 km a gap is an
+impoundment, over it the two reaches are two rivers, and joining them invents a
+watercourse. Any rule that bridges gaps needs a limit beyond which it refuses.
+
+**162. When your number disagrees with local ground truth, publish the
+disagreement.** Corridor distances came out at 0.53x the local outfitter's
+figures above Mio and 0.78x near it — OSM's centreline is drawn at 62 m spacing
+and loses the meanders.
+
+The tempting fix is a correction factor. The shortfall is not constant, so any
+factor is invented, and it would be applied to a number someone plans a day
+around. The distance ships with a field stating what it measures and that the
+real river is longer. The ORDER, which is exact, carries the actual use.
+
+A number you cannot stand behind is not improved by scaling it.
+
+**163. A check can prove a card SAYS something and not that the answer is any
+use.** Four assertions passed on the paddle card — it named what was above, what
+was below, whether a dam sat between, and the distance caveat. The Mio Dam card
+read "Above: Canoe access · about 0.0 mi" and "Below: Canoe access · about
+0.0 mi", which is true, matches every assertion, and tells a paddler nothing.
+
+A dam has an access on each bank and both project to the same river mile. The
+checks tested for the presence of the rows, which is the shape of the answer,
+not its content.
+
+**Print the thing a person reads and read it.** One command showed what four
+passing checks could not, and the assertions were right to keep — they stop the
+rows disappearing. They just cannot tell you the rows are worth having.
+
+**164. Nearest is not most useful.** "The next access downstream" sounds exact
+until two of them sit at the same spot. The neighbour search now skips anything
+within 0.06 mi, because a row naming a place you are already standing at is
+worse than no row — it looks like an answer.
+
+Where a feature picks "the next" of something, decide what distance makes two
+things the same thing, and say what happens at zero.
+
+**165. A harness that copies the tree must delete the copy.**
+`smoke-fatal` copies `www/` to a temp directory to corrupt its manifest and prove
+the app refuses a broken bundle. The copy includes 45 MB of imagery tiles and was
+never removed. By take 103 there were **189 of them, 11 GB**, and the disk was at
+100%.
+
+What that looked like was not "no disk". It was
+`net::ERR_INSUFFICIENT_RESOURCES` on a bundle fetch and a puppeteer crash —
+reported by the gate as `render failed`. Landmine 101's corollary, arriving from
+a direction nobody had watched: the drill that proves the app is safe was
+quietly filling the machine.
+
+Sweep before creating and remove on exit, both — a run that dies still has to
+clean up, and the next run should not trust that the last one did.
+
+**166. A check written against a temporary state will accuse the change that was
+the goal.** `Tools shows one entry, not three diagnostics` asserted the bucket
+held exactly ONE chip. That was true for four takes — because the bucket was
+empty — and it failed the moment tools were put in it, which is what a bucket is
+for.
+
+What the check meant was "the diagnostics are behind one entry". Write the
+invariant, not the current count. A count is a snapshot; an invariant survives
+the feature landing.
+
+**167. A bearing to where you are standing is not a bearing.** The compass listed
+a waypoint saved at the current position as "N 0° · 0.00 mi · 49° left" — true,
+consistent with every assertion, and noise. Under ~100 ft the row says "you are
+here".
+
+Second occurrence of landmine 164 in three takes, in unrelated code: the paddle
+card and the compass both pick "the nearest thing" and both had to be told what
+distance makes two things the same place. Any feature that names the nearest
+anything needs a floor, and needs to say what happens at zero.
+
+**168. When your number disagrees with one source, go and find a second.**
+Take 102 found the corridor distances at 0.55x a local outfitter's published
+table, assumed the geometry was generalised, and shipped an apology on every
+card: "runs short of a real float".
+
+Take 106 pulled the same river from USGS NHD — an independent federal survey —
+expecting to fix ours. It agreed with OpenStreetMap **to within 4%**. Two surveys
+do not both come out 45% wrong; the outfitter's mileages run high, and the app
+had been apologising for the correct number.
+
+One disagreement is ambiguous and says nothing about which side is wrong.
+A second independent source resolves it, and costs a query. Landmine 144 said
+two maps agreeing is worth more than either — this is the same rule when they
+disagree.
+
+**Corollary — a wrong apology is not the safe choice.** Hedging felt cautious and
+it told a rider the good number was unreliable, which would have sent them back
+to the source that was actually wrong.
+
+**169. Calibrate on the consistent data, not on all of it.** The outfitter's long
+floats imply 2.51, 2.54, 2.57 and 2.59 mph against our distances. Their short
+ones give 1.50, 2.08 and 3.10 — booking figures rounded to convenient numbers.
+
+Averaging everything would have produced a worse pace and a range wide enough to
+be useless. Look at the spread before taking the mean, and when part of a dataset
+disagrees with itself, find out why before letting it vote.
+
+**170. The CI cache list is a copied set too.**
+`ci/build.yml` named the payloads to cache one by one. By take 107 it had missed
+three — poi, contour and corridor — and `osm_cache`, so every build
+re-downloaded a 297 MB extract and re-ran a 285-second step for output it
+already had. Nothing failed; it was just slow, which is why nobody noticed.
+
+**Fifth occurrence** of the same shape: the palette (77), the CI dependency map
+(84), the label layers (90), region.DERIVED (96), and this. Every one was fixed
+by deriving instead of syncing, and every one was found by accident.
+
+When a list names members of a set the code already has a rule for, it is not a
+list — it is a bug that has not fired yet.
+
+**171. Scan the structure, not the text.**
+A check that the CI cache covers `*_payload.json` and `osm_cache` tested the
+whole file, and the strings it looked for were **inside its own explanatory
+comment**. Two of three negative controls passed on a cache list that had been
+gutted.
+
+Third time in this project (takes 96, 98, 107). The fix each time was the same:
+parse the thing you mean — a function body, a heading's status field, a YAML
+`path:` block — and strip comments before matching. A file is not a structure,
+and a substring test on a file will eventually match the sentence explaining why
+the test exists.
+
+**172. "Slow" is a defect that reports nothing.**
+The cache drift cost roughly five minutes and 297 MB per build and produced no
+error, no warning and no failed check. It was found by an audit looking at
+something else.
+
+A correctness bug announces itself. A performance regression has to be measured
+on purpose, so the things that are expensive need a number written down when
+they are built — otherwise the only way to find the cost is to go looking for it.
+
+**173. Wired is not reachable.** Every button in the app had a handler — the
+cross-check found zero unwired. That says nothing about whether a rider can find
+them. `I'm here` was correctly bound and sat in a different destination from
+`Set home`, which is its other half: `syncArm()` sets both classNames in one
+function while the two lived on separate tabs.
+
+Check both, and check them differently. Wiring is a source cross-reference;
+reachability means walking the UI and asking what is actually on screen.
+
+**174. A guard can turn removed code into permanent dead code.**
+`c-relief` and `c-labels` lost their chips at take 90. Their handlers survived
+as `if(el('c-relief'))el('c-relief').addEventListener(...)` — the guard was added
+so the removal would not throw, and it also guaranteed the block could never run
+again.
+
+Defensive guards are right when an element is OPTIONAL. When it is gone, the
+guard is not defence, it is preservation: the code stays, reads as live wiring,
+and the next person to grep for the handler finds one.

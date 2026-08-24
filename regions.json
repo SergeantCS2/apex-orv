@@ -1,9 +1,9 @@
 {
-  "_note": "One definition per riding area. Every tool reads this; nothing hardcodes a bbox. Adding a region is one entry here, then `python3 tools/pipeline.py --region <id>`. `state` is the outline drawn at low zoom for orientation only \u2014 never routable.",
+  "_note": "One definition per riding area. Every tool reads this; nothing hardcodes a bbox. Adding a region is one entry here, then `python3 tools/pipeline.py --region <id>`. `state` is the outline drawn at low zoom for orientation only — never routable.",
   "default": "neml-bullgap",
   "regions": {
     "neml-bullgap": {
-      "name": "Bull Gap \u00b7 Mio \u00b7 Rose City",
+      "name": "Bull Gap · Mio · Rose City",
       "bbox": [
         -84.3,
         44.42,
@@ -70,7 +70,7 @@
       "imagery_max_zoom": 15
     },
     "sthelen": {
-      "name": "St. Helen \u00b7 Roscommon",
+      "name": "St. Helen · Roscommon",
       "bbox": [
         -84.56,
         44.3,
@@ -82,24 +82,12 @@
         -84.39,
         44.42
       ],
-      "note": "St. Helen scramble area and the Au Sable State Forest trails. Different DNR management unit from the Bull Gap region, which is the point of having it \u2014 it proves the pipeline is not shaped around one place.",
+      "note": "St. Helen scramble area and the Au Sable State Forest trails. Different DNR management unit from the Bull Gap region, which is the point of having it — it proves the pipeline is not shaped around one place. Roscommon (2.5 km west) and Houghton Lake (16.2 km west) were listed as anchors but fall outside this bbox; a chip for them panned the rider off the map. Removed at take 96 rather than widening the bbox, which would change what this region downloads — that is a judgement call, not a bug fix.",
       "anchors": [
         [
           "St. Helen",
           -84.4103,
           44.3611,
-          "town"
-        ],
-        [
-          "Roscommon",
-          -84.5919,
-          44.4986,
-          "town"
-        ],
-        [
-          "Houghton Lake",
-          -84.7639,
-          44.3169,
           "town"
         ]
       ],

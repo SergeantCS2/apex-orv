@@ -39,6 +39,9 @@ ARTIFACTS = [
     ("context_payload.json", "context.json",  "context",  False),
     ("address_payload.json", "address.json",  "address",  False),
     ("other_payload.json",   "other.json",    "other",    False),
+    ("poi_payload.json",     "poi.json",         "places",   False),
+    ("contour_payload.json", "contour.json",     "contour",  False),
+    ("corridor_payload.json","corridor.json",    "paddle",   False),
 ]
 
 # How many things are actually IN a payload. A layer with no features in it is
@@ -56,7 +59,10 @@ ARTIFACTS = [
 # bundle, which is landmine 54 wearing a new hat.
 COUNTERS = {
     "hydro":   lambda d: sum(len(v) for v in (d.get("l") or {}).values()),
+    "contour": lambda d: len(d.get("l") or []),
+    "paddle":  lambda d: len(d.get("c") or []),
     "other":   lambda d: len(d.get("r") or []),
+    "places":  lambda d: len(d.get("p") or []),
     "context": lambda d: len(d.get("counties") or []) + len(d.get("rings") or []),
     "address": lambda d: len(d.get("segs") or []),
 }

@@ -28,10 +28,22 @@ let wwwArg = opt("--www", "www");
    its manifest, and assert the app REFUSES the region with a plain screen
    instead of rendering a map with holes (landmine 34). A refusal that has
    never fired is a hope, not a safety property. */
-import { cpSync, mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 if (FATAL_DRILL) {
   const src = wwwArg.startsWith("/") ? wwwArg : join(ROOT, wwwArg);
+  /* Sweep anything a previous run left behind BEFORE making another. This copy
+     is ~55 MB because it includes the imagery tiles, and it was never removed —
+     189 of them, 11 GB, had accumulated by take 103 and filled the disk to 100%.
+     What that looked like was not "no disk": it was
+     `net::ERR_INSUFFICIENT_RESOURCES` on a bundle fetch and a puppeteer crash,
+     i.e. a render failure (landmine 101's corollary, take 103). */
+  try {
+    for (const d of readdirSync(tmpdir())) {
+      if (d.startsWith("apex-fatal-"))
+        rmSync(join(tmpdir(), d), { recursive: true, force: true });
+    }
+  } catch (e) { /* a temp dir we cannot read is not a reason to fail the drill */ }
   const t = mkdtempSync(join(tmpdir(), "apex-fatal-"));
   cpSync(src, t, { recursive: true });
   const mp = join(t, "bundle/manifest.json");
@@ -39,6 +51,10 @@ if (FATAL_DRILL) {
   man.artifacts = man.artifacts.filter((a) => a.kind !== "network");
   writeFileSync(mp, JSON.stringify(man));
   wwwArg = t;
+  /* And remove this one on the way out, however the run ends. */
+  const _sweep = () => { try { rmSync(t, { recursive: true, force: true }); } catch (e) {} };
+  process.on("exit", _sweep);
+  process.on("SIGINT", () => { _sweep(); process.exit(130); });
 }
 const WWW = wwwArg.startsWith("/") ? wwwArg : join(ROOT, wwwArg);
 const EXPECT_PARTIAL = (opt("--expect-partial", "") || "").split(",").filter(Boolean);
@@ -206,6 +222,12 @@ class MapStub {
      undefined here would make every base collapse to 1 and the casings would
      silently stop dimming correctly (landmine 62). */
   getLayer(id) { return this._layers.has(id) ? { id } : undefined; }
+  /* A91 derives the label set from the style rather than from a hand-kept
+     array, so the app now asks the map what layers it has. The stub already
+     held them; it just never offered them (landmine 62 — the gate's stub
+     check caught this before any test did). */
+  getStyle() { return { layers: this._styleLayers.slice(),
+                        sources: this._styleSources || {} }; }
   getPaintProperty(id, k) {
     if (this._paint.has(id + "|" + k)) return this._paint.get(id + "|" + k);
     const l = this._styleLayers.find((x) => x.id === id);
@@ -220,7 +242,15 @@ class MapStub {
        undefined id. Faithful stubs, or the harness invents its own bugs. */
     if (box === undefined)
       return DEAD_RENDER ? [] : new Array(1240).fill({ properties: {} });
-    return this._hit || [];
+    /* MapLibre gives every hit a `geometry`. The stub gave none, so the first
+       code to read one — the A110 place card — crashed on a real bug the stub
+       had been hiding: a click handler that throws takes every other tap with
+       it. Faithful stubs, or the harness invents its own bugs (landmine 62). */
+    return (this._hit || []).map((f) =>
+      f && f.geometry ? f : Object.assign({}, f,
+        { geometry: { type: "Point", coordinates: this.getCenter
+                        ? [this.getCenter().lng, this.getCenter().lat]
+                        : [0, 0] } }));
   }
   getCanvas() { const c = new El("__gl"); c.getContext = () => null; c.width = 411; c.height = 696; return c; }
   getLayoutProperty(id, k) { const h = record.layout.filter((l) => l[0] === id && l[1] === k); return h.length ? h.at(-1)[2] : "visible"; }
@@ -578,6 +608,33 @@ ok((record.setData.alt || []).length > 0 &&
   ok(marked.length === 1, `exactly one card marked selected (${marked.length})`);
 }
 
+/* 5x · A110 — places you can ride to (take 89).
+   The payload is optional, so the checks must be honest when it is absent
+   rather than asserting a count the region may not have. */
+{
+  const pj = manifest.artifacts.find((a) => a.kind === "places");
+  if (!pj) {
+    ok(true, "no places artifact in this bundle — pins skipped, not failed");
+  } else {
+    const P = sandbox.POIS;
+    ok(P && Array.isArray(P.p) && P.p.length > 0,
+       `places payload loaded: ${P && P.p ? P.p.length : 0} entries`);
+    const kinds = new Set(P.p.map((r) => r.k));
+    ok(kinds.has("fuel"),
+       `fuel is among the places (${[...kinds].length} kinds) — the app has costed `
+       + `routes against a fuel range since take 36 and never showed where fuel is`);
+    /* Named-only, except beaches. That is the rule poi.py states; assert it
+       rather than trusting the comment. */
+    const unnamed = P.p.filter((r) => !r.n);
+    ok(unnamed.every((r) => r.k === "beach"),
+       `only beaches ship unnamed (${unnamed.length} unnamed, all beaches)`);
+    ok(P.p.every((r) => Array.isArray(r.p) && r.p.length === 2
+                        && r.p[0] >= manifest.bbox[0] && r.p[0] <= manifest.bbox[2]
+                        && r.p[1] >= manifest.bbox[1] && r.p[1] <= manifest.bbox[3]),
+       "every place is inside the region bbox");
+  }
+}
+
 /* 5y · A60 — route both, draw one (take 86).
    The promise is not "fewer lines". It is that every edge stays ROUTABLE while
    only one copy of a duplicated road is DRAWN. Asserted against the real
@@ -637,6 +694,85 @@ ok((record.setData.alt || []).length > 0 &&
     const anyLegal = plain.some((e) => R.machineLegal(e));
     ok(anyLegal, "edges with no per-vehicle rule still fall back to the class rule");
   }
+}
+
+/* 6a1 · special restrictions (take 95, A101).
+   ZERO edges in this region carry one, so the refusal can only be proven by
+   making one — a refusal that has never fired is a hope (landmine 45). The
+   strings below are verbatim from the DNR, all nine of which exist statewide. */
+{
+  const R = sandbox.__restrict;
+  ok(!!R && Array.isArray(R.table) && R.table.length >= 8,
+     `restriction table enumerates ${R ? R.table.length : 0} published strings`);
+  const live = sandbox.__route.EDGES.filter((e) => R.of(e)).length;
+  ok(live === 0, `no edge in this region carries a restriction (${live}) — ` +
+     "this is preparation for A72, and the drill below is the only proof");
+
+  const pick = () => sandbox.__route.EDGES.find((e) => e.c === "trail50");
+  const MOTO_BAN = "ORV Routes B BK BL BF BH BI Restriction ORVs less than 65 "
+    + "inches in width only between the dates of May 1st and November 1st.  "
+    + "Off road motorcycles are prohibited  ORV license and trail permit required";
+
+  let e = R.inject(pick(), MOTO_BAN);
+  const parsed = R.of(e);
+  ok(!!parsed && parsed.ban.indexOf("bike") >= 0,
+     "the motorcycle prohibition is recognised, not guessed at");
+  R.setMachine("bike");
+  ok(R.legal(e) === false,
+     "a DIRT BIKE is refused a segment the DNR says prohibits off-road motorcycles");
+  R.setMachine("quad");
+  ok(R.legal(e) === true,
+     "a QUAD is NOT refused it — the restriction bans one machine, not all");
+  R.setMachine("bike");
+
+  /* an unrecognised string must restrict nobody and still be shown */
+  let u = R.inject(sandbox.__route.EDGES.find((x) => x.c === "mccct"),
+                   "Some Restriction The DNR Has Not Published Yet");
+  const un = R.of(u);
+  ok(!!un && un.unknown === true && un.ban.length === 0,
+     "an unrecognised restriction bans nobody");
+  ok(R.legal(u) === true,
+     "and does not silently remove access — it is displayed, not interpreted");
+}
+
+/* 6a2 · waypoints (take 92, A84).
+   A waypoint IS stored as geometry, and that is the opposite of the saved-route
+   rule on purpose: a route stores inputs because closures move and a frozen
+   line replays a stale legality decision (landmine 113); a point on the ground
+   does not move and encodes no decision. Both halves asserted so the difference
+   stays deliberate rather than becoming an inconsistency someone "fixes". */
+{
+  const before = sandbox.localStorage.getItem("apex.waypoints.v1");
+  ok(before === null, "no waypoints before the first save");
+  const c = manifest.bbox;
+  const at = [(c[0] + c[2]) / 2, (c[1] + c[3]) / 2];
+  /* grab("map") is the DOM element stub; the MapLibre stub is `theMap`, and
+     contextmenu is registered on the map, not the div (take 92). */
+  theMap.fire("contextmenu", { lngLat: { lng: at[0], lat: at[1] } });
+  frames(1);
+  ok(/pc-wpt/.test(grab("panel")._html),
+     "a dropped pin offers Save as waypoint");
+  grab("pc-wpt").fire("click");
+  const raw = sandbox.localStorage.getItem("apex.waypoints.v1");
+  ok(typeof raw === "string" && raw.length > 2, "saving a waypoint writes storage");
+  let recs = [];
+  try { recs = JSON.parse(raw); } catch { }
+  ok(recs.length === 1, `one waypoint stored (${recs.length})`);
+  const r = recs[0] || {};
+  ok(Array.isArray(r.p) && r.p.length === 2,
+     "a waypoint DOES store its coordinate — a point on the ground encodes no "
+     + "decision that could go stale, unlike a route");
+  ok(typeof r.n === "string" && r.n.length > 0, `auto-named without a dialog: "${r.n}"`);
+  ok(r.r === manifest.region, `region stamped (${r.r})`);
+  /* and the route rule must still hold, in the same run */
+  let routes = [];
+  try { routes = JSON.parse(sandbox.localStorage.getItem("apex.routes.v1") || "[]"); } catch { }
+  if (routes.length) {
+    ok(!/"path"|"geom"|"line"|"coords"/.test(JSON.stringify(routes[0])),
+       "and a saved ROUTE still stores no geometry — the two rules differ on purpose");
+  }
+  grab("c-saved").fire("click");
+  ok(/data-wpgo/.test(grab("panel")._html), "the Saved panel lists waypoints");
 }
 
 /* 6b · saved routes (take 79, A85 — A28's last enumerated gap).
