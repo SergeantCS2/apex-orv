@@ -692,6 +692,51 @@ def check_region_clean():
                  f"{len(dirs)} directory; every anchor inside its bbox")
 
 
+
+
+# ── 4j. No two functions may share a name ───────────────────────────────────
+# Take 109 found TWO `function stLayout(){}` in app.html. JavaScript keeps the
+# last declaration and silently discards the first, so a check added to the
+# wrong one had never run for sixteen takes — and take 111 found the dead twin
+# also held THREE MORE checks that had never run: machine-on-map,
+# hud-matches-ride and map-has-room.
+#
+# Nothing errors. The code reads as live and greps as present. This is the only
+# failure in the ledger that cost a whole function's worth of silence, so it is
+# checked mechanically rather than remembered (landmine 175).
+def check_no_duplicate_defs():
+    src = read("src", "app.html")
+    if not src:
+        return fails.append("src/app.html missing")
+    m = re.findall(r"<script>(.*?)</script>", src, re.S)
+    if not m:
+        return fails.append("src/app.html has no script block")
+    js = m[-1]
+    names = re.findall(r"^function ([A-Za-z_$][\w$]*)\s*\(", js, re.M)
+    dup = sorted({n for n in names if names.count(n) > 1})
+    if dup:
+        return fails.append(
+            "app.html declares these functions twice: " + ", ".join(dup) +
+            " — the later one silently wins and everything in the earlier one "
+            "never runs (landmine 175)")
+    # top-level vars that shadow each other are the same trap, quieter
+    vs = re.findall(r"^var ([A-Za-z_$][\w$]*)\s*=", js, re.M)
+    vdup = sorted({v for v in vs if vs.count(v) > 1})
+    if vdup:
+        return fails.append(
+            "app.html assigns these top-level vars twice: " + ", ".join(vdup))
+    # ids in the STATIC markup, where a collision is a real ambiguity
+    head = src[:src.find("<script>")]
+    ids = re.findall(r'\sid="([A-Za-z0-9_-]+)"', head)
+    idup = sorted({i for i in ids if ids.count(i) > 1})
+    if idup:
+        return fails.append(
+            "duplicate ids in the static markup: " + ", ".join(idup) +
+            " — getElementById returns only the first")
+    notes.append(f"no duplicate definitions: {len(set(names))} functions, "
+                 f"{len(set(vs))} top-level vars, {len(set(ids))} static ids")
+
+
 # Items without a ruled-out line get re-derived from scratch every session.
 def check_agenda():
     a = read("docs", "AGENDA.md")
@@ -1478,7 +1523,7 @@ def check_manifest():
 for fn in (check_handoff, check_stamps, check_offline,
            check_style, check_palette, check_machine_legality,
            check_ledgers, check_osm_fallback, check_drawn,
-           check_region_clean,
+           check_region_clean, check_no_duplicate_defs,
            check_layer_control,
            check_artifacts_agree, check_agenda, check_syntax, check_stubs,
            check_orphan_sources, check_class_legality, check_workflow_yaml,

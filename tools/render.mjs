@@ -567,6 +567,44 @@ if (zoomed.trails === 0) {
   ok(ct.labels.length > 0,
      `index contours carry an elevation: ${ct.labels.slice(0, 4).join(", ") || "(none)"}`);
 
+  /* Take 112 · four field findings from Jacob's take-110 session. */
+  const field = await page.evaluate(async () => {
+    const s = (ms) => new Promise((r) => setTimeout(r, ms));
+    const out = {};
+    // A · the chevron must be ONE glyph, not the six literal chars \u25BE
+    out.chev = (document.getElementById("peek-chev").textContent || "").trim();
+    // B · action buttons hold their height even inside the FOLDED drawer,
+    //     which is the state Jacob's report measured them in at 28 px
+    window.railSet(false); await s(400);
+    out.actH = Math.round(document.getElementById("btn-disp")
+      .getBoundingClientRect().height);
+    // C · a status message must not unfold the drawer
+    window.railSet(false); await s(350);
+    window.showQuiet("<b>You are about 135 mi away.</b>", "135 mi away · planning mode");
+    await s(250);
+    out.stayedFolded = document.getElementById("rail").className === "folded";
+    out.peekLine = document.getElementById("peek-txt").textContent || "";
+    out.panelHasIt = /135 mi away/.test(
+      document.getElementById("panel").innerText || "");
+    // D · relief starts off; the group stays in the layers panel
+    out.relief = window.map.getLayoutProperty("hillshade", "visibility");
+    return out;
+  });
+  ok(field.chev.length === 1 && field.chev === "\u25BE",
+     `the drawer chevron is one real glyph, not the literal string \\u25BE `
+     + `("${field.chev}")`);
+  ok(field.actH >= 38,
+     `action buttons hold ${field.actH}px even inside the folded drawer — `
+     + `Jacob's report measured 28px there`);
+  ok(field.stayedFolded && field.panelHasIt,
+     "a status message fills the panel WITHOUT unfolding the drawer — it is "
+     + "not a card about a place the rider touched");
+  ok(/135 mi away/.test(field.peekLine),
+     `and the peek strip carries its summary ("${field.peekLine}")`);
+  ok(field.relief === "none",
+     "relief starts OFF — over the flat basemap it reads as dark blotches; "
+     + "it stays one tap away under Layers");
+
   /* A129 · the first-run guide. Shown once, dismissed for good, reachable
      afterwards from Tools (take 110). */
   const guide = await page.evaluate(async () => {
@@ -744,8 +782,12 @@ if (zoomed.trails === 0) {
   });
   ok(/not reporting a compass|waiting for the compass/.test(mag.before),
      "with no sensor and no GPS the compass says so rather than drawing a needle");
-  ok(mag.src === "compass" && mag.deg === 49,
-     `one magnetometer reading gives a heading standing still (${mag.deg}\u00B0 by ${mag.src})`);
+  /* 311 alpha -> 49 magnetic -> 42 TRUE. Take 109 mixed a magnetic heading with
+     true bearings computed from coordinates; everything is true at the source
+     now, so one number means one thing (take 111). */
+  ok(mag.src === "compass" && mag.deg === 42,
+     `a magnetometer reading is converted to TRUE north (${mag.deg}\u00B0 by ${mag.src}, `
+     + `49\u00B0 magnetic less 7\u00B0 declination)`);
   ok(/compass/.test(mag.after) && /NE/.test(mag.after),
      "and the rose shows it with its source named");
 

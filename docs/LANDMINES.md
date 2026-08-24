@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 110.*
+*Current as of take 112.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -2349,3 +2349,60 @@ a blurred sheet and called the map blank.
 Writing a landmine does not install it. The checks that mutate shared state are a
 small, listable set, and every one of them should save and restore in the same
 block as a matter of form rather than as a thing to remember.
+
+**182. Deleting the dead code is part of the fix.**
+Take 109 found two `function stLayout(){}`, moved the dispatch timing into the
+live one, and left the dead twin in place. The trap stayed armed — and the twin
+turned out to hold THREE more checks that had never run, one of them
+(`machine-on-map`) dead since take 80.
+
+Moving the thing you noticed out of a broken structure is not repairing the
+structure. If a construct can silently swallow code, remove the construct, then
+go and read what else was inside it.
+
+**183. Two units that look like one number.**
+The compass read GPS course (TRUE north) while moving and the magnetometer
+(MAGNETIC north) while stopped — about 7° apart here — and compared both against
+bearings computed from coordinates, which are true. Every "109° left" was out by
+seven degrees, and the same needle meant different things depending on speed.
+
+Nothing throws when two units share a type. Convert at the SOURCE so one number
+means one thing everywhere, and put the unit on screen so a reader can tell.
+
+**184. A slim control is still a tap target.**
+The drawer's open-state handle was styled as a thin grab bar at 20 px and failed
+the 38 px minimum — a rule that exists because the rider wears gloves.
+
+Visual weight and touch area are separate properties. Make the target big and
+the mark small; never let the mark set the target.
+
+**185. Escapes are per-language, and markup is not JavaScript.**
+The drawer chevron was written as `\u25BE` in HTML. That escape exists in
+JavaScript strings; in markup it is six literal characters, which the app drew —
+and the folded state's `rotate(180deg)` mirrored them into gibberish. Jacob
+reported "a random string of test/error code" twice; both were this one span.
+
+A string moved between languages carries its escapes as freight, and nothing
+errors — it just draws them. In markup write the entity (`&#x25BE;`) or the
+character itself, and assert glyph LENGTH where a single symbol is meant.
+
+**186. Flex-stretch inside a clipped box squeezes children below their padding.**
+The pinned action row lives in the folded drawer (`max-height:0`, clipped).
+Jacob's self-test measured the buttons at 28 px there — flex default alignment
+sizes children against a container that has no height, and padding does not
+save them.
+
+`min-height` on the child wins over the squeeze in every state. A control's
+minimum touch size belongs on the CONTROL, not derived from whatever box it
+happens to sit in today.
+
+**187. A status message is not a card.**
+`show()` opens the drawer — that is its job, one hook for every card. Then the
+"you are 135 mi away" startup message used it, arrived mid-guide, and the drawer
+stood open underneath the tutorial.
+
+The rule was right and the message was mis-classified: cards are about a place
+the rider touched; status is about the app. `showQuiet()` fills the panel and the
+peek line without unfolding. When one function serves two kinds of content, the
+kinds will eventually need different behaviour — name the second kind rather
+than special-casing the first.

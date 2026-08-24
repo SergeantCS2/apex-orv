@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 110.* Ranked by blocking-ness, not by interest.
+*Current as of take 112.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2033,3 +2033,53 @@ reachable afterwards from a How-to button in Tools.
   All routed through `show()` (landmine 180).
 - **Ruled out:** animating anything that costs layout. Transform and opacity
   only, and `prefers-reduced-motion` disables it.
+
+## A131 — Hardening sweep · SHIPPED take 111
+
+- **FOUND AND FIXED:** the dead `stLayout` twin from take 109 was never deleted,
+  and held **three checks that had never run** — `machine-on-map` (dead since
+  take 80), `hud-matches-ride`, `map-has-room` (landmine 182).
+- **PROVEN:** lifting them exposed `_hb`, `_hs`, `_rid` as undefined references
+  that threw and killed every check after them. Self-test **38 → 42**.
+- **PROVEN:** `map-has-room` reports **825 of 915 px, 90% of the screen** — the
+  take-109 drawer's payoff, now with a check that will notice a regression.
+- **PROVEN, gated:** `check_no_duplicate_defs` refuses duplicate function names,
+  duplicate top-level vars and duplicate static ids. Three controls, including
+  the take-109 bug reproduced exactly.
+- **Ruled out:** leaving the twin in place with a comment. A construct that can
+  silently swallow code has to go, not be annotated.
+- **Open:** `routes` appears as an id in two mutually-exclusive template strings.
+  Nothing reads it by id — it is CSS only — so it is not a runtime collision, and
+  the gate checks static markup rather than template strings.
+
+### A128 corrected at take 111 — two norths (see A128 above)
+
+- **PROVEN:** GPS course is TRUE north, the magnetometer is MAGNETIC, about 7° W
+  here. The same needle meant different things depending on speed, and every
+  bearing row compared a magnetic heading against a true bearing (landmine 183).
+- **PROVEN:** converted at the source; a 311° alpha reading now reads **42° true**
+  and the screen says "true · compass".
+- **Ruled out:** a WMM model. It changes slowly, this app covers one region of
+  one state, and an approximate correction applied consistently beats an exact
+  one applied to half the app.
+
+## A132 — Field fixes from the take-110 session · SHIPPED take 112
+
+- **FIXED, field-reported:** the chevron shipped as the literal six characters
+  `\u25BE` — a JS escape pasted into markup — and the fold's rotation mirrored
+  it; both of Jacob's "random strings" were this one span (landmine 185).
+- **FIXED, field-reported:** action buttons at 28 px inside the folded drawer —
+  flex-stretch in a clipped box squeezes below padding height; `min-height:44px`
+  on the control itself (landmine 186).
+- **FIXED, field-reported:** the away message opened the drawer under the
+  first-run guide. `showQuiet()` — status fills the panel and the peek line
+  without unfolding; cards still open it (landmine 187).
+- **FIXED, field-reported:** relief defaulted ON and read as dark blotches over
+  the flat basemap. Starts OFF, one tap away under Layers.
+- **PROVEN:** all four asserted in a real browser, including the button height
+  measured in the folded state specifically — where the report caught it.
+- **Ruled out:** removing relief. On Hybrid at low opacity it earns its place;
+  the fault was the default, not the layer.
+- **Ruled out:** special-casing show() with a flag for startup. Status is a
+  different KIND of content, so it gets a named function, not a boolean.
+- **Open:** Jacob has more guide adjustments coming; the content will move.

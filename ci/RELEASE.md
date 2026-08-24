@@ -1,52 +1,51 @@
-**Take 110 — cards that move, and a guide the first time you open it.**
+**Take 112 — your four field findings, all fixed.**
 
-Signed release build, installs over take 109.
+Signed release build, installs over take 111 (which you have not ridden yet —
+this includes everything from it: the compass reading true north, the four
+revived self-test checks, the bigger drawer handle).
 
-### Cards move now
+### The "random string of test/error code" — found it
 
-Take 109 made the details panel slide up and down. Its **contents** still changed
-between frames — tap one pin, then another, and the text just became different
-text.
+That was the drawer's chevron arrow. I wrote it in a computer-code escape that
+means "▾" in JavaScript but means nothing in a web page, so the page drew the
+raw six characters — and the folded state rotates the arrow 180°, which mirrored
+them into the second bit of gibberish you saw near the bar. Same bug, upright
+and upside down.
 
-Now each card rises as it arrives. It is quick, about a seventh of a second, and
-the place name comes in a fraction slower than the rest so your eye lands on what
-you tapped before the detail underneath it.
+It is a real arrow now, and there is a check that the arrow is exactly one
+character so this cannot quietly come back.
 
-Three cards had no motion at all and were not opening the panel properly —
-**saved routes, the route options list, and turn-by-turn directions**. They were
-written a different way from every other card in the app. All fixed, and they now
-behave like everything else.
+### The one FAIL in your self-test — real, and fixed
 
-### A guide, the first time you open it
+`tap-targets: btn-disp 28px` — the Dispatch, Retrace and Directions buttons were
+being squeezed to 28 px when the drawer folded. They now hold **44 px minimum in
+every state** — the glove number.
 
-First launch now shows a short guide with the **map blurred behind it**. It
-covers:
+### The drawer standing open after the tutorial
 
-- What the four tabs are for
-- Tapping things, pressing and holding, the Layers button
-- That it knows which trails your machine may legally use, and never routes you
-  through a closed one
-- The six rivers, and picking two points for the float between them
-- What Dispatch does, and that it refuses to guess
+Your first GPS fix arrived while the tutorial was up, and the "you are 135 mi
+away" message opened the drawer underneath it. That message is status, not a
+card about something you tapped — so it no longer unfolds anything. The strip
+just reads **"135 mi away · planning mode"** and the full note is one tap away
+on the handle.
 
-Close it with **Start riding**, or tap the blurred background. It will not come
-back on its own.
+### Relief — agreed, and off by default
 
-**Tools → How to use** brings it back any time.
-
-Everything in it is something the app actually does. There is nothing in there I
-cannot back up.
+Over the flat map style it reads as dark blotches. It starts OFF now. It is
+still there under **Layers** — on Hybrid at low strength it actually helps, which
+is why it is a toggle and not deleted.
 
 ### Test script
 
-- **Airplane mode on, force-stop, reopen.** Map renders, NET badge green.
-- **The guide should appear on first launch only.** Close it, force-stop, reopen
-  — it should not come back. Then check **Tools → How to use** brings it back.
-- **Does the guide say the right things?** You are the only person who has used
-  this on real ground; if it explains something wrongly or misses the thing you
-  would want a friend to know first, tell me.
-- **Tap between several pins in a row.** Do the cards feel right arriving, or is
-  the motion too slow, too much, or distracting while riding?
-- **Open saved routes, route options and directions** — those three were the odd
-  ones out and I want to know they feel the same as the rest now.
-- Everything from take 109: the drawer, the compass standing still, the icons.
+- **Force-stop, reopen.** The chevron on the drawer strip should be a small
+  clean arrow, nothing else printed anywhere near the bar.
+- **Fold the drawer, then run the self-test.** `tap-targets` should pass — that
+  was your one FAIL.
+- **Force-stop and reopen away from home** — the map should stay full-screen
+  with just "135 mi away · planning mode" on the strip, no drawer.
+- **The map itself** — relief off. Better at first glance?
+- **Layers → Relief on, basemap Hybrid** — that is the combination where relief
+  is meant to earn its keep. Worth it there, or should it go entirely?
+- Everything from take 111: compass reads "° true", self-test is 42 checks.
+
+Guide content adjustments whenever you have them — that list is yours to shape.

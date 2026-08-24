@@ -294,8 +294,11 @@
      is already on screen below it. Folded, it is the at-a-glance line. Keeping
      it full height in both states pushed Return home off the bottom of a 360 px
      phone, which the device matrix caught (take 109). */
-  #rail:not(.folded) #peek{min-height:20px;padding:3px 13px 2px;
-    justify-content:center}
+  /* Open, the strip is a grab handle — visually slim, but still a TAP TARGET.
+     At 20 px it failed the 38 px minimum, which exists because Jacob wears
+     gloves. The chevron stays small; the touchable area does not (take 111). */
+  #rail:not(.folded) #peek{min-height:38px;padding:0 13px;
+    justify-content:center;align-items:center}
   #rail:not(.folded) #peek-txt{display:none}
   #rail:not(.folded) #peek-chev{font-size:var(--t-sm)}
   #coords{font-size:var(--t-xl);font-weight:600;font-variant-numeric:tabular-nums}
@@ -365,7 +368,12 @@
   #actions{display:flex;gap:6px;margin-top:9px}
   button.act{flex:1;appearance:none;border:1px solid #3A342C;background:#211E19;color:var(--bone);
     font:600 var(--t-sm)/1 Roboto,system-ui,sans-serif;font-stretch:condensed;letter-spacing:.11em;
-    text-transform:uppercase;padding:13px 4px;border-radius:3px;cursor:pointer}
+    text-transform:uppercase;padding:13px 4px;border-radius:3px;cursor:pointer;
+    /* Jacob's take-110 report measured these at 28 px: flex-stretch inside the
+       folded drawer's clipped box squeezes children below their padding height.
+       min-height wins over the squeeze in every state, and 44 px is the glove
+       number (take 112). */
+    min-height:44px}
   button.act:active{background:var(--line)}
   button.act:focus-visible{outline:2px solid var(--flag);outline-offset:2px}
   button.act[disabled]{opacity:.4}
@@ -380,7 +388,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 110</span>
+    <span id="title"><b>APEX</b> ORV · Take 112</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -466,7 +474,11 @@
          so nothing is ever unreachable, only folded. -->
     <button id="peek" aria-label="Show or hide the details">
       <span id="peek-txt">Tap the map for details</span>
-      <span id="peek-chev">\u25BE</span>
+      <!-- An HTML entity, NOT \u25BE — that is a JavaScript escape and means
+           nothing in markup. It shipped as six literal characters, and the
+           folded state's rotate(180deg) mirrored them into gibberish
+           (take 112, field report). -->
+      <span id="peek-chev">&#x25BE;</span>
     </button>
     <div id="railbody">
     <div id="coords">—<span class="unit"></span></div>

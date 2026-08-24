@@ -565,6 +565,8 @@ function magStart(){
     else if(e.absolute===true&&typeof e.alpha==='number')deg=(360-e.alpha)%360;
     else if(typeof e.alpha==='number')deg=(360-e.alpha)%360;
     if(deg===null||isNaN(deg))return;
+    /* Stored raw; converted where it is read, so the raw sensor value stays
+       available if this ever needs to show both. */
     MAG_OK=true;MAG=(deg+360)%360;
     if(CMP_ON)cmpPaint()};
   try{window.addEventListener('deviceorientationabsolute',onEv,true)}catch(e){}
@@ -578,10 +580,32 @@ function magStart(){
 
 /* Which heading to believe: moving, trust the GPS course; stopped, trust the
    compass. Returns null only when neither has anything. */
+/* ── TWO NORTHS (A128, take 111) ──────────────────────────────────────────
+   Take 109 shipped a compass that reads GPS course while moving and the
+   magnetometer while stopped. Those are not the same north.
+
+   GPS course-over-ground is TRUE north. A magnetometer points at MAGNETIC
+   north, which in north-east Michigan sits about 7 degrees WEST of true. So the
+   same needle meant different things depending on whether the bike was rolling,
+   and worse: every bearing in the list — "Home WNW 300 deg · 109 deg left" — is
+   computed from coordinates and is therefore TRUE. Comparing a magnetic heading
+   against a true bearing put the turn figure out by 7 degrees.
+
+   Everything is converted to TRUE at the source, so one number means one thing.
+
+   The value is a constant, not a model: WMM changes slowly and this app covers
+   one region of one state. Stated, dated, and cheap to revise — an approximate
+   correction applied consistently beats an exact one applied to half the app. */
+var DECL_W = 7.0;      /* degrees west, NE Michigan, 2026 */
+
+function magToTrue(deg){
+  if(deg===null||deg===undefined)return null;
+  return (deg-DECL_W+360)%360}
+
 function headingNow(){
   var moving=HUD.spd!==null&&HUD.spd>1.2;   /* ~2.7 mph */
   if(moving&&HUD.hdg!==null)return {deg:HUD.hdg,src:'course'};
-  if(MAG!==null)return {deg:MAG,src:'compass'};
+  if(MAG!==null)return {deg:magToTrue(MAG),src:'compass'};
   if(HUD.hdg!==null)return {deg:HUD.hdg,src:'course'};
   return null}
 
@@ -641,7 +665,7 @@ function cmpPaint(){
        (MAG_OK===false?'this phone is not reporting a compass \u2014 start moving '+
          'and it will use your GPS course instead'
         :'waiting for the compass\u2026')+'</span>'
-     :compass(hdg)+' <span style="color:#9C9384">'+Math.round(hdg)+'\u00B0 \u00B7 '+
+     :compass(hdg)+' <span style="color:#9C9384">'+Math.round(hdg)+'\u00B0 true \u00B7 '+
        (H.src==='compass'?'compass':'course')+'</span>')+
     '</div></div>'+
     (rows.length?'<div style="margin-top:9px;line-height:1.7">'+rows.join('<br>')+'</div>'
@@ -3318,6 +3342,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.paddleCard=paddleCard;window.PADDLE_MPH=PADDLE_MPH;
     window.headingNow=headingNow;window.railSet=railSet;
     window.guideShow=guideShow;window.guideClose=guideClose;
+    window.showQuiet=showQuiet;
     window.railState=function(){var b=el('railbody');
       return{folded:el('rail').className==='folded',
              h:b?Math.round(b.getBoundingClientRect().height):-1}};
@@ -3500,77 +3525,6 @@ function stRender(){
 }
 
 function stLayout(){
-  /* Layout bugs are what Jacob actually hits, and no data check sees them.
-     Take 35's route strip was 788 px wide inside a 411 px screen: options 4 and
-     5 were not off-screen, they were unreachable. That is measurable, on his
-     device, at his width — so measure it. */
-  var vw=document.documentElement.clientWidth||innerWidth;
-  stInfo('UI','viewport',vw+'x'+(document.documentElement.clientHeight||innerHeight)+
-    ' css px @dpr '+devicePixelRatio);
-  var wide=[];
-  Array.prototype.forEach.call(document.querySelectorAll('#shell *'),function(e){
-    var r=e.getBoundingClientRect();
-    if(r.width>vw+1)wide.push((e.id||e.className||e.tagName)+' '+Math.round(r.width)+'px')});
-  stAdd('UI','no-overflow',wide.length===0,
-    wide.length?'wider than the screen: '+wide.slice(0,3).join(', '):
-      'nothing exceeds '+vw+' px');
-  /* anything that scrolls must actually be able to */
-  var bad=[],scrollers=0;
-  Array.prototype.forEach.call(document.querySelectorAll('#shell *'),function(e){
-    var ov=getComputedStyle(e).overflowX;
-    if(ov!=='auto'&&ov!=='scroll')return;
-    /* Hidden panels legitimately have no width — the search results row is
-       display:none until you open it. Only judge what is on screen. */
-    if(e.offsetParent===null&&e.id!=='shell')return;
-    if(e.clientHeight<1)return;
-    scrollers++;
-    /* A scroller wider than the screen is the take-35 bug: it grew instead of
-       overflowing, so its far end is unreachable. Content that simply FITS is
-       not a fault — an earlier version of this check confused the two and
-       failed a perfectly good chip row at 900 px. */
-    if(e.clientWidth>vw+1)bad.push((e.id||e.className)+' is '+e.clientWidth+
-      ' px inside a '+vw+' px screen');
-    else if(e.clientWidth<1)bad.push((e.id||e.className)+' has no width')});
-  stAdd('UI','scrollers-scroll',bad.length===0,
-    bad.length?bad.join(', '):scrollers+' horizontal scrollers, all within the screen');
-  /* gloved thumbs need real targets */
-  var small=[];
-  Array.prototype.forEach.call(document.querySelectorAll('.chip,.act,.rc'),function(e){
-    var r=e.getBoundingClientRect();
-    if(r.height>0&&r.height<36)small.push((e.id||e.textContent||'').slice(0,14)+' '+Math.round(r.height)+'px')});
-  stAdd('UI','tap-targets',small.length===0,
-    small.length?small.length+' under 36 px: '+small.slice(0,3).join(', '):
-      'every control at least 36 px tall');
-  /* Assert the HUD's RESPONSE to the ride state, not a fixed state — PARTIAL
-     taught this the hard way at take 76 (landmine 56's corollary). */
-  var _rid=!!(rideMode||riding),_hb=el('hudbar'),_hs=el('hudstats');
-  /* The map must agree with the router about what this machine may use. Both
-     read MACHINE[machine].ok, so this asserts they are actually WIRED, not that
-     two lists happen to match (take 80). */
-  var _no=machineIllegal(),_okc=(MACHINE[machine]||{}).ok||[];
-  var _wired=true;
-  try{['trail50','moto24','track'].forEach(function(id){
-    var e=map.getPaintProperty(id,'line-opacity');
-    if(!e||!e.length||e[0]!=='case')_wired=false})}catch(e){_wired=false}
-  stAdd('UI','machine-on-map',_wired,
-    MACHINE[machine].lbl.replace(/^\S+\s/,'')+' — '+_okc.length+' classes legal, '+
-    _no.length+' faded'+(_no.length?' ('+_no.join(', ')+')':''));
-  stAdd('UI','hud-matches-ride',
-    !!_hb&&!!_hs&&_hb.hidden===!_rid&&_hs.hidden===!_rid,
-    _rid?'riding — ribbon and stats on screen':'not riding — HUD off screen');
-  var off=[];
-  Array.prototype.forEach.call(document.querySelectorAll('#actions .act'),function(e){
-    var r=e.getBoundingClientRect();
-    if(r.right<0||r.left>vw+1)off.push(e.textContent.slice(0,12))});
-  stAdd('UI','actions-reachable',off.length===0,
-    off.length?'off-screen: '+off.join(', '):'all primary actions on screen');
-  var vh=document.documentElement.clientHeight||innerHeight,
-      mh=map.getContainer().getBoundingClientRect().height;
-  stAdd('UI','map-has-room',mh>vh*0.35,
-    Math.round(mh)+' of '+vh+' px ('+Math.round(100*mh/vh)+'% of the screen)');
-}
-
-function stLayout(){
   /* Every UI bug Jacob has reported was invisible to this self-test: a strip
      that could not scroll, options unreachable off-screen, a map that jumped.
      None of them are data or logic — they are LAYOUT, and layout only exists on
@@ -3675,6 +3629,46 @@ function stLayout(){
       :(_folded?'primary controls reachable — the details drawer is folded, '+
                 'its handle is on screen'
               :'primary controls all reachable'));
+
+
+  /* ── LIFTED FROM A DEAD TWIN (take 111) ──────────────────────────────
+     These three checks lived in a SECOND `function stLayout(){}` further
+     up the file. JavaScript keeps the last declaration and discards the
+     first without a word, so they had never run — the same trap that hid
+     dispatch-scan for sixteen takes (landmine 175). The dead twin is gone
+     and a gate check now refuses a duplicate function name. */
+  /* The map must agree with the router about what this machine may use. Both
+     read MACHINE[machine].ok, so this asserts they are actually WIRED, not that
+     two lists happen to match (take 80). */
+  var _no=machineIllegal(),_okc=(MACHINE[machine]||{}).ok||[];
+  var _wired=true;
+  try{['trail50','moto24','track'].forEach(function(id){
+    var e=map.getPaintProperty(id,'line-opacity');
+    if(!e||!e.length||e[0]!=='case')_wired=false})}catch(e){_wired=false}
+  stAdd('UI','machine-on-map',_wired,
+    MACHINE[machine].lbl.replace(/^\S+\s/,'')+' — '+_okc.length+' classes legal, '+
+    _no.length+' faded'+(_no.length?' ('+_no.join(', ')+')':''));
+  /* `_hb`, `_hs` and `_rid` were defined earlier in the dead twin's body and
+     came across as undefined references — which threw, and killed every check
+     after this one. Defined here (take 111). */
+  var _hb=el('hudbar'),_hs=el('hudstats'),_rid=!!rideMode;
+  stAdd('UI','hud-matches-ride',
+    !!_hb&&!!_hs&&_hb.hidden===!_rid&&_hs.hidden===!_rid,
+    _rid?'riding — ribbon and stats on screen':'not riding — HUD off screen');
+  var off=[];
+  Array.prototype.forEach.call(document.querySelectorAll('#actions .act'),function(e){
+    var r=e.getBoundingClientRect();
+    if(r.right<0||r.left>vw+1)off.push(e.textContent.slice(0,12))});
+  stAdd('UI','actions-reachable',off.length===0,
+    off.length?'off-screen: '+off.join(', '):'all primary actions on screen');
+  /* vh is already in scope from the live function; only the map height is new.
+     The threshold is the ONE number that matters after the take-109 drawer: the
+     map is the product, and if it ever drops below a third of the screen
+     something has gone wrong with the chrome. */
+  var mh=map.getContainer().getBoundingClientRect().height;
+  stAdd('UI','map-has-room',mh>vh*0.35,
+    Math.round(mh)+' of '+vh+' px ('+Math.round(100*mh/vh)+'% of the screen)');
+
 }
 
 function stData(){
@@ -4119,6 +4113,11 @@ map.on('idle',function(){if(!healthOK)renderHealth()});
 map.on('move',refreshReadout);map.on('load',refreshReadout);
 map.on('moveend',railFoldIfAway);
 map.on('load',function(){setBasemap(0);wpDraw();showTab('map');
+  /* Relief starts OFF. The style ships hillshade visible, and over the flat
+     vector basemap it reads as dark blotches — Jacob: "it looks really bad".
+     On Hybrid it earns its place at low opacity, so it stays one tap away under
+     Layers rather than being removed (take 112, field report). */
+  try{map.setLayoutProperty('hillshade','visibility','none')}catch(e){}
   /* First open only. Waits for the map so the blur has something behind it. */
   if(!guideSeen())setTimeout(guideShow,450);
   /* The map is the product; the rail is a drawer. Opens the moment you touch
@@ -4159,12 +4158,13 @@ function locateOnce(){
     stInfo&&0; } },25000);}
 
 function showAway(acc){
-  show('<b>You are about '+Math.round(awayMi)+' mi from '+(BUNDLE.name||'this region')+
+  showQuiet('<b>You are about '+Math.round(awayMi)+' mi from '+(BUNDLE.name||'this region')+
     '.</b><br>This download only covers the boxed area — everywhere else is '+
     'deliberately blank, not broken. <b>Planning mode</b> is on: browse, search, '+
     'tap open ground to set a start, then <b>Return Home</b> or <b>Directions</b>.'+
     '<br><br>Tap <b>◉ Locate</b> to jump to your real position, or a chip above to '+
-    'jump to the riding area.','')}
+    'jump to the riding area.',
+    Math.round(awayMi)+' mi away \u00b7 planning mode')}
 
 /* Relief and Labels moved into the layers panel at take 90; the strip was at
    sixteen chips with layer toggles scattered among ride actions. lyrSet() still
@@ -4329,6 +4329,17 @@ function railFoldIfAway(){
    through one function now; a card written any other way is a card that behaves
    differently for no reason a rider could name (take 110). */
 function cardHTML(h,s){show(h,s)}
+
+/* Status messages — "you are 135 mi away", startup notes — are not CARDS about
+   a place the rider touched, so they must not unfold the drawer. Jacob closed
+   the first-run guide and found the drawer standing open under it: the first
+   GPS fix had arrived mid-guide and showAway() opened it (take 112).
+   quiet=true sets the content and a peek summary and leaves the fold alone —
+   the full text is one handle-tap away. */
+function showQuiet(h,peekLine){
+  var p=el('panel');p.innerHTML=h;p.className='';
+  var t=el('peek-txt');
+  if(t&&peekLine)t.textContent=peekLine;}
 
 function show(h,s){
   var p=el('panel');p.innerHTML=h;

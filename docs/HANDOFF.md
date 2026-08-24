@@ -1,4 +1,136 @@
-# HANDOFF — through Take 110 · V2
+# HANDOFF — through Take 112 · V2
+
+## Take 112 — 2026-08-24 — Four field findings from the take-110 session
+
+Jacob rode the drawer build. PASS 42 / FAIL 1, and four findings — every one
+real, and one of them a category of bug this project had not hit before.
+
+### "A random string of test/error code" — twice
+
+The drawer chevron was written as `\u25BE` **in the HTML markup**. That is a
+JavaScript escape; in markup it is six literal characters. So the handle
+rendered the text `\u25BE` — and the folded state's `rotate(180deg)` then
+mirrored it into gibberish near the bar. Both of Jacob's "random strings" were
+the same six characters, once upright and once upside down.
+
+Now an HTML entity. The render check asserts the chevron is ONE glyph, so an
+escape leaking into markup anywhere near it fails loudly.
+
+**New category:** the escape languages differ per context — JS strings take
+`\u`, markup takes `&#x...;` — and a string moved from one context to the other
+carries its escapes as freight. Nothing errors; it just draws them.
+
+### The XX in his report: buttons at 28 px
+
+`tap-targets: btn-disp 28px · btn-retrace 28px · btn-steps 28px`. The pinned
+action row sits in the folded drawer's clipped box, and flex-stretch inside a
+`max-height:0` container squeezes children below their padding height.
+
+`min-height:44px` on the buttons — min-height wins over the squeeze in every
+state, and 44 is the glove number. Asserted in the folded state specifically,
+because that is where his report measured 28.
+
+### The drawer stood open under the first-run guide
+
+He closed the tutorial and the drawer was already up behind it: the first GPS
+fix had arrived mid-guide, `showAway()` called `show()`, and `show()` opens the
+drawer — which is exactly what it is for, except that a status message is not a
+card about a place the rider touched.
+
+`showQuiet()`: fills the panel, puts a one-line summary on the peek strip
+(**"135 mi away · planning mode"**), and leaves the fold alone. The full text is
+one handle-tap away. The rule stays clean: cards open the drawer, status does
+not.
+
+### Relief was on by default, "it looks really bad" — agreed
+
+The style ships hillshade visible, and over the flat vector basemap it reads as
+dark blotches — his screenshots show it plainly. On Hybrid at low opacity it
+earns its place, so it starts OFF and stays one tap away under Layers rather
+than being removed.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **131 checks**, five new on the field
+findings. Gate green.
+
+---
+
+
+## Take 111 — 2026-08-24 — Hardening: four checks that never ran, and two norths
+
+Jacob: *"Harden and lock down this take, and we'll work out all bugs and
+issues/loose ends."* No new features. What follows was already broken.
+
+### The dead twin was still there, and it held three more checks
+
+Take 109 found **two `function stLayout(){}`** in app.html and moved the
+dispatch timing into the live one. It did not delete the dead one — so the trap
+was still armed, and worse, the dead twin contained **three checks that had never
+run at all**:
+
+```
+UI/machine-on-map     the map and the router agree about machine legality
+UI/hud-matches-ride   the ride ribbon matches whether a ride is running
+UI/map-has-room       the map still gets a real share of the screen
+```
+
+`machine-on-map` is the one that matters: it asserts the map and the router are
+actually WIRED to the same legality rules rather than two lists that happen to
+agree. It has been dead since take 80.
+
+All three lifted into the live function, the twin deleted. Lifting them exposed
+that `_hb`, `_hs` and `_rid` were defined earlier in the dead body — undefined
+references that **threw**, killing every check after them. Defined properly.
+
+**Self-test: 38 checks → 42.**
+
+And the number worth having: `map-has-room: 825 of 915 px (90% of the screen)`.
+Before the take-109 drawer the rail took nearly half. Now the map has ninety
+percent, and there is a check that will notice if that ever regresses.
+
+### Gated, so it cannot come back
+
+`check_no_duplicate_defs` refuses a duplicate function name, a top-level var
+assigned twice, or a duplicate id in the static markup. Three negative controls,
+including the take-109 bug reproduced exactly. Baseline:
+**163 functions, 102 top-level vars, 70 static ids, no duplicates.**
+
+Nothing errors on this failure. The code reads as live and greps as present. It
+is the only fault in the ledger that cost a whole function's worth of silence,
+so it is checked mechanically rather than remembered.
+
+### The compass was mixing two norths
+
+Take 109 shipped a compass reading GPS course while moving and the magnetometer
+while stopped. **Those are not the same north.** Course-over-ground is TRUE;
+a magnetometer points at MAGNETIC, about **7° west** here.
+
+So the same needle meant different things depending on whether the bike was
+rolling — and every bearing in the list is computed from coordinates, therefore
+true, so "Home WNW 300° · 109° left" was comparing a magnetic heading against a
+true bearing and putting the turn figure out by seven degrees.
+
+Everything is converted to true at the source. The rose now says **"42° true ·
+compass"**, so one number means one thing and the screen says which.
+
+`DECL_W = 7.0` is a constant, not a model: the WMM changes slowly and this app
+covers one region of one state. An approximate correction applied consistently
+beats an exact one applied to half the app.
+
+### And the drawer handle was too small to press
+
+At 20 px the open-state grab handle failed the 38 px minimum — a rule that exists
+because Jacob wears gloves. The chevron still looks slim; the touchable area does
+not.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render 126 checks. Self-test **42 passed, 0 real
+failures**. Gate green across 30 checks.
+
+---
+
 
 ## Take 110 — 2026-08-24 — Card motion, and a guide for the first time you open it
 
