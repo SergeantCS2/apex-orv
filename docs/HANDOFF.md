@@ -1,4 +1,180 @@
-# HANDOFF — through Take 108 · V2
+# HANDOFF — through Take 110 · V2
+
+## Take 110 — 2026-08-24 — Card motion, and a guide for the first time you open it
+
+### The cards move now
+
+Take 109 gave the drawer a slide. Its **contents** still swapped between frames —
+tap one pin, then another, and the text simply became different text. A card that
+replaces itself with no motion reads as a redraw; one that rises reads as an
+answer to what you just touched.
+
+140 ms, transform and opacity only so it composites and costs no layout while the
+map is drawing. The place name inside a card rises fractionally longer, so the
+eye lands on WHAT you tapped before the detail under it.
+
+**Restarting the animation needed care**: setting the class does nothing when it
+is already there — a browser will not replay an animation for an unchanged class
+— so it comes off, the layout is read to force the change to land, and it goes
+back on.
+
+### Three cards had no motion because they never used show()
+
+Saved routes, route options and the step list wrote `panel.innerHTML` directly.
+They got no animation and did not open the drawer. Everything goes through one
+function now: **a card written any other way is a card that behaves differently
+for no reason a rider could name.**
+
+That refactor cost three syntax errors in a row — the step-list call was inside
+an `addEventListener`, so replacing its tail needed `})` and I wrote `}`, then
+`)`, then finally read the whole function instead of patching its edge.
+
+### A129 · the first-run guide
+
+Jacob asked for a short guide the first time the app opens, with the map blurred
+behind it, reachable afterwards from Tools.
+
+`backdrop-filter: blur(9px)` — the blur is the point, because the map staying
+recognisable behind it makes the guide read as something ON the app rather than
+a screen before it.
+
+It covers the four destinations, tapping and long-pressing, layers, what the app
+knows about legality and closures, the six rivers, and Dispatch. Everything in it
+is a fact about what the app DOES. No marketing, and nothing it cannot back up —
+including the line that Dispatch refuses to guess.
+
+Dismissed with **Start riding** or by tapping the blurred backdrop, and the flag
+goes in the same localStorage as waypoints and saved routes. If storage is
+unavailable the guide shows every time rather than failing: an extra tap is a
+smaller harm than a first-time rider getting no explanation at all.
+
+Reachable afterwards from **Tools → How to use**.
+
+### I made the same mistake as one take ago
+
+My guide check left the overlay open, and the colour-variety check that runs
+later saw a blurred sheet and called the map blank. **A check that mutates shared
+state hands that state to every check after it** — landmine 177, written one take
+ago, by me, about the device matrix.
+
+### And a threshold that was measuring its edge
+
+`map viewport has 171 distinct colours` failed a `> 200` check whose own message
+says a blank map is 1–3. The drawer made the map ~210 px taller and changed the
+sampled area. 171 is nowhere near blank, and the sibling check — busiest colour
+under 90%, passing at 82.9% — is what actually distinguishes terrain and trails
+from a flat sheet.
+
+Widened to a margin that still catches the failure it was written for, with the
+reasoning in the file. A threshold tuned so tightly that a layout change trips it
+is measuring the edge (landmine 151).
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **126 checks**, seven new: the guide opens,
+blurs, explains, is remembered, reopens from Tools, closes on the backdrop, and
+puts itself away. Gate green.
+
+---
+
+
+## Take 109 — 2026-08-24 — The drawer, and three bugs from the first real session
+
+Jacob rode take 108 — **PASS 42, FAIL 0** — and reported three things. All three
+were real, and one of them had been broken for sixteen takes without anyone
+seeing it.
+
+### "I don't think compass works" — correct
+
+It read GPS course-over-ground, which does not exist standing still. Opening it
+at a junction with the engine off showed a rose with no needle and a sentence
+explaining why: a correct answer to a question nobody asked.
+
+The Fold has a magnetometer and the WebView exposes it through
+`deviceorientationabsolute` — **no Capacitor plugin**, which is why none of the
+seven on his device mention it. Moving, GPS course still wins; a magnetometer
+beside an engine is not to be trusted. Stopped, the compass takes over. Verified:
+one reading at alpha 311 gives **`NE 49° · compass`**, with the source named.
+
+### A self-test check that had never run, anywhere
+
+`dispatch-scan` was added at take 93 and is absent from his report. There are
+**two `stLayout()` functions** in the file; JavaScript keeps the second and
+silently discards the first, and the block was in the first. Dead in his reports
+*and* in the harness, for sixteen takes.
+
+It also required `ME`, which is only set INSIDE the region — so it would have
+skipped anyway at 135 mi away. Both fixed. **17–22 ms.** The take-93 worry was
+unfounded and it took this long to find out because nobody notices a check that
+produces no line.
+
+### "The car doesn't look good" — a defect, not taste
+
+The wheels were `a1.6 1.6 0 1 0 0 .1`, an arc too short to render as a circle.
+**Eight icons** used that construction — `here`, `locate`, `info`, `clock`,
+`target`, `pin`, `sat`, `loop`. All redrawn with real circles; the vehicle
+redrawn as a silhouette with a cabin, bonnet and two round wheels.
+
+### The drawer (A127)
+
+Jacob's design, and his diagnosis of why the app felt cheap: the rail was always
+there, taking nearly half a map app's screen.
+
+**The rule: the card belongs to a place.** It opens when you touch something and
+leaves when that thing does.
+
+```
+opens   any card — every one goes through show(), so one hook rather than a
+        call at each site
+folds   empty-map tap · panning until the subject leaves the screen · the handle
+peeks   always — the strip carries distance to the truck and the handle back,
+        so nothing is unreachable, only folded
+```
+
+It animates `max-height` rather than transform, because the rail is a grid row:
+translating it would leave a hole the map does not fill, which is the "just
+disappears" he did not want. Folding shrinks the row and the map grows into it.
+
+### Two real bugs the drawer work exposed
+
+**The action row scrolled away.** With a tall card — six route options, a
+self-test report — the body hit its cap and Dispatch and Return home went below
+the fold. Now pinned OUTSIDE the scrolling body. That would have bitten a rider.
+
+**My device-matrix check leaked state.** It forced the drawer open to measure and
+never put it back, so the self-test ran later against a permanently expanded rail
+and reported four buttons off-screen. A check that changed the state it measured
+and handed that state to the next check.
+
+### What this cost, and what I should have done sooner
+
+I spent four rounds guessing at a failure instead of reading it. The moment the
+check reported its own geometry it said `railbody=549 vh=915 btn-home=973` and
+the cause was one line. Then again for the second one.
+
+The trap underneath: the check ran in the **same tick** as the `show()` that
+opened the drawer, so the class already read open while the 260 ms transition had
+not moved — `rail="" folded=false railbody=0`. A class name is an intention; a
+rect is a fact, and mid-transition they disagree.
+
+### And what I could not measure
+
+In headless the drawer's measured height **lags its class by a step**:
+`railSet(true)` reads `folded:false h:0`, then `railSet(false)` reads
+`folded:true h:84`. I could not model that reliably.
+
+So the checks assert what can be measured honestly — the state, and the
+*structural* fact that the action row sits outside the scrolling body, which is
+the property that was actually broken. Not the pixel mid-animation, which is the
+animation. Six behaviours asserted, none of them a number I do not trust.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **119 checks**. All four device sizes
+clean. Gate green.
+
+---
+
 
 ## Take 108 — 2026-08-23 — Wiring audit before the ride
 

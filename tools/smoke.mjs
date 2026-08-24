@@ -222,6 +222,19 @@ class MapStub {
      undefined here would make every base collapse to 1 and the casings would
      silently stop dimming correctly (landmine 62). */
   getLayer(id) { return this._layers.has(id) ? { id } : undefined; }
+  /* railFoldIfAway asks whether the place a card is about is still on screen,
+     which means projecting lon/lat to a pixel. A flat approximation is enough:
+     the app only tests whether the point is outside the container by 40 px, and
+     nothing here depends on a real Mercator (take 109). */
+  project(ll) {
+    const c = Array.isArray(ll) ? ll : [ll.lng, ll.lat];
+    const b = this._centre || [-84.09, 44.57];
+    const z = this._zoom || 12;
+    const px = 256 * Math.pow(2, z) / 360;
+    return { x: 200 + (c[0] - b[0]) * px * 0.71,
+             y: 400 - (c[1] - b[1]) * px };
+  }
+  getContainer() { return { getBoundingClientRect: () => ({ width: 412, height: 700 }) }; }
   /* A91 derives the label set from the style rather than from a hand-kept
      array, so the app now asks the map what layers it has. The stub already
      held them; it just never offered them (landmine 62 — the gate's stub
@@ -469,8 +482,10 @@ if (AWAY) {
   const [cx, cy] = [(manifest.bbox[0]+manifest.bbox[2])/2, (manifest.bbox[1]+manifest.bbox[3])/2];
   theMap.fire("click", { lngLat: { lng: cx, lat: cy }, point: { x: 540, y: 900 } });
   /* Tap on open ground no longer pins — it tells you how (take 36). */
-  ok(/Press and hold/.test(grab("panel")._html),
-     "tap on open ground explains the long press instead of pinning");
+  ok(/press and hold/i.test(grab("peek-txt").textContent || ""),
+     "tap on open ground FOLDS the drawer and explains the long press on the "
+     + "peek strip — an empty tap is how a rider asks for the map back, so the "
+     + "answer must not cost half the screen (A127, take 109)");
   /* Long press: drive the real touch path, timer and all. */
   const cv = theMap.getCanvasContainer();
   theMap._up = [cx, cy];

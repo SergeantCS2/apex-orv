@@ -27,6 +27,41 @@
   #shell>*{min-width:0}
   /* A third row for the destination bar. The rail keeps its own scroll; the bar
      is always reachable without hunting a horizontally scrolling strip. */
+  /* The blur is the point: the map stays recognisable behind the guide, so it
+     reads as something ON the app rather than a screen before it. */
+  #guide{position:fixed;inset:0;z-index:40;display:flex;align-items:center;
+    justify-content:center;padding:18px;
+    background:rgba(12,11,9,.62);backdrop-filter:blur(9px);
+    -webkit-backdrop-filter:blur(9px);
+    animation:guideIn 220ms var(--m-ease)}
+  #guide[hidden]{display:none}
+  @keyframes guideIn{from{opacity:0}to{opacity:1}}
+  #guide-card{max-width:min(430px,94vw);max-height:88vh;overflow-y:auto;
+    background:rgba(26,24,20,.97);border:1px solid rgba(255,255,255,.16);
+    border-radius:14px;padding:20px 20px 16px;
+    box-shadow:0 18px 50px rgba(0,0,0,.55);
+    animation:cardIn 260ms var(--m-ease)}
+  #guide-card h2{margin:0 0 3px;font:800 var(--t-xl)/1.15 Roboto,system-ui,sans-serif;
+    letter-spacing:.02em;color:var(--bone)}
+  #guide-card h2 span{display:block;font:600 var(--t-sm)/1.4 Roboto,system-ui,sans-serif;
+    color:#9C9384;letter-spacing:.1em;text-transform:uppercase;margin-top:4px}
+  #guide-card h3{margin:16px 0 6px;font:700 var(--t-xs)/1 Roboto,system-ui,sans-serif;
+    letter-spacing:.15em;text-transform:uppercase;color:var(--flag)}
+  #guide-card p{margin:0 0 6px;font:400 var(--t-md)/1.55 Roboto,system-ui,sans-serif;
+    color:#C9C1B2}
+  #guide-card p.lede{color:var(--bone);margin-top:8px}
+  #guide-card ul{margin:0;padding-left:17px}
+  #guide-card li{font:400 var(--t-md)/1.5 Roboto,system-ui,sans-serif;
+    color:#C9C1B2;margin-bottom:5px}
+  #guide-card b{color:var(--bone)}
+  #guide-card p.foot{margin-top:15px;font-size:var(--t-sm);color:#8B8375}
+  #guide-go{margin-top:14px;width:100%;appearance:none;border:0;cursor:pointer;
+    background:var(--flag);color:#1A1814;border-radius:9px;min-height:46px;
+    font:800 var(--t-md)/1 Roboto,system-ui,sans-serif;letter-spacing:.06em;
+    text-transform:uppercase}
+  #guide-go:active{filter:brightness(.92)}
+  @media (prefers-reduced-motion:reduce){
+    #guide,#guide-card{animation:none}}
   #tabs{display:grid;grid-template-columns:repeat(4,1fr);
     border-top:1px solid var(--line);background:rgba(20,18,15,.98)}
   .tab{appearance:none;border:0;background:none;cursor:pointer;
@@ -70,7 +105,24 @@
     color var(--m-fast) var(--m-ease),border-color var(--m-fast) var(--m-ease)}
   .chip:active,.act:active{transform:scale(.97)}
   .actrow{transition:background-color var(--m-fast) var(--m-ease)}
+  /* ── CARD MOTION (take 110) ────────────────────────────────────────────
+     The drawer slides, but its CONTENTS used to swap between frames — tap one
+     pin, then another, and the text simply became different text. A card that
+     replaces itself with no motion reads as a redraw; one that rises reads as
+     an answer to what you just touched.
+     transform + opacity only, so it composites and costs no layout while the
+     map is drawing. 140 ms: long enough to register, short enough that a rider
+     tapping down a river never waits for it. */
   #panel{transition:opacity var(--m-fast) var(--m-ease)}
+  #panel.swap{animation:cardIn 140ms var(--m-ease)}
+  @keyframes cardIn{
+    from{opacity:0;transform:translateY(6px)}
+    to{opacity:1;transform:translateY(0)}}
+  /* The place name inside a card gets a fractionally longer rise, so the eye
+     lands on WHAT you tapped before the detail under it. */
+  #panel.swap .tn{animation:cardIn 200ms var(--m-ease)}
+  @media (prefers-reduced-motion:reduce){
+    #panel.swap,#panel.swap .tn{animation:none}}
 
   /* Someone who has asked their phone to stop animating has asked for a
      reason, and on a bike in the sun that reason may be legibility. */
@@ -209,8 +261,43 @@
   #alert small{display:block;font-weight:400;font-size:var(--t-sm);opacity:.9;margin-top:3px}
   .crumb{stroke:#00A8E8}
 
-  #rail{border-top:2px solid var(--flag);padding:10px 13px 9px;
+  #rail{border-top:2px solid var(--flag);
     font-family:ui-monospace,"Roboto Mono",monospace}
+  /* The body folds; the peek bar does not. Collapsing animates max-height and
+     opacity rather than transform, because the rail is a GRID ROW — translating
+     it would leave a hole the map does not fill, which is the "just disappears"
+     Jacob did not want. Folding shrinks the row and the map grows into it. */
+  /* Hidden while folded so the fold animates cleanly; scrollable when open so a
+     long card — six route options, a self-test — is reachable rather than
+     silently clipped at 60vh. */
+  #railbody{padding:10px 13px 9px;overflow-y:auto;
+    max-height:42vh;opacity:1;
+    transition:max-height 260ms var(--m-ease), opacity 170ms var(--m-ease),
+               padding 260ms var(--m-ease)}
+  #rail.folded #railbody{max-height:0;opacity:0;padding-top:0;padding-bottom:0;
+    overflow:hidden}
+  /* The pinned row folds with the drawer but never scrolls with its contents. */
+  #actions{overflow:hidden;max-height:80px;
+    transition:max-height 260ms var(--m-ease), opacity 170ms var(--m-ease),
+               padding 260ms var(--m-ease)}
+  #rail.folded #actions{max-height:0;opacity:0;padding-top:0;padding-bottom:0}
+  #peek{display:flex;width:100%;align-items:center;gap:10px;appearance:none;
+    border:0;background:none;cursor:pointer;color:var(--bone);
+    padding:9px 13px;min-height:40px;text-align:left;
+    font:600 var(--t-sm)/1.2 ui-monospace,"Roboto Mono",monospace}
+  #peek-txt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #peek-chev{color:var(--dim);font-size:var(--t-md);
+    transition:transform 260ms var(--m-ease)}
+  #rail.folded #peek-chev{transform:rotate(180deg)}
+  #peek:active{background:rgba(255,255,255,.05)}
+  /* Open, the strip is a grab handle and nothing more — everything it could say
+     is already on screen below it. Folded, it is the at-a-glance line. Keeping
+     it full height in both states pushed Return home off the bottom of a 360 px
+     phone, which the device matrix caught (take 109). */
+  #rail:not(.folded) #peek{min-height:20px;padding:3px 13px 2px;
+    justify-content:center}
+  #rail:not(.folded) #peek-txt{display:none}
+  #rail:not(.folded) #peek-chev{font-size:var(--t-sm)}
   #coords{font-size:var(--t-xl);font-weight:600;font-variant-numeric:tabular-nums}
   #coords .unit{color:var(--dim);font-size:var(--t-sm)}
   #grid{margin-top:7px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
@@ -293,7 +380,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 108</span>
+    <span id="title"><b>APEX</b> ORV · Take 110</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -351,6 +438,7 @@
       <!-- A119 · Tools became a real bucket at take 101. About, Self-test and
            Pan test are DIAGNOSTICS, not tools — they went behind one entry so
            the tab has room for the things a rider actually reaches for. -->
+      <button class="chip" data-tab="tools" id="c-howto">__IC_info__<span>How to use</span></button>
       <button class="chip" data-tab="tools" id="c-compass">__IC_locate__<span>Compass</span></button>
       <button class="chip" data-tab="tools" id="c-markme">__IC_pin__<span>Mark this spot</span></button>
       <button class="chip" data-tab="tools" id="c-diag">__IC_shield__<span>Diagnostics</span></button>
@@ -368,7 +456,19 @@
     </div>
   </div>
 
-  <div id="rail">
+  <div id="rail" class="folded">
+    <!-- ── THE PEEK BAR (A127, take 109) ────────────────────────────────────
+         Jacob, after the first real session: the rail is always there and it
+         takes nearly half the screen on a map app. It should appear when you
+         touch something and get out of the way when you do not.
+         This strip never leaves. It carries the one number that matters while
+         riding — distance to the truck — and the handle that opens the rest,
+         so nothing is ever unreachable, only folded. -->
+    <button id="peek" aria-label="Show or hide the details">
+      <span id="peek-txt">Tap the map for details</span>
+      <span id="peek-chev">\u25BE</span>
+    </button>
+    <div id="railbody">
     <div id="coords">—<span class="unit"></span></div>
     <div id="grid">
       <div class="cell"><div class="k">To truck</div><div class="v" id="v-truck">—</div></div>
@@ -382,6 +482,11 @@
       <div id="hits"></div>
     </div>
     <div id="panel">You're at Bull Gap, home is the Pink Store. Tap <b>Return home</b> for ranked ways back — then <b>▶ Ride it</b>, hit <b>😖 Wrong turn</b>, and watch what happens.</div>
+    </div>
+    <!-- Pinned OUTSIDE the scrolling body. With a tall card — six route options,
+         a self-test report — the body hits its 60vh cap and everything below it
+         scrolls away. Dispatch and Return home are the two buttons a rider needs
+         without hunting, so they do not scroll (take 109). -->
     <div id="actions">
       <button class="act" id="btn-disp">Dispatch</button>
       <button class="act" id="btn-retrace">Retrace</button>
@@ -397,6 +502,56 @@
        Four destinations. Every chip keeps its id, its handler and its place in
        the DOM — only which ones are ON SCREEN changes, so nothing that clicks a
        chip needs to know this exists. -->
+  <!-- ── FIRST RUN (A129, take 110) ───────────────────────────────────────
+       Jacob: a short guide the first time the app opens, reachable afterwards
+       from Tools. Everything here is a fact about what the app DOES — no
+       marketing, and nothing it cannot back up. It is dismissed once and never
+       reappears unless asked for. -->
+  <div id="guide" hidden>
+    <div id="guide-card">
+      <h2>APEX <span>Bull Gap · Mio · Rose City</span></h2>
+      <p class="lede">An offline map for riding and paddling north-east Michigan.
+        Everything works with no signal — the whole map, the routing and the
+        rivers are already on your phone.</p>
+
+      <h3>Getting around</h3>
+      <ul>
+        <li><b>Map</b> — layers, search, find yourself</li>
+        <li><b>Plan</b> — your machine, home, fuel range, loops, saved routes</li>
+        <li><b>Ride</b> — start recording, mark a wrong turn</li>
+        <li><b>Tools</b> — compass, mark a spot, diagnostics</li>
+      </ul>
+
+      <h3>The map</h3>
+      <ul>
+        <li><b>Tap a trail, road or pin</b> for details. The panel slides up and
+          folds away when you tap empty ground or pan off.</li>
+        <li><b>Press and hold</b> anywhere to drop a pin — then save it as a
+          waypoint.</li>
+        <li><b>Layers</b> turns on contours, named hills, places and rivers.</li>
+      </ul>
+
+      <h3>What it knows</h3>
+      <ul>
+        <li>Which trails <b>your machine may legally use</b>, from the DNR and
+          the Forest Service — it will not route you somewhere you cannot ride.</li>
+        <li><b>Closed trails</b> are drawn red and never routed through.</li>
+        <li><b>Six rivers</b> with every launch, campground and dam. Pick two
+          points for the float between them.</li>
+      </ul>
+
+      <h3>If something goes wrong</h3>
+      <p><b>Dispatch</b> gives you your position, the nearest junction and the
+        nearest pavement, in words you can read aloud on a phone call. It refuses
+        to guess: if it does not know where you are, it says so instead of
+        showing a number.</p>
+
+      <p class="foot">This guide lives under <b>Tools → How to use</b>.
+        It will not show again on its own.</p>
+      <button id="guide-go">Start riding</button>
+    </div>
+  </div>
+
   <nav id="tabs">
     <button class="tab on" data-go="map">__IC_map__<span>Map</span></button>
     <button class="tab" data-go="plan">__IC_route__<span>Plan</span></button>

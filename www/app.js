@@ -536,7 +536,54 @@ function runClear(){RUNFROM=null}
    `coords.heading` as null when stationary and the crumb-trail fallback needs
    two fixes apart — so "no heading yet" is the normal state at a standstill and
    is said in those words. */
-var CMP_ON=false;
+var CMP_ON=false, MAG=null, MAG_OK=null;
+
+/* ══ THE MAGNETOMETER (take 109) ════════════════════════════════════════════
+   Jacob, on the take-108 compass: "I don't think compass works". It was working
+   exactly as designed and the design was wrong. It read GPS course-over-ground,
+   which does not exist standing still — so a compass you open at a junction
+   with the engine off showed a rose with no needle and a sentence explaining
+   why. That is a correct answer to a question nobody asked.
+
+   The phone has a magnetometer and the Android WebView exposes it through
+   `deviceorientationabsolute` with no Capacitor plugin and no permission — the
+   plugin list on his Fold is Geolocation, Device, Haptics, Cookies, WebView,
+   Share, Http, and none of them are needed for this.
+
+   GPS heading still wins WHILE MOVING, because course-over-ground is what you
+   are actually doing and a magnetometer near an engine is not to be trusted.
+   Standing still the magnetometer takes over, which is the case that was broken.
+
+   If the sensor never reports, MAG_OK stays null and the compass says so rather
+   than pretending — the same rule as everything else here. */
+function magStart(){
+  if(MAG_OK!==null)return;
+  MAG_OK=false;
+  var onEv=function(e){
+    var deg=null;
+    if(typeof e.webkitCompassHeading==='number')deg=e.webkitCompassHeading;
+    else if(e.absolute===true&&typeof e.alpha==='number')deg=(360-e.alpha)%360;
+    else if(typeof e.alpha==='number')deg=(360-e.alpha)%360;
+    if(deg===null||isNaN(deg))return;
+    MAG_OK=true;MAG=(deg+360)%360;
+    if(CMP_ON)cmpPaint()};
+  try{window.addEventListener('deviceorientationabsolute',onEv,true)}catch(e){}
+  try{window.addEventListener('deviceorientation',onEv,true)}catch(e){}
+  /* iOS needs a gesture-gated permission; Android does not. Asked for only if
+     the API exists, and never blocking. */
+  try{
+    var D=window.DeviceOrientationEvent;
+    if(D&&typeof D.requestPermission==='function')D.requestPermission().catch(function(){});
+  }catch(e){}}
+
+/* Which heading to believe: moving, trust the GPS course; stopped, trust the
+   compass. Returns null only when neither has anything. */
+function headingNow(){
+  var moving=HUD.spd!==null&&HUD.spd>1.2;   /* ~2.7 mph */
+  if(moving&&HUD.hdg!==null)return {deg:HUD.hdg,src:'course'};
+  if(MAG!==null)return {deg:MAG,src:'compass'};
+  if(HUD.hdg!==null)return {deg:HUD.hdg,src:'course'};
+  return null}
 
 function cmpRose(deg){
   var ticks='',i,a,x1,y1,x2,y2,r=46;
@@ -560,8 +607,9 @@ function cmpRose(deg){
     (deg===null?'':'<path d="M50 8 L45 20 L55 20 Z" fill="#E2570F"/>')+
     '<circle cx="50" cy="50" r="2.4" fill="#F2ECE0"/></svg>'}
 
-function cmpRows(){
-  var out=[],hdg=HUD.hdg;
+function cmpRows(hdg){
+  var out=[];
+  if(hdg===undefined){var H=headingNow();hdg=H?H.deg:null}
   function row(label,at){
     if(!at||!ME)return;
     var b=bearing(ME,at),d=mi(ME,at);
@@ -586,12 +634,15 @@ function cmpRows(){
 function cmpPaint(){
   var box=el('cmpbox');
   if(!box||!CMP_ON)return;
-  var hdg=HUD.hdg,rows=cmpRows();
+  var H=headingNow(),hdg=H?H.deg:null,rows=cmpRows(hdg);
   box.innerHTML='<div style="text-align:center">'+cmpRose(hdg)+
     '<div style="font:700 var(--t-lg)/1 Roboto,system-ui,sans-serif;margin-top:4px">'+
     (hdg===null?'<span style="color:#9C9384;font-size:var(--t-sm)">'+
-       'no heading yet \u2014 a phone lying still has none; start moving</span>'
-     :compass(hdg)+' <span style="color:#9C9384">'+Math.round(hdg)+'\u00B0</span>')+
+       (MAG_OK===false?'this phone is not reporting a compass \u2014 start moving '+
+         'and it will use your GPS course instead'
+        :'waiting for the compass\u2026')+'</span>'
+     :compass(hdg)+' <span style="color:#9C9384">'+Math.round(hdg)+'\u00B0 \u00B7 '+
+       (H.src==='compass'?'compass':'course')+'</span>')+
     '</div></div>'+
     (rows.length?'<div style="margin-top:9px;line-height:1.7">'+rows.join('<br>')+'</div>'
      :'<div class="sub" style="margin-top:9px">Nothing to take a bearing to yet — '+
@@ -1252,27 +1303,33 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
    generic vehicle mark and the words carry the meaning. */
 var ICONS={
   layers:'M12 3 3 8l9 5 9-5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5',
-  vehicle:'M4 15h16M6.5 15a1.6 1.6 0 1 0 0 .1M17.5 15a1.6 1.6 0 1 0 0 .1M5 15l1.5-5h8l3 5',
+  /* The first version drew a ground line, a lean-to body and two wheels made
+     from `a1.6 1.6 0 1 0 0 .1` — an arc so short it renders as a sliver, not a
+     circle. Jacob: "the car doesn't look good". Real circles, a cabin and a
+     bonnet now (take 109). */
+  vehicle:'M3.5 16.5h1M19.5 16.5h1M4.5 16.5h15M5 16.5l1.2-4.2a1.5 1.5 0 0 1 1.4-1h8.8'+
+          'a1.5 1.5 0 0 1 1.3.8l2.2 4.4M8.2 11.3h7.4M8.4 18a1.9 1.9 0 1 1 3.8 0'+
+          'a1.9 1.9 0 1 1-3.8 0M16.2 18a1.9 1.9 0 1 1 3.8 0a1.9 1.9 0 1 1-3.8 0',
   home:'M4 11.5 12 4l8 7.5M6.5 10v9h11v-9',
-  here:'M12 3v3M12 18v3M3 12h3M18 12h3M12 8a4 4 0 1 0 .1 0',
+  here:'M12 3v3M12 18v3M3 12h3M18 12h3M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8',
   fuel:'M4 20V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v15M3 20h12M5.5 9h6M16 8l2.5 2.5V17a1.5 1.5 0 0 0 3 0v-6',
   play:'M8 5.5 19 12 8 18.5z',
   stop:'M7 7h10v10H7z',
   alert:'M12 4 2.5 20h19zM12 10v4.5M12 17.2v.1',
-  locate:'M12 2v3M12 19v3M2 12h3M19 12h3M12 7a5 5 0 1 0 .1 0M12 11.5a.5.5 0 1 0 .1 0',
-  clock:'M12 3a9 9 0 1 0 .1 0M12 7v5.5l3.5 2',
-  info:'M12 3a9 9 0 1 0 .1 0M12 11v6M12 7.6v.1',
+  locate:'M12 2v3M12 19v3M2 12h3M19 12h3M12 7a5 5 0 1 1 0 10a5 5 0 1 1 0-10M12 11a1 1 0 1 1 0 2a1 1 0 1 1 0-2',
+  clock:'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18M12 7v5.5l3.5 2',
+  info:'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18M12 11v6M12 7.4a.6.6 0 1 1 0 1.2a.6.6 0 1 1 0-1.2',
   loop:'M20 12a8 8 0 1 1-2.6-5.9M20 3v4h-4',
   star:'M12 3.5l2.6 5.6 6 .8-4.4 4.2 1.1 6.1L12 17.3 6.7 20.2l1.1-6.1L3.4 9.9l6-.8z',
   shield:'M12 3 5 6v6c0 4.5 3 7.6 7 9 4-1.4 7-4.5 7-9V6zM9.5 12h5M12 9.5v5',
   search:'M11 4a7 7 0 1 0 .1 0M16.2 16.2 21 21',
   map:'M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5zM9 4v13M15 6.5v13',
-  sat:'M12 3a9 9 0 1 0 .1 0M3.5 9.5h17M3.5 14.5h17M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18',
-  target:'M12 3a9 9 0 1 0 .1 0M12 7.5a4.5 4.5 0 1 0 .1 0M12 11.6a.4.4 0 1 0 .1 0',
+  sat:'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18M3.5 9.5h17M3.5 14.5h17M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18',
+  target:'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18M12 7.5a4.5 4.5 0 1 1 0 9a4.5 4.5 0 1 1 0-9M12 11.4a.6.6 0 1 1 0 1.2a.6.6 0 1 1 0-1.2',
   phone:'M6 3.5h3.5l1.8 4.3-2.2 1.4a12 12 0 0 0 5.7 5.7l1.4-2.2 4.3 1.8V18a2.5 2.5 0 0 1-2.7 2.5C10.5 20 4 13.5 3.5 6.2A2.5 2.5 0 0 1 6 3.5z',
   close:'M6 6l12 12M18 6L6 18',
   check:'M4.5 12.5 9.5 18 20 6.5',
-  pin:'M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11zM12 8.2a2 2 0 1 0 .1 0',
+  pin:'M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11zM12 7.2a2 2 0 1 1 0 4a2 2 0 1 1 0-4',
   truck:'M3 7h11v9H3zM14 10.5h3.6L21 14v2h-7M6.5 16a1.7 1.7 0 1 0 .1 0M17 16a1.7 1.7 0 1 0 .1 0',
   route:'M6 20a3 3 0 1 0 .1 0M18 7a3 3 0 1 0 .1 0M18 10v3a5 5 0 0 1-5 5H9'
 };
@@ -1499,6 +1556,34 @@ var SVKEY='apex.routes.v1';
    observation, and freezing an observation is what saving it means. */
 var WPKEY='apex.waypoints.v1';
 
+/* ══ THE FIRST-RUN GUIDE (A129) ═════════════════════════════════════════════
+   Shown once, on first open, and never again on its own. Reachable afterwards
+   from Tools -> How to use.
+
+   The flag goes in the same localStorage the waypoints and saved routes use, so
+   it survives a force-stop and dies with the app's data — nothing is sent
+   anywhere and there is nothing to opt out of. If storage is unavailable the
+   guide simply shows every time rather than failing: an extra tap is a smaller
+   harm than a first-time rider getting no explanation at all. */
+var GUIDEKEY='apex.guide.v1';
+
+function guideSeen(){
+  if(!svAvailable())return false;
+  try{return localStorage.getItem(GUIDEKEY)==='1'}catch(e){return false}}
+
+function guideShow(){
+  var g=el('guide');
+  if(!g)return;
+  g.hidden=false;
+  logAct('act  guide open');}
+
+function guideClose(mark){
+  var g=el('guide');
+  if(!g)return;
+  g.hidden=true;
+  if(mark&&svAvailable()){try{localStorage.setItem(GUIDEKEY,'1')}catch(e){}}
+  logAct('act  guide close');}
+
 function wpLoad(){
   if(!svAvailable())return [];
   try{var a=JSON.parse(localStorage.getItem(WPKEY)||'[]');
@@ -1661,7 +1746,7 @@ function buildSavedPanel(){
        '<div class="sub"><button class="chip" data-svopen="'+i+'">Open</button> '+
        '<button class="chip" data-svren="'+i+'">Rename</button> '+
        '<button class="chip" data-svdel="'+i+'">Delete</button></div></div>'});
-  el('panel').className='';el('panel').innerHTML=h+'</div>';
+  show(h+'</div>','');
   var bind=function(attr,fn){
     Array.prototype.forEach.call(document.querySelectorAll('['+attr+']'),function(b){
       b.addEventListener('click',function(e){
@@ -1874,7 +1959,7 @@ function renderRoutes(out){
   html+='<div class="sub" style="margin-top:7px">'+
     '<button class="chip" id="btn-save">\u2606 Save this route</button> '+
     '<button class="chip" id="btn-clear">\u2715 Clear route</button></div>';
-  el('panel').className='';el('panel').innerHTML=html;
+  show(html,'');
   var cb2=el('btn-clear');
   if(cb2)cb2.addEventListener('click',function(){
     logAct('act  cleared route');
@@ -2127,9 +2212,8 @@ el('btn-steps').addEventListener('click',function(){
       (at>0.05?'<div class="at">at '+at.toFixed(1)+' mi</div>':'')+
       '</div></div>'});
   html+='</div>';
-  el('panel').className='';
-  el('panel').innerHTML='<span class="tn">'+steps.length+' steps · '+tot.toFixed(1)+
-    ' mi</span><span class="tag legal">'+last[sel].h+'</span>'+html});
+  show('<span class="tn">'+steps.length+' steps · '+tot.toFixed(1)+
+    ' mi</span><span class="tag legal">'+last[sel].h+'</span>'+html,'')})
 
 /* ══ BASEMAP ════════════════════════════════════════════════════════════════
    PROTOCOL §8 as revised at take 10: provisioning may use the network, the
@@ -2921,9 +3005,16 @@ function showTab(t){
 Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'),function(b){
   b.addEventListener('click',function(){showTab(b.dataset.go)})});
 
+el('c-howto').addEventListener('click',function(){guideShow()});
+el('guide-go').addEventListener('click',function(){guideClose(true)});
+/* Tapping the blurred background closes it too — the same gesture as tapping
+   empty map to put the drawer away. */
+el('guide').addEventListener('click',function(e){
+  if(e.target===el('guide'))guideClose(true)});
+
 el('c-compass').addEventListener('click',function(){
   var p=el('cmppanel');CMP_ON=p.hidden;p.hidden=!p.hidden;
-  if(CMP_ON){el('diagpanel').hidden=true;cmpPaint()}
+  if(CMP_ON){magStart();el('diagpanel').hidden=true;cmpPaint()}
   logAct('tap  c-compass')});
 
 /* One tap where you are, rather than long-pressing a map you may not be able to
@@ -2939,6 +3030,12 @@ el('c-markme').addEventListener('click',function(){
   wpDraw();
   show('Marked <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
     'Find it again under \u2606 Saved.</span>','pass')});
+
+el('peek').addEventListener('click',function(){
+  var folded=el('rail').className==='folded';
+  RAIL_MANUAL=!folded;              /* folded by hand stays folded */
+  railSet(folded);
+  logAct('tap  rail '+(folded?'open':'fold'))});
 
 el('c-diag').addEventListener('click',function(){
   var p=el('diagpanel');p.hidden=!p.hidden;logAct('tap  c-diag')});
@@ -3219,6 +3316,14 @@ function dropPin(at){
 
 try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.paddleCard=paddleCard;window.PADDLE_MPH=PADDLE_MPH;
+    window.headingNow=headingNow;window.railSet=railSet;
+    window.guideShow=guideShow;window.guideClose=guideClose;
+    window.railState=function(){var b=el('railbody');
+      return{folded:el('rail').className==='folded',
+             h:b?Math.round(b.getBoundingClientRect().height):-1}};
+    /* The results array itself, not the formatted report — a check that greps
+       rendered text is testing the formatter as much as the result (take 109). */
+    window.__st=function(){return ST};
     window.__geo={addressAt:addressAt,geocode:geocode,
                   get ADDR(){return ADDR}};
     /* A96: the dispatch card runs six full scans on one tap and has never been
@@ -3433,25 +3538,6 @@ function stLayout(){
   Array.prototype.forEach.call(document.querySelectorAll('.chip,.act,.rc'),function(e){
     var r=e.getBoundingClientRect();
     if(r.height>0&&r.height<36)small.push((e.id||e.textContent||'').slice(0,14)+' '+Math.round(r.height)+'px')});
-  /* A96. The dispatch card runs six full scans on one tap — nearestEdge alone
-     decodes every edge polyline in the region. It is the highest-stakes screen
-     in the app and had never been timed on a phone, only reasoned about. This
-     puts the real number in Jacob's next report instead of my extrapolation
-     from a desktop, which is the same mistake as measuring a 900x1400 viewport
-     (landmine 87). */
-  (function(){
-    try{
-      var at=ME&&ME.slice?ME.slice():null;
-      if(!at)return;
-      var t0=performance.now();
-      nearestEdge(at);nearestJunction(at);nearestPavement(at);
-      countyAt(at);addressAt(at);addressAt(at,true);
-      var ms=performance.now()-t0;
-      stAdd('PERF','dispatch-scan',ms<600,
-        Math.round(ms)+' ms to assemble the dispatch card ('+EDGES.length+
-        ' edges scanned) — this is what you wait for after tapping Dispatch');
-    }catch(e){stInfo('PERF','dispatch-scan','could not time: '+e)}
-  })();
   stAdd('UI','tap-targets',small.length===0,
     small.length?small.length+' under 36 px: '+small.slice(0,3).join(', '):
       'every control at least 36 px tall');
@@ -3490,6 +3576,34 @@ function stLayout(){
      None of them are data or logic — they are LAYOUT, and layout only exists on
      a real device at a real viewport. These checks run there. */
   var vw=document.documentElement.clientWidth;
+
+  /* A96. The dispatch card runs six full scans on one tap — nearestEdge alone
+     decodes every edge polyline in the region. It is the highest-stakes screen
+     in the app and had never been timed on a phone, only reasoned about. This
+     puts the real number in Jacob's next report instead of my extrapolation
+     from a desktop, which is the same mistake as measuring a 900x1400 viewport
+     (landmine 87). */
+  (function(){
+    try{
+      /* ME is only set when you are INSIDE the region (see classifyFix), so
+         this returned silently on Jacob's take-108 report — he tested from home,
+         135 mi away — and in the headless harness, which has no GPS at all.
+         A check added at take 93 had therefore never once run, anywhere.
+         The point is to measure the SCAN, not to require a live fix, so it now
+         times against a point that always exists (take 109, landmine 85). */
+      var at=(ME&&ME.slice)?ME.slice():
+             (CTR&&CTR.slice)?CTR.slice():null;
+      if(!at)return;
+      var t0=performance.now();
+      nearestEdge(at);nearestJunction(at);nearestPavement(at);
+      countyAt(at);addressAt(at);addressAt(at,true);
+      var ms=performance.now()-t0;
+      stAdd('PERF','dispatch-scan',ms<600,
+        Math.round(ms)+' ms to assemble the dispatch card ('+EDGES.length+
+        ' edges scanned from '+((ME&&ME.slice)?'your position':'the region centre')+
+        ') — this is what you wait for after tapping Dispatch');
+    }catch(e){stInfo('PERF','dispatch-scan','could not time: '+e)}
+  })();
   stInfo('UI','viewport',vw+'x'+document.documentElement.clientHeight+
     ' css px · dpr '+devicePixelRatio);
 
@@ -3530,12 +3644,37 @@ function stLayout(){
 
   /* Controls that have slid off the bottom cannot be pressed. */
   var vh=document.documentElement.clientHeight,off=[];
-  ['btn-home','btn-disp','btn-steps','btn-retrace','c-ride','c-locate'].forEach(function(id){
+  /* A folded rail clips its children while they keep their natural positions,
+     so Return home measures as off-screen when it is simply put away. Measure
+     with the drawer OPEN — that is the state where these controls matter — and
+     put it back. Forcing the conditional state is part of the check
+     (landmine 111, take 109). */
+  /* The rail is a drawer now (A127). When it is folded its children keep their
+     natural positions inside a clipped box, so they measure as off-screen while
+     being exactly where they belong — put away, one tap from the handle.
+     Forcing it open to measure was tried and it fought the fold transition; the
+     honest check is simpler. A folded drawer is REPORTED, not failed, and the
+     handle itself is what must be on screen — that is the thing that would
+     actually strand a rider (landmine 173: reachable, not merely wired). */
+  /* Ask the GEOMETRY, not the class name. The check runs in the same tick as
+     the show() that opened the drawer, so the class already reads open while
+     the 260 ms max-height transition has not moved — `rail="" folded=false
+     railbody=0` was the exact state, with Return home at y=1015 inside a
+     zero-height clipped box. A class is an intention; a rect is a fact, and
+     mid-transition they disagree (take 109). */
+  var _r=el('rail'),_rb=el('railbody');
+  var _folded=!_rb||_rb.getBoundingClientRect().height<8;
+  var LIST=_folded?['peek','c-ride','c-locate']
+                  :['btn-home','btn-disp','btn-steps','btn-retrace','c-ride','c-locate'];
+  LIST.forEach(function(id){
     var e=el(id);if(!e)return;var r=e.getBoundingClientRect();
     if(r.height===0)return;
     if(r.bottom>vh+2||r.top<0)off.push(id)});
   stAdd('UI','controls-on-screen',off.length===0,
-    off.length?off.join(', ')+' outside the viewport':'primary controls all reachable');
+    off.length?off.join(', ')+' outside the viewport'
+      :(_folded?'primary controls reachable — the details drawer is folded, '+
+                'its handle is on screen'
+              :'primary controls all reachable'));
 }
 
 function stData(){
@@ -3978,7 +4117,13 @@ map.on('load',collapseAttrib);map.on('idle',collapseAttrib);
 
 map.on('idle',function(){if(!healthOK)renderHealth()});
 map.on('move',refreshReadout);map.on('load',refreshReadout);
-map.on('load',function(){setBasemap(0);wpDraw();showTab('map');buildActPanel();actLabel();
+map.on('moveend',railFoldIfAway);
+map.on('load',function(){setBasemap(0);wpDraw();showTab('map');
+  /* First open only. Waits for the map so the blur has something behind it. */
+  if(!guideSeen())setTimeout(guideShow,450);
+  /* The map is the product; the rail is a drawer. Opens the moment you touch
+     something (A127). */
+  railSet(false);buildActPanel();actLabel();
   setTimeout(renderHealth,1800);
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Geolocation;
   if(C){try{C.requestPermissions().then(locateOnce).catch(locateOnce)}catch(e){locateOnce()}}
@@ -4045,6 +4190,8 @@ map.on('click',function(e){
   /* A115 · a paddle pin is checked before anything else it may be sitting on.
      A dam is checked before a launch, because if both are under the finger the
      hazard is the answer. */
+  /* Remember what this card is about, so panning away can take it with it. */
+  RAIL_AT=[e.lngLat.lng,e.lngLat.lat];
   var box=[[e.point.x-13,e.point.y-13],[e.point.x+13,e.point.y+13]];
   var dam=map.queryRenderedFeatures(box,{layers:['pad-dam']});
   var padf2=dam.length?dam:map.queryRenderedFeatures(box,{layers:['pad-dot']});
@@ -4084,8 +4231,14 @@ map.on('click',function(e){
     /* Tap does ONE job: identify. Pinning moved to long-press at take 36 so a
        pin can be dropped ON a road or trail — tapping one has to keep selecting
        it. Google Maps' convention, and the only way both gestures fit. */
-    return show('Nothing there. <b>Press and hold</b> anywhere to drop a pin — '+
-      'including on a road or trail. Tap a line to identify it.','')}
+    { /* Tapping empty ground is how a rider says "get out of the way". The
+         rail folds instead of opening a card that says nothing — and the
+         message goes on the peek strip, still readable without costing the map
+         half the screen (A127). */
+      railSet(false);RAIL_MANUAL=false;
+      var pt=el('peek-txt');
+      if(pt)pt.textContent='Nothing there \u2014 press and hold to drop a pin';
+      return}}
   if(f[0].properties.i===undefined){
     /* a show-only route: exists, but not ridable on this machine */
     var pr=f[0].properties;
@@ -4122,7 +4275,74 @@ map.on('click',function(e){
   if(UP[ed.i]||DN[ed.i])bits.push('+'+ft(UP[ed.i])+' / -'+ft(DN[ed.i])+' ft');
   show(out+bits.join(' · '),'')});
 
-function show(h,s){var p=el('panel');p.className=s||'';p.innerHTML=h}
+/* ══ THE RAIL, FOLDED (A127) ════════════════════════════════════════════════
+   The rule: THE CARD BELONGS TO A PLACE. It opens when you touch something and
+   it leaves when that thing does.
+
+     opens   tapping a pin, road or trail · a route being planned · any chip
+             that produces a card — all of which go through show(), so there is
+             ONE place that opens it rather than a call at every site
+     folds   tapping empty map · panning until the subject is off screen ·
+             the handle
+     peeks   always. The strip carries distance to the truck while riding and
+             the handle to bring the rest back, so nothing is unreachable —
+             only folded (landmine 173: reachable is not the same as wired).
+
+   A ride keeps it peeked rather than open: mid-trail you want the map, and the
+   one number that matters is already on the strip. */
+var RAIL_AT=null;          /* what the open card is about, in lon/lat */
+var RAIL_MANUAL=false;     /* did the rider fold it by hand? then leave it alone */
+
+function railPeekText(){
+  if(TRUCK&&ME){
+    var d=mi(ME,TRUCK);
+    return 'Truck '+(d<10?d.toFixed(1):Math.round(d))+' mi '+compass(bearing(ME,TRUCK))}
+  if(RAIL_AT)return 'Details';
+  return 'Tap the map for details'}
+
+function railSet(open,at){
+  var r=el('rail');
+  if(!r)return;
+  if(open){
+    RAIL_AT=at||RAIL_AT||null;
+    r.className='';
+  }else{
+    RAIL_AT=null;
+    r.className='folded';
+  }
+  var t=el('peek-txt');
+  if(t)t.textContent=open?railPeekText():
+    (RAIL_AT?'Details':railPeekText());}
+
+function railFoldIfAway(){
+  /* Pan far enough that the thing the card is about has left the screen and the
+     card goes with it. Not a timer and not a scroll threshold — the subject
+     either is on screen or it is not. */
+  if(RAIL_MANUAL||!RAIL_AT)return;
+  try{
+    var p=map.project(RAIL_AT),b=map.getContainer().getBoundingClientRect();
+    if(p.x<-40||p.y<-40||p.x>b.width+40||p.y>b.height+40)railSet(false);
+  }catch(e){}}
+
+/* Three places wrote the panel directly — saved routes, route options, the step
+   list — so they got no motion and did not open the drawer. Everything goes
+   through one function now; a card written any other way is a card that behaves
+   differently for no reason a rider could name (take 110). */
+function cardHTML(h,s){show(h,s)}
+
+function show(h,s){
+  var p=el('panel');p.innerHTML=h;
+  /* Restart the animation on every card. Setting the class alone does nothing
+     when it is already there — the browser will not replay an animation for an
+     unchanged class — so it comes off, the layout is read to force the change
+     to land, and it goes back on. */
+  p.className=s||'';
+  void p.offsetWidth;
+  p.className=(s?s+' ':'')+'swap';
+  /* Every card in the app goes through here — place cards, route options,
+     search hits, the self-test, dispatch. One hook, so a new card cannot forget
+     to open the rail (landmine 107's shape applied to behaviour). */
+  RAIL_MANUAL=false;railSet(true);}
 
 var geo=new maplibregl.GeolocateControl({positionOptions:{enableHighAccuracy:true},
   trackUserLocation:true,showAccuracyCircle:true});

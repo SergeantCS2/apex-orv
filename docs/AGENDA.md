@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 108.* Ranked by blocking-ness, not by interest.
+*Current as of take 110.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -1971,3 +1971,65 @@ be the Michiganders dream, the one stop Michigan app."*
   reachable (landmine 173).
 - **Ruled out:** removing `lyrSet`'s guarded writes to `c-relief`/`c-labels`.
   Those are deliberate, so re-adding a chip needs no new code.
+
+## A127 — The details drawer · SHIPPED take 109
+
+Jacob's design, after the first real session: the rail was always on screen and
+took nearly half of a map app.
+
+- **PROVEN, six behaviours:** folds to its resting state · tapping a place opens
+  it · panning until the place leaves the screen folds the card with it · the
+  handle works · the peek strip never leaves · the action row sits outside the
+  scrolling body.
+- **PROVEN:** clean at all four device sizes; the map gains ~210 px at rest.
+- **Ruled out:** translating the rail off screen. It is a grid row, so a
+  transform leaves a hole the map does not fill — the "just disappears" Jacob
+  did not want. Folding shrinks the row and the map grows into it.
+- **Ruled out:** opening from each card site. Every card goes through `show()`,
+  so there is one hook and a new card cannot forget.
+- **FOUND AND FIXED:** the action row scrolled away under a tall card, taking
+  Dispatch and Return home below the fold.
+- **Open:** the drawer does not remember a manual fold across a tab switch.
+- **Open:** during a ride it peeks rather than opening; whether that is right is
+  a field question.
+
+## A128 — Compass from the magnetometer · SHIPPED take 109
+
+- **PROVEN, field-reported:** *"I don't think compass works."* It read GPS
+  course-over-ground, which does not exist standing still.
+- **PROVEN:** `deviceorientationabsolute` needs no Capacitor plugin; one reading
+  at alpha 311 gives `NE 49° · compass`.
+- **Ruled out:** a magnetometer while moving. Course-over-ground is what you are
+  doing, and a compass beside an engine is not to be trusted.
+- **Ruled out:** drawing a needle with no source. If neither reports, it says so.
+- **Open:** magnetic declination is not applied — about 7° W in this part of
+  Michigan, which matters for a bearing read off a paper map.
+
+## A129 — First-run guide · SHIPPED take 110
+
+Jacob: a short guide the first time the app opens, blurring the background,
+reachable afterwards from a How-to button in Tools.
+
+- **PROVEN, in a real browser:** opens on first run · blurs the map behind rather
+  than covering it · explains the destinations, the map and Dispatch · dismissal
+  is remembered so it never shows again on its own · **Tools → How to use**
+  brings it back · tapping the blurred backdrop closes it.
+- **Ruled out:** anything in it the app cannot back up. Every line is a fact
+  about what the app does, including that Dispatch refuses to guess.
+- **Ruled out:** failing when storage is unavailable. It shows every time
+  instead — an extra tap is a smaller harm than a first-time rider getting no
+  explanation at all.
+- **Open:** it is one long card. If it grows, paging it beats scrolling it.
+
+## A130 — Card motion · SHIPPED take 110
+
+- **PROVEN:** cards rise on every change, 140 ms, transform and opacity only so
+  it composites and costs no layout while the map is drawing.
+- **PROVEN:** the animation replays on consecutive cards — the class is removed,
+  layout read, and re-added, because a browser will not replay for an unchanged
+  class (landmine 179).
+- **FOUND AND FIXED:** three cards — saved routes, route options, the step list —
+  wrote the panel directly, so they had no motion and did not open the drawer.
+  All routed through `show()` (landmine 180).
+- **Ruled out:** animating anything that costs layout. Transform and opacity
+  only, and `prefers-reduced-motion` disables it.

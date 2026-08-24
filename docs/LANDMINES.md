@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 108.*
+*Current as of take 110.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -2271,3 +2271,81 @@ again.
 Defensive guards are right when an element is OPTIONAL. When it is gone, the
 guard is not defence, it is preservation: the code stays, reads as live wiring,
 and the next person to grep for the handler finds one.
+
+**175. Two functions with the same name, and the second silently wins.**
+`dispatch-scan` was added to `stLayout()` at take 93 and never emitted a line —
+not on Jacob's phone, not in the harness, for sixteen takes. There are TWO
+`function stLayout(){}` declarations in the file. JavaScript keeps the last one
+and discards the first without a word.
+
+Nothing errors. The code reads as live, greps as present, and does nothing. This
+is landmine 38's family — definition order is load-bearing — with the sharpest
+edge: a duplicate NAME, not a duplicate call.
+
+**Corollary — a check that produces no output is invisible.** A failing check
+shouts. A check that never runs looks exactly like a check that passed and had
+nothing to say. Any new self-test line should be READ in the report once, by eye,
+before it is trusted.
+
+**176. A class name is an intention; a rect is a fact.**
+The reachability check ran in the same tick as the `show()` that opened the
+drawer, so `rail.className` already read open while the 260 ms `max-height`
+transition had not moved: `rail="" folded=false railbody=0`, with Return home at
+y=1015 inside a zero-height clipped box.
+
+Mid-transition, state and geometry disagree. Test whichever one you actually
+mean — and if it is geometry, either measure it or wait for it to settle, never
+infer it from a class.
+
+**177. A check that changes state must put it back.**
+The device matrix forced the drawer open to measure controls, and left it open.
+The self-test ran afterwards against a permanently expanded rail and reported
+four buttons off-screen — a failure with no cause in the code it was testing.
+
+A check that mutates shared state hands that state to every check after it. Save
+and restore, in the same block, always.
+
+**178. Assert what you can measure honestly.**
+The drawer's height lags its class by a step in headless — `railSet(true)` reads
+`folded:false h:0`, `railSet(false)` reads `folded:true h:84`. Four attempts to
+pin that down failed.
+
+The property that was actually broken was STRUCTURAL: the action row lived inside
+the scrolling body, so a tall card pushed Dispatch off the bottom. Whether it is
+outside that box is a DOM fact and does not move with an animation.
+
+When a measurement will not hold still, find the fact underneath it. An assertion
+on a number you do not trust is worse than no assertion, because it will fail on
+someone else's change and be believed.
+
+**179. A browser will not replay an animation for a class that is already
+there.** Card motion is a CSS animation applied by adding a class in `show()`.
+The second card in a row got no animation, because the class had never come off.
+
+Remove it, read a layout property to force the change to land, then add it back.
+An animation that plays once and then silently stops looks like an animation that
+was never wired.
+
+**180. A helper that is optional will be bypassed.** Saved routes, route options
+and the step list all wrote `panel.innerHTML` directly instead of calling
+`show()`. They got no card motion and did not open the drawer — three cards that
+behaved differently from every other card for no reason a rider could name.
+
+`show()` was not enforced, only conventional, so three call sites drifted from it
+over ninety takes. When a helper carries behaviour and not just formatting, route
+everything through it and leave nothing that can write the same target.
+
+**Corollary — patch the function, not its edge.** Rewriting the step list's tail
+cost three consecutive syntax errors, because the call sat inside an
+`addEventListener` and I kept guessing at how many brackets closed it. Reading
+the whole function took one command and would have been right the first time.
+
+**181. I repeated my own landmine, one take later.**
+Landmine 177 — *a check that changes state must put it back* — was written at
+take 109 about the device matrix leaving the drawer open. At take 110 my guide
+check left the overlay open, and the colour-variety check that ran afterwards saw
+a blurred sheet and called the map blank.
+
+Writing a landmine does not install it. The checks that mutate shared state are a
+small, listable set, and every one of them should save and restore in the same
+block as a matter of form rather than as a thing to remember.
