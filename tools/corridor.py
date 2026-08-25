@@ -303,6 +303,12 @@ def main():
                   f"taking the longest")
             groups.sort(key=lambda g: sum(
                 metres(a, b) for pr in g for a, b in zip(pr, pr[1:])), reverse=True)
+        if not groups:
+            # Statewide (take 117): a river can qualify by name and access
+            # count yet contribute no usable line — every reach degenerate or
+            # out of reach. Skip it loudly rather than crash the other 82.
+            print(f"corridor: {nm} — no usable line groups, skipped")
+            continue
         reaches, cuts = [], []
         for i, pr in enumerate(groups[0]):
             reaches.append(pr)

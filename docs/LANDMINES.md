@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 116.*
+*Current as of take 117.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -2476,3 +2476,50 @@ name-resolution twist: parse catches syntax, only execution catches names. Two
 rules: any step whose tool was touched this take RUNS this take before the seal
 (now in PROTOCOL); and cross-tool constants live in ONE place — regions.json is
 read by region.py alone, and every tool asks R.
+
+**195. Artifacts that index each other verify each other.**
+The graph was re-emitted; terrain was not re-run. Terrain's arrays indexed the
+OLD graph's edges, and the first out-of-range read threw inside a timer and
+died unheard — "Routing…" forever, no error anywhere a person looks. Take 117
+lost a session-leg to it.
+
+The app now checks the alignment at load (terrain edge-count vs graph
+edge-count) and degrades LOUDLY to terrain-absent on mismatch. The general law:
+any payload that indexes another payload carries a figure the consumer can
+check, because a silent misalignment is a crash wearing a loading spinner.
+
+**196. A cache is invalidated by everything that mutates its inputs — 
+including the debug bridge.**
+The legality memo (pure in machine × class × bundle) cut statewide routing from
+30+ seconds to milliseconds — and immediately served stale answers to the smoke
+drill, because the app's own debug bridge sets `machine` and injects
+restrictions WITHOUT going through the paths that clear the memo. A drill
+proved a quad legal on a motorcycle-only trail: the exact lie the check exists
+to catch, manufactured by the harness's side door.
+
+Every mutation path clears the memo now, bridge included. A debug bridge that
+lies is worse than none.
+
+**197. A drill's hardcoded geography expires when the region grows.**
+Three in one take: the "far away" fix was Detroit — genuinely away from a
+forest box, INSIDE the statewide bbox; the drill's working coordinates were the
+bbox midpoint — for Michigan, the middle of Lake Michigan, where every pin
+snapped to one shoreline node and every route was a zero-length null; and "no
+edge carries a restriction" was box truth that statewide data (1,399 live
+restrictions) made false.
+
+Drills stand where riders stand (`manifest.centre`), compute their own
+out-of-region point from the bbox they are judging, and read `manifest.bulk`
+when a premise is regional. A hardcoded coordinate in a test is a region
+assumption with a fuse.
+
+**198. Settle, then measure — a tiling map outlives any fixed nap.**
+Three appearances in one take: the dam check (source worker still tiling when
+the sleep expired), the drawer place-tap (badge not yet placed under the
+synthetic click), and the machine-legality count comparison (two snapshots
+taken mid-repaint differed by tile-loading luck). All three passed for 100+
+takes on a box small enough to tile inside the nap.
+
+The pattern is now standard: poll until the queried quantity exists or two
+consecutive readings agree, bounded, then assert. Fixed sleeps in front of
+queryRenderedFeatures are box-scale luck.

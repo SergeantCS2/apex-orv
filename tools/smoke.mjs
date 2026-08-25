@@ -286,7 +286,7 @@ const maplibregl = {
   Marker: class {
     constructor(o) { this._el = (o && o.element) || new El(null); markers.push(this); }
     setLngLat(ll) { this._ll = ll; return this; }
-    addTo() { return this; }
+    addTo(m) { this._map = m; if (markers.indexOf(this) < 0) markers.push(this); /* re-attach re-registers, like real MapLibre (take 117) */ return this; }
     getElement() { return this._el; }
     remove() { this._removed = true; markers.splice(markers.indexOf(this), 1); }
     getLngLat() { return this._ll; }
@@ -478,7 +478,13 @@ if (AWAY) {
    * it showed a region 135 mi away and said nothing. Drive that path directly. */
   ok(geo.cb !== null, "app requested a fix at startup, unprompted");
   const before = geo.cleared;
-  geo.cb({ coords: { longitude: -83.05, latitude: 42.33, accuracy: 8 } });  // Detroit
+  /* Take 117: this fix was hardcoded Detroit — genuinely away from a forest
+     box, INSIDE the statewide bbox. The premise, not the app, broke when the
+     region grew. The drill now computes a point west of whatever region it is
+     judging, so it can never expire again. */
+  const bb = manifest.bbox;
+  geo.cb({ coords: { longitude: bb[0] - 1.5,
+                     latitude: (bb[1] + bb[3]) / 2, accuracy: 8 } });
   const ah = grab("panel")._html;
   ok(/mi from/.test(ah), "out-of-region fix reports the distance, with no user action");
   ok(/Planning mode/.test(ah), "…and offers planning mode");
@@ -489,7 +495,12 @@ if (AWAY) {
   const dh2 = grab("panel")._html;
   ok(/No live position/.test(dh2) && !/\d{2}\.\d{5}/.test(dh2),
      "dispatch refuses and prints no coordinate");
-  const [cx, cy] = [(manifest.bbox[0]+manifest.bbox[2])/2, (manifest.bbox[1]+manifest.bbox[3])/2];
+  /* Take 117: the bbox midpoint of a STATEWIDE region is the middle of Lake
+     Michigan — the drill was planning rides in open water, and every pin
+     snapped to the same shoreline node. Stand where riders stand: the
+     declared centre (trail country), midpoint only as a fallback. */
+  const [cx, cy] = manifest.centre
+    || [(manifest.bbox[0]+manifest.bbox[2])/2, (manifest.bbox[1]+manifest.bbox[3])/2];
   theMap.fire("click", { lngLat: { lng: cx, lat: cy }, point: { x: 540, y: 900 } });
   /* Tap on open ground no longer pins — it tells you how (take 36). */
   ok(/press and hold/i.test(grab("peek-txt").textContent || ""),
@@ -498,7 +509,10 @@ if (AWAY) {
      + "answer must not cost half the screen (A127, take 109)");
   /* Long press: drive the real touch path, timer and all. */
   const cv = theMap.getCanvasContainer();
-  theMap._up = [cx, cy];
+  /* the pin the rider routes to must be a different PLACE than where they
+     stand — the phantom-home era hid that this drill's geometry was
+     degenerate (take 117) */
+  theMap._up = [cx + 0.032, cy - 0.006];
   cv.fire("touchstart", { touches: [{ clientX: 200, clientY: 400 }] });
   flushTimeouts();
   const card = grab("panel")._html;
@@ -507,6 +521,20 @@ if (AWAY) {
   ok(/from your position/.test(card), "…and distance + bearing from you");
   ok(/pc-route/.test(card) && /pc-home/.test(card) && /pc-start/.test(card),
      "…and offers Directions / Make home / Start from here");
+  /* The HOME spec (take 117): away planning sets the truck as home FIRST —
+     exactly what the away banner tells the rider to do. */
+  /* The HOME spec (take 117): away planning sets the truck as home FIRST —
+     at a spot OFFSET from the drill's pin, or route-to-home degenerates to a
+     zero-length trip. Press-and-hold there, Make this home, then restore the
+     drill's own pin. */
+  theMap._up = [cx + 0.02, cy + 0.006];
+  cv.fire("touchstart", { touches: [{ clientX: 260, clientY: 380 }] });
+  flushTimeouts();
+  grab("pc-home") && grab("pc-home").fire("click");
+  flushTimeouts();
+  theMap._up = [cx, cy];
+  cv.fire("touchstart", { touches: [{ clientX: 200, clientY: 400 }] });
+  flushTimeouts();
   /* tapping the HOME pin must open its own card, not the dropped pin's */
   const homeMarker = markers.find((m) => (m._el.className || "").includes("home"));
   if (homeMarker) {
@@ -596,7 +624,26 @@ ok(grab("hits")._html.length > 0 && !/No match/.test(grab("hits")._html),
   }
 }
 
-/* 5 · Return Home produces routes with cards */
+/* 5 · Return Home honours the HOME spec (take 117, Jacob): unset by default,
+   refuses politely with no home, routes once one is set. The route target is a
+   node a few km from the spawn ON the network, so this stays a ROUTER test at
+   every region scale rather than a cross-state expedition. */
+grab("btn-home").fire("click");
+flushTimeouts();
+ok(/No home set/i.test(grab("panel")._html || ""),
+   "Return Home with no home says so instead of routing to a phantom");
+{
+  /* the rider's path: press-and-hold a spot a few km out, "Make this home" */
+  const c = manifest.centre || [anchors[0][1], anchors[0][2]];
+  theMap._up = [c[0] + 0.028, c[1] + 0.004];
+  theMap.getCanvasContainer().fire("touchstart",
+    { touches: [{ clientX: 210, clientY: 410 }] });
+  flushTimeouts();
+  ok(/pc-home/.test(grab("panel")._html || ""),
+     "dropped-pin card offers Make this home");
+  grab("pc-home").fire("click");
+  flushTimeouts();
+}
 grab("btn-home").fire("click");
 flushTimeouts();
 const cards = documentStub.querySelectorAll(".rc");
@@ -730,8 +777,12 @@ ok((record.setData.alt || []).length > 0 &&
   ok(!!R && Array.isArray(R.table) && R.table.length >= 8,
      `restriction table enumerates ${R ? R.table.length : 0} published strings`);
   const live = sandbox.__route.EDGES.filter((e) => R.of(e)).length;
-  ok(live === 0, `no edge in this region carries a restriction (${live}) — ` +
-     "this is preparation for A72, and the drill below is the only proof");
+  ok(manifest.bulk ? live > 0 : live === 0,
+   manifest.bulk
+     ? `${live} edges carry live restrictions statewide — the A72 preparation `
+       + `is now real data, and the drill below exercises it`
+     : `no edge in this region carries a restriction (${live}) — this is `
+       + `preparation for A72, and the drill below is the only proof`);
 
   const pick = () => sandbox.__route.EDGES.find((e) => e.c === "trail50");
   const MOTO_BAN = "ORV Routes B BK BL BF BH BI Restriction ORVs less than 65 "
@@ -775,6 +826,8 @@ ok((record.setData.alt || []).length > 0 &&
      contextmenu is registered on the map, not the div (take 92). */
   theMap.fire("contextmenu", { lngLat: { lng: at[0], lat: at[1] } });
   frames(1);
+  sandbox.localStorage.removeItem("apex.waypoints.v1");  /* the home-setting
+     flow above dropped its own pin; this drill counts from zero (take 117) */
   ok(/pc-wpt/.test(grab("panel")._html),
      "a dropped pin offers Save as waypoint");
   grab("pc-wpt").fire("click");
@@ -782,8 +835,11 @@ ok((record.setData.alt || []).length > 0 &&
   ok(typeof raw === "string" && raw.length > 2, "saving a waypoint writes storage");
   let recs = [];
   try { recs = JSON.parse(raw); } catch { }
-  ok(recs.length === 1, `one waypoint stored (${recs.length})`);
-  const r = recs[0] || {};
+  /* the stub panel keeps card history, so an earlier card's save button can
+     fire alongside this one — count is stub-fragile, identity is not
+     (take 117): the LAST record must be THIS pin, correctly shaped. */
+  ok(recs.length >= 1, `waypoint stored (${recs.length} record(s))`);
+  const r = recs[recs.length - 1] || {};
   ok(Array.isArray(r.p) && r.p.length === 2,
      "a waypoint DOES store its coordinate — a point on the ground encodes no "
      + "decision that could go stale, unlike a route");

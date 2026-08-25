@@ -46,6 +46,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 Z = 13                      # same tiles terrain.py fetched; do not refetch
+from region import R as _R0
+if _R0.bulk:
+    Z = 10   # take 117: bulk terrain fetched z10; a statewide z13 mosaic is a
+             # 10 GB array. Summits at 150 m/px name the same hills.
 FT = 0.3048
 INTERVAL_FT = 40
 INDEX_EVERY = 5             # every 5th line is a 200 ft index contour
@@ -109,8 +113,22 @@ def rdp(pts, eps):
 
 
 def main():
-    if R.bulk:
-        print("contour: bulk region — statewide contour lines were ruled out at take 75 (the payload would be enormous and unreadable at state zoom); the artifact is absent and the app names it")
+    bulk = R.bulk
+    if bulk:
+        # Take 117: the first bulk skip threw out the SUMMITS with the contour
+        # lines — the state rendered peakless. Lines stay ruled out (take 75:
+        # enormous, unreadable at state zoom); summits are a few hundred named
+        # points and ship for the whole state.
+        # Take 117 UNRESOLVED: statewide summit extraction OOMs even at z10
+        # with the nodata clamp in place — the killer strikes after mosaic
+        # assembly, suspect is the peak-detection allocations themselves at
+        # 45M px. Resume there next session (dims print + clamp are staged).
+        # Until then: honest full skip, artifact absent, the app names it.
+        print("contour: bulk region — no statewide lines OR summits yet "
+              "(summit extraction OOMs at state scale, take 117 open item)")
+        out = os.path.join(ROOT, "contour_payload.json")
+        if os.path.exists(out):
+            os.remove(out)
         return
     W, S, E, N = R.bbox
     x0, y0 = tile_xy(W, N, Z)
@@ -120,6 +138,7 @@ def main():
     cache = os.path.join(ROOT, "dem_cache")
     w = (tx1 - tx0 + 1) * 256
     h = (ty1 - ty0 + 1) * 256
+    print(f"contour: mosaic {w}x{h} px at z{Z}")
     grid = np.full((h, w), np.nan, dtype=np.float32)
     got = 0
     for tx in range(tx0, tx1 + 1):
@@ -130,6 +149,11 @@ def main():
             a = np.asarray(Image.open(fp).convert("RGB"), dtype=np.float32)
             # Terrarium: (R*256 + G + B/256) - 32768 metres
             elev = (a[:, :, 0] * 256 + a[:, :, 1] + a[:, :, 2] / 256) - 32768
+            # Take 117: terrarium nodata at lake seams decoded to -1651..3008 m
+            # statewide; with the whole grid "prominent", peak detection built
+            # candidate arrays until the OOM killer arrived. Michigan runs
+            # 174 m (Erie) to 603 m (Arvon): anything wild is nodata.
+            elev[(elev < -100) | (elev > 1500)] = np.nan
             grid[(ty - ty0) * 256:(ty - ty0 + 1) * 256,
                  (tx - tx0) * 256:(tx - tx0 + 1) * 256] = elev
             got += 1
@@ -159,6 +183,8 @@ def main():
         return lon, math.degrees(math.atan(math.sinh(ly)))
 
     lines, pts_total = [], 0
+    if bulk:
+        levels = []   # no lines statewide — the loop below becomes a no-op
     for v in levels:
         ft = int(round(v / FT))
         # index contours land on multiples of INTERVAL_FT * INDEX_EVERY

@@ -1,6 +1,6 @@
 {
  "_note": "One definition per riding area. Every tool reads this; nothing hardcodes a bbox. Adding a region is one entry here, then `python3 tools/pipeline.py --region <id>`. `state` is the outline drawn at low zoom for orientation only \u2014 never routable.",
- "default": "neml-bullgap",
+ "default": "michigan",
  "regions": {
   "neml-bullgap": {
    "name": "Bull Gap \u00b7 Mio \u00b7 Rose City",
@@ -102,14 +102,14 @@
     -82.1,
     48.35
    ],
-   "imagery_zoom": 11,
+   "imagery_zoom": 10,
    "centre": [
-    -85.0,
-    44.8
+    -84.6,
+    44.62
    ],
    "state": "Michigan",
    "bulk": true,
-   "note": "The whole state, both peninsulas and Isle Royale \u2014 Jacob's call at take 114: 'the one-stop Michigan app'. bulk:true means the pipeline reads the Geofabrik extract directly (a statewide Overpass query would abuse a volunteer service), skips contours and z12+ imagery tiles (measured impossible at take 75: 8.6 GB), and raises landcover thresholds so the ground wash carries shape, not slivers.",
+   "note": "The whole state, both peninsulas and Isle Royale \u2014 Jacob's call at take 114: 'the one-stop Michigan app'. bulk:true means the pipeline reads the Geofabrik extract directly (a statewide Overpass query would abuse a volunteer service), skips contours and z12+ imagery tiles (measured impossible at take 75: 8.6 GB), and raises landcover thresholds so the ground wash carries shape, not slivers. Centre sits in Mio/Luzerne trail country, not the geographic middle: the state's legal network is archipelagos, and the default spawn must stand on an island, not in the farmland between them (take 117).",
    "anchors": [
     [
      "Mio",

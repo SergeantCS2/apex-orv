@@ -79,7 +79,8 @@ def main():
             print("poi: removed a stale poi_payload.json from an earlier run")
         return
     W, S, E, N = R.bbox
-    els = json.load(open("aoi.json"))["elements"]
+    import aoi_stream
+    els = aoi_stream.elements()   # generator — 542 MB statewide, never loaded
     seen, out = set(), []
     for e in els:
         kind, unnamed_ok = classify(e.get("tags", {}))

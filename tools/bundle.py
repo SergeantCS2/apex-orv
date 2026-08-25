@@ -133,7 +133,7 @@ def build(rid):
             print(f"  ---  {name:<16} {'stale — removed':>20}")
 
     man = {"schema": SCHEMA, "region": rid, "name": reg.name,
-           "bbox": reg.bbox, "note": reg.note, "centre": reg.centre,
+           "bbox": reg.bbox, "note": reg.note, "centre": reg.centre, "bulk": bool(getattr(reg, "bulk", False)),
            "anchors": reg.anchors,
            "built": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
            "bytes": total, "artifacts": entries}

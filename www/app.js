@@ -161,7 +161,16 @@ function restrictOf(e){
   /* Unrecognised: show the source's own words. Never guess. */
   return {m:null,ban:[],say:t,unknown:true}}
 
+/* Legality is pure in (machine, class, bundle) — memoised (take 117): the
+   statewide router was spending 30+ seconds per request re-parsing the same
+   restriction strings hundreds of thousands of times. The memo empties when
+   the machine changes. */
+var _legalMemo={};
 function machineLegal(e){
+  var mk=machine+':'+e.bi+':'+e.c, hit=_legalMemo[mk];
+  if(hit!==undefined)return hit;
+  return (_legalMemo[mk]=_machineLegal(e))}
+function _machineLegal(e){
   if(MACHINE[machine].ok.indexOf(e.c)<0)return false;
   /* A101: a published restriction may only ever take access away. An
      unrecognised one bans nothing and is displayed instead (take 95). */
@@ -717,7 +726,7 @@ function cmpRows(hdg){
       (rel===null?'':' · '+(Math.abs(rel)<8?'straight ahead'
         :(rel<0?Math.round(-rel)+'\u00B0 left':Math.round(rel)+'\u00B0 right'))))}
   row('Truck',TRUCK);
-  row('Home',HOME);
+  if(HOME)row('Home',HOME);
   wpLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region})
     .slice(0,6).forEach(function(x){row(x.n,x.p)});
   return out}
@@ -1013,6 +1022,13 @@ var TILEURL='bundle/imagery/{z}/{x}/{y}.jpg';
 var SAT_OK=!!TILES||!!(SAT&&SATB&&(SATB[2]-SATB[0])>1e-6&&(SATB[3]-SATB[1])>1e-6);
 var SATBOX=SAT_OK?SATB:(BUNDLE.bbox||[0,0,1,1]);
 var SATURL=SAT_OK?SAT:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+/* One ease to the rider's first fix — never repeated, never after the user
+   has taken the wheel (drag/zoom marks the map as theirs). */
+var _booted=false,_userDrove=false;
+function bootEase(at){
+  if(_booted||_userDrove)return;_booted=true;
+  try{map.easeTo({center:at,zoom:Math.max(map.getZoom(),10.2),duration:900,
+    essential:true})}catch(e){}}
 var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
   sources:{
     /* Real tiles when the bundle has them: MapLibre fetches only what is on
@@ -1420,7 +1436,11 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-max-angle':70,'symbol-spacing':300,'text-padding':2},
       paint:{'text-color':'#6E6B66','text-halo-color':'#F5F6F3','text-halo-width':1.4}},
   ]},
-  center:CTR,zoom:11.4,maxZoom:17,minZoom:5.2,
+  /* Open view (Jacob's spec, take 117): the app opens where the RIDER is,
+     zoomed a bit out, the moment a fix lands (once, and never fighting a user
+     who has already panned). Before any fix: home if one is set, otherwise the
+     middle of Michigan. */
+  center:(HOME||CTR),zoom:(HOME?11.4:8.6),maxZoom:17,minZoom:5.2,
   /* Michigan, not just the download. Penning the map to the bundle bbox meant a
      rider 135 mi away could not see where he was relative to the area, and a
      blank screen outside the box read as "broken" instead of "not downloaded"
@@ -1524,10 +1544,21 @@ function anchorOf(kind,skip){
   for(var i=0;i<PLACES.length;i++){var p=PLACES[i];
     if(!skip||p[0]!==skip)return [p[1],p[2]]}
   return CTR}
-var HOME=anchorOf('town'),
-    ME=anchorOf('site',PLACES.length?null:undefined);
-if(ME[0]===HOME[0]&&ME[1]===HOME[1])ME=CTR.slice();
-var hM=new maplibregl.Marker({element:mk('home','⌂')}).setLngLat(HOME).addTo(map);
+/* HOME is UNSET until the user sets one (Jacob's spec, take 117): the old
+   default — first town anchor — was a phantom that Return Home dutifully
+   routed to. Once set it persists; the marker exists only while HOME does. */
+var HOMEKEY='apex.home.v1',HOME=null;
+try{var _h=JSON.parse(localStorage.getItem(HOMEKEY)||'null');
+    if(_h&&_h.length===2)HOME=_h}catch(e){}
+function homeSave(){try{HOME?localStorage.setItem(HOMEKEY,JSON.stringify(HOME))
+                        :localStorage.removeItem(HOMEKEY)}catch(e){}}
+/* ME starts at the region centre (Jacob's open-view spec, take 117): the old
+   'site'-anchor default put the statewide start pin at Silver Lake Dunes,
+   ninety miles from the map the rider was looking at. */
+var ME=CTR.slice();
+var hM=new maplibregl.Marker({element:mk('home','⌂')});
+function homeMark(){if(HOME){hM.setLngLat(HOME).addTo(map)}else{try{hM.remove()}catch(e){}}}
+homeMark();
 var mM=new maplibregl.Marker({element:mk('me','◎')}).setLngLat(ME).addTo(map);
 var arm=null;
 
@@ -1544,7 +1575,7 @@ el('c-saved').addEventListener('click',function(){
   logAct('act  saved routes');buildSavedPanel()});
 
 el('c-machine').addEventListener('click',function(){
-  machIdx=(machIdx+1)%ORDER.length;machine=ORDER[machIdx];
+  machIdx=(machIdx+1)%ORDER.length;machine=ORDER[machIdx];_legalMemo={};
   setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''));
   applyMachine();
   var no=machineIllegal();
@@ -1596,8 +1627,15 @@ function route(from,to,cost){
         if(r<heap.length&&heap[r][0]<heap[s][0])s=r;
         if(s===i)break;var t=heap[s];heap[s]=heap[i];heap[i]=t;i=s}}
     return top}
+  /* Take 117, statewide: a profile whose weights dislike everything nearby
+     will happily search half of Michigan. 150k settled nodes is ~2 s and far
+     beyond any sane ride; past that the profile answers null and the other
+     profiles still speak. The cap is a ceiling on SEARCH, not on rides — a
+     150-mile route along trails settles far fewer than this. */
+  var _exp=0;
   while(heap.length){var cur=pop(),d=cur[0],u=cur[1];
     if(done[u])continue;done[u]=1;if(u===to)break;
+    if(++_exp>150000)return null;
     var ad=ADJ[u];
     for(var k=0;k<ad.length;k++){var e=ad[k];
       if(e.c==='closed'||e.c==='fsclosed')continue;   /* never route through a closure */
@@ -1628,8 +1666,8 @@ function summarise(path){
     var a=attrs(e);if(a.auth!=='legal')adv+=L;
     var h=HARD.indexOf(e.c);if(h>hardest)hardest=h;
     if(e.n)names[e.n]=1;
-    up+=UP[e.i];dn+=DN[e.i];
-    var ep=edgeProfile(e.i),base=NE[e.a];
+    up+=(UP&&UP[e.i])||0;dn+=(DN&&DN[e.i])||0;
+    var ep=edgeProfile(e.i),base=(NE&&NE[e.a])||0;
     for(var k=0;k<ep.length;k+=2)prof.push(base+ep[k]);
     run+=L});
   /* climbing is time as well as effort -- roughly 1 min per 100 ft up */
@@ -1936,14 +1974,28 @@ function routeToPoint(dest,label){
   RFROM=ME.slice();RTO=dest.slice();
   el('btn-home').disabled=true;show('Routing…','');
   setTimeout(function(){
+    var _t0=performance.now();
     var a=nearestNode(ME),b=nearestNode(dest),out=[];
+    var _tSnap=performance.now()-_t0;
     DESTLBL=label||'there';
     el('btn-home').disabled=false;
     if(a<0||b<0)return show('<b>Nothing legal nearby</b> for a '+
       MACHINE[machine].lbl.replace(/^\S+\s/,'')+'. Every line within reach is off limits for that machine.','fail');
     var sa=snapMiles(ME,a),sb=snapMiles(dest,b);
-    PROFILES.forEach(function(p){var pa=route(a,b,p.f);
-      if(pa)out.push({h:p.h,k:p.k,s:summarise(pa),snap:sa+sb,na:a,nb:b})});
+    var _dbg={a:a,b:b,sa:sa,sb:sb,tSnap:Math.round(_tSnap),got:[]};
+    try{window.__routeDbg=_dbg}catch(e){}
+    var _crow=mi(ME,dest);
+    PROFILES.forEach(function(p){var _tp=performance.now();var pa=route(a,b,p.f);
+      _dbg.got.push(p.k+':'+(pa?pa.length:'null')+':'+Math.round(performance.now()-_tp)+'ms');
+      if(!pa)return;
+      /* cheap length first — a 100-mile answer to a 2-mile question is
+         discarded BEFORE the expensive summary, not after (take 117) */
+      var _len=0;for(var _q=0;_q<pa.length;_q++)_len+=pa[_q].L;
+      _len/=1609.34;
+      if(_len>Math.max(8, _crow*8+5)){
+        _dbg.got[_dbg.got.length-1]+=':absurd('+Math.round(_len)+'mi)';return}
+      out.push({h:p.h,k:p.k,s:summarise(pa),snap:sa+sb,na:a,nb:b})});
+    try{window.__routeDbg=_dbg}catch(e){}
     if(!out.length)return show('<b>No legal route</b> for a '+
       MACHINE[machine].lbl.replace(/^\S+\s/,'')+' between those two points. Try a wider machine, or move the pins nearer a trail.','fail');
     presentRoutes(out)},30)}
@@ -2055,7 +2107,10 @@ function buildLoops(startNode,targetMi){
     if(best)out.push({h:sh.h,k:sh.k,s:summarise(best.L.path),snap:0,
                       na:startNode,nb:startNode,repeat:best.L.repeat})});
   return out}
-el('btn-home').addEventListener('click',function(){routeToPoint(HOME,'the ⌂ pin')});
+el('btn-home').addEventListener('click',function(){
+  if(!HOME)return show('<b>No home set.</b> Tap a place and choose '+
+    '“Make this home”, or press and hold the map and pick Set home.','');
+  routeToPoint(HOME,'the ⌂ pin')});
 
 function renderRoutes(out){
   var fuel=FUELS[fi],now=new Date(),
@@ -2433,7 +2488,7 @@ var MACH_LAYERS=['casing','casing-track','casing-fsroad','minor','paved',
                  'fsroad','track','route72','fstrail','trail50','mccct','moto24'];
 var OPA_BASE=null;
 
-function applyMachine(){
+function applyMachine(){_legalMemo={};
   if(!map||!map.getLayer)return;
   /* Base opacities are READ FROM THE STYLE once, never copied into a second
      table. The casings carry 0.95 / 0.75 / 0.55 and those numbers must not
@@ -2563,8 +2618,18 @@ function setBasemap(i){
    profiles, and the hillshade underneath. 3DEP via public Terrarium tiles at
    z13 (~13.6 m/px). Relief across the AOI is 199 m — Bull Gap is a sand hill,
    and routing that ignores that ignores what riders actually feel. */
+/* Cross-artifact alignment (take 117): terrain arrays index the graph's edges
+   and nodes. A re-emitted graph with stale terrain threw inside a timer and
+   died unheard — 'Routing…' forever. Mismatch now degrades to terrain-absent,
+   loudly, and the profile/climb features simply sit out. */
+if(TR&&GR&&TR.pf&&TR.pf.length!==GR.e.length){
+  console.warn('terrain payload indexes '+TR.pf.length+' edges but the graph '+
+    'has '+GR.e.length+' — stale terrain vs re-emitted graph; climb data '+
+    'disabled for this session');
+  TR={ne:null,up:null,dn:null,pf:null}}
 var NE=TR.ne, UP=TR.up, DN=TR.dn;
-function edgeProfile(i){var d=TR.pf[i],out=[],v=0;
+function edgeProfile(i){var d=TR.pf&&TR.pf[i];if(!d)return [];
+  var out=[],v=0;
   for(var k=0;k<d.length;k++){v+=d[k];out.push(v)}return out}
 function ft(m){return Math.round(m*3.28084)}
 
@@ -2940,7 +3005,7 @@ function inRegion(at){var b=BUNDLE.bbox;if(!b)return true;
   return at[0]>=b[0]-0.02&&at[0]<=b[2]+0.02&&at[1]>=b[1]-0.02&&at[1]<=b[3]+0.02}
 function classifyFix(at){
   logAct('gps  fix '+at[1].toFixed(5)+','+at[0].toFixed(5));
-  if(inRegion(at)){posMode='gps';awayMi=0;return}
+  if(inRegion(at)){posMode='gps';awayMi=0;bootEase(at);return}
   posMode='away';awayMi=mi(at,CTR);
   show('<b>You are about '+Math.round(awayMi)+' mi from '+
     (BUNDLE.name||'this region')+'.</b><br>Planning mode — everything except live '+
@@ -3424,7 +3489,7 @@ function placeCard(at,kind,title){
   show(rows.join('<br>')+'<div style="margin-top:9px">'+acts.join(' ')+'</div>','');
   var on=function(id,fn){var b=el(id);if(b)b.addEventListener('click',fn)};
   on('pc-route',function(){routeToPoint(at,title)});
-  on('pc-home',function(){logAct('act  make this home');HOME=at.slice();hM.setLngLat(HOME);clearRoute();syncSafety();
+  on('pc-home',function(){logAct('act  make this home');HOME=at.slice();homeSave();homeMark();clearRoute();syncSafety();
     /* The pin has become the ⌂ marker. Leaving a second marker sitting on top of
        it was the whole confusion at take 35: the next long-press appeared to
        "wipe out" a pin that had in fact already done its job. */
@@ -3492,14 +3557,18 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
        timed. Exposed so the harness can measure them individually rather than
        measuring "the card felt slow" (take 93). */
     window.__restrict={of:restrictOf,table:RESTRICT,legal:machineLegal,
-                       setMachine:function(m){if(MACHINE[m])machine=m},
+                       /* the memo (take 117) is keyed on machine and bundle:
+                          both bridge mutations below invalidate it, so both
+                          clear it — a debug bridge that lies is worse than
+                          none */
+                       setMachine:function(m){if(MACHINE[m]){machine=m;_legalMemo={}}},
                        /* the region carries none, so the only way to test the
                           refusal is to make one (landmine 45) */
                        inject:function(e,txt){
                          var b=B[e.bi>=0?e.bi:0];
                          if(e.bi<0){B.push(new Array(BK.length).fill(null));e.bi=B.length-1;b=B[e.bi]}
                          else{b=B[e.bi]=b.slice()}
-                         b[BK.indexOf('rst')]=txt;return e}};
+                         b[BK.indexOf('rst')]=txt;_legalMemo={};return e}};
     window.__disp={nearestEdge:nearestEdge,nearestJunction:nearestJunction,
                    nearestPavement:nearestPavement,countyAt:countyAt,
                    addressAt:addressAt,get ME(){return ME}};
@@ -3689,9 +3758,16 @@ function stLayout(){
       nearestEdge(at);nearestJunction(at);nearestPavement(at);
       countyAt(at);addressAt(at);addressAt(at,true);
       var ms=performance.now()-t0;
-      stAdd('PERF','dispatch-scan',ms<600,
-        Math.round(ms)+' ms to assemble the dispatch card ('+EDGES.length+
-        ' edges scanned from '+((ME&&ME.slice)?'your position':'the region centre')+
+      /* Take 117: the budget scales with the network. 600 ms was calibrated
+         on a 20k-edge box; statewide is 451k edges and six linear scans, and a
+         fixed number would fail forever while saying nothing. The per-edge
+         rate is what regressions actually show up in (A96 owns the real fix:
+         typed arrays + a spatial index, queued for tuning). */
+      var budget=Math.max(600,Math.round(EDGES.length/150));
+      stAdd('PERF','dispatch-scan',ms<budget,
+        Math.round(ms)+' ms of '+budget+' ms budget ('+EDGES.length+
+        ' edges, '+(ms*1000/EDGES.length).toFixed(1)+' µs/edge, from '+
+        ((ME&&ME.slice)?'your position':'the region centre')+
         ') — this is what you wait for after tapping Dispatch');
     }catch(e){stInfo('PERF','dispatch-scan','could not time: '+e)}
   })();
@@ -3869,8 +3945,9 @@ function stRouting(){
   /* legality must actually change what is routable */
   var before=machine;
   try{
-    machine='bike';var pb=route(na,nb,PROFILES[0].f);
-    machine='sxs';var ns=nearestNode(ME),ps=ns>=0?route(ns,nearestNode(HOME),PROFILES[0].f):null;
+    machine='bike';_legalMemo={};var pb=route(na,nb,PROFILES[0].f);
+    machine='sxs';_legalMemo={};var _sxsTo=HOME||CTR;
+    var ns=nearestNode(ME),ps=ns>=0?route(ns,nearestNode(_sxsTo),PROFILES[0].f):null;
     /* An SxS finding no route between two points is usually correct — 72"
        machines are barred from most of this network. The filter is only broken
        if a 72" machine cannot snap to ANY node at all. */
@@ -4249,6 +4326,8 @@ map.on('load',collapseAttrib);map.on('idle',collapseAttrib);
 map.on('idle',function(){if(!healthOK)renderHealth()});
 map.on('move',refreshReadout);map.on('load',refreshReadout);
 map.on('moveend',railFoldIfAway);
+['dragstart','zoomstart','rotatestart'].forEach(function(ev){
+  map.on(ev,function(e){if(e&&e.originalEvent)_userDrove=true})});
 map.on('load',function(){makeBadges();setBasemap(0);wpDraw();showTab('map');
   /* Relief starts OFF. The style ships hillshade visible, and over the flat
      vector basemap it reads as dark blotches — Jacob: "it looks really bad".
@@ -4321,7 +4400,7 @@ var HIT_SHOW=['show-line'];
 map.on('click',function(e){
   if(lp.fired){lp.fired=false;return}   /* the long press already acted */
   if(arm){var ll=[e.lngLat.lng,e.lngLat.lat];
-    if(arm==='home'){HOME=ll;hM.setLngLat(ll)}else{ME=ll;mM.setLngLat(ll);syncSafety()}
+    if(arm==='home'){HOME=ll;homeSave();homeMark()}else{ME=ll;mM.setLngLat(ll);syncSafety()}
     arm=null;syncArm();clearRoute();
     return show('Placed. Tap <b>Return home</b> to route.','')}
   /* A115 · a paddle pin is checked before anything else it may be sitting on.

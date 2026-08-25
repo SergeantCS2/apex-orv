@@ -83,8 +83,15 @@ print(f"fetched {len(jobs)-missing}/{len(jobs)} tiles")
 # ── decode to metres ────────────────────────────────────────────────────────
 import numpy as np
 
-arr = np.asarray(mosaic, dtype=np.float64)
-RAW = (arr[:, :, 0] * 256.0 + arr[:, :, 1] + arr[:, :, 2] / 256.0) - 32768.0
+# Take 117: float64 RGB of a statewide mosaic is 1.1 GB before the elevation
+# math starts — the OOM killer took it on the 3 GB build box. uint8 view +
+# channel-wise float32 decode: same numbers, a quarter of the memory.
+arr = np.asarray(mosaic, dtype=np.uint8)
+del mosaic
+RAW = (arr[:, :, 0].astype(np.float32) * np.float32(256.0)
+       + arr[:, :, 1].astype(np.float32)
+       + arr[:, :, 2].astype(np.float32) / np.float32(256.0)) - np.float32(32768.0)
+del arr
 Hp, Wp = RAW.shape
 lo, hi = float(RAW.min()), float(RAW.max())
 print(f"elevation {lo:.0f}..{hi:.0f} m  ({lo*3.28084:.0f}..{hi*3.28084:.0f} ft), relief {hi-lo:.0f} m")

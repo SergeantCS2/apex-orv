@@ -121,10 +121,11 @@ def extract_path(state):
     return fp
 
 
-def build(rid=None):
+def build(rid=None, sink=None):
     import osmium
 
     rid, r = region(rid)
+    bulk = bool(r.get("bulk"))
     W, S, E, N = r["bbox"]
     print(f"region {rid} — {r['name']}  [{W}, {S}, {E}, {N}]")
     pbf = extract_path(r.get("state", "Michigan"))
@@ -134,6 +135,8 @@ def build(rid=None):
             super().__init__()
             self.out = []
             self.seen = 0
+            self.emit = (sink if sink is not None
+                         else self.out.append)
 
         def _poi(self, t):
             for k, vals in list(POI.items()) + list(POI_EXTRA.items()):
@@ -151,7 +154,7 @@ def build(rid=None):
             lon, lat = n.location.lon, n.location.lat
             if not (W <= lon <= E and S <= lat <= N):
                 return
-            self.out.append({"type": "node", "id": n.id,
+            self.emit({"type": "node", "id": n.id,
                              "tags": dict(n.tags), "lon": lon, "lat": lat})
 
         def way(self, w):
@@ -162,6 +165,17 @@ def build(rid=None):
             if not (hw in HIGHWAY or ww in WATERWAY or nat == "water"
                     or self._poi(t)):
                 return
+            if bulk:
+                # Statewide census (take 117): service 951k (driveways, parking
+                # aisles) + footway 486k (sidewalks) + cycleway 19k were 65% of
+                # a 1.08 GB pull, and unnamed streams are drainage ditches.
+                # None of it serves an ORV/paddle app at state scale; the box
+                # region keeps its original behaviour for regression.
+                if hw in ("service", "footway", "cycleway", "steps",
+                          "pedestrian", "corridor", "raceway"):
+                    return
+                if ww == "stream" and not t.get("name"):
+                    return
             self.seen += 1
             geom, inside = [], False
             for n in w.nodes:
@@ -178,12 +192,23 @@ def build(rid=None):
             # about the TIGER path, where features are county-sized; these are
             # not).
             if inside and len(geom) >= 2:
-                self.out.append({"type": "way", "id": w.id,
+                self.emit({"type": "way", "id": w.id,
                                  "tags": dict(t), "geometry": geom})
 
     h = H()
-    print("  reading extract (node locations indexed in memory)…")
-    h.apply_file(pbf, locations=True, idx="flex_mem")
+    # Statewide, flex_mem (every node location in RAM) stacked on the element
+    # list drew the OOM killer (-9, take 117). The sparse FILE index keeps
+    # node locations on disk — size tracks node count, lookups stay fast, and
+    # peak RAM drops by the entire index.
+    _idx = os.path.join("/tmp", f"apex_nodes_{rid}.idx")
+    if os.path.exists(_idx):
+        os.remove(_idx)
+    print(f"  reading extract (node locations on disk: {_idx})…")
+    h.apply_file(pbf, locations=True, idx=f"sparse_file_array,{_idx}")
+    try:
+        os.remove(_idx)
+    except OSError:
+        pass
     print(f"  {h.seen:,} candidate ways in Michigan, {len(h.out):,} touching the region")
 
     from collections import Counter
@@ -195,6 +220,26 @@ def build(rid=None):
     print("  " + " · ".join(f"{k} {v}" for k, v in c.most_common(8)))
 
     return h.out
+
+
+def build_stream(out_path, rid=None):
+    """build(), but each kept element streams straight to out_path so the
+    element list never lives in RAM beside the parse (take 117)."""
+    import json as _json
+    f = open(out_path, "w")
+    f.write('{"source": "geofabrik", "elements": [')
+    state = {"n": 0}
+    def sink(el):
+        if state["n"]:
+            f.write(",")
+        f.write(_json.dumps(el, separators=(",", ":")))
+        state["n"] += 1
+    els = build(rid, sink=sink)
+    f.write("]}")
+    f.close()
+    print(f"  streamed aoi — {state['n']:,} elements, "
+          f"{os.path.getsize(out_path)//1048576} MB")
+    return state["n"]
 
 
 def build_and_write(rid=None):

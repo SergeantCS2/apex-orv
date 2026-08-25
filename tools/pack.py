@@ -113,9 +113,13 @@ def main():
 
     if not os.path.exists('aoi.json'):
         return nothing("no aoi.json — OSM was unavailable at ingest.")
-    aoi = json.load(open('aoi.json'))
-    src = aoi.get('source')
-    els = aoi['elements']
+    # Take 117: 542 MB statewide — stream and keep only water-bearing elements.
+    import aoi_stream
+    src = 'geofabrik'   # the bulk path writes this; box-era Overpass source
+                        # strings only feed a log line below
+    els = [e for e in aoi_stream.elements()
+           if (e.get('tags') or {}).get('waterway')
+           or (e.get('tags') or {}).get('natural') == 'water']
     buckets = {'waterway': [], 'water': []}
     # A77. 175 of these carry a name in OSM and the payload threw every one of
     # them away, so the app drew Shaw Lake and the Au Sable as anonymous blue

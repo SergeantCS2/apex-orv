@@ -79,8 +79,8 @@ if (mode === "shots") {
   console.log("basemap screens written");
 } else if (mode === "eval") {
   const code = readFileSync(process.argv[3] || "/dev/stdin", "utf8");
-  const out = await pg.evaluate(new Function("s",
-    `return (async()=>{${code}})()`).bind(null));
+  // eval as a string expression — the Function wrapper mangled user code
+  const out = await pg.evaluate("(async()=>{" + code + "})()");
   console.log(JSON.stringify(out, null, 2));
 }
 await b.close(); srv.close();

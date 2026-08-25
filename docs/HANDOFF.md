@@ -1,4 +1,88 @@
-# HANDOFF — through Take 116 · V2
+# HANDOFF — through Take 117 · V2
+
+## Take 117 — 2026-08-25 — ALL OF MICHIGAN. Built, routed, suites green, sealed.
+
+The statewide arc, Jacob's call: "It's time to do all of Michigan." Region
+`michigan` is now the default and the built bundle. The longest take in the
+project by far — many sessions, four OOM battles, and a parade of box-era
+premises expiring at state scale, each caught by the machinery built for
+exactly that.
+
+### The pipeline, statewide, measured
+
+- **Ingest**: 731,310 elements streamed from the Geofabrik extract in ~370 s.
+  The raw pull was 1,078 MB; the census said 64% was metro driveways, sidewalks
+  and unnamed ditches. The bulk keep policy trimmed to **542 MB** of real
+  content — 501k roads/trails, 12k rivers, 33k named streams, 80k inland lakes.
+- **Authoritative**: the fetcher had NO pagination (the box never exceeded
+  ArcGIS's 2000-record cap, so it never showed). Now: 1000-row pages, per-layer
+  disk cache (restarts resume), politeness delays, and QUADRANT SPLITTING for
+  any layer whose statewide envelope makes the server shed load — Jacob's
+  staging idea, applied surgically. 1,399 edges statewide carry live DNR
+  restrictions: A72's preparation met real data.
+- **Graph**: **346,907 nodes / 473,674 edges, 38.5 MB payload** — 22x the box,
+  inside A72's predicted 18–26x band. **Connector-only residential**: attempt 1
+  (keep all) met the OOM killer; attempt 2 (drop all) severed a THIRD of nodes
+  from the giant component — take 64's lesson at state scale; attempt 3
+  union-finds the non-residential network and admits only bridging residential:
+  **6,272 ways (2.4%) carry all the connectivity**, metro grids stay out.
+- **Terrain** z10 (700 tiles), landcover 8,145 areas, 76 river corridors,
+  address 770k segments (53.7 MB — tuning candidate), imagery underlay z10.
+  Bundle **127 MB, PARTIAL as declared** (contours + z12+ pyramid honestly
+  absent; statewide summits an open OOM item, absence named in-app).
+
+### The 3 GB build box, beaten repeatedly
+
+Disk-backed sparse node index · `aoi_stream.py` (all consumers stream, none
+load) · noding drops each geometry the moment its noded copy exists · auth rows
+freed · terrain float32 channel-wise decode · and finally **2 GB of swap**,
+which the sandbox accepted. CI has 7 GB and never needed any of it proven — but
+now it is.
+
+### Routing at state scale — the whole detective story
+
+Return Home statewide first said "no legal route" after 31–41 s. The chain, in
+order, each step evidence-first: HOME was a phantom (first town anchor — Jacob's
+spec landed: **unset until set, persisted, refuses politely**; open-view spec
+with it). ME was Silver Lake Dunes, ninety miles from the map (now centre).
+The graph WAS connected — the legal subgraph too — and the real wall was the
+residential cut (fixed above). Then "Routing…" forever: **stale terrain vs the
+re-emitted graph threw inside a timer, unheard** — artifacts that index each
+other now VERIFY each other, and mismatch degrades loudly to absent (landmine
+195). Then the legality memo (pure in machine x class x bundle) cut per-edge
+string parsing; the debug bridge that mutates bundles now invalidates it
+(landmine 196). An expansion cap (150k settles) bounds any profile's search;
+an absurd-length filter runs BEFORE the expensive summary, not after. End
+state: **six route cards, every profile 84–102 ms** on 473k edges.
+
+### The suites: every failure judged on its merits
+
+Smoke 5/5, render 124/124 — after separating product bugs from expired
+premises from harness physics:
+
+- REAL, fixed: draw-dedup could suppress a closure/designated line (now
+  undroppable — the red line always draws); the memo/bridge staleness above.
+- EXPIRED premises (landmine 197): the away drill's "far away" fix was Detroit
+  — inside Michigan; its coordinates were the bbox midpoint — **the middle of
+  Lake Michigan**, every pin snapping to one shoreline node; "no restrictions
+  in this region" was box truth. Drills now stand where riders stand
+  (manifest.centre), compute their own away point, and read manifest.bulk.
+- HARNESS physics (landmine 198): statewide sources out-tile any fixed nap —
+  the dam check, the drawer tap and the machine-count comparison all needed
+  settle-then-measure. Third appearance in one take made it a law.
+- Marker stub now re-registers on addTo, like real MapLibre. Waypoint drill
+  asserts identity, not stub-fragile count. Dispatch-scan budget scales with
+  edge count and prints its µs/edge (A96 owns the real fix).
+
+### Still open, in Jacob's declared order
+
+Great Lakes water polygons → tuning: riding-area polygon (Silver Lake), 
+statewide summits OOM, address size, corridor box-prose, A96 typed arrays,
+residential display layer. Then A136/A137: onX Backcountry + Hunt/Fish
+references, the modes era.
+
+---
+
 
 ## Take 116 — 2026-08-25 — The CI break was mine: bulk patches that never ran
 

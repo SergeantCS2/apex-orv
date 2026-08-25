@@ -212,7 +212,7 @@ osm_n = 0
 _osm_ok = os.path.exists("aoi.json")
 if _osm_ok:
     try:
-        _osm_ok = len(json.load(open("aoi.json")).get("elements", [])) > 0
+        _osm_ok = next(iter(__import__("aoi_stream").elements()), None) is not None
     except Exception:
         _osm_ok = False
 # Existence is not content. An empty aoi.json passed the old check and produced
@@ -226,7 +226,82 @@ if not _osm_ok:
              "cannot be built.\n       DNR/USFS trail data fetched fine; re-run "
              "when Overpass recovers.\n       Refusing to ship a bundle whose "
              "Return Home cannot reach a road.")
-for e in json.load(open("aoi.json"))["elements"]:
+# Take 117: the statewide aoi is 542 MB; json.load of it needs more RAM than
+# the build machine has. Stream, never load (aoi_stream).
+import aoi_stream
+from region import R as _R
+
+# ── CONNECTOR-ONLY RESIDENTIAL (take 117, third attempt at one problem) ────
+# Attempt 1: keep all residential — the OOM killer (260k town-grid ways do not
+# fit a 3 GB build box). Attempt 2: drop them all — severed local connectivity,
+# a THIRD of nodes fell out of the giant component and 2.8 km neighbours could
+# not reach each other (take 64's lesson at state scale). Attempt 3, this one:
+# keep only the residential ways that CONNECT — union-find the non-residential
+# network by rounded coordinate, then admit a residential way iff it touches
+# two different components (a bridge) or extends an accepted connector (chain
+# passes, capped). Metro grids stay out; trailhead access stays in.
+KEEP_RES = None
+if _R.bulk:
+    def _k(pt):
+        return (round(pt["lon"] * 1e6) << 32) ^ (round(pt["lat"] * 1e6) & 0xFFFFFFFF)
+    _P = {}
+    def _f(x):
+        r = x
+        while _P.get(r, r) != r:
+            r = _P[r]
+        while _P.get(x, x) != x:
+            _P[x], x = r, _P[x]
+        return r
+    def _u(a, b):
+        _P.setdefault(a, a)      # every seen point self-registers, so
+        _P.setdefault(b, b)      # membership (`kk in _P`) is exact
+        ra, rb = _f(a), _f(b)
+        if ra != rb:
+            _P[ra] = rb
+    n_nonres = 0
+    for _e in aoi_stream.elements():
+        _t = _e.get("tags") or {}
+        _hw = _t.get("highway")
+        if not _hw or _hw == "residential":
+            continue
+        if CLS.get(_hw) is None:
+            continue
+        _g = _e.get("geometry") or []
+        for _i in range(len(_g) - 1):
+            _u(_k(_g[_i]), _k(_g[_i + 1]))
+        n_nonres += 1
+    KEEP_RES = set()
+    for _pass in range(3):
+        added = 0
+        for _e in aoi_stream.elements():
+            _t = _e.get("tags") or {}
+            if _t.get("highway") != "residential":
+                continue
+            if _e.get("id") in KEEP_RES:
+                continue
+            _g = _e.get("geometry") or []
+            touch = [_k(_pt) for _pt in _g]
+            roots = set(_f(kk) for kk in touch if kk in _P)
+            if len(roots) >= 2:
+                KEEP_RES.add(_e.get("id"))
+                for _i in range(len(touch) - 1):
+                    _u(touch[_i], touch[_i + 1])
+                added += 1
+        print(f"graph: connector pass {_pass + 1} admitted {added} residential ways")
+        if not added:
+            break
+    print(f"graph: connector-only residential — {len(KEEP_RES)} of the "
+          f"statewide residential ways bridge the network; the rest stay out "
+          f"(non-residential ways unioned: {n_nonres})")
+    _P = None
+    import gc as _gc2
+    _gc2.collect()
+
+for e in aoi_stream.elements():
+    if (KEEP_RES is not None
+            and (e.get("tags") or {}).get("highway") == "residential"
+            and e.get("id") not in KEEP_RES):
+        continue
     t = e.get("tags", {})
     c = CLS.get(t.get("highway", ""))
     g = e.get("geometry")
@@ -248,17 +323,27 @@ for e in json.load(open("aoi.json"))["elements"]:
                 "geometry": {"type": "LineString",
                              "coordinates": [[p["lon"], p["lat"]] for p in g]}})
     osm_n += 1
+del rows
+import gc as _gc
+_gc.collect()
 print(f"osm context: {osm_n} added, {osm_dupe} dropped as duplicates of agency geometry ({len(net)} total)")
 
 # ── 3. node the network ────────────────────────────────────────────────────
 polys = []
 for f in net:
-    for ln in lines_of(f):
+    _lns = list(lines_of(f))
+    # Take 117: on the 3 GB build box, keeping BOTH the raw coordinate lists
+    # and their noded tuple copies for 200k statewide features was the OOM.
+    # Once the rounded copy exists the original is dead weight — drop it.
+    f["geometry"] = None
+    for ln in _lns:
         pts = [(round(float(p[0]), 6), round(float(p[1]), 6))
                for p in ln if len(p) >= 2]
         ded = [pts[0]] + [p for i, p in enumerate(pts[1:], 1) if p != pts[i - 1]]
         if len(ded) >= 2:
             polys.append((f, ded))
+import gc
+gc.collect()
 
 touch = defaultdict(set)
 for pi, (_, pts) in enumerate(polys):

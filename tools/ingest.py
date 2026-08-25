@@ -77,9 +77,15 @@ def _count(base, layer):
 SHORTFALL = []
 
 
-def query(base, layer, fields):
+def query(base, layer, fields, env=None, depth=0):
+    # env: "W,S,E,N". A statewide envelope makes some layers shed load with
+    # 5xx no matter how small the pages are. When a layer exhausts its retries,
+    # the envelope QUARTERS and each quadrant fetches independently (Jacob's
+    # staging idea, applied only where a server demands it), then features
+    # dedupe by OBJECTID because quadrant edges double-count boundary crossers
+    # (take 117).
     q = urllib.parse.urlencode({
-        "geometry": BBOX, "geometryType": "esriGeometryEnvelope", "inSR": 4326,
+        "geometry": env or BBOX, "geometryType": "esriGeometryEnvelope", "inSR": 4326,
         "outSR": 4326, "spatialRel": "esriSpatialRelIntersects", "where": "1=1",
         "outFields": fields, "returnGeometry": "true", "f": "geojson",
     })
@@ -88,13 +94,60 @@ def query(base, layer, fields):
     # whole pipeline — and in CI that is a red build for an upstream hiccup
     # nobody controls (landmine 57). Every network read retries now.
     import time
-    url = f"{base}/{layer}/query?{q}"
-    req = urllib.request.Request(url, headers={
-        "User-Agent": "APEX-Offroad/1.0 (offline trail map; contact via repo)"})
+    # ── PAGINATION (take 117) ────────────────────────────────────────────
+    # The box era never saw a layer exceed ArcGIS's 2000-record transfer cap,
+    # so this function issued ONE request and the shortfall check below stayed
+    # silent for 100+ takes. Statewide, DNR and MVUM layers run 3-4k+ features
+    # and the single request quietly returned the first 2000 — the shortfall
+    # warnings fired on the very first statewide run, which is exactly what
+    # they were built for. Pages of 1000 until a short page; smaller requests
+    # also stopped the 503s the statewide envelope was provoking.
+    PAGE = 1000
+    # Resumable (take 117): the statewide fetch is long, servers are flaky
+    # under statewide envelopes, and the sandbox can kill a background run
+    # mid-flight. Each completed layer caches to disk; a rerun pays only for
+    # what is missing. Same convention as osm_cache (landmine 172: caches are
+    # named for what they hold).
+    os.makedirs("auth_cache", exist_ok=True)
+    _b = "".join(c if c.isalnum() else "_" for c in base.split("//")[-1][:40].lower())
+    _e = "" if env is None else "_" + "".join(
+        c if c.isalnum() else "-" for c in env)
+    ck = os.path.join("auth_cache", f"{_b}_L{layer}{_e}.json")
+    if os.path.exists(ck):
+        try:
+            cached = json.load(open(ck))
+            if isinstance(cached, list):
+                return cached
+        except Exception:
+            pass
+    def _page(offset):
+        qq = q + "&" + urllib.parse.urlencode(
+            {"resultOffset": offset, "resultRecordCount": PAGE,
+             "orderByFields": "OBJECTID"})
+        rq = urllib.request.Request(f"{base}/{layer}/query?{qq}", headers={
+            "User-Agent": "APEX-Offroad/1.0 (offline trail map; contact via repo)"})
+        for attempt in range(4):
+            try:
+                with urllib.request.urlopen(rq, timeout=180) as r:
+                    return json.load(r).get("features", [])
+            except urllib.error.HTTPError:
+                if attempt == 3:
+                    raise
+                w = 10 * (2 ** attempt)
+                print(f"  HTTPError on layer {layer} p{offset//PAGE} — "
+                      f"retrying in {w}s ({attempt+1}/3)")
+                time.sleep(w)
+        return []
     for attempt in range(4):
         try:
-            with urllib.request.urlopen(req, timeout=180) as r:
-                feats = json.load(r).get("features", [])
+            feats = []
+            while True:
+                pg = _page(len(feats))
+                feats.extend(pg)
+                if len(pg) < PAGE:
+                    break
+                time.sleep(1.0)   # politeness between pages — the 503s were us
+            json.dump(feats, open(ck, "w"))
             have = _count(base, layer)
             if have is not None and len(feats) < have:
                 msg = (f"layer {layer}: server reports {have} features, got "
@@ -104,7 +157,21 @@ def query(base, layer, fields):
             return feats
         except Exception as e:
             if attempt == 3:
-                raise
+                if depth >= 3:
+                    raise
+                W_, S_, E_, N_ = [float(x) for x in (env or BBOX).split(",")]
+                MX, MY = (W_ + E_) / 2, (S_ + N_) / 2
+                print(f"  layer {layer}: envelope too heavy — quartering "
+                      f"(depth {depth + 1})")
+                seen, out = set(), []
+                for qd in (f"{W_},{S_},{MX},{MY}", f"{MX},{S_},{E_},{MY}",
+                           f"{W_},{MY},{MX},{N_}", f"{MX},{MY},{E_},{N_}"):
+                    for f in query(base, layer, fields, env=qd, depth=depth + 1):
+                        k = (f.get("properties") or {}).get("OBJECTID")                             or json.dumps(f.get("geometry", {}), sort_keys=True)[:80]
+                        if k not in seen:
+                            seen.add(k); out.append(f)
+                json.dump(out, open(ck, "w"))
+                return out
             wait = 6 * (attempt + 1)
             print(f"  {type(e).__name__} on layer {layer} — retrying in {wait}s "
                   f"({attempt + 1}/3)")
@@ -269,11 +336,10 @@ out geom;"""
         import osm_local
         print("osm: bulk region — reading the Geofabrik extract directly "
               "(Overpass is for boxes, not states)")
-        els = osm_local.build()
-        if not els:
+        n = osm_local.build_stream("aoi.json")
+        if not n:
             sys.exit("osm: bulk extract produced nothing — refusing to continue")
-        json.dump({"source": "geofabrik", "elements": els}, open("aoi.json", "w"))
-        print(f"osm: aoi.json written from Geofabrik ({len(els)} elements)")
+        print(f"osm: aoi.json streamed from Geofabrik ({n:,} elements)")
         return
     payload = urllib.parse.urlencode({"data": q}).encode()
     hdrs = {"User-Agent": "APEX-Offroad/1.0 (offline trail map; contact via repo)"}

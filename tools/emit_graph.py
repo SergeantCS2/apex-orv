@@ -124,6 +124,18 @@ def mark_duplicates(edges):
                 rx = DRAW_RANK.get(ix[3], 9); ry = DRAW_RANK.get(iy[3], 9)
                 loser = y if rx <= ry else x
                 winner = x if loser == y else y
+                # Take 117 (smoke caught 2 statewide): a closure or designated
+                # ORV line may NEVER be the hidden twin — a rider must see the
+                # red line and the designated line, whichever agency drew the
+                # copy. If both twins are protected, neither hides.
+                NEVER = ("closed", "fsclosed", "route72", "trail50",
+                         "moto24", "mccct", "fstrail")
+                lc = (info[loser] or (0,0,0,None,0))[3]
+                wc = (info[winner] or (0,0,0,None,0))[3]
+                if lc in NEVER:
+                    if wc in NEVER:
+                        continue
+                    loser, winner = winner, loser
                 # never hide the last drawn copy of a span
                 if winner in drop:
                     continue

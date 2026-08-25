@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 116.* Ranked by blocking-ness, not by interest.
+*Current as of take 117.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2148,3 +2148,34 @@ Third reference for the design synthesis. Slot reserved in docs/DESIGN.md §7.
 - **Ruled out:** designing from the app's reputation before Jacob's screenshots
   arrive — transcribe, don't invent (landmine 190).
 - **Open:** everything, pending captures.
+
+## A137 — App modes: the multi-discipline vision · RECORDED take 117 (Jacob)
+
+Jacob's direction, on the record: after the first Michigan draft, APEX splits
+into MODES — General Outdoors, ORV/Mountain Biking, Hunting/Fishing, potentially
+more. onX Hunt and onX Fish join the reference set (Jacob holds "tons of
+screenshots", to be transcribed not invented, landmine 190). Implications noted
+now so statewide decisions don't fight it: per-mode legality/routing profiles
+(Return Home matters more cross-mode), per-mode POI emphasis, per-mode layer
+defaults. Route-length expectations differ per mode (he judges Return Home is
+not for massive trips in ORV mode).
+- **Ruled out:** designing modes before the Michigan draft ships.
+- **Open:** everything else, pending his screenshots.
+
+
+## A138 — Statewide Michigan: FIRST CUT SHIPPED take 117
+
+The one-stop Michigan app exists: 473,674 edges routed, 127 MB bundle, six
+route profiles at 84–102 ms, suites green (smoke 274+/5 modes, render 124).
+- **PROVEN:** connector-only residential (6,272 bridging ways = 2.4% carry all
+  connectivity); legality memo + expansion cap + pre-summary length filter;
+  HOME/open-view spec; cross-artifact alignment guard; closure lines
+  undroppable in dedup.
+- **PROVEN:** the harness scales — expired box premises (197) and tiling races
+  (198) identified and cured as classes, not instances.
+- **Ruled out:** keeping all residential (OOM at 3 GB) and dropping all
+  residential (severed a third of the network) — the bridge subset is the
+  proven middle.
+- **Open (Jacob's order):** Great Lakes polygons → tuning (Silver Lake riding
+  area, summits OOM, 53.7 MB address, corridor box-prose, A96 typed arrays,
+  residential display layer) → A136/A137 references and modes.

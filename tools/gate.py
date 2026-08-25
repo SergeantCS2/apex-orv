@@ -1243,7 +1243,10 @@ def check_render():
         if os.environ.get("CI"):
             return fails.append(msg)
         return notes.append(msg + " [local skip]")
-    r = subprocess.run(["node", rm], capture_output=True, text=True, timeout=300)
+    # Take 117: the statewide render suite settles-then-measures (landmine
+    # 198) and legitimately runs ~7 minutes; 300 s was box-era. The suite must
+    # still PASS — only the stopwatch grew with the state.
+    r = subprocess.run(["node", rm], capture_output=True, text=True, timeout=1200)
     if r.returncode:
         bad = [l.strip() for l in r.stdout.splitlines() if "FAIL" in l][:2]
         fails.append("render failed: " + ("; ".join(bad) or r.stderr[-120:]))
