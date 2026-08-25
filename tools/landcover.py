@@ -100,8 +100,7 @@ def simplify(pts, tol):
 def main():
     w, s, e, n = R.bbox                  # (w, s, e, n)
     bbox = (w, s, e, n)
-    cfg = json.load(open(os.path.join(ROOT, "regions.json")))
-    bulk = bool(cfg["regions"][R.id].get("bulk"))
+    bulk = R.bulk
     global TOL_DEG
     mins = BULK_M2 if bulk else MIN_M2
     if bulk:

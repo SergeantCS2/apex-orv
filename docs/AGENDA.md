@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 114.* Ranked by blocking-ness, not by interest.
+*Current as of take 116.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2138,5 +2138,13 @@ app, and re-tunes street-label halos for the light ground.
   statewide memory model proven by corridor.py in CI.
 - **Ruled out:** statewide Overpass (volunteer-service abuse); z13 statewide DEM
   (~38,000 tiles); z12+ statewide imagery pyramid (8.6 GB, take 75).
-- **Open:** the run itself — switch, measure, tune. Next after Jacob's visual
-  feedback, multiple takes budgeted.
+- **Open:** the run itself — switch, measure, tune. Jacob's confirmed order
+  (take 116): Michigan as a whole → Great Lakes water polygons via the area
+  handler → tuning. Multiple takes budgeted.
+
+## A136 — onX Backcountry study · AWAITING REFERENCES take 115
+
+Third reference for the design synthesis. Slot reserved in docs/DESIGN.md §7.
+- **Ruled out:** designing from the app's reputation before Jacob's screenshots
+  arrive — transcribe, don't invent (landmine 190).
+- **Open:** everything, pending captures.

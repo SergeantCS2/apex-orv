@@ -93,9 +93,9 @@ function blob(u){return fetch(u).then(function(r){
   .then(function(b){return URL.createObjectURL(b)})}
 
 function fatal(msg,detail){
-  document.body.innerHTML='<div style="padding:26px;font:400 14px/1.6 Roboto,'+
+  document.body.innerHTML='<div style="padding:26px;font:400 14px/1.6 Barlow,'+
    'system-ui,sans-serif;color:#F5EFE2;background:#14120F;height:100%">'+
-   '<div style="font:700 12px/1 Roboto;letter-spacing:.17em;text-transform:uppercase;'+
+   '<div style="font:700 12px/1 Barlow,system-ui,letter-spacing:.17em;text-transform:uppercase;'+
    'color:#E2570F;margin-bottom:14px">APEX ORV</div>'+
    '<b style="font-size:17px">'+msg+'</b><br><br>'+
    '<span style="color:#9A9184">'+detail+'</span></div>'}

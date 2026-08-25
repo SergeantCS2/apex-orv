@@ -133,9 +133,7 @@ def tiles(zmax):
         z12-z15  41 MB   3.4 m/px   <- individual trails
         z12-z16 158 MB   1.7 m/px
     """
-    import json as _j
-    _cfg=_j.load(open(os.path.join(ROOT,'regions.json')))
-    if _cfg['regions'][R.id].get('bulk'):
+    if R.bulk:
         print('imagery: bulk region — the z12+ tile pyramid was measured impossible statewide at take 75 (8.6 GB at z15); the low-zoom underlay ships, the pyramid does not, and Hybrid says so')
         return
 

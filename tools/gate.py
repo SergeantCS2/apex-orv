@@ -1520,10 +1520,24 @@ def check_manifest():
                      "folding destroys the activity (landmine 7)")
 
 
+
+# ── Ledger entries file in numeric order ────────────────────────────────────
+# Take 115's audit: 191 entries, zero gaps, zero duplicates — and two entries
+# (68, 119) filed out of position, which the set-completeness check could never
+# see. An out-of-order ledger cites fine and READS wrong. Order is asserted now.
+def check_ledger_order():
+    lm = read("docs", "LANDMINES.md") or ""
+    nums = [int(x) for x in re.findall(r"^\*\*(\d+)[.,]", lm, re.M)]
+    if nums != sorted(nums):
+        bad = [(a, b) for a, b in zip(nums, nums[1:]) if b < a][:4]
+        return fails.append(f"LANDMINES.md entries out of numeric order near {bad}")
+    notes.append(f"landmine file order: {len(nums)} entries, strictly ascending")
+
+
 for fn in (check_handoff, check_stamps, check_offline,
            check_style, check_palette, check_machine_legality,
            check_ledgers, check_osm_fallback, check_drawn,
-           check_region_clean, check_no_duplicate_defs,
+           check_region_clean, check_no_duplicate_defs, check_ledger_order,
            check_layer_control,
            check_artifacts_agree, check_agenda, check_syntax, check_stubs,
            check_orphan_sources, check_class_legality, check_workflow_yaml,

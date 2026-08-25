@@ -109,9 +109,7 @@ def rdp(pts, eps):
 
 
 def main():
-    import json as _j, os as _o
-    _cfg=_j.load(open(_o.path.join(ROOT,"regions.json")))
-    if _cfg["regions"][R.id].get("bulk"):
+    if R.bulk:
         print("contour: bulk region — statewide contour lines were ruled out at take 75 (the payload would be enormous and unreadable at state zoom); the artifact is absent and the app names it")
         return
     W, S, E, N = R.bbox

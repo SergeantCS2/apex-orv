@@ -1,4 +1,89 @@
-# HANDOFF — through Take 114 · V2
+# HANDOFF — through Take 116 · V2
+
+## Take 116 — 2026-08-25 — The CI break was mine: bulk patches that never ran
+
+Jacob's GitHub build died at terrain: `NameError: ROOT` — my take-114 bulk-mode
+patch referenced a ROOT that terrain.py never defines, and imagery.py carried
+the identical latent crash. The patches had been verified by PARSE ONLY; their
+steps never executed locally because the payloads were cached. CI, the clean
+runner, executed them first (landmine 194 — landmine 32 in tool form). His
+installs of takes 114 and 115 were blocked by this; take 116 is the one to
+build.
+
+Fix is structural, not spot: **regions.json is now read by region.py alone** —
+`R.bulk` is a first-class attribute and all five bulk-aware tools (ingest,
+terrain, imagery, contour, landcover) ask R instead of re-deriving paths. The
+three previously-unexecuted steps were then RUN for real (terrain 110 tiles,
+contour, imagery full pyramid — all green), both regions' flag resolution
+verified, full suite green. PROTOCOL gains the rule: touched steps run before
+the seal.
+
+Jacob's ordering confirmed for the statewide arc: **Michigan first, the Great
+Lakes right after, then tuning** (A135 note updated).
+
+---
+
+
+## Take 115 — 2026-08-25 — Full adversarial audit of T1–T4, at Jacob's order
+
+Jacob: confirm T1–T4 are real, find every loose end, and audit the landmines
+themselves — trust to be re-earned by verification. Audited the SEALED ZIP
+first, because the zip is what he gets (landmine 191's content corollary).
+
+### T1–T4 presence: 16/18 on first pass, 18/18 after two real fixes
+
+Every claimed mechanism verified inside `apex-seed-t114.zip`. The two misses
+were genuine T1 gaps:
+
+- **`.actrow.on` still glowed full orange** — the accent rule had been applied
+  by sweep and held by memory, and memory decayed within two takes. Quieted to
+  the same white tint as the basemap toggle, and the rule is now a COUNTER: the
+  render suite counts accent-surfaced elements and fails above one per screen
+  (landmine 192).
+- **Coordinates were not last on the card** — T1's spec demoted them to the
+  bottom; they had landed above the stats row. Filed correctly.
+
+Also: **`fatal()` had dodged the one-face rule** — it lives in build_app's
+loader template with `Roboto` split across string concatenation, exactly how
+the take-113 sweep missed it. Barlow now, even on the worst screen.
+
+### The wiring and loose-end sweep
+
+40+ buttons cross-referenced; the "unwired" alarms were dynamic card buttons
+bound after `show()` — probe error, not product error. Zero TODO/FIXME. Stale
+files gone. Six ICONS entries currently unused (`stop, sat, target, phone,
+check, truck`) — kept deliberately as inventory for upcoming cards, recorded
+here so they are a decision rather than drift.
+
+### The landmine audit — the ledger holds
+
+**193 entries, zero gaps, zero duplicates, 49 cited inside live guards.** No
+entry was found prescribing structure the redesign invalidated — stale mentions
+are historical narration, which is what a ledger is for. One structural fault:
+**entries 68 and 119 were filed out of numeric order**, invisible to the
+set-completeness check. Relocated (content untouched), and the gate now asserts
+strictly ascending file order so it cannot recur.
+
+**Three of the audit's five alarms were the probe's own regexes** (landmine
+193): a probe earns belief the same way a check does — against a known-true
+case first. Protocol §0 now says so, alongside the delivery rule: verify what
+is IN the outputs directory, named and hashed.
+
+### Michigan and the third reference
+
+Statewide prep re-verified dormant and intact (default region unchanged, bulk
+paths inert, all patched tools parse). **onX Backcountry** joins as the third
+reference — DESIGN.md §7 reserves the slot, A136 awaits Jacob's screenshots.
+Transcribe, don't invent.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **132** (the accent counter is new).
+Gate **31** including the new order check. Sealed as `apex-seed-t115.zip`,
+hash in the message.
+
+---
+
 
 ## Take 114 — 2026-08-24 — T4, a delivery failure, and Michigan parked at the door
 

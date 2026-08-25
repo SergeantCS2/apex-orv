@@ -1,12 +1,24 @@
 # PROTOCOL
 
-*Revised 2026-08-19, take 114.*
+*Revised 2026-08-19, take 116.*
 
 The working rules for this project. The gate enforces the ones it can.
 
 ---
 
 ## 0. Start of every session
+
+**Deliverables are verified where the person reaches them.** A session that
+hands over work checks what is ACTUALLY in the outputs directory — not what a
+previous session remembers putting there (landmine 191: a verified take-113
+seed reverted to take 112 between sessions). Every sealed seed carries its take
+number in its filename (`apex-seed-tNNN.zip`) and its sha256 is printed in the
+message beside it.
+
+**One-off audit probes are code and get the same suspicion as checks** — a
+probe is verified against a known-true case before its findings are believed
+(landmine 193: three of a take-115 audit's five alarms were the probe's own
+regexes).
 
 Read, in this order:
 
@@ -183,3 +195,8 @@ If a Phase 4 item can fail silently, it needs an indicator showing it is working
 - Have I stated what I am DEFERRING this cycle? (§6)
 - Am I asking Jacob to test more than one thing at a time?
 - Would splitting this across two messages produce a more complete result?
+
+**Touched steps run before the seal.** If a take edits a pipeline tool, that
+step executes this take — locally or with its region path exercised — before
+anything is sealed. Parse is not verification; cached payloads hide dead code
+until the clean CI runner finds it (landmine 194).

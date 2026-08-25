@@ -48,6 +48,12 @@ class Region:
         self.centre = d.get("centre", [(self.W + self.E) / 2, (self.S + self.N) / 2])
         self.anchors = d.get("anchors", [])
         self.state = d.get("state")
+        # Take 116: bulk regions (the whole state) flip tool behaviours. This
+        # lives HERE so no tool reloads regions.json with its own path math —
+        # take 114 did exactly that in four tools and two of them referenced a
+        # ROOT they never defined, which only the clean CI runner executed
+        # (landmine 194; landmine 32's clean-checkout lesson, in tool form).
+        self.bulk = bool(d.get("bulk"))
 
     @property
     def overpass_bbox(self):

@@ -264,9 +264,7 @@ out geom;"""
     # A bulk region (the whole state) never queries Overpass: a statewide
     # request to a volunteer-run service is abuse, and the sanctioned bulk path
     # already exists and reproduces the same network (take 114, A72).
-    _cfg = json.load(open(os.path.join(os.path.dirname(
-        os.path.dirname(os.path.abspath(__file__))), "regions.json")))
-    if _cfg["regions"][R.id].get("bulk"):
+    if R.bulk:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import osm_local
         print("osm: bulk region — reading the Geofabrik extract directly "

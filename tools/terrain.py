@@ -19,9 +19,7 @@ Z = 13
 # ~6,700 px mosaic (inside the 8192 GPU texture limit, landmine on maxTex),
 # ~150 m/px. Elevation reads coarser and SAYS so in the log; the alternative is
 # no terrain at all, and terrain is a REQUIRED artifact (take 114).
-import json as _j
-_cfg = _j.load(open(os.path.join(ROOT, "regions.json")))
-if _cfg["regions"][R.id].get("bulk"):
+if R.bulk:
     Z = 10
     print("terrain: bulk region — DEM at z10 (~150 m/px), the statewide trade")
 W, S, E, N = R.W, R.S, R.E, R.N
