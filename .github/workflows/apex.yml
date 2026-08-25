@@ -1,18 +1,9 @@
-name: APEX
-
-# Phone-only pipeline. Everything that needs a real computer happens here.
-#   bundle -> builds the map archive + vendors libraries
-#   pages  -> browser build, for checking a change without installing
-#   apk    -> Stage 1: installable APK on the Releases tab
-#
-# Run it from the Actions tab ("Run workflow") or just push.
+name: build
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - apex-seed.zip
-      - apex-orv-github-repo.zip
       - BUILD
       - 'src/**'
       - 'tools/**'
@@ -34,68 +25,20 @@ permissions:
 
 env:
   # The region — bbox, anchors, imagery zoom — lives in regions.json.
-  # Change which one CI builds here; bump TILES_KEY in the same commit or the
-  # cache will hand back the previous region's artifacts.
-  APEX_REGION: neml-bullgap
-  TILES_KEY: neml-v2
+  # ── TAKE 118: REGION AUTHORITY LIVES IN THE SEED, NOT HERE ──────────────
+  # This file once pinned APEX_REGION and a hand-bumped TILES_KEY. When the
+  # seed switched to ALL OF MICHIGAN, this override kept commanding the box —
+  # CI shipped the wrong state wearing take 117 at full green (landmine 199).
+  # Now: regions.json's `default` decides, a step below derives the cache key
+  # from it, and ci/bundle.sh (seed-updated) verifies the built bundle names
+  # the declared region. NEVER add APEX_REGION back here.
+  DATA_V: v3   # bump only to force a clean data pull
 
 jobs:
-  # ── one-file installer ──────────────────────────────────────────────────
-  # Unpacks a seed zip sitting in the repo root the first time, then gets out of
-  # the way. It exists because GitHub's mobile web UI cannot create folders from
-  # an upload, and GITHUB_TOKEN cannot write .github/workflows — so the installer
-  # has to BE the build rather than write it (landmines 42, 46, 77).
-  seed:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: Unpack a seed zip if one is sitting in the repo root
-        run: |
-          ZIP=""
-          for c in apex-seed.zip apex-orv-github-repo.zip; do
-            [ -f "$c" ] && ZIP="$c" && break
-          done
-          if [ -z "$ZIP" ]; then
-            echo "no seed zip in the repo root — nothing to unpack, going"
-            echo "straight to the build (normal after the first run)"
-            exit 0
-          fi
-          echo "unpacking $ZIP"
-          unzip -oq "$ZIP" -d _seed
-          # apex-orv-github-repo.zip nests everything under one folder; the plain
-          # seed does not. Flatten either shape so the reasonable wrong choice
-          # still works (landmine 78).
-          SRC=_seed
-          if [ ! -f _seed/BUILD ] && [ "$(ls -1 _seed | wc -l)" = "1" ]; then
-            SRC="_seed/$(ls -1 _seed)"
-            echo "  (nested zip — flattening $SRC)"
-          fi
-          # NEVER write .github/workflows: GITHUB_TOKEN is refused there
-          # (landmine 46), and the workflow running this IS the build — a
-          # second copy would run everything twice. Whatever you pasted stays.
-          rm -rf "$SRC/.github"
-          cp -a "$SRC/." .
-          rm -rf _seed "$ZIP"
-          echo "unpacked $(find . -type f -not -path './.git/*' | wc -l) files"
-          # Gate BEFORE committing: a bad seed must not half-populate the repo.
-          # APEX_GATE_SEED=1 skips the workflow-file checks: the workflow here is
-          # the one YOU pasted, not part of the seed, and it cannot be updated by
-          # this job (GITHUB_TOKEN has no workflows permission). Gating the seed
-          # against it would deadlock — the fix ships in the seed the gate is
-          # refusing to install (landmine 84).
-          python3 -m pip install --quiet pyyaml
-          APEX_GATE_SEED=1 python3 tools/gate.py
-          git config user.name  apex-seed
-          git config user.email seed@users.noreply.github.com
-          git add -A
-          git commit -m "seed: APEX ORV" || echo "nothing new"
-          git push
   # ────────────────────────────────────────────────────────────────────────
   bundle:
-    needs: seed
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 90   # statewide first build ~40-60 min; cached ~10-15
     steps:
       # ref is REQUIRED here. checkout defaults to the commit that TRIGGERED the
       # run; the seed job pushes a newer one, so a default checkout lands on a
@@ -127,25 +70,42 @@ jobs:
           fi
           echo "source present — take $(grep -oP 'OFFROAD_TAKE=\K[0-9]+' BUILD)"
 
+      - name: Derive region from the seed (take 118)
+        id: region
+        run: |
+          R=$(python3 -c "import json;print(json.load(open('regions.json'))['default'])")
+          echo "id=$R" >> "$GITHUB_OUTPUT"
+          echo "Seed declares region: $R"
+
       - name: Restore region artifacts
         id: tilecache
         uses: actions/cache@v4
         with:
+          # EVERY per-region payload, by the same *_payload.json convention
+          # region.py clears by — plus the input caches. This was a hand-written
+          # list and it had drifted exactly as region.DERIVED did: poi (take 89),
+          # contour (91) and corridor (102) were all missing, so every build
+          # re-ran them. osm_cache was missing too, so every build re-downloaded
+          # the 297 MB Michigan extract and spent ~5 minutes on the corridor step
+          # for a result it already had. Found by the take-107 audit, not by
+          # anything watching (landmine 170).
           path: |
-            graph_payload.json
-            terrain_payload.json
-            glyphs_payload.json
-            water_payload.json
+            ./*_payload.json
             hillshade.jpg
             imagery.jpg
             imagery_meta.json
+            imagery_budget.json
+            imagery_tiles.json
+            imagery_tiles
+            dem_meta.json
             aoi.json
             authoritative.json
-            context_payload.json
-            address_payload.json
             dem_cache
             img_cache
-          key: region-${{ env.TILES_KEY }}
+            osm_cache
+            auth_cache
+            region_stamp.json
+          key: region-${{ steps.region.outputs.id }}-${{ env.DATA_V }}
 
       - uses: actions/setup-python@v5
         with:
@@ -240,4 +200,3 @@ jobs:
             "${{ steps.pkg.outputs.apk }}" \
             --title "APEX ORV — take ${{ steps.pkg.outputs.take }}" \
             --notes-file ci/RELEASE.md
-            
