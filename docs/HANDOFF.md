@@ -1,4 +1,205 @@
-# HANDOFF — through Take 112 · V2
+# HANDOFF — through Take 115 · V2
+
+## Take 115 — 2026-08-25 — Full adversarial audit of T1–T4, at Jacob's order
+
+Jacob: confirm T1–T4 are real, find every loose end, and audit the landmines
+themselves — trust to be re-earned by verification. Audited the SEALED ZIP
+first, because the zip is what he gets (landmine 191's content corollary).
+
+### T1–T4 presence: 16/18 on first pass, 18/18 after two real fixes
+
+Every claimed mechanism verified inside `apex-seed-t114.zip`. The two misses
+were genuine T1 gaps:
+
+- **`.actrow.on` still glowed full orange** — the accent rule had been applied
+  by sweep and held by memory, and memory decayed within two takes. Quieted to
+  the same white tint as the basemap toggle, and the rule is now a COUNTER: the
+  render suite counts accent-surfaced elements and fails above one per screen
+  (landmine 192).
+- **Coordinates were not last on the card** — T1's spec demoted them to the
+  bottom; they had landed above the stats row. Filed correctly.
+
+Also: **`fatal()` had dodged the one-face rule** — it lives in build_app's
+loader template with `Roboto` split across string concatenation, exactly how
+the take-113 sweep missed it. Barlow now, even on the worst screen.
+
+### The wiring and loose-end sweep
+
+40+ buttons cross-referenced; the "unwired" alarms were dynamic card buttons
+bound after `show()` — probe error, not product error. Zero TODO/FIXME. Stale
+files gone. Six ICONS entries currently unused (`stop, sat, target, phone,
+check, truck`) — kept deliberately as inventory for upcoming cards, recorded
+here so they are a decision rather than drift.
+
+### The landmine audit — the ledger holds
+
+**193 entries, zero gaps, zero duplicates, 49 cited inside live guards.** No
+entry was found prescribing structure the redesign invalidated — stale mentions
+are historical narration, which is what a ledger is for. One structural fault:
+**entries 68 and 119 were filed out of numeric order**, invisible to the
+set-completeness check. Relocated (content untouched), and the gate now asserts
+strictly ascending file order so it cannot recur.
+
+**Three of the audit's five alarms were the probe's own regexes** (landmine
+193): a probe earns belief the same way a check does — against a known-true
+case first. Protocol §0 now says so, alongside the delivery rule: verify what
+is IN the outputs directory, named and hashed.
+
+### Michigan and the third reference
+
+Statewide prep re-verified dormant and intact (default region unchanged, bulk
+paths inert, all patched tools parse). **onX Backcountry** joins as the third
+reference — DESIGN.md §7 reserves the slot, A136 awaits Jacob's screenshots.
+Transcribe, don't invent.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render **132** (the accent counter is new).
+Gate **31** including the new order check. Sealed as `apex-seed-t115.zip`,
+hash in the message.
+
+---
+
+
+## Take 114 — 2026-08-24 — T4, a delivery failure, and Michigan parked at the door
+
+### The take-113 seed never reached Jacob — and his report was the evidence
+
+Jacob installed "the latest" and got take 112. Direct check: the deliverable in
+the outputs directory WAS the take-112 zip (685,907 bytes, 18:51), despite the
+take-113 seal having verified and listed the new file (844,951 bytes, 20:01) in
+the same turn. The workspace held take 113 intact throughout; only the delivered
+artifact reverted between sessions.
+
+The in-turn verification was real and it was still not enough, because it
+verified a filesystem that did not persist. Structural fix, landmine 191: **the
+seed now carries its take number in its filename** (`apex-seed-t114.zip`) and
+**its sha256 is printed in the message beside it**, so a stale artifact can
+never impersonate a fresh one — and session start re-checks what is actually in
+outputs before claiming anything about it.
+
+### T4 · one typeface carries the whole app
+
+The SDF glyph pack is now built from **Barlow SemiBold** — SemiBold because
+Regular goes thin under SDF at trail-label sizes. The old face is deleted, not
+retired: one face, one pack (A134's ruled-out held). Street-name labels re-tuned
+for the light ground — quiet grey `#6E6B66`, halo `#F5F6F3` at 1.4 — instead of
+the dark-on-tan values they had carried since the old basemap.
+
+All label-placement checks passed untouched: trail names still place, water
+names still place, the shield text renders in the new face.
+
+### Michigan: fully prepped, deliberately parked
+
+Jacob's call mid-preparation: the visual arc ships and gets judged FIRST, then
+statewide. The preparation LANDED and sleeps in the tree, all of it dormant
+while `neml-bullgap` stays default:
+
+- `regions.json`: **michigan** declared — both peninsulas and Isle Royale,
+  12 anchors all inside the bbox, `bulk: true`.
+- Five tools grew a bulk mode, each with its reason printed: **ingest** goes
+  straight to Geofabrik (a statewide Overpass query is abuse of a volunteer
+  service) · **contour** skips (ruled out at take 75) · **imagery** ships the
+  underlay, skips the z12+ pyramid (8.6 GB, measured) · **terrain** drops to
+  z10 (~150 m/px — z13 statewide is ~38,000 tiles and a 50,000 px mosaic) ·
+  **landcover** raises thresholds ~30× and simplifies at 50 m.
+- The intelligence that de-risks it, from A72's own take-75 measurements:
+  Michigan is **236× the box by area but only 18–26× by network** — the graph
+  scales by network. And `corridor.py` already proved the statewide memory
+  model in CI.
+
+When Jacob says go: switch region, run, measure, tune. Multiple takes budgeted.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render 131. Gate green. Sealed as
+**apex-seed-t114.zip** with its hash in the message.
+
+---
+
+
+## Take 113 — 2026-08-24 — The reference redesign: audit, study, and T1–T3
+
+The biggest single take in the project, run under the NEW WORKFLOW: checkpoints
+during the work, one seal at the end. Jacob's brief: *"a love child of onX
+Offroad and AllTrails, but Michigan only"* — hybrid reads like onX, the light
+map reads like AllTrails, our ORV network on both.
+
+### First, the audit that started it
+
+Jacob asked whether the time was being spent well and whether a different AI
+would design better. Honest answers, on the record: the stack (Capacitor +
+MapLibre + the offline bundle) is RIGHT and stays; the presentation lagged
+because I designed from first principles instead of references and because my
+assertions catch broken, never ugly. Both fixed structurally: he sent five
+reference screenshots (onX statewide satellite; AllTrails at four zooms
+including OUR ground at Mio), the study is transcribed in **docs/DESIGN.md**,
+and screenshots are now the review loop — `tools/probe.mjs` is a permanent
+scaffold after ~30 takes of rewriting the same boilerplate.
+
+### T1 · Chrome
+
+- **Lucide** (ISC) replaces every hand-drawn icon — 24 icons inlined at build
+  time from lucide-static; the renderer embeds full inner markup, not one path.
+- **Barlow + Barlow Condensed** bundled offline (www/fonts, 128 KB latin);
+  monospace demoted to coordinates only.
+- **One control language**: dark near-opaque, white icons, 44 px, small radius.
+  Cream pills, grey pills and the orange basemap toggle all died.
+- **Accent reclaimed**: orange appears once per screen (the primary action).
+  Tab underline gone; active is white-vs-grey like both references.
+- **The sheet**: rounded top riding 14 px over the map, centred grabber, no
+  standing text. Card hierarchy FLIPPED — the place name leads; coordinates sit
+  last, small, in the one place monospace still lives.
+- **The place strip folded into Search**: empty query offers all 8 anchors as
+  jump chips. #chips stays in the DOM (HUD swap + self-test restore) but renders
+  nothing.
+
+### T2 · The ground
+
+New extractor **tools/landcover.py** (pyosmium area handler — closed ways AND
+multipolygon relations, so lakes stay punched out of forest; DP-simplified
+~25 m): **276 areas, 285 KB** — forest 179, wetland 37, park 59, and one
+`public` polygon that is the **Huron National Forest boundary**, washing federal
+ground in the deeper tone AllTrails uses. Wired as bundle kind `ground`,
+placeholder `__LAND__`, BOTH loader paths. Ground `#E4D7BC → #F2F3F0`; water to
+`#A9D3E6`; lake names to a live blue. The tan that drew a national forest as a
+desert is gone.
+
+### T3 · The details that read as craft
+
+- **White cased roads** (`minor`/`paved` white over `#C9C8C2` casings) — the
+  AllTrails treatment, and white also reads over dimmed imagery, one value both
+  styles.
+- **Category badges** replace every dot: canvas-drawn circles, white glyphs,
+  label in the category colour with white halo. Brown tent, green tree, blue
+  boat, gold beach — the AllTrails POI system, drawn by hand at badge scale
+  where a stroke sketch beats an imported path. Same system on paddle pins.
+- **The Michigan trunkline diamond** for M-routes, upright regardless of road
+  bearing; other refs keep the along-line badge.
+- **Hybrid dimming**: `raster-saturation -0.35, brightness-max 0.82` — the onX
+  inversion, dark ground so the network glows.
+- Loose ends: empty stat cells hide; folded band slimmed to a grabber.
+
+### What broke, and the pattern worth keeping
+
+**131 render checks passed UNTOUCHED through the entire reskin, three times
+over** — behaviour-and-structure assertions survive a redesign; pixel
+assertions would have fought every step (landmine 178 vindicated at scale).
+
+What did break was the harness meeting new browser surface: `MapStub.addImage`
+(the gate's stub-API check caught it — working exactly as designed), a canvas
+the stub cannot 2d-context, and `parentNode` absent on stub elements — the last
+one turned cell-hiding polish into a loader fatal. The rule extracted:
+**polish must never be the reason the map refuses to load**; every cosmetic
+touch guards and bails.
+
+### Verified
+
+Smoke 5 modes, 274 assertions. Render 131. Gate green across 30, including
+loader kinds with `ground`. Sealed as one take.
+
+---
+
 
 ## Take 112 — 2026-08-24 — Four field findings from the take-110 session
 

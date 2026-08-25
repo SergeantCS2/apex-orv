@@ -1,98 +1,189 @@
 {
-  "_note": "One definition per riding area. Every tool reads this; nothing hardcodes a bbox. Adding a region is one entry here, then `python3 tools/pipeline.py --region <id>`. `state` is the outline drawn at low zoom for orientation only — never routable.",
-  "default": "neml-bullgap",
-  "regions": {
-    "neml-bullgap": {
-      "name": "Bull Gap · Mio · Rose City",
-      "bbox": [
-        -84.3,
-        44.42,
-        -83.9,
-        44.72
-      ],
-      "imagery_zoom": 14,
-      "centre": [
-        -84.09,
-        44.57
-      ],
-      "note": "Huron NF east of M-33 plus the Ogemaw state trails.",
-      "anchors": [
-        [
-          "Bull Gap",
-          -84.0274,
-          44.6166,
-          "site"
-        ],
-        [
-          "Mio",
-          -84.133,
-          44.6597,
-          "town"
-        ],
-        [
-          "The Pink Store",
-          -84.1279,
-          44.5219,
-          "site"
-        ],
-        [
-          "Rose City",
-          -84.0666,
-          44.4939,
-          "town"
-        ],
-        [
-          "Luzerne",
-          -84.256,
-          44.628,
-          "town"
-        ],
-        [
-          "Mack Lake",
-          -84.06,
-          44.57,
-          "site"
-        ],
-        [
-          "McKinley",
-          -83.96,
-          44.61,
-          "town"
-        ],
-        [
-          "South Branch",
-          -83.928,
-          44.4747,
-          "town"
-        ]
-      ],
-      "state": "Michigan",
-      "imagery_max_zoom": 15
-    },
-    "sthelen": {
-      "name": "St. Helen · Roscommon",
-      "bbox": [
-        -84.56,
-        44.3,
-        -84.22,
-        44.54
-      ],
-      "imagery_zoom": 14,
-      "centre": [
-        -84.39,
-        44.42
-      ],
-      "note": "St. Helen scramble area and the Au Sable State Forest trails. Different DNR management unit from the Bull Gap region, which is the point of having it — it proves the pipeline is not shaped around one place. Roscommon (2.5 km west) and Houghton Lake (16.2 km west) were listed as anchors but fall outside this bbox; a chip for them panned the rider off the map. Removed at take 96 rather than widening the bbox, which would change what this region downloads — that is a judgement call, not a bug fix.",
-      "anchors": [
-        [
-          "St. Helen",
-          -84.4103,
-          44.3611,
-          "town"
-        ]
-      ],
-      "state": "Michigan",
-      "imagery_max_zoom": 15
-    }
+ "_note": "One definition per riding area. Every tool reads this; nothing hardcodes a bbox. Adding a region is one entry here, then `python3 tools/pipeline.py --region <id>`. `state` is the outline drawn at low zoom for orientation only \u2014 never routable.",
+ "default": "neml-bullgap",
+ "regions": {
+  "neml-bullgap": {
+   "name": "Bull Gap \u00b7 Mio \u00b7 Rose City",
+   "bbox": [
+    -84.3,
+    44.42,
+    -83.9,
+    44.72
+   ],
+   "imagery_zoom": 14,
+   "centre": [
+    -84.09,
+    44.57
+   ],
+   "note": "Huron NF east of M-33 plus the Ogemaw state trails.",
+   "anchors": [
+    [
+     "Bull Gap",
+     -84.0274,
+     44.6166,
+     "site"
+    ],
+    [
+     "Mio",
+     -84.133,
+     44.6597,
+     "town"
+    ],
+    [
+     "The Pink Store",
+     -84.1279,
+     44.5219,
+     "site"
+    ],
+    [
+     "Rose City",
+     -84.0666,
+     44.4939,
+     "town"
+    ],
+    [
+     "Luzerne",
+     -84.256,
+     44.628,
+     "town"
+    ],
+    [
+     "Mack Lake",
+     -84.06,
+     44.57,
+     "site"
+    ],
+    [
+     "McKinley",
+     -83.96,
+     44.61,
+     "town"
+    ],
+    [
+     "South Branch",
+     -83.928,
+     44.4747,
+     "town"
+    ]
+   ],
+   "state": "Michigan",
+   "imagery_max_zoom": 15
+  },
+  "sthelen": {
+   "name": "St. Helen \u00b7 Roscommon",
+   "bbox": [
+    -84.56,
+    44.3,
+    -84.22,
+    44.54
+   ],
+   "imagery_zoom": 14,
+   "centre": [
+    -84.39,
+    44.42
+   ],
+   "note": "St. Helen scramble area and the Au Sable State Forest trails. Different DNR management unit from the Bull Gap region, which is the point of having it \u2014 it proves the pipeline is not shaped around one place. Roscommon (2.5 km west) and Houghton Lake (16.2 km west) were listed as anchors but fall outside this bbox; a chip for them panned the rider off the map. Removed at take 96 rather than widening the bbox, which would change what this region downloads \u2014 that is a judgement call, not a bug fix.",
+   "anchors": [
+    [
+     "St. Helen",
+     -84.4103,
+     44.3611,
+     "town"
+    ]
+   ],
+   "state": "Michigan",
+   "imagery_max_zoom": 15
+  },
+  "michigan": {
+   "name": "Michigan",
+   "bbox": [
+    -90.6,
+    41.68,
+    -82.1,
+    48.35
+   ],
+   "imagery_zoom": 11,
+   "centre": [
+    -85.0,
+    44.8
+   ],
+   "state": "Michigan",
+   "bulk": true,
+   "note": "The whole state, both peninsulas and Isle Royale \u2014 Jacob's call at take 114: 'the one-stop Michigan app'. bulk:true means the pipeline reads the Geofabrik extract directly (a statewide Overpass query would abuse a volunteer service), skips contours and z12+ imagery tiles (measured impossible at take 75: 8.6 GB), and raises landcover thresholds so the ground wash carries shape, not slivers.",
+   "anchors": [
+    [
+     "Mio",
+     -84.133,
+     44.6597,
+     "town"
+    ],
+    [
+     "St. Helen",
+     -84.4109,
+     44.3634,
+     "town"
+    ],
+    [
+     "Grayling",
+     -84.7145,
+     44.6614,
+     "town"
+    ],
+    [
+     "Gladwin",
+     -84.4864,
+     43.9808,
+     "town"
+    ],
+    [
+     "Baldwin",
+     -85.8517,
+     43.9011,
+     "town"
+    ],
+    [
+     "Cadillac",
+     -85.4012,
+     44.252,
+     "town"
+    ],
+    [
+     "Silver Lake Dunes",
+     -86.475,
+     43.66,
+     "site"
+    ],
+    [
+     "Atlanta",
+     -84.144,
+     45.0044,
+     "town"
+    ],
+    [
+     "Newberry",
+     -85.5095,
+     46.355,
+     "town"
+    ],
+    [
+     "Munising",
+     -86.6493,
+     46.4113,
+     "town"
+    ],
+    [
+     "Marquette",
+     -87.3954,
+     46.5436,
+     "town"
+    ],
+    [
+     "Drummond Island",
+     -83.742,
+     46.003,
+     "site"
+    ]
+   ]
   }
+ }
 }

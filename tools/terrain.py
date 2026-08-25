@@ -14,6 +14,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from region import R
 
 Z = 13
+# Bulk regions (the whole state) drop to z10: z13 statewide is ~38,000 tiles
+# and a 50,000 px mosaic — unfetchable and unholdable. z10 is ~730 tiles and a
+# ~6,700 px mosaic (inside the 8192 GPU texture limit, landmine on maxTex),
+# ~150 m/px. Elevation reads coarser and SAYS so in the log; the alternative is
+# no terrain at all, and terrain is a REQUIRED artifact (take 114).
+import json as _j
+_cfg = _j.load(open(os.path.join(ROOT, "regions.json")))
+if _cfg["regions"][R.id].get("bulk"):
+    Z = 10
+    print("terrain: bulk region — DEM at z10 (~150 m/px), the statewide trade")
 W, S, E, N = R.W, R.S, R.E, R.N
 TS = 256
 CACHE = "dem_cache"

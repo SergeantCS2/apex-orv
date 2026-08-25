@@ -1,12 +1,24 @@
 # PROTOCOL
 
-*Revised 2026-08-19, take 112.*
+*Revised 2026-08-19, take 115.*
 
 The working rules for this project. The gate enforces the ones it can.
 
 ---
 
 ## 0. Start of every session
+
+**Deliverables are verified where the person reaches them.** A session that
+hands over work checks what is ACTUALLY in the outputs directory — not what a
+previous session remembers putting there (landmine 191: a verified take-113
+seed reverted to take 112 between sessions). Every sealed seed carries its take
+number in its filename (`apex-seed-tNNN.zip`) and its sha256 is printed in the
+message beside it.
+
+**One-off audit probes are code and get the same suspicion as checks** — a
+probe is verified against a known-true case before its findings are believed
+(landmine 193: three of a take-115 audit's five alarms were the probe's own
+regexes).
 
 Read, in this order:
 

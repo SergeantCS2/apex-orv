@@ -15,9 +15,9 @@ function blob(u){return fetch(u).then(function(r){
   .then(function(b){return URL.createObjectURL(b)})}
 
 function fatal(msg,detail){
-  document.body.innerHTML='<div style="padding:26px;font:400 14px/1.6 Roboto,'+
+  document.body.innerHTML='<div style="padding:26px;font:400 14px/1.6 Barlow,'+
    'system-ui,sans-serif;color:#F5EFE2;background:#14120F;height:100%">'+
-   '<div style="font:700 12px/1 Roboto;letter-spacing:.17em;text-transform:uppercase;'+
+   '<div style="font:700 12px/1 Barlow,system-ui,letter-spacing:.17em;text-transform:uppercase;'+
    'color:#E2570F;margin-bottom:14px">APEX ORV</div>'+
    '<b style="font-size:17px">'+msg+'</b><br><br>'+
    '<span style="color:#9A9184">'+detail+'</span></div>'}
@@ -59,10 +59,11 @@ j('bundle/manifest.json').then(function(man){
        no contour artifact and the map simply has no contour lines. */
     have.contour?j('bundle/'+have.contour):Promise.resolve(null),
     /* A115. Optional and absent-safe like the rest. */
-    have.paddle?j('bundle/'+have.paddle):Promise.resolve(null)]);
+    have.paddle?j('bundle/'+have.paddle):Promise.resolve(null),
+    have.ground?j('bundle/'+have.ground):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
-  POIS=r[10];CONT=r[11];PADDLE=r[12];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -388,21 +389,87 @@ var showFeats=(SHOW&&SHOW.r?SHOW.r:[]).map(function(r){
    sprite would render as a box. A coloured dot with a text label costs nothing,
    scales on the GPU, and is legible at 2 px — landmine 30 in advance rather
    than after. */
+/* ── CATEGORY BADGES (take 113 · T3, reference study) ─────────────────────
+   AllTrails' POI system, transcribed: a category-coloured circle with a white
+   glyph, label in the SAME colour with a white halo. The glyph names which
+   badge image to draw (makeBadges below); colours are the reference family —
+   deep green for nature, brown for camping, blue for water access — with fuel
+   and trailheads keeping their higher-urgency reds/oranges. */
 var POIKIND={
-  fuel:     {c:'#C1121F', h:'Fuel',        r:1},
-  trailhead:{c:'#E2570F', h:'Trailhead',   r:1},
-  camp:     {c:'#2F7D4F', h:'Campground',  r:2},
-  launch:   {c:'#1E6FA8', h:'Boat launch', r:2},
-  beach:    {c:'#C9A227', h:'Beach',       r:3},
-  dayuse:   {c:'#2F7D4F', h:'Day use',     r:3},
-  store:    {c:'#7A4FA3', h:'Store',       r:3},
-  food:     {c:'#7A4FA3', h:'Food',        r:4},
-  view:     {c:'#4A443B', h:'Viewpoint',   r:4},
-  info:     {c:'#4A443B', h:'Information', r:5},
-  water:    {c:'#1E6FA8', h:'Drinking water', r:5},
-  toilet:   {c:'#4A443B', h:'Toilets',     r:6},
-  shelter:  {c:'#4A443B', h:'Shelter',     r:6}
+  fuel:     {c:'#C1121F', h:'Fuel',        r:1, g:'fuel'},
+  trailhead:{c:'#D2500C', h:'Trailhead',   r:1, g:'flag'},
+  camp:     {c:'#7A5B3A', h:'Campground',  r:2, g:'tent'},
+  launch:   {c:'#2E7FA8', h:'Boat launch', r:2, g:'boat'},
+  beach:    {c:'#C9A227', h:'Beach',       r:3, g:'sun'},
+  dayuse:   {c:'#3D6B35', h:'Day use',     r:3, g:'tree'},
+  store:    {c:'#6B4FA0', h:'Store',       r:3, g:'bag'},
+  food:     {c:'#6B4FA0', h:'Food',        r:4, g:'cup'},
+  view:     {c:'#3D6B35', h:'Viewpoint',   r:4, g:'eye'},
+  info:     {c:'#4A5560', h:'Information', r:5, g:'i'},
+  water:    {c:'#2E7FA8', h:'Drinking water', r:5, g:'drop'},
+  toilet:   {c:'#4A5560', h:'Toilets',     r:6, g:'i'},
+  shelter:  {c:'#4A5560', h:'Shelter',     r:6, g:'tent'}
 };
+
+function makeBadges(){
+  /* Tiny glyphs drawn by hand on a canvas: at 8 px inside a 26 px badge a
+     stroke sketch outlives any imported path. Registered once per kind. */
+  var G={
+    tree:function(x){x.moveTo(13,6);x.lineTo(8,15);x.lineTo(18,15);x.closePath();
+      x.moveTo(13,15);x.lineTo(13,19)},
+    tent:function(x){x.moveTo(6,18);x.lineTo(13,7);x.lineTo(20,18);x.closePath();
+      x.moveTo(13,18);x.lineTo(13,12)},
+    boat:function(x){x.moveTo(6,15);x.lineTo(20,15);x.lineTo(17,19);x.lineTo(9,19);
+      x.closePath();x.moveTo(13,15);x.lineTo(13,6);x.lineTo(18,12);x.lineTo(13,12)},
+    fuel:function(x){x.rect(8,7,7,12);x.moveTo(15,11);x.lineTo(18,11);
+      x.lineTo(18,17)},
+    flag:function(x){x.moveTo(9,20);x.lineTo(9,6);x.lineTo(18,9);x.lineTo(9,12)},
+    sun:function(x){x.arc(13,13,4,0,6.283);x.moveTo(13,5);x.lineTo(13,7);
+      x.moveTo(13,19);x.lineTo(13,21);x.moveTo(5,13);x.lineTo(7,13);
+      x.moveTo(19,13);x.lineTo(21,13)},
+    drop:function(x){x.moveTo(13,6);x.bezierCurveTo(9,12,8,14,8,16);
+      x.arc(13,16,5,3.1416,0,true);x.bezierCurveTo(18,14,17,12,13,6)},
+    bag:function(x){x.rect(8,10,10,9);x.moveTo(10,10);x.arc(13,10,3,3.1416,0)},
+    cup:function(x){x.moveTo(8,8);x.lineTo(8,16);x.arc(11,16,3,3.1416,0,true);
+      x.moveTo(14,8);x.lineTo(14,14);x.moveTo(14,10);x.arc(14,12,2,-1.57,1.57)},
+    eye:function(x){x.moveTo(6,13);x.bezierCurveTo(9,8,17,8,20,13);
+      x.bezierCurveTo(17,18,9,18,6,13);x.moveTo(15,13);
+      x.arc(13,13,2,0,6.283)},
+    i:function(x){x.moveTo(13,11);x.lineTo(13,18);x.moveTo(13,7);x.lineTo(13,8)},
+    dam:function(x){x.moveTo(7,7);x.lineTo(13,18);x.lineTo(19,7);
+      x.moveTo(13,10);x.lineTo(13,13)}
+  };
+  var done={};
+  function one(name,color,glyph){
+    if(done[name]||!map.addImage)return;
+    /* headless stubs have elements without a 2d context — a badge is polish,
+       and polish must never be the reason the map refuses to load (take 113) */
+    if(!document.createElement('canvas').getContext)return;
+    done[name]=1;
+    var S=2,c=document.createElement('canvas');c.width=c.height=26*S;
+    var x=c.getContext('2d');x.scale(S,S);
+    x.beginPath();x.arc(13,13.6,11,0,6.283);x.fillStyle='rgba(0,0,0,.22)';x.fill();
+    x.beginPath();x.arc(13,13,11,0,6.283);x.fillStyle=color;x.fill();
+    x.lineWidth=1.6;x.strokeStyle='#FFFFFF';x.stroke();
+    x.beginPath();x.lineWidth=1.7;x.lineCap='round';x.lineJoin='round';
+    (G[glyph]||G.i)(x);x.stroke();
+    try{map.addImage(name,x.getImageData(0,0,26*S,26*S),{pixelRatio:S})}catch(e){}}
+  Object.keys(POIKIND).forEach(function(k){
+    one('bdg-'+k,POIKIND[k].c,POIKIND[k].g)});
+  one('bdg-pad-launch','#2E7FA8','boat');one('bdg-pad-access','#2E8B99','boat');
+  one('bdg-pad-camp','#7A5B3A','tent');one('bdg-pad-parking','#4A5560','i');
+  one('bdg-dam','#C1121F','dam');
+  /* The Michigan trunkline diamond — the black-on-white rotated square every
+     Michigander reads as "M-road" before the number registers. Both reference
+     apps draw it correctly; a Michigan-only app has no excuse not to. */
+  if(!done['mi-diamond']&&map.addImage&&document.createElement('canvas').getContext){done['mi-diamond']=1;
+    var S2=2,cv=document.createElement('canvas');cv.width=cv.height=30*S2;
+    var g=cv.getContext('2d');g.scale(S2,S2);g.translate(15,15);g.rotate(Math.PI/4);
+    var h=9.6;
+    g.beginPath();g.rect(-h,-h,h*2,h*2);
+    g.fillStyle='#FFFFFF';g.fill();
+    g.lineWidth=1.8;g.strokeStyle='#1C1A16';g.stroke();
+    try{map.addImage('mi-diamond',g.getImageData(0,0,30*S2,30*S2),{pixelRatio:S2})}catch(e){}}}
 var poif=((POIS&&POIS.p)||[]).map(function(r,i){
   var k=POIKIND[r.k]||{c:'#4A443B',h:r.k,r:7};
   return {type:'Feature',
@@ -660,7 +727,7 @@ function cmpPaint(){
   if(!box||!CMP_ON)return;
   var H=headingNow(),hdg=H?H.deg:null,rows=cmpRows(hdg);
   box.innerHTML='<div style="text-align:center">'+cmpRose(hdg)+
-    '<div style="font:700 var(--t-lg)/1 Roboto,system-ui,sans-serif;margin-top:4px">'+
+    '<div style="font:700 var(--t-lg)/1 Barlow,Roboto,system-ui,sans-serif;margin-top:4px">'+
     (hdg===null?'<span style="color:#9C9384;font-size:var(--t-sm)">'+
        (MAG_OK===false?'this phone is not reporting a compass \u2014 start moving '+
          'and it will use your GPS course instead'
@@ -865,7 +932,10 @@ var PAL={
   track:'#96562A',                      /* was #9C7343, dE 29->42; clears nfsmoto by 28 */
   fsroad:'#8A7C66',                     /* unchanged — see the casing note above */
   /* roads: background by design */
-  minor:'#4A443B', paved:'#3A352E',
+  /* Take 113 · T3: on the light green ground, roads are WHITE with a hairline
+     casing — the AllTrails treatment — and white also reads correctly over the
+     dimmed hybrid imagery, so one value serves both styles. */
+  minor:'#FFFFFF', paved:'#FFFFFF',
   /* closed to everything */
   closed:'#C1121F', fsclosed:'#C1121F',
   /* show-only: drawn so the map is honest about what exists, dashed because
@@ -959,6 +1029,13 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       coordinates:[[SATBOX[0],SATBOX[3]],[SATBOX[2],SATBOX[3]],[SATBOX[2],SATBOX[1]],[SATBOX[0],SATBOX[1]]]},
     hs:{type:'image',url:SHADE,
       coordinates:[[TR.b[0],TR.b[3]],[TR.b[2],TR.b[3]],[TR.b[2],TR.b[1]],[TR.b[0],TR.b[1]]]},
+    ground:{type:'geojson',data:(function(){
+      /* forest / wetland / park polygons plus the NF boundary wash, extracted
+         from the same OSM file everything else comes from. Absent-safe. */
+      var f=(LAND&&LAND.f||[]).map(function(a){
+        return {type:'Feature',properties:{k:a.k},
+          geometry:{type:'Polygon',coordinates:a.g}}});
+      return {type:'FeatureCollection',features:f}})()},
     wtr:{type:'geojson',data:{type:'FeatureCollection',features:wf}},
     wlbl:{type:'geojson',data:{type:'FeatureCollection',features:wlab}},
     refs:{type:'geojson',data:{type:'FeatureCollection',features:refstrokes}},
@@ -983,11 +1060,35 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     places:{type:'geojson',data:placeFC}
   },
   layers:[
-    {id:'bg',type:'background',paint:{'background-color':'#E4D7BC'}},
+    /* ── THE GROUND (take 113 · T2, reference study) ────────────────────
+       AllTrails' light map: warm light-grey base, landcover doing the work.
+       The tan that drew a national forest as a desert dies here. */
+    {id:'bg',type:'background',paint:{'background-color':'#F2F3F0'}},
     /* USGS ImageryOnly, NAIP-derived, public domain. Landmine 22: Esri, Google,
        Bing and Mapbox imagery are licensed and may not ship offline. */
+    /* Public-land wash first (the Huron NF boundary — AllTrails' deeper tone
+       over federal ground), then the specific covers on top of it. All of it
+       sits UNDER relief, water and the network: the ground is what the map is
+       read against, never what competes with it. */
+    {id:'lc-public',type:'fill',source:'ground',
+      filter:['==',['get','k'],'public'],
+      paint:{'fill-color':'#E9F0DE','fill-opacity':0.85}},
+    {id:'lc-forest',type:'fill',source:'ground',
+      filter:['==',['get','k'],'forest'],
+      paint:{'fill-color':'#D9E7C9','fill-opacity':0.9}},
+    {id:'lc-wetland',type:'fill',source:'ground',
+      filter:['==',['get','k'],'wetland'],
+      paint:{'fill-color':'#D3E4DA','fill-opacity':0.9}},
+    {id:'lc-park',type:'fill',source:'ground',
+      filter:['==',['get','k'],'park'],
+      paint:{'fill-color':'#C9E2B6','fill-opacity':0.9}},
+    /* The onX satellite trick is INVERSION: dim and desaturate the imagery so
+       the network becomes the brightest thing on screen. Dark ground, luminous
+       data (take 113, reference study). */
     {id:'sat',type:'raster',source:'sat',layout:{visibility:'none'},
-      paint:{'raster-opacity':1,'raster-fade-duration':0}},
+      paint:{'raster-opacity':1,'raster-fade-duration':0,
+        'raster-saturation':-0.35,'raster-brightness-max':0.82,
+        'raster-contrast':0.06}},
     /* Relief under the map, multiplied into the sand rather than laid over it,
        so trails stay the loudest thing on screen. */
     {id:'hillshade',type:'raster',source:'hs',
@@ -1009,9 +1110,9 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       paint:{'line-color':'#8A6A42','line-width':w(0.9,1.7,2.8),
         'line-opacity':0.8}},
     {id:'water',type:'fill',source:'wtr',filter:['==',['get','c'],'water'],
-      paint:{'fill-color':'#8FA9B8'}},
+      paint:{'fill-color':'#A9D3E6'}},
     {id:'wway',type:'line',source:'wtr',filter:['==',['get','c'],'waterway'],
-      paint:{'line-color':'#8FA9B8','line-width':w(0.5,1.8,4)}},
+      paint:{'line-color':'#A9D3E6','line-width':w(0.5,1.8,4)}},
     /* A white casing under every trail. This is the single thing that makes a
        coloured network readable over satellite imagery, and it was switched OFF
        except in satellite mode — so on the default map the trails had no
@@ -1049,6 +1150,11 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        they read as "not for you", which is why Jacob said the trails he rides
        had no colour (take 58). They are ridable dirt: a warm tan, solid, thinner
        than designated trail so the hierarchy still reads. */
+    /* Hairline casing UNDER the white fill — without it a white road on a
+       light ground is invisible, and the casing is what gives the reference
+       maps their quiet road hierarchy (take 113). */
+    lyr('minor-case','minor','#C9C8C2',w(1.2,2.1,3.8)),
+    lyr('paved-case','paved','#BFBEB8',w(1.9,3.4,6.6)),
     lyr('minor','minor',PAL.minor,w(0.4,0.9,2.2)),
     lyr('paved','paved',PAL.paved,w(0.9,2,4.8)),
     /* fsroad and track were the same brown at take 58, and Jacob's own example
@@ -1173,17 +1279,20 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        dot appears before the name so a pin is visible at a zoom where its
        label will not fit, and `symbol-sort-key` puts fuel and trailheads ahead
        of picnic tables when they compete for space. */
-    {id:'poi-dot',type:'circle',source:'poi',minzoom:11.4,
-      paint:{'circle-color':['get','c'],
-        'circle-radius':w(2.6,4.2,6.5),
-        'circle-stroke-color':'#FFFFFF','circle-stroke-width':w(0.8,1.4,2)}},
+    /* Badges, not dots (take 113 · T3): the id keeps 'poi-dot' because the
+       layers panel and checks address it, but it is now the category badge. */
+    {id:'poi-dot',type:'symbol',source:'poi',minzoom:11.4,
+      layout:{'icon-image':['concat','bdg-',['get','k']],
+        'icon-size':w(0.52,0.72,0.95),'icon-allow-overlap':true,
+        'symbol-sort-key':['get','r']},
+      paint:{}},
     {id:'poi-label',type:'symbol',source:'poi',minzoom:12.8,
       layout:{'text-field':['get','n'],'text-font':['APEX'],
         'text-size':w(8.5,10,11.5),'text-max-width':9,
-        'text-offset':[0,0.85],'text-anchor':'top','text-padding':3,
+        'text-offset':[0,1.15],'text-anchor':'top','text-padding':3,
         'symbol-sort-key':['get','r']},
-      paint:{'text-color':'#241F19','text-halo-color':'#FFFFFF',
-        'text-halo-width':1.9}},
+      paint:{'text-color':['get','c'],'text-halo-color':'#FFFFFF',
+        'text-halo-width':1.7}},
     /* Only the INDEX contour carries a number. Labelling every 40 ft line puts
        sixteen numbers on one hillside; labelling every 200 ft is what a paper
        quad does and is readable. */
@@ -1219,13 +1328,11 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       paint:{'text-color':'#3A352E','text-halo-color':'#FFFFFF','text-halo-width':1.9}},
     /* Access, launches and camps ON the river, each carrying its river mile so
        a shuttle can be planned from the map: which put-in is above which. */
-    {id:'pad-dot',type:'circle',source:'padpin',minzoom:9.5,
-      layout:{visibility:'none'},
-      filter:['!=',['get','k'],'dam'],
-      paint:{'circle-radius':w(3,4.6,6.4),
-        'circle-color':['match',['get','k'],
-          'launch','#1E6FA8','access','#2E8B99','camp','#2F7D4F','parking','#6E665B','#1E6FA8'],
-        'circle-stroke-color':'#FFFFFF','circle-stroke-width':1.6}},
+    {id:'pad-dot',type:'symbol',source:'padpin',minzoom:9.5,
+      layout:{visibility:'none',
+        'icon-image':['concat','bdg-pad-',['get','k']],
+        'icon-size':w(0.5,0.68,0.9),'icon-allow-overlap':true},
+      paint:{}},
     {id:'pad-lbl',type:'symbol',source:'padpin',minzoom:12.4,
       layout:{visibility:'none','text-field':['get','lb'],'text-font':['APEX'],
         'text-size':w(8,9.5,11),'text-offset':[0,1],'text-anchor':'top',
@@ -1265,7 +1372,19 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        Styled as a badge rather than a name: tighter letter spacing, a heavier
        halo, and a colour of its own so a number reads as a number at a glance.
        Real shields would need a sprite sheet the build does not have. */
+    /* M-routes wear the diamond, upright regardless of road bearing; every
+       other ref keeps the along-line badge. */
+    {id:'lbl-shield',type:'symbol',source:'refs',minzoom:10.8,
+      filter:['==',['index-of','M-',['get','lb']],0],
+      layout:{'symbol-placement':'line','symbol-spacing':420,
+        'icon-image':'mi-diamond','icon-rotation-alignment':'viewport',
+        'icon-size':w(0.72,0.92,1.05),'icon-allow-overlap':false,
+        'text-field':['slice',['get','lb'],2],'text-font':['APEX'],
+        'text-size':w(8,9.5,10.5),'text-rotation-alignment':'viewport',
+        'text-allow-overlap':false},
+      paint:{'text-color':'#1C1A16'}},
     {id:'lbl-ref',type:'symbol',source:'refs',minzoom:11.2,
+      filter:['!=',['==',['index-of','M-',['get','lb']],0],true],
       layout:{'symbol-placement':'line','text-field':['get','lb'],
         'text-font':['APEX'],'text-size':w(9,10.5,12.5),
         'text-max-angle':70,'symbol-spacing':340,'text-padding':4,
@@ -1284,7 +1403,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       layout:{'text-field':['get','n'],'text-font':['APEX'],
         'text-size':w(8,9.5,11.5),'text-max-width':8,
         'text-letter-spacing':0.06,'text-padding':3},
-      paint:{'text-color':'#3E6A80','text-halo-color':'#EFE6D2','text-halo-width':1.6,
+      paint:{'text-color':'#4E93B8','text-halo-color':'#F2F3F0','text-halo-width':1.5,
         'text-opacity':0.95}},
     {id:'lbl-stream',type:'symbol',source:'wlbl',minzoom:12.6,
       filter:['==',['get','c'],'waterway'],
@@ -1299,7 +1418,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       layout:{'symbol-placement':'line','text-field':['get','lb'],
         'text-font':['APEX'],'text-size':w(8.5,10,12.5),
         'text-max-angle':70,'symbol-spacing':300,'text-padding':2},
-      paint:{'text-color':'#3A342C','text-halo-color':'#EFE6D2','text-halo-width':1.5}},
+      paint:{'text-color':'#6E6B66','text-halo-color':'#F5F6F3','text-halo-width':1.4}},
   ]},
   center:CTR,zoom:11.4,maxZoom:17,minZoom:5.2,
   /* Michigan, not just the download. Penning the map to the bundle bbox meant a
@@ -1326,44 +1445,48 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
    is worse than none — the label already says "Dirt bike 24\"". It gets a
    generic vehicle mark and the words carry the meaning. */
 var ICONS={
-  layers:'M12 3 3 8l9 5 9-5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5',
-  /* The first version drew a ground line, a lean-to body and two wheels made
-     from `a1.6 1.6 0 1 0 0 .1` — an arc so short it renders as a sliver, not a
-     circle. Jacob: "the car doesn't look good". Real circles, a cabin and a
-     bonnet now (take 109). */
-  vehicle:'M3.5 16.5h1M19.5 16.5h1M4.5 16.5h15M5 16.5l1.2-4.2a1.5 1.5 0 0 1 1.4-1h8.8'+
-          'a1.5 1.5 0 0 1 1.3.8l2.2 4.4M8.2 11.3h7.4M8.4 18a1.9 1.9 0 1 1 3.8 0'+
-          'a1.9 1.9 0 1 1-3.8 0M16.2 18a1.9 1.9 0 1 1 3.8 0a1.9 1.9 0 1 1-3.8 0',
-  home:'M4 11.5 12 4l8 7.5M6.5 10v9h11v-9',
-  here:'M12 3v3M12 18v3M3 12h3M18 12h3M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8',
-  fuel:'M4 20V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v15M3 20h12M5.5 9h6M16 8l2.5 2.5V17a1.5 1.5 0 0 0 3 0v-6',
-  play:'M8 5.5 19 12 8 18.5z',
-  stop:'M7 7h10v10H7z',
-  alert:'M12 4 2.5 20h19zM12 10v4.5M12 17.2v.1',
-  locate:'M12 2v3M12 19v3M2 12h3M19 12h3M12 7a5 5 0 1 1 0 10a5 5 0 1 1 0-10M12 11a1 1 0 1 1 0 2a1 1 0 1 1 0-2',
-  clock:'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18M12 7v5.5l3.5 2',
-  info:'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18M12 11v6M12 7.4a.6.6 0 1 1 0 1.2a.6.6 0 1 1 0-1.2',
-  loop:'M20 12a8 8 0 1 1-2.6-5.9M20 3v4h-4',
-  star:'M12 3.5l2.6 5.6 6 .8-4.4 4.2 1.1 6.1L12 17.3 6.7 20.2l1.1-6.1L3.4 9.9l6-.8z',
-  shield:'M12 3 5 6v6c0 4.5 3 7.6 7 9 4-1.4 7-4.5 7-9V6zM9.5 12h5M12 9.5v5',
-  search:'M11 4a7 7 0 1 0 .1 0M16.2 16.2 21 21',
-  map:'M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5zM9 4v13M15 6.5v13',
-  sat:'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18M3.5 9.5h17M3.5 14.5h17M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18',
-  target:'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18M12 7.5a4.5 4.5 0 1 1 0 9a4.5 4.5 0 1 1 0-9M12 11.4a.6.6 0 1 1 0 1.2a.6.6 0 1 1 0-1.2',
-  phone:'M6 3.5h3.5l1.8 4.3-2.2 1.4a12 12 0 0 0 5.7 5.7l1.4-2.2 4.3 1.8V18a2.5 2.5 0 0 1-2.7 2.5C10.5 20 4 13.5 3.5 6.2A2.5 2.5 0 0 1 6 3.5z',
-  close:'M6 6l12 12M18 6L6 18',
-  check:'M4.5 12.5 9.5 18 20 6.5',
-  pin:'M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11zM12 7.2a2 2 0 1 1 0 4a2 2 0 1 1 0-4',
-  truck:'M3 7h11v9H3zM14 10.5h3.6L21 14v2h-7M6.5 16a1.7 1.7 0 1 0 .1 0M17 16a1.7 1.7 0 1 0 .1 0',
-  route:'M6 20a3 3 0 1 0 .1 0M18 7a3 3 0 1 0 .1 0M18 10v3a5 5 0 0 1-5 5H9'
+/* ── LUCIDE (take 113) ─────────────────────────────────────────────────────
+   Professionally drawn open-source icons (ISC licence, lucide.dev) replacing
+   every hand-drawn path. Jacob's field reports caught the hand-drawn set twice
+   (broken wheels take 109; "the svgs don't look that good"). Icon geometry is a
+   specialist craft; both reference apps use professional sets, so this one does
+   too. Values are inner-SVG markup, inlined at build time from lucide-static —
+   the app bundles nothing and calls nowhere. */
+  layers:'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />',
+  vehicle:'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" /> <circle cx="7" cy="17" r="2" /> <path d="M9 17h6" /> <circle cx="17" cy="17" r="2" />',
+  home:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />',
+  here:'<line x1="2" x2="5" y1="12" y2="12" /> <line x1="19" x2="22" y1="12" y2="12" /> <line x1="12" x2="12" y1="2" y2="5" /> <line x1="12" x2="12" y1="19" y2="22" /> <circle cx="12" cy="12" r="7" />',
+  fuel:'<path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 4 0v-6.998a2 2 0 0 0-.59-1.42L18 5" /> <path d="M14 21V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v16" /> <path d="M2 21h13" /> <path d="M3 9h11" />',
+  play:'<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />',
+  stop:'<rect width="18" height="18" x="3" y="3" rx="2" />',
+  alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" />',
+  locate:'<line x1="2" x2="5" y1="12" y2="12" /> <line x1="19" x2="22" y1="12" y2="12" /> <line x1="12" x2="12" y1="2" y2="5" /> <line x1="12" x2="12" y1="19" y2="22" /> <circle cx="12" cy="12" r="7" /> <circle cx="12" cy="12" r="3" />',
+  clock:'<circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" />',
+  info:'<circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" />',
+  loop:'<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" />',
+  star:'<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />',
+  shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />',
+  search:'<path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" />',
+  map:'<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" /> <path d="M15 5.764v15" /> <path d="M9 3.236v15" />',
+  sat:'<path d="m13.5 6.5-3.148-3.148a1.205 1.205 0 0 0-1.704 0L6.352 5.648a1.205 1.205 0 0 0 0 1.704L9.5 10.5" /> <path d="M16.5 7.5 19 5" /> <path d="m17.5 10.5 3.148 3.148a1.205 1.205 0 0 1 0 1.704l-2.296 2.296a1.205 1.205 0 0 1-1.704 0L13.5 14.5" /> <path d="M9 21a6 6 0 0 0-6-6" /> <path d="M9.352 10.648a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l4.296-4.296a1.205 1.205 0 0 0 0-1.704l-2.296-2.296a1.205 1.205 0 0 0-1.704 0z" />',
+  target:'<circle cx="12" cy="12" r="10" /> <line x1="22" x2="18" y1="12" y2="12" /> <line x1="6" x2="2" y1="12" y2="12" /> <line x1="12" x2="12" y1="6" y2="2" /> <line x1="12" x2="12" y1="22" y2="18" />',
+  phone:'<path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" />',
+  close:'<path d="M18 6 6 18" /> <path d="m6 6 12 12" />',
+  check:'<path d="M20 6 9 17l-5-5" />',
+  pin:'<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" />',
+  truck:'<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" /> <path d="M15 18H9" /> <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14" /> <circle cx="17" cy="18" r="2" /> <circle cx="7" cy="18" r="2" />',
+  route:'<circle cx="6" cy="19" r="3" /> <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" /> <circle cx="18" cy="5" r="3" />',
 };
 
 function ic(n,sz){
   var d=ICONS[n];
   if(!d)return '';
+  /* Lucide entries are full inner markup (paths, circles, lines), not a single
+     d-string — so they are embedded, not wrapped in one <path>. Stroke width 2
+     is what the set is drawn for. */
   return '<svg class="ic" width="'+(sz||15)+'" height="'+(sz||15)+'" viewBox="0 0 24 24" '+
-    'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" '+
-    'stroke-linejoin="round" aria-hidden="true"><path d="'+d+'"/></svg>'}
+    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '+
+    'stroke-linejoin="round" aria-hidden="true">'+d+'</svg>'}
 
 /* Twelve places rewrite a chip's label with textContent, which would wipe the
    icon inside it. One helper, so a chip's icon survives every state change. */
@@ -2175,8 +2298,14 @@ function renderHits(list){
 el('c-search').addEventListener('click',function(){
   var on=el('srch').className.indexOf('on')<0;
   el('srch').className=on?'on':'';el('c-search').className='chip'+(on?' on':'');
-  if(on){el('q').focus();renderHits(search(el('q').value||'m'))}});
-el('q').addEventListener('input',function(){renderHits(search(el('q').value))});
+  if(on){el('q').focus();
+    var q0=el('q').value||'';
+    if(q0){renderHits(search(q0))}
+    else{show(jumpChipsHTML(),'');wireJumpChips(el('panel'))}}});
+el('q').addEventListener('input',function(){
+  var q=el('q').value;
+  if(!q){show(jumpChipsHTML(),'');wireJumpChips(el('panel'));return}
+  renderHits(search(q))});
 
 /* ══ DIRECTIONS ═════════════════════════════════════════════════════════════
    A blue line is not an instruction. Someone who is lost and tired needs words
@@ -2675,7 +2804,15 @@ function record(at){
 /* 4.3 — back to the vehicle. Never more than a glance away, always on the rail. */
 function syncSafety(){
   var tv=el('v-truck'), rv=el('v-rec');
-  if(!TRUCK){tv.textContent='—';tv.className='v';rv.textContent='—';return}
+  if(!TRUCK){tv.textContent='—';tv.className='v';rv.textContent='—';
+    /* a cell with nothing to say takes no space (take 113); parentNode is
+       guarded because stub elements have none, and a hidden cell is polish —
+       polish must never be why the loader fatals (same rule as the badges) */
+    if(tv.parentNode)tv.parentNode.className='cell empty';
+    if(rv.parentNode)rv.parentNode.className='cell empty';
+    return}
+  if(tv.parentNode)tv.parentNode.className='cell';
+  if(rv.parentNode)rv.parentNode.className='cell';
   var d=mi(ME,TRUCK), b=bearing(ME,TRUCK);
   tv.textContent=(d<10?d.toFixed(1):Math.round(d))+' '+compass(b);
   tv.className='v'+(d>8?' warn':' good');
@@ -4112,7 +4249,7 @@ map.on('load',collapseAttrib);map.on('idle',collapseAttrib);
 map.on('idle',function(){if(!healthOK)renderHealth()});
 map.on('move',refreshReadout);map.on('load',refreshReadout);
 map.on('moveend',railFoldIfAway);
-map.on('load',function(){setBasemap(0);wpDraw();showTab('map');
+map.on('load',function(){makeBadges();setBasemap(0);wpDraw();showTab('map');
   /* Relief starts OFF. The style ships hillshade visible, and over the flat
      vector basemap it reads as dark blotches — Jacob: "it looks really bad".
      On Hybrid it earns its place at low opacity, so it stays one tap away under
@@ -4298,7 +4435,7 @@ function railPeekText(){
     var d=mi(ME,TRUCK);
     return 'Truck '+(d<10?d.toFixed(1):Math.round(d))+' mi '+compass(bearing(ME,TRUCK))}
   if(RAIL_AT)return 'Details';
-  return 'Tap the map for details'}
+  return ''}
 
 function railSet(open,at){
   var r=el('rail');
@@ -4368,12 +4505,24 @@ el('c-locate').addEventListener('click',function(){
   setTimeout(function(){if(!flyToYou())geo.trigger()},1200)});
 geo.on('error',function(){show('Location unavailable — browsers block GPS on <b>file://</b> and in embedded frames. Expected here; works in the APK. Use <b>&#39;I am here&#39;</b> to place yourself manually.','fail')});
 
-el('chips').innerHTML=PLACES.map(function(p,i){
-  return '<button class="chip" data-i="'+i+'">'+p[0]+'</button>'}).join('');
-Array.prototype.forEach.call(document.querySelectorAll('#chips .chip'),function(c){
-  c.addEventListener('click',function(){var p=PLACES[+c.dataset.i];
-    map.easeTo({center:[p[1],p[2]],zoom:p[3]==='town'?13.2:13.8,
-      duration:700,essential:true})})});
+/* ── THE PLACE STRIP FOLDS INTO SEARCH (take 113) ─────────────────────────
+   Neither reference keeps a permanent row of place pills eating the top of the
+   map — the quick-jumps now live where you would look for a place: under
+   Search, shown when the query is empty. The #chips element stays in the DOM
+   (the ride HUD swaps with it and the self-test restores it) but it renders
+   nothing and takes no space. */
+el('chips').innerHTML='';
+el('chips').style.display='none';
+function jumpChipsHTML(){
+  return '<div class="sub" style="margin:2px 0 7px">Jump to</div>'+
+    PLACES.map(function(p,i){
+      return '<button class="chip" data-jump="'+i+'" style="margin:0 6px 6px 0">'+
+        p[0]+'</button>'}).join('')}
+function wireJumpChips(root){
+  Array.prototype.forEach.call(root.querySelectorAll('[data-jump]'),function(c){
+    c.addEventListener('click',function(){var p=PLACES[+c.dataset.jump];
+      map.easeTo({center:[p[1],p[2]],zoom:p[3]==='town'?13.2:13.8,
+        duration:700,essential:true});railSet(false)})})}
 
 function refreshReadout(){
   var c=map.getCenter(),e=elevAt([c.lng,c.lat]);

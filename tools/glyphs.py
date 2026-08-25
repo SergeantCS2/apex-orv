@@ -124,7 +124,11 @@ if __name__ == "__main__":
     # ONE fontstack on purpose: a single stack can be served from a static data:
     # URI, which avoids needing a custom protocol handler for glyph requests.
     for name, path in (
-        ("APEX", os.path.join(ROOT, "assets", "fonts", "NationalPark-Bold.ttf")),
+        # T4 (take 114): one typeface carries the whole app. The chrome went
+        # Barlow at take 113; the map follows. SemiBold survives SDF rendering
+        # at trail-label sizes where Regular goes thin. The old face is gone --
+        # one face, one pack (A134's ruled-out).
+        ("APEX", os.path.join(ROOT, "assets", "fonts", "Barlow-SemiBold.ttf")),
     ):
         pbf, n = build(path, name, CHARS)
         packs[name] = base64.b64encode(pbf).decode()

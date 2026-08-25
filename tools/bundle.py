@@ -33,6 +33,7 @@ ARTIFACTS = [
     ("graph_payload.json",   "graph.json",    "network",  True),
     ("terrain_payload.json", "terrain.json",  "terrain",  True),
     ("glyphs_payload.json",  "glyphs.json",   "labels",   True),
+    ("landcover_payload.json","landcover.json","ground",   False),
     ("water_payload.json",   "water.json",    "hydro",    False),
     ("hillshade.jpg",        "hillshade.jpg", "relief",   False),
     ("imagery.jpg",          "imagery.jpg",   "imagery",  False),
@@ -58,6 +59,7 @@ ARTIFACTS = [
 # aimed at the wrong key reports 0 on a good artifact and degrades a healthy
 # bundle, which is landmine 54 wearing a new hat.
 COUNTERS = {
+    "ground":  lambda d: len(d.get("f") or []),
     "hydro":   lambda d: sum(len(v) for v in (d.get("l") or {}).values()),
     "contour": lambda d: len(d.get("l") or []),
     "paddle":  lambda d: len(d.get("c") or []),

@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 112.* Ranked by blocking-ness, not by interest.
+*Current as of take 115.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2083,3 +2083,67 @@ reachable afterwards from a How-to button in Tools.
 - **Ruled out:** special-casing show() with a flag for startup. Status is a
   different KIND of content, so it gets a named function, not a boolean.
 - **Open:** Jacob has more guide adjustments coming; the content will move.
+
+## A133 — Reference redesign T1–T3 · SHIPPED take 113
+
+Jacob's brief: onX hybrid, AllTrails light map, one app, Michigan only. Study
+in docs/DESIGN.md; built as checkpoints, sealed once.
+
+- **PROVEN (T1):** Lucide icons, bundled Barlow, one dark control language,
+  accent once per screen, true sheet anatomy, place-name-first cards, place
+  strip folded into Search (8 jump chips on empty query, asserted).
+- **PROVEN (T2):** landcover extracted — 276 areas incl. the HNF boundary wash;
+  ground/water/labels re-coloured to the reference family.
+- **PROVEN (T3):** white cased roads · category badges on POI and paddle pins ·
+  the Michigan trunkline diamond · onX imagery dimming · empty cells hide.
+- **PROVEN:** 131 render checks passed untouched through the whole reskin
+  (landmine 189); smoke 274 and gate 30 green at seal.
+- **Ruled out:** a stack change. The gap was presentation; MapLibre carries the
+  reference look in style JSON and canvas images with zero new dependencies.
+- **Ruled out:** importing icon paths into badges — at 8 px inside a 26 px
+  circle a hand stroke sketch reads better than any scaled import.
+- **Open:** Jacob's real feedback pass on the finished direction — colours,
+  badge glyphs and the trail palette on the light ground are his call now.
+- **Open:** street-name labels still carry the old dark halo weight; label
+  typography pass (Barlow SDF glyphs for the MAP itself) is a candidate T4.
+
+## A134 — T4 · Barlow on the map itself · SHIPPED take 114
+
+- **PROVEN:** glyph pack rebuilt from Barlow SemiBold; trail, water, street and
+  shield labels all place under the render checks untouched.
+- **PROVEN:** street labels re-tuned for the light ground (grey on light halo);
+  they had carried dark-on-tan values since the old basemap.
+- **Ruled out (held):** shipping two packs. The old face is deleted the same
+  take.
+- **Ruled out:** Regular weight — it goes thin under SDF at trail-label sizes.
+
+### A134 original queue note (take 114)
+
+The chrome speaks Barlow; the map still labels in the old glyph face. T4
+regenerates the SDF glyph pack from Barlow so one typeface carries the whole
+app, and re-tunes street-label halos for the light ground.
+
+- **Ruled out:** shipping a second glyph pack beside the old one. One face,
+  one pack; the old pack dies the same take.
+- **Open:** scheduled after statewide lands — a glyph pack is region-independent
+  and there is no reason to build it twice.
+
+
+## A135 — Statewide preparation (A72's groundwork) · LANDED DORMANT take 114
+
+- **PROVEN dormant:** michigan region declared (12 anchors in-bbox, bulk:true);
+  bulk modes in ingest / contour / imagery / terrain / landcover, every skip
+  printing its reason; default region unchanged, all paths inert for the box.
+- **PROVEN by prior measurement:** 236× area but 18–26× network (take 75);
+  statewide memory model proven by corridor.py in CI.
+- **Ruled out:** statewide Overpass (volunteer-service abuse); z13 statewide DEM
+  (~38,000 tiles); z12+ statewide imagery pyramid (8.6 GB, take 75).
+- **Open:** the run itself — switch, measure, tune. Next after Jacob's visual
+  feedback, multiple takes budgeted.
+
+## A136 — onX Backcountry study · AWAITING REFERENCES take 115
+
+Third reference for the design synthesis. Slot reserved in docs/DESIGN.md §7.
+- **Ruled out:** designing from the app's reputation before Jacob's screenshots
+  arrive — transcribe, don't invent (landmine 190).
+- **Open:** everything, pending captures.

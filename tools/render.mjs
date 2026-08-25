@@ -567,6 +567,25 @@ if (zoomed.trails === 0) {
   ok(ct.labels.length > 0,
      `index contours carry an elevation: ${ct.labels.slice(0, 4).join(", ") || "(none)"}`);
 
+  /* Take 115 · THE ACCENT IS A BUDGET, ENFORCED BY COUNT. The T1 rule was
+     "orange appears once per screen"; the take-115 audit found .actrow.on still
+     glowing full orange because a rule held in memory decays. Counted now: at
+     rest, at most ONE element on screen may wear the accent as a surface. */
+  const accent = await page.evaluate(() => {
+    const hit = [];
+    for (const el of document.querySelectorAll("body *")) {
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+      const bg = getComputedStyle(el).backgroundColor;
+      if (/226,\s*87,\s*15/.test(bg) && !/0\.[012]\d*\)$/.test(bg))
+        hit.push(el.id || el.className || el.tagName);
+    }
+    return hit;
+  });
+  ok(accent.length <= 1,
+     `the accent is spent at most once per screen (${accent.length}: `
+     + `${accent.join(", ") || "none"})`);
+
   /* Take 112 · four field findings from Jacob's take-110 session. */
   const field = await page.evaluate(async () => {
     const s = (ms) => new Promise((r) => setTimeout(r, ms));

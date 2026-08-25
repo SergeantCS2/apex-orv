@@ -235,6 +235,7 @@ class MapStub {
              y: 400 - (c[1] - b[1]) * px };
   }
   getContainer() { return { getBoundingClientRect: () => ({ width: 412, height: 700 }) }; }
+  addImage() {} hasImage() { return false; }
   /* A91 derives the label set from the style rather than from a hand-kept
      array, so the app now asks the map what layers it has. The stub already
      held them; it just never offered them (landmine 62 — the gate's stub
@@ -380,7 +381,8 @@ if (FATAL_DRILL) {
   process.exit(failures ? 1 : 0);
 }
 if (EXPECT_PARTIAL.length === 0) {
-  ok(!fatalHtml, "loader did not hit the fatal screen");
+  ok(!fatalHtml, "loader did not hit the fatal screen"
+     + (fatalHtml ? " :: " + fatalHtml.replace(/<[^>]+>/g, " ").slice(0, 220) : ""));
 } 
 ok(theMap !== null, "map constructed");
 if (!theMap) process.exit(1);
@@ -390,10 +392,18 @@ frames(20);
 /* 1 · region identity flows through */
 const anchors = manifest.anchors || [];
 const chips = documentStub.querySelectorAll(".chip").filter((c) => c.dataset.i !== undefined);
-ok(chips.length >= Math.min(anchors.length, 1), `chips rendered (${chips.length}) from ${anchors.length} anchors`);
-ok(anchors.every((a) => grab("chips")._html.includes(a[0])), "every anchor named in the chip strip");
-
-/* 2 · sources and layers */
+/* Take 113: the place strip folded into Search (reference study — neither
+     onX nor AllTrails keeps a permanent pill row over the map). The contract
+     is now: the strip renders NOTHING, and an empty search offers every anchor
+     as a jump chip instead. */
+  ok(!(grab("chips")._html || "").trim(),
+     "the place strip renders nothing — quick-jumps moved into Search");
+  grab("c-search").click();
+  const jumps = grab("panel")._html.match(/data-jump=/g) || [];
+  ok(jumps.length >= 8,
+     `empty search offers every anchor as a jump chip (${jumps.length})`);
+  grab("c-search").click();
+  /* 2 · sources and layers */
 for (const s of ["net", "route", "crumb", "back"])
   ok(s in record.sources, `source '${s}' declared`);
 /* Take 20: every source was declared AND correctly populated, and the device

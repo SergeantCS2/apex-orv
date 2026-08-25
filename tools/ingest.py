@@ -261,6 +261,22 @@ def fetch_osm(path="aoi.json"):
 out geom;"""
     # Overpass returns 406 to urllib's default user-agent. Identify properly —
     # it is also just good manners on a volunteer-run service.
+    # A bulk region (the whole state) never queries Overpass: a statewide
+    # request to a volunteer-run service is abuse, and the sanctioned bulk path
+    # already exists and reproduces the same network (take 114, A72).
+    _cfg = json.load(open(os.path.join(os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))), "regions.json")))
+    if _cfg["regions"][R.id].get("bulk"):
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import osm_local
+        print("osm: bulk region — reading the Geofabrik extract directly "
+              "(Overpass is for boxes, not states)")
+        els = osm_local.build()
+        if not els:
+            sys.exit("osm: bulk extract produced nothing — refusing to continue")
+        json.dump({"source": "geofabrik", "elements": els}, open("aoi.json", "w"))
+        print(f"osm: aoi.json written from Geofabrik ({len(els)} elements)")
+        return
     payload = urllib.parse.urlencode({"data": q}).encode()
     hdrs = {"User-Agent": "APEX-Offroad/1.0 (offline trail map; contact via repo)"}
     # Overpass is volunteer-run and rate-limits under load — a 429 or 504 killed

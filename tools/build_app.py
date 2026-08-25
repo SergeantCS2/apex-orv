@@ -23,7 +23,7 @@ WWW = os.path.join(ROOT, "www")
 # One line, and it must match src/app.html BYTE FOR BYTE — these are stripped
 # by exact string match, so a two-line form with different indentation left
 # `CONT = __CONT__` in the shipped app and the map never constructed (take 91).
-DECLS = ('var WATER = __WATER__, GR = __GRAPH__, TR = __TERRAIN__, POIS = __POIS__, CONT = __CONT__, PADDLE = __PADDLE__;',
+DECLS = ('var WATER = __WATER__, GR = __GRAPH__, TR = __TERRAIN__, POIS = __POIS__, CONT = __CONT__, PADDLE = __PADDLE__, LAND = __LAND__;',
          'var SHADE = "__SHADE__";', 'var SAT = "__SAT__";',
          'var SATB = __SATB__;', 'var GLYPHS = __GLYPHS__;')
 
@@ -38,6 +38,7 @@ IN_BUNDLE = {"graph_payload.json": "graph.json",
              "poi_payload.json": "poi.json",
              "contour_payload.json": "contour.json",
              "corridor_payload.json": "corridor.json",
+             "landcover_payload.json": "landcover.json",
              "address_payload.json": "address.json",
              "other_payload.json": "other.json",
              "hillshade.jpg": "hillshade.jpg",
@@ -92,9 +93,9 @@ function blob(u){return fetch(u).then(function(r){
   .then(function(b){return URL.createObjectURL(b)})}
 
 function fatal(msg,detail){
-  document.body.innerHTML='<div style="padding:26px;font:400 14px/1.6 Roboto,'+
+  document.body.innerHTML='<div style="padding:26px;font:400 14px/1.6 Barlow,'+
    'system-ui,sans-serif;color:#F5EFE2;background:#14120F;height:100%">'+
-   '<div style="font:700 12px/1 Roboto;letter-spacing:.17em;text-transform:uppercase;'+
+   '<div style="font:700 12px/1 Barlow,system-ui,letter-spacing:.17em;text-transform:uppercase;'+
    'color:#E2570F;margin-bottom:14px">APEX ORV</div>'+
    '<b style="font-size:17px">'+msg+'</b><br><br>'+
    '<span style="color:#9A9184">'+detail+'</span></div>'}
@@ -136,10 +137,11 @@ j('bundle/manifest.json').then(function(man){
        no contour artifact and the map simply has no contour lines. */
     have.contour?j('bundle/'+have.contour):Promise.resolve(null),
     /* A115. Optional and absent-safe like the rest. */
-    have.paddle?j('bundle/'+have.paddle):Promise.resolve(null)]);
+    have.paddle?j('bundle/'+have.paddle):Promise.resolve(null),
+    have.ground?j('bundle/'+have.ground):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
-  POIS=r[10];CONT=r[11];PADDLE=r[12];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -267,6 +269,7 @@ def single(out):
             f'POIS = {rd("poi_payload.json") or "null"};\n'
             f'CONT = {rd("contour_payload.json") or "null"};\n'
             f'PADDLE = {rd("corridor_payload.json") or "null"};\n'
+            f'LAND = {rd("landcover_payload.json") or "null"};\n'
             f'var SHADE = "{uri("hillshade.jpg")}";\n'
             f'var SAT = "{uri("imagery.jpg")}";\n'
             f'var SATB = {json.dumps(json.loads(meta)["b"]) if meta else "[0,0,0,0]"};\n'
