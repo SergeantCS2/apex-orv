@@ -142,15 +142,3 @@ Layout, palette, iconographic conventions and cartographic style are not
 copyrightable subject matter; we transcribe them freely for this free personal
 app. We do NOT copy their actual asset files, fonts under proprietary licence,
 logos or names. Lucide is ISC; Barlow is SIL OFL; both bundle offline cleanly.
-
-
-## 7 · Third reference incoming: onX Backcountry (take 115)
-
-Jacob: the target is now a love child of THREE — onX Offroad (motorised,
-satellite), AllTrails (light map, general outdoors), and **onX Backcountry**
-(hiking/backcountry: topo emphasis, slope, waypoint-rich planning). Screenshots
-to come; this section reserves the slot so the study extends rather than
-restarts. Expected pulls, to be verified against his captures: topo/contour
-presentation, slope-angle styling (A88 exists), tree-cover layers, and their
-waypoint/route planning surfaces. Status: AWAITING REFERENCES — transcribe,
-don't invent (landmine 190).

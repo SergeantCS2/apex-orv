@@ -212,10 +212,7 @@
   .actrow{display:flex;align-items:center;gap:9px;width:100%;min-height:38px;
     padding:5px 8px;background:none;border:0;border-radius:7px;color:#F2ECE0;
     font:600 var(--t-md)/1.2 Barlow,Roboto,system-ui,sans-serif;text-align:left}
-  /* Take 115 audit: the activity filter's on-state was still full orange — the
-     exact loudness the basemap toggle was cured of at T1. Same quiet white
-     tint; orange stays reserved for the one primary action. */
-  .actrow.on{background:rgba(245,239,226,.18);color:var(--bone)}
+  .actrow.on{background:rgba(226,87,15,.9);color:#fff}
   /* Legend-only rows: they explain a colour, they do not filter by it. Indented
      under the activity they belong to, quieter, and not tappable. The 38 px
      tap-target minimum (take 37) applies to CONTROLS; this is not one, so the
@@ -450,7 +447,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 115</span>
+    <span id="title"><b>APEX</b> ORV · Take 114</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -549,15 +546,13 @@
       <div id="hits"></div>
     </div>
     <div id="panel">You're at Bull Gap, home is the Pink Store. Tap <b>Return home</b> for ranked ways back — then <b>▶ Ride it</b>, hit <b>😖 Wrong turn</b>, and watch what happens.</div>
+    <div id="coords">—<span class="unit"></span></div>
     <div id="grid">
       <div class="cell"><div class="k">To truck</div><div class="v" id="v-truck">—</div></div>
       <div class="cell"><div class="k">Recorded</div><div class="v" id="v-rec">—</div></div>
       <div class="cell"><div class="k">Elevation</div><div class="v" id="v-elev">—</div></div>
       <div class="cell" hidden><div class="v" id="v-fps">—</div></div>
     </div>
-    <!-- Coordinates END the card (take 115 audit — the T1 spec said demoted to
-         the bottom, and they had landed above the stats row instead). -->
-    <div id="coords">—<span class="unit"></span></div>
     
     </div>
     <!-- Pinned OUTSIDE the scrolling body. With a tall card — six route options,

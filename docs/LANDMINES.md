@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 115.*
+*Current as of take 114.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -633,6 +633,18 @@ asserting `inRegion(fix)` failed when the rider was legitimately 135 mi away,
 with a detail line that literally said "planning mode is correct". Assert the
 system's *response* to a condition, never the condition itself.
 
+**68. Retry every network read, not just the one that bit you.** Take 14 added
+backoff to Overpass after a 429 and stopped there. Take 29 hit a plain 503 from
+a state ArcGIS endpoint and the whole pipeline died — which in CI is a red build
+for an upstream hiccup nobody controls. Agency servers are not more reliable
+than the volunteer one; they just had not failed yet.
+
+**Corollary — verify on leftovers reads as success.** After that failed run,
+`bundle.py verify` reported COMPLETE against bundle files from an earlier build,
+because ingest died before anything was regenerated. A green verdict means
+nothing unless the thing it describes was actually produced by the run you are
+judging.
+
 **57. Do not reconstruct an asset you already possess.** The APEX mark was
 hand-plotted from polygons twice, across two takes, and rejected both times —
 while a pixel-perfect copy sat in the uploads folder the whole while. Source
@@ -795,18 +807,6 @@ imagery affordable on a phone.
 **Measure the ground resolution and put it in the report.** "Looks bad" is an
 opinion; "22.1 m/px for a 1 m trail" is a decision.
 
-**68. Retry every network read, not just the one that bit you.** Take 14 added
-backoff to Overpass after a 429 and stopped there. Take 29 hit a plain 503 from
-a state ArcGIS endpoint and the whole pipeline died — which in CI is a red build
-for an upstream hiccup nobody controls. Agency servers are not more reliable
-than the volunteer one; they just had not failed yet.
-
-**Corollary — verify on leftovers reads as success.** After that failed run,
-`bundle.py verify` reported COMPLETE against bundle files from an earlier build,
-because ingest died before anything was regenerated. A green verdict means
-nothing unless the thing it describes was actually produced by the run you are
-judging.
-
 **69. A source with no layer is invisible data.** `alt` (dimmed alternates,
 take 35) and `approach` (dashed off-network legs, take 39) were both created,
 fed correct geometry, and **never drawn** — the patches adding their layers
@@ -942,6 +942,24 @@ check also demanded that the step write the output to `$GITHUB_OUTPUT`. Third-
 party actions declare their own outputs; `deploy-pages` emits `page_url` and
 nothing writes it. A check that cannot be right for a valid input is worse than
 no check.
+
+**119. Fail where the user can act, not where the code happens to break.**
+*(Written as a second "78" at take 49. 78 was already taken by the unresolved-step-reference lesson, which is what mkapex.py and gate.py cite. Given its own number at take 82; nothing was renumbered.)* An
+empty repo produced a Node stack trace from `npm ci` — accurate, and useless:
+the real fault was four steps earlier, in a different language, and amounted to
+"you uploaded the wrong file". Check preconditions at the top of the job, print
+what IS there, and name the fix.
+
+**Corollary — make the reasonable wrong choice work.** Given `apex-seed.zip` and
+`apex-orv-github-repo.zip`, a user reaching for the one whose name says "repo" is
+being sensible. The seed accepts either and flattens the nested shape rather than
+silently doing nothing.
+
+**Corollary — a workflow pasted by hand can be stale.** The copy in the repo was
+correct and the copy pasted into GitHub was three versions old, reintroducing a
+fixed bug. When handing someone a file to paste, hand them the file — and when
+they report an error, check WHICH version they are running before debugging the
+one in front of you.
 
 **79. A permissive parser is not a validator.** PyYAML's `safe_load` keeps the
 LAST of duplicate keys and returns a clean dict. `build.yml` carried two
@@ -1585,24 +1603,6 @@ past its end into `route()` — which does call it — and the check passed on a
 `nearestNode` reverted to class-only. Bound at the next top-level definition.
 
 Found by the negative control, which is the entire argument for writing them.
-
-**119. Fail where the user can act, not where the code happens to break.**
-*(Written as a second "78" at take 49. 78 was already taken by the unresolved-step-reference lesson, which is what mkapex.py and gate.py cite. Given its own number at take 82; nothing was renumbered.)* An
-empty repo produced a Node stack trace from `npm ci` — accurate, and useless:
-the real fault was four steps earlier, in a different language, and amounted to
-"you uploaded the wrong file". Check preconditions at the top of the job, print
-what IS there, and name the fix.
-
-**Corollary — make the reasonable wrong choice work.** Given `apex-seed.zip` and
-`apex-orv-github-repo.zip`, a user reaching for the one whose name says "repo" is
-being sensible. The seed accepts either and flattens the nested shape rather than
-silently doing nothing.
-
-**Corollary — a workflow pasted by hand can be stale.** The copy in the repo was
-correct and the copy pasted into GitHub was three versions old, reintroducing a
-fixed bug. When handing someone a file to paste, hand them the file — and when
-they report an error, check WHICH version they are running before debugging the
-one in front of you.
 
 **120. Name the thing that is actually broken.** Four takes shipped on the claim
 "OpenStreetMap is down", measured as 0/24 real responses across three Overpass
@@ -2441,25 +2441,3 @@ Two rules now: the seed carries its TAKE NUMBER in its filename, and its sha256
 is printed in the message beside it, so the person can confirm what they hold.
 And a session that intends to hand over work starts by checking what is
 actually in the outputs directory, not by remembering what was put there.
-
-**192. A budget rule is enforced by a count, not a memory.**
-T1's rule was "the accent appears once per screen." Take 115's audit of the
-sealed zip found `.actrow.on` still glowing full orange — the rule had been
-applied by sweep and held by memory, and memory decayed within two takes.
-
-The render suite now COUNTS elements wearing the accent as a surface and fails
-above one. When a rule has the shape "X at most N times," write the counter the
-same day you write the rule; a rule without its counter is a hope.
-
-**193. An audit's first suspect is its own probes.**
-Of five alarms a one-off audit raised, three were the probe's own regexes:
-"unwired buttons" that bind dynamically after show(), an icon placeholder
-matched inside its own documentation, and a gate runner "missing" because the
-capture took the wrong tuple. The two real findings (192, and coordinates filed
-above the stats row) were only trustworthy AFTER the probes were verified
-against known-true cases.
-
-Negative controls are not just for permanent checks (landmine 85) — a throwaway
-probe earns belief the same way. And the corollary that paid today: the ledger
-itself audits clean — 191 entries, no gaps, no duplicates — with exactly one
-structural fault (two entries misfiled out of order), now asserted by the gate.
