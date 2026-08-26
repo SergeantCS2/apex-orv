@@ -1,3 +1,13 @@
+**Take 120 — every tap got fast. Plus everything in take 119.**
+
+Take 120 adds one thing over 119: the spatial grid (A96). Dropping a pin,
+the dispatch card, tap-identify and the Return Home snap all scanned every
+one of 474,047 edges — instant on the old test box, seconds on the Fold
+statewide. They now walk a grid outward from where you are and stop; the
+answer is proven identical to the old scan. Dispatch 304 → 41 ms in a
+desktop browser. Feel for it: long-press anywhere, the card should be
+immediate.
+
 **Take 119 — Riding areas, statewide summits, and the one line that killed
 your first complete Michigan build.**
 

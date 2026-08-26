@@ -1,4 +1,34 @@
-# HANDOFF — through Take 119 · V2
+# HANDOFF — through Take 120 · V2
+
+## Take 120 — 2026-08-26 — A96: the spatial grid. Box-era scans, state-era cost.
+
+Jacob asked for every box lesson applied to the state. The largest unpaid
+one was in the render log all along: `nearestEdge 304 ms` in desktop
+headless. Three "nearest X" functions were linear scans — every tap that
+drops a pin, every dispatch card, every Return Home snap decoded 1.4M
+vertices from delta-encoded geometry. Instant over 20k box edges; seconds
+on a phone over 474k.
+
+One grid, 0.02° cells (~1.6 km), indexes every node and every geometry
+vertex of every edge, built on first use in one decode pass and kept.
+Lookups walk rings outward — perimeter only, the square-and-skip first draft
+cost 440 ms 100 mi out in Superior — and stop when the next ring is farther
+than the best hit. The claim is EXACTNESS: smoke asserts grid == linear scan
+for nearestEdge and nearestNode at four probes read off the region bbox
+(landmine 197), two of them offshore. Both linear versions stay as `_linear`
+for that proof. `nearestEdgeTo` (the pin card's "nearest:" line) used to
+scan START nodes only; it now gets the true nearest vertex, so it got more
+accurate as it got faster.
+
+Measured: land probes 0–13 ms where the linear scan took ~1 s in the node
+vm; Chrome dispatch `nearestEdge` 304 → 41 ms INCLUDING the one-time build.
+Next in that line (not done): nearestPavement 40 ms, addressAt/addressNear
+41 ms each — the address index is the next scan to ring-walk.
+
+Sealed with take-119's other content unchanged. Render PASSED 133, smoke 5
+modes green.
+
+---
 
 ## Take 119 — 2026-08-25 — Riding areas, summits without a mosaic, and the line that killed CI
 

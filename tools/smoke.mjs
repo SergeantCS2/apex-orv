@@ -743,6 +743,45 @@ ok((record.setData.alt || []).length > 0 &&
   }
 }
 
+/* 5x3 · A96 — the spatial grid (take 119). The claim is EXACTNESS, not
+   just speed: for every probe the grid answer must equal the linear scan's.
+   Probes are read off the region bbox, not hardcoded (landmine 197): the
+   centre, two corners pulled inward, and a point in open water where the
+   nearest edge is far and the ring walk has to go a long way. */
+{
+  const D = sandbox.window.__disp, R = sandbox.window.__route;
+  if (!D || !D.nearestEdgeLinear) {
+    ok(false, "grid bridge missing from __disp");
+  } else {
+    const bb = manifest.bbox;
+    const probes = [
+      [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2],
+      [bb[0] + (bb[2] - bb[0]) * 0.3, bb[1] + (bb[3] - bb[1]) * 0.3],
+      [bb[0] + (bb[2] - bb[0]) * 0.7, bb[1] + (bb[3] - bb[1]) * 0.75],
+      [bb[0] + (bb[2] - bb[0]) * 0.55, bb[1] + (bb[3] - bb[1]) * 0.98],
+    ];
+    const t0 = Date.now(); D.gridBuild(); const tb = Date.now() - t0;
+    ok(tb < 8000, `grid built once in ${tb} ms (edges + vertices)`);
+    let same = 0, tg = 0, tl = 0; const per = [];
+    for (const p of probes) {
+      const a0 = Date.now(); const g = D.nearestEdge(p); const dg = Date.now() - a0; tg += dg;
+      const b0 = Date.now(); const l = D.nearestEdgeLinear(p); tl += Date.now() - b0;
+      per.push(`${dg}ms@${g.d.toFixed(1)}mi`);
+      if (g.e === l.e && Math.abs(g.d - l.d) < 1e-9) same++;
+    }
+    console.log(`  ..   grid per probe: ${per.join(" · ")}`);
+    ok(same === probes.length,
+       `grid nearestEdge equals the linear scan at ${same}/${probes.length} probes `
+       + `(grid ${tg} ms total, linear ${tl} ms total)`);
+    let sameN = 0;
+    for (const p of probes) {
+      if (R.nearestNode(p) === D.nearestNodeLinear(p)) sameN++;
+    }
+    ok(sameN === probes.length,
+       `grid nearestNode equals the linear scan at ${sameN}/${probes.length} probes`);
+  }
+}
+
 /* 5y · A60 — route both, draw one (take 86).
    The promise is not "fewer lines". It is that every edge stays ROUTABLE while
    only one copy of a duplicated road is DRAWN. Asserted against the real

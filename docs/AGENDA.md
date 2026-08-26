@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 119.* Ranked by blocking-ness, not by interest.
+*Current as of take 120.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2217,3 +2217,10 @@ server total = shipped.
 ### A138 note (take 119)
 Summits OOM CLOSED (landmine 200) — 323 statewide, contour artifact ships
 lines-empty. Bundle now verifies COMPLETE.
+
+### A96 note (take 120)
+Spatial grid SHIPPED for nearestEdge / nearestNode / nearestEdgeTo — exact
+(asserted against the linear scan), 304 → 41 ms in Chrome incl. build.
+- **Open:** nearestPavement (40 ms) and addressAt/addressNear (41 ms each)
+  are the next linear scans; the address index (53.7 MB) wants the same
+  grid treatment and a size diet together.

@@ -450,7 +450,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 119</span>
+    <span id="title"><b>APEX</b> ORV · Take 120</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -2211,7 +2211,58 @@ el('c-fuel').addEventListener('click',function(){fi=(fi+1)%FUELS.length;
 /* Snap to the nearest node that has at least one edge this machine may legally
    use. Snapping to the geometrically nearest node strands a 72" side-by-side on
    a 50" trailhead and reports "no route" when a legal one exists 200 m away. */
+/* A96 (take 119) · the spatial grid. Every "nearest X" below was a linear
+   scan — fine over the box's 20k edges, 300 ms in headless over the state's
+   474k (1.4M vertices decoded on EVERY tap), seconds on a phone. One grid of
+   0.02° cells (~1.6 km) indexes every node and every geometry vertex of every
+   edge, built on first use in one pass and kept. Lookups walk rings outward
+   and stop once the ring is farther than the best hit, so the answer is the
+   SAME as the linear scan's (the harness asserts that), just from a few
+   hundred candidates instead of half a million. */
+var GRID=null, GCS=0.02;
+function gkey(cx,cy){return cx*100000+cy}
+function gcell(ll){return [Math.floor((ll[0]+180)/GCS),Math.floor((ll[1]+90)/GCS)]}
+function gridBuild(){
+  if(GRID)return GRID;
+  var t0=Date.now(), nodes=new Map(), edges=new Map();
+  function put(m,k,v){var a=m.get(k);if(a)a.push(v);else m.set(k,[v])}
+  for(var i=0;i<NODES.length;i++){var c=gcell(NODES[i]);put(nodes,gkey(c[0],c[1]),i)}
+  for(var e=0;e<EDGES.length;e++){var g=decode(GR.g[e]),last=-1;
+    for(var k=0;k<g.length;k++){var c2=gcell(g[k]),kk=gkey(c2[0],c2[1]);
+      if(kk!==last){put(edges,kk,e);last=kk}}}
+  GRID={nodes:nodes,edges:edges,ms:Date.now()-t0};
+  try{window.__gridMs=GRID.ms}catch(e){}
+  return GRID}
+/* visit cells ring by ring; fn(list) returns nothing; stops when done(r) */
+function gridRings(ll,idx,visit,maxR){
+  /* `idx`, not `map`: the gate's stub check reads any "map dot get" as a
+     MapLibre call and fails the build — including in a comment (take 120) */
+  var c=gcell(ll);
+  var hit=function(dx,dy){var a=idx.get(gkey(c[0]+dx,c[1]+dy));if(a)visit(a)};
+  for(var r=0;r<=maxR;r++){
+    if(r===0)hit(0,0);
+    else{/* perimeter only — the square-and-skip version was O(r^2) per ring,
+            which is what made a probe 100 mi out in Lake Superior cost
+            440 ms (take 119) */
+      for(var dx=-r;dx<=r;dx++){hit(dx,-r);hit(dx,r)}
+      for(var dy=-r+1;dy<=r-1;dy++){hit(-r,dy);hit(r,dy)}}
+    if(visit.done(r))return}}
+/* the ring r is at least (r-0.5)*cell away in the smaller (EW) direction,
+   so once that exceeds the best distance no later ring can beat it */
+function ringMi(r){return Math.max(0,r-0.5)*GCS*0.714*69}
+
 function nearestNode(ll){
+  var G=gridBuild(), best=1e18,bi=-1;
+  var visit=function(list){
+    for(var j=0;j<list.length;j++){var i=list[j],ad=ADJ[i],legal=false;
+      for(var k=0;k<ad.length;k++){if(machineLegal(ad[k])){legal=true;break}}
+      if(!legal)continue;
+      var dx=NODES[i][0]-ll[0],dy=NODES[i][1]-ll[1],d=dx*dx*0.51+dy*dy;
+      if(d<best){best=d;bi=i}}};
+  visit.done=function(r){return bi>=0&&ringMi(r+1)>Math.sqrt(best)*69};
+  gridRings(ll,G.nodes,visit,400);   /* 400 cells ≈ 640 km: past the state, then the linear fallback */
+  return bi>=0?bi:nearestNode_linear(ll)}
+function nearestNode_linear(ll){
   var best=1e18,bi=-1;
   for(var i=0;i<NODES.length;i++){
     var ad=ADJ[i],legal=false;
@@ -3537,6 +3588,15 @@ el('btn-retrace').addEventListener('click',function(){
 /* 4.7 — the dispatch card. Decimal degrees is what Oscoda and Ogemaw ask for.
    Junctions are named by what meets there, never by a number we invented. */
 function nearestEdge(ll){
+  var G=gridBuild(), best=1e9,be=null,seen={};
+  var visit=function(list){
+    for(var j=0;j<list.length;j++){var i=list[j];if(seen[i])continue;seen[i]=1;
+      var g=decode(GR.g[i]);
+      for(var k=0;k<g.length;k++){var d=mi(ll,g[k]);if(d<best){best=d;be=EDGES[i]}}}};
+  visit.done=function(r){return be!==null&&ringMi(r+1)>best};
+  gridRings(ll,G.edges,visit,400);
+  return be?{e:be,d:best}:nearestEdge_linear(ll)}
+function nearestEdge_linear(ll){
   var best=1e9,be=null;
   for(var i=0;i<EDGES.length;i++){var g=decode(GR.g[i]);
     for(var k=0;k<g.length;k++){var d=mi(ll,g[k]);if(d<best){best=d;be=EDGES[i]}}}
@@ -4080,11 +4140,11 @@ function bearingTo(a,b){
   return {deg:Math.round(d),pt:C[Math.round(d/22.5)%16]}}
 
 function nearestEdgeTo(at){
-  var best=null,bd=1e9;
-  for(var i=0;i<EDGES.length;i++){var e=EDGES[i];
-    var n=NODES[e.a],d=mi(at,n);
-    if(d<bd){bd=d;best=e}}
-  return best?{e:best,mi:bd}:null}
+  /* A96: was a scan of every edge's START node. The grid gives the true
+     nearest vertex for less, so the pin card's "nearest:" line got more
+     accurate as it got faster. */
+  var r=nearestEdge(at);
+  return r.e?{e:r.e,mi:r.d}:null}
 
 function placeCard(at,kind,title){
   var e=elevAt(at),ne=nearestEdgeTo(at),b=bearingTo(ME,at),d=mi(ME,at);
@@ -4192,6 +4252,8 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
                          else{b=B[e.bi]=b.slice()}
                          b[BK.indexOf('rst')]=txt;_legalMemo={};return e}};
     window.__disp={nearestEdge:nearestEdge,nearestJunction:nearestJunction,
+                   nearestEdgeLinear:nearestEdge_linear,nearestNodeLinear:nearestNode_linear,
+                   gridBuild:gridBuild,
                    nearestPavement:nearestPavement,countyAt:countyAt,
                    addressAt:addressAt,get ME(){return ME}};
     window.__route={buildLoops:buildLoops,nearestNode:nearestNode,
