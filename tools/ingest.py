@@ -555,6 +555,31 @@ for lid, cls in ((2, "fstrail"), (1, "fsroad")):
         })
 
 fetch_osm()
+# ── A156 (take 122): clip to the STATE, not the bbox ──────────────────────
+# Every query above used the region rectangle. For a box region the rectangle
+# WAS the region; statewide it holds northern Wisconsin, the Minnesota
+# Arrowhead and a slice of Ontario, and the USFS service returned 7,413 edges
+# of Lakeland ATV, Price County snowmobile and Superior NF spurs — drawn on
+# bare white, because nothing else extends past the shoreline. A feature is
+# kept if ANY vertex is inside the state polygon, so a trail that crosses the
+# border is drawn whole to its end (Geofabrik's rule for ways). Drops are
+# printed per source and class: a silent clip is how the next one hides.
+if R.bulk:
+    import statemask
+    from collections import Counter
+    kept, dropped = [], Counter()
+    for f in out:
+        if statemask.touches_state(f.get("geometry")):
+            kept.append(f)
+        else:
+            dropped[(f.get("src"), f.get("c"))] += 1
+    n_drop = sum(dropped.values())
+    if n_drop:
+        print(f"clip: {n_drop} feature(s) wholly outside {R.name} dropped — "
+              + ", ".join(f"{src}/{c} {n}" for (src, c), n in dropped.most_common()))
+    else:
+        print(f"clip: every agency feature touches {R.name}")
+    out = kept
 json.dump(out, open("authoritative.json", "w"))
 print(f"region {R.id} — {R.name}")
 

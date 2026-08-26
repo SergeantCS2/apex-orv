@@ -1,4 +1,54 @@
-# HANDOFF — through Take 121 · V2
+# HANDOFF — through Take 122 · V2
+
+## Take 122 — 2026-08-26 — the diagnosis, fact-checked and worked in order
+
+Jacob asked for the take-121 diagnosis (docs/DIAGNOSIS-t121.md) to be
+fact-checked before anything was built on it. Every claim held against the
+tree except one mechanism: the A156 write-up said landcover clips to the
+state polygon; its "outside" test is a BBOX test (landcover.py:148), and
+foreign landcover is absent only because the Geofabrik extract is
+state-clipped. Conclusion unchanged, attribution corrected in the document.
+
+**A150 · one opaque control surface.** `.basebtn.on` was a 16 % cream tint
+under cream text — invisible over satellite, and over the light map the pill
+showed while the text vanished into it. Jacob asked whether the tint was
+still needed: no. The label already says the state ("Hybrid", "ORV / dirt
+bike"). Rule adopted: *every floating control is one opaque surface; state
+lives in the label, never in the background.* ON = brighter border + accent
+dot. The readout and scale are permanently dark ink with a hard 1 px white
+outline (four offset shadows, not a blur — the blur is what read grey over
+imagery). `body.satmode` and A145's swap are gone.
+
+**A154 · panels anchored to the measured strip.** `--strip-h` is published
+from `#tools.offsetHeight` on load and resize; diag and compass panels sit
+`calc(var(--strip-h) + 8px)` above it instead of a hardcoded 64 px that A144
+had quietly made wrong.
+
+**A156 · clip to the state, not the bbox.** New `tools/statemask.py`:
+Census 1:500k state polygon (context.py draws 1:20m — an outline, not a
+keep/drop tool), rasterised with PIL at 0.004° and DILATED 3 px (~1 km).
+The undilated first run dropped 82 DNR features that turned out to be
+Michigan beach trails — Tawas Point, Hoffmaster, the NCT on the Porkies
+shore — which is why the dilation exists and why it is written down.
+Clip at ingest's single dump point, keep a feature if ANY vertex touches the
+state (boundary-crossers whole, Geofabrik's rule), print drops per source
+and class: **3,774 dropped, all USFS** (fsclosed 2,305, foot 862, fsroad 398,
+nfsmoto 110, fstrail 99). POI clipped the same way: the Geofabrik buffer had
+let 221 places in from Sault Ontario and Hurley Wisconsin.
+`check_region_polygon` in the gate asks the question nobody asked for 118
+takes — inside the POLYGON, not the bbox — and its negative control refused
+the unclipped graph at 1.97 % outside.
+
+**A152 · a trailhead needs a trail.** Trail vertices (OSM track / path /
+bridleway during the same stream, plus every agency line) go into a 200 m
+grid; a named car park keeps its trailhead badge only if one is within
+~150 m. Statewide: **1,902 → 732 trailheads**; ".", "001", "RMHA Pool
+Parking Lot" are gone, Pontiac Lake Rec Area stays.
+
+Process lesson, paid twice this take: `pkill -f` with a pattern that appears
+in the calling shell's own command line kills the call. Kill by pid.
+
+---
 
 ## Take 121 — 2026-08-26 — Jacob's field report, worked in his order
 
@@ -43,6 +93,27 @@ policy — beaches AND launches, no others.
 to the region centre (-84.6, 44.62) to spin the camera for the fps
 measurement and never put the view back. It now restores centre, zoom and
 bearing after counting.
+
+**The harness, four bugs in a row.** Sealing took four rounds, all of them
+checks lying about a healthy map, all one law: *a check must control where it
+looks, and a drill must put back what it moved.*
+1. `icon-size` nested a zoom interpolate inside w() — MapLibre allows one and
+   rejects the WHOLE style, so nothing drew at all. Landmine 52, documented
+   six lines above the helper, walked into anyway.
+2. `roads: 0 features` on a run drawing 22,782. Jumping to an anchor and
+   counting same-tick failed too (a jump needs a frame; stRender is sync), so
+   the check now NAMES the view it counted — which is what identified it.
+3. That view was 47.035,-88.189 z15: the rail drill jumps to the first POI in
+   the payload (Keweenaw) and never restored the camera. Restored. It also
+   polled only `poi-dot`, which A143's split would have made time out
+   whenever the first POI is a destination — fixed in the same edit.
+4. `illegal line still DRAWN` read 31 for a side-by-side against 102 for a
+   bike. Not legality: the block had no viewport either, so the two machines
+   were sampled at different moments of one tile load. It picks a trail50 line
+   out of the payload, jumps, settles once, then reads both. 149 = 149.
+
+Sealed: gate PASSED, render 133/0, smoke 5 modes, palette 18, bundle
+COMPLETE 132.4 MB. apex-seed-t121.zip sha256 41ea542f…e604.
 
 Deferred with reasons: A147 (guide race on first launch — not reproduced
 yet), A148 (compass phasing — needs sample smoothing, wants a real ride to

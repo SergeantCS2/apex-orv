@@ -1,46 +1,40 @@
-**Take 121 — your field report, worked in your order.**
+**Take 122 — the diagnosis, fact-checked and worked in order.**
 
-Nine things came off the Fold. Six are fixed here.
+Your take-121 report was written up as a diagnosis first, then checked claim
+by claim against the code before anything was built. One attribution was
+wrong and is corrected in the record; every finding held. Four items fixed.
 
-### On the map
+### What you will see
 
-- **The tan sheet is gone.** The state shape was drawing ABOVE landcover,
-  water and the trails, so at 20-mile scale the whole peninsula was a flat
-  tan wash with the network bleeding through it. It draws underneath now:
-  forest, park and water read as themselves the moment you zoom out.
-- **Big pins for destinations.** Trailheads, campgrounds, boat and kayak
-  launches, beaches, day-use areas and viewpoints are twice the size and
-  visible from about ten miles out, on their own layer above the services.
-  Fuel, food and stores stay small and appear about three miles out. Plan a
-  trip without zooming in.
-- **The kayak drops you were missing.** You named Waterford — of 81 launches
-  there, 66 have no name in OpenStreetMap and were being thrown away.
-  Beaches were already exempt from the name rule; launches never were, for no
-  reason anyone had written down. Statewide: 989 → **2,156** launches.
+- **The basemap and activity chips are always readable.** The ON state was
+  a cream tint that vanished over satellite and swallowed its own text on
+  the light map. You asked whether we still need the tint: no. The chip's
+  label already says "Hybrid" or "ORV / dirt bike". Every floating control
+  is now one solid dark surface; ON is a brighter edge and an orange dot.
+- **Elevation and scale are permanently dark with a white outline**, as
+  you asked. No more switching colour with the basemap.
+- **Diagnostics and compass panels sit above the Tools row** instead of on
+  top of it.
+- **No more Wisconsin.** 3,774 USFS features that were wholly outside
+  Michigan are gone — Lakeland ATV, Price County snowmobile, Superior NF
+  spurs. They came in because every agency layer was fetched by the
+  region's rectangle, and a rectangle around Michigan holds a lot of
+  Wisconsin. Boundary-crossing trails are kept whole. The gate now checks
+  polygon membership, not rectangle membership: 99.92 % of routable nodes
+  and 100 % of places are inside the state.
+- **Trailheads are trailheads.** A named car park keeps the badge only if
+  a trail comes within ~150 m of it. Statewide 1,902 → 732; "RMHA Pool
+  Parking Lot", ".", "001" are gone. Pontiac Lake stays.
 
-### Chrome
+### Not in this take, by your ranking
 
-- The bottom sheet no longer crosses the Layers / Locate / Search row.
-- Elevation and scale moved up, and now read dark on the light map and white
-  on satellite. They were white-on-white on the basemap that ships by
-  default.
+Pin churn (A151) is next — the prominence rank and badge/name pairing. Then
+dimmer roads on satellite and imagery patches over the riding areas (A153).
+Guide rewrite (A155) after the pins settle. Compass (A148) after a real ride.
 
-### The Bull Gap teleport
+### Check on the phone
 
-Not the app zeroing itself. The self-test spins the camera at the region
-centre to measure frame rate and never put your view back — so every run
-quietly moved you. It restores centre, zoom and bearing now.
-
-### Still open
-
-The how-to guide not opening on first launch, and the compass phasing in and
-out, are both recorded and not yet fixed — the compass wants a real ride to
-judge. The DNR publishes a Boating Access Sites layer with proper names; that
-is the next data win, same shape as the scramble areas.
-
-### What to check on the phone
-
-1. Zoom out to the whole state — greens and blues, not a tan sheet.
-2. From ~10 mi up, destination pins should already be readable.
-3. Waterford: kayak and boat launches around Pontiac Lake, Dodge Park.
-4. Run the self-test and confirm it leaves you where you were.
+1. Switch to Hybrid, then back: both chips and the elevation stay readable.
+2. Open Tools → Diagnostics: the panel clears the button row.
+3. Western UP at 10 mi: nothing drawn on the white outside the state line.
+4. Waterford: the pool car parks are no longer orange trailhead pins.

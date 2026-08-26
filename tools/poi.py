@@ -87,8 +87,34 @@ def main():
     import aoi_stream
     els = aoi_stream.elements()   # generator — 542 MB statewide, never loaded
     seen, out = set(), []
+    # A152 (take 122): a named car park is a TRAILHEAD only if a trail comes
+    # to it. Statewide the old rule shipped 1,902 "trailheads" including ".",
+    # "001", "1 hour/Handicapped" and "RMHA Pool Parking Lot" — every named
+    # lot in every city. Trail vertices (OSM track/path/bridleway, plus every
+    # agency line) go into a 200 m grid during the same stream; a parking POI
+    # keeps its badge only if one lies within ~150 m. Everything else is a
+    # place to leave a car, not a place to start a ride, and is dropped.
+    TRAILWAYS = {"track", "path", "bridleway"}
+    GC = 0.002
+    tgrid = {}
+    def _tadd(lon, lat):
+        tgrid.setdefault((int(lon / GC), int(lat / GC)), []).append((lon, lat))
+    def _near_trail(lon, lat, r=0.0015):
+        cx, cy = int(lon / GC), int(lat / GC)
+        r2 = r * r
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for px, py in tgrid.get((cx + dx, cy + dy), ()):
+                    ddx = (px - lon) * 0.72
+                    if ddx * ddx + (py - lat) ** 2 <= r2:
+                        return True
+        return False
     for e in els:
-        kind, unnamed_ok = classify(e.get("tags", {}))
+        tags = e.get("tags", {})
+        if e.get("type") == "way" and tags.get("highway") in TRAILWAYS:
+            for pt in e.get("geometry") or []:
+                _tadd(pt["lon"], pt["lat"])
+        kind, unnamed_ok = classify(tags)
         if not kind:
             continue
         nm = (e.get("tags", {}).get("name") or "").strip()
@@ -107,12 +133,40 @@ def main():
         out.append({"k": kind, "n": nm or None,
                     "p": [round(c[0], 5), round(c[1], 5)]})
 
+    # agency lines count as trails too — a DNR hiking trailhead is real
+    if os.path.exists("authoritative.json"):
+        for f in json.load(open("authoritative.json")):
+            g = f.get("geometry") or {}
+            parts = g.get("coordinates") or []
+            if g.get("type") == "LineString":
+                parts = [parts]
+            for part in parts if g.get("type") in ("LineString", "MultiLineString") else []:
+                for pt in part:
+                    _tadd(pt[0], pt[1])
+    th_before = sum(1 for r in out if r["k"] == "trailhead")
+    out = [r for r in out if r["k"] != "trailhead" or _near_trail(r["p"][0], r["p"][1])]
+    th_after = sum(1 for r in out if r["k"] == "trailhead")
+    if th_before != th_after:
+        print(f"poi: trailheads — {th_before} named car parks, {th_after} within 150 m "
+              f"of a trail kept, {th_before - th_after} dropped (A152)")
+
     if not out:
         print("poi: nothing named in this region")
         if os.path.exists("poi_payload.json"):
             os.remove("poi_payload.json")
         return
 
+    # A156 (take 122): the Geofabrik extract is clipped with a BUFFER, so
+    # Sault Ontario's fuel and Hurley Wisconsin's bars leaked in — 221 of
+    # 25,893 places sat outside the state. A place you cannot ride to under
+    # Michigan's rules is not a place on this map. Boundary-town survivors are
+    # the ones whose point is actually inside the polygon.
+    if R.bulk:
+        import statemask
+        before = len(out)
+        out = [r for r in out if statemask.inside(r["p"][0], r["p"][1])]
+        if before != len(out):
+            print(f"poi: clip — {before - len(out)} place(s) outside {R.name} dropped")
     out.sort(key=lambda r: (r["k"], r["n"] or ""))
     blob = json.dumps({"bbox": list(R.bbox), "p": out}, separators=(",", ":"))
     open("poi_payload.json", "w").write(blob)

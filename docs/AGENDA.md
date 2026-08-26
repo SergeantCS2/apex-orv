@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 121.* Ranked by blocking-ness, not by interest.
+*Current as of take 122.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2301,3 +2301,95 @@ the drill from the anchors nearest the rider and restore the view after.
 A142 (tan wash — the whole state reads wrong) → A144 (sheet overlaps the
 button row) → A145 (readout invisible on light) → A143 (POI tiers) →
 A146 (lake access data) → A149 (self-test hijacks the view) → A147/A148.
+
+## Take-121 field report (Jacob, 2026-08-26) — A150–A154
+
+Full investigation in docs/DIAGNOSIS-t121.md (read that first; every cause
+below was proven from the tree or measured, not guessed). No code changed
+this cycle at Jacob's instruction.
+
+Confirmed fixed on the phone: Bull Gap elevation Δ49 -> **Δ0** (riding-area
+z13 patches), map area 65% -> **81%** of screen, roads check names its view.
+
+- **A150 · P1 · the chips are unreadable in BOTH basemaps.** `.basebtn` text
+  is --bone #F5EFE2; `.basebtn.on` tints the background with the same cream
+  at 16%. Over satellite the tint vanishes and the text floats unbacked
+  (24321, 24319); over the light map the pill shows and the cream text
+  disappears into it (24325, 24317 — a ghost pill with no legible label).
+  Unreadable only when ON, in opposite ways. A first pass at this claimed the
+  light map was fine; Jacob's crops disprove it.
+  - **Jacob asks: do we still need the cream tint?** No — delete the concept.
+    The chip label ALREADY states the state ("Map"/"Satellite"/"Hybrid",
+    "All routes"/"ORV / dirt bike"); the tint re-encodes that in the least
+    legible channel available. Rule to adopt: every floating control is one
+    opaque surface, state lives in the label, never in the background. ON =
+    brighter border + an accent dot.
+  - Readout/scale: one treatment everywhere per Jacob — dark ink, white
+    outline via four +/-1px shadows, not a blur (a blur is what made it read
+    grey over imagery).
+  - Add to verify_palette: floating-control background alpha >= 0.85 and text
+    contrast >= 4.5:1 in BOTH basemap states.
+  - **Ruled out:** a rendering or z-order fault — "All routes" in its OFF
+    state is crisp in the same screenshot.
+- **A151 · P1 · pins pop in and out.** `icon-allow-overlap:false` below z11.4
+  hands 670 destination badges (Oakland, 10 mi) to a collision solver whose
+  answer changes on every pan and tile load. Fix by thinning the DATA: a
+  prominence rank from poi.py filtered by zoom, then allow-overlap true
+  everywhere; dedupe unnamed launches within ~200 m (1,167 of 2,156 are
+  unnamed).
+  - **Ruled out:** badge size as the cause — 24327 at 2000 ft is stable and
+    reads well; density is the variable.
+- **A151b · P1 · badge and name are placed independently.** 24315 (z~12.2)
+  shows launch NAMES with no badges; 24323 (z~11.8) shows launch BADGES with
+  almost no names — opposite failures at nearly the same zoom, because A143
+  split pins into two symbol layers that collide separately. Pair icon+text in
+  ONE layer with text-optional:true, or prove it is fade churn first: park,
+  count both layers, pan 200px, settle, count again at the same centre.
+- **A155 · P4 · guide rewrite for statewide** (Jacob's own ranking: lowest).
+  It still teaches Bull Gap and the Pink Store as the world. Do it after the
+  pin work, or it documents pins that are about to change. Ship with the
+  bumped GUIDEKEY from A147.
+- **A152 · P1 · trailhead = any named car park.** 1,902 statewide, including
+  ".", "001", "1 hour/Handicapped", "RMHA Pool Parking Lot". Require
+  proximity (~150 m) to a designated trail or forest road; demote the rest.
+- **A153 · P2 · Hybrid is a white grid, and blurry.** minor/paved are literally
+  #FFFFFF (take 113, correct for a 20k-edge box) and the statewide graph
+  carries 246,883 context ways. Dim and narrow roads on satellite only.
+  Blurriness is the take-75 trade (464 m/px mosaic, no z12+ pyramid); the
+  answer is imagery patches over the 8 riding areas + ORV corridors, the same
+  shape as the terrain patches.
+  - **Ruled out:** the ORV selector failing to filter — applyAct exempts roads
+    deliberately, "you still need to know where the road is".
+- **A147 · P3 · guide never auto-opens.** Not a race: localStorage
+  `apex.guide.v1` survives every install, so it has been marked seen since an
+  earlier take. Version the key with the guide's content.
+- **A154 · P2 · diag/compass panels overlap the Tools strip.** Both anchored
+  `bottom:64px`; the strip is ~76 px since A144 added its bottom padding —
+  take 121 made this worse. Publish the measured strip height as a CSS var.
+- **A148 · P3 · compass phasing.** Hypothesis only (Jacob's call): no
+  smoothing and no hysteresis between magnetometer and GPS course. Needs a
+  real ride to judge.
+
+**Measure, do not guess:** dispatch-scan reads 654 / 300 / 662 ms across
+t119-121 on the same phone. Only nearestEdge is grid-backed; nearestPavement
+still walks 474k edges and addressAt runs twice over 770k segments, and the
+grid builds lazily so it may or may not fall inside the timed window. Report
+all six calls separately plus window.__gridMs (exposed at A96, never read)
+before optimising anything.
+
+### A156 · P1 · out-of-state bleed (Jacob, 24331) — DATA, do before A151
+Agency layers are fetched with the region BBOX and never clipped to the state
+polygon. 7,413 of 474,047 edges sit outside every Michigan county: Lakeland
+ATV and Price County snowmobile trails (Wisconsin), Chequamegon-Nicolet forest
+roads, Superior NF spurs (Minnesota). Landcover and state-fill DO clip, which
+is why the foreign networks sit on bare white in the screenshot — two
+subsystems disagreeing about what the region is.
+- **Ruled out:** OSM. The Geofabrik extract is state-clipped and `track` shows
+  almost no bleed; the USFS MVUM layers carry it (fstrail 11% out-of-state).
+- **Ruled out:** Ontario data. Jacob read "Canada"; the northernmost cluster
+  is Minnesota's Arrowhead at 48.0,-90.0. No Ontario features found.
+- **Fix:** clip at ingest against context.py's shoreline polygon (promote it
+  to a shared artifact), keep boundary-crossers whole, report drops per layer.
+- **The missing assertion:** every check asks "inside the region BBOX" —
+  which these pass. Nothing asks "inside the region POLYGON". Bbox and polygon
+  were the same thing for 118 takes of box regions; statewide they are not.

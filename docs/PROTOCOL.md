@@ -1,6 +1,6 @@
 # PROTOCOL
 
-*Revised 2026-08-19, take 121.*
+*Revised 2026-08-19, take 122.*
 
 The working rules for this project. The gate enforces the ones it can.
 

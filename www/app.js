@@ -2755,8 +2755,6 @@ function setBasemap(i){
      symbol layer through labelLayers(), which is where that belongs (take 94). */
   setChip('c-base',sat?'sat':'map',m);
   el('c-base').className='basebtn'+(sat?' on':'');
-  /* A145: one class carries the light/dark rule to every floating readout */
-  try{document.body.classList.toggle('satmode',!!sat)}catch(e){}
 }
 
 /* LABELS block moved above the map constructor at take 15 — see the note where
@@ -3362,6 +3360,12 @@ function buildLyrPanel(){
    immediately — its basemap checks encode behaviour worth keeping (take 90).
    The panel is a separate chip. */
 el('c-base').addEventListener('click',function(){setBasemap(bmi+1)});
+/* A154 · the Tools strip tells the panels how tall it is. Measured, not
+   assumed: chip height follows the type scale and the safe-area inset. */
+function stripH(){try{var t=el('tools');if(t)document.documentElement.style
+  .setProperty('--strip-h',t.offsetHeight+'px')}catch(e){}}
+stripH();setTimeout(stripH,600);
+try{window.addEventListener('resize',stripH)}catch(e){}   /* stubbed window in the harness */
 /* ══ DESTINATIONS (A113) ════════════════════════════════════════════════════
    Which chips are on screen, and nothing else. Every handler, id and DOM
    position is untouched — a chip in a closed destination is `hidden`, which the

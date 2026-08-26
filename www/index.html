@@ -174,7 +174,17 @@
   /* The basemap TOGGLE was the loudest element on the screen — bright orange
      for a settings control. Its on-state is now a quiet white tint; orange
      belongs to the one primary action only (reference study). */
-  .basebtn.on{background:rgba(245,239,226,.16);border-color:rgba(255,255,255,.28)}
+  /* A150 (take 122) · the ON state used to be a 16 % cream tint over whatever
+     was underneath: invisible over satellite (the pill vanished, cream text
+     floated), and over the light map the pill showed while the cream text
+     vanished INTO it. Unreadable both ways, only when switched on. Jacob's
+     question — do we still need the tint? — no: the label already says the
+     state ("Hybrid", "ORV / dirt bike"). Rule: every floating control is one
+     opaque surface; state lives in the label, never in the background. ON is
+     a brighter border and an accent dot before the label. */
+  .basebtn.on{border-color:rgba(255,255,255,.55)}
+  .basebtn.on>span::before{content:'';display:inline-block;width:7px;height:7px;
+    border-radius:50%;background:var(--flag);margin-right:7px;vertical-align:1px}
   .actbtn{top:136px}
   #lyrpanel{position:absolute;left:11px;top:136px;z-index:6;max-width:min(248px,76vw);
     background:rgba(24,22,18,.96);border:1px solid rgba(255,255,255,.22);
@@ -182,7 +192,12 @@
     max-height:70vh;overflow-y:auto}
   #lyrpanel[hidden]{display:none}
   /* Anchored above the destination bar, where the Tools tab is. */
-  #cmppanel{position:absolute;left:11px;right:11px;bottom:64px;z-index:6;
+  /* A154 (take 122) · both panels were anchored bottom:64px while the Tools
+     strip is ~76 px tall since A144 padded it — take 121 moved the sheet off
+     the buttons and pushed the buttons into these panels. The strip publishes
+     its measured height as --strip-h; the panels sit 8 px above it. One
+     measurement, two consumers, no drift. */
+  #cmppanel{position:absolute;left:11px;right:11px;bottom:calc(var(--strip-h,64px) + 8px);z-index:6;
     background:rgba(24,22,18,.96);border:1px solid rgba(255,255,255,.22);
     border-radius:10px;padding:10px 12px;box-shadow:0 6px 22px rgba(0,0,0,.45);
     color:#F2ECE0;font:600 var(--t-sm)/1.5 Barlow,Roboto,system-ui,sans-serif;
@@ -191,7 +206,7 @@
                transform var(--m-base) var(--m-ease)}
   #cmppanel[hidden]{opacity:0;transform:translateY(6px) scale(.98);
     pointer-events:none;visibility:hidden}
-  #diagpanel{position:absolute;left:11px;right:11px;bottom:64px;z-index:6;
+  #diagpanel{position:absolute;left:11px;right:11px;bottom:calc(var(--strip-h,64px) + 8px);z-index:6;
     background:rgba(24,22,18,.96);border:1px solid rgba(255,255,255,.22);
     border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45);
     display:flex;flex-direction:column;gap:5px;
@@ -227,23 +242,23 @@
   .sw.dash{background-image:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 9px)}
   /* A145 (take 121) · Jacob: "elevation and the view selector can move up now
      the quick buttons are gone, and white is invisible on the light map."
-     Both true. The stack rises 22 px, and the readout takes the colour of the
-     ground it sits on — near-black with a bone halo on the light map, white
-     with a dark shadow on satellite — the same rule the map labels follow.
-     body.satmode is set by the basemap toggle, so one class flips both. */
+     Both true. The stack rises 22 px. (Take 121 also made the readout swap
+     colour with the basemap; take 122 / A150 undid that — see below.) */
+  /* A150 (take 122) · Jacob: "make it permanently black, with a small 1pt
+     white border." The basemap-dependent swap (A145) is gone — it made the
+     readout change colour under him. Four hard ±1 px shadows make an outline;
+     a single blurred shadow reads as grey fringing over imagery, which is why
+     it looked "sometimes white, sometimes black" in the field. */
   #readout{position:absolute;left:13px;top:60px;pointer-events:none;z-index:3;
     font:700 var(--t-md)/1.25 Barlow,Roboto,system-ui,sans-serif;
-    color:#26231E;
-    text-shadow:0 1px 2px rgba(255,255,255,.95),0 0 3px rgba(255,255,255,.9)}
-  body.satmode #readout{color:#fff;
-    text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 2px rgba(0,0,0,.9)}
+    color:#1C1A16;
+    text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,
+                0 0 3px rgba(255,255,255,.9)}
   .maplibregl-ctrl-scale{background:transparent!important;border:none!important;
-    border-bottom:2px solid rgba(38,35,30,.9)!important;
-    color:#26231E!important;font:700 var(--t-sm)/1.2 Barlow,Roboto,system-ui,sans-serif!important;
-    text-shadow:0 1px 2px rgba(255,255,255,.95);padding:0 0 1px!important;margin:0!important}
-  body.satmode .maplibregl-ctrl-scale{
-    border-bottom-color:rgba(255,255,255,.95)!important;color:#fff!important;
-    text-shadow:0 1px 3px rgba(0,0,0,.85)}
+    border-bottom:2px solid #1C1A16!important;box-shadow:0 1px 0 #fff,0 -1px 0 #fff;
+    color:#1C1A16!important;font:700 var(--t-sm)/1.2 Barlow,Roboto,system-ui,sans-serif!important;
+    text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;
+    padding:0 0 1px!important;margin:0!important}
   .maplibregl-ctrl-bottom-left{left:9px;bottom:auto;top:38px}
   .maplibregl-ctrl-attrib{font-size:var(--t-xs)}.maplibregl-ctrl-top-right{display:none}
   .strip{position:absolute;left:0;right:0;display:flex;gap:6px;padding:8px 11px;
@@ -467,7 +482,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 121</span>
+    <span id="title"><b>APEX</b> ORV · Take 122</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>

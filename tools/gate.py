@@ -1436,6 +1436,53 @@ def check_empty_artifacts():
                      f"{seen} bundle(s), every one has content")
 
 
+# ── 6c3. Region POLYGON membership (take 122, A156) ─────────────────────────
+# Every earlier check asked "inside the region BBOX" — which 7,413 Wisconsin
+# and Minnesota edges passed. Bbox and polygon were the same thing for 118
+# takes of box regions; statewide they are not. Boundary-crossers are kept
+# whole by design, so a small fraction of nodes may sit just over the line;
+# the threshold is 99.5 % of routable nodes and 99.5 % of places INSIDE.
+def check_region_polygon():
+    try:
+        sys.path.insert(0, HERE)
+        from region import R
+        if not getattr(R, "bulk", False):
+            return
+        import statemask
+    except Exception as e:
+        return notes.append(f"region polygon: check skipped ({e})")
+    gp = os.path.join(ROOT, "graph_payload.json")
+    pp = os.path.join(ROOT, "poi_payload.json")
+    if not os.path.exists(gp):
+        return
+    g = json.load(open(gp))
+    x = y = 0
+    inside = total = 0
+    a = g["n"]
+    for i in range(0, len(a), 2):
+        x += a[i]; y += a[i + 1]
+        total += 1
+        if statemask.inside(x / 1e5, y / 1e5):
+            inside += 1
+    frac = inside / max(1, total)
+    if frac < 0.995:
+        fails.append(f"{total - inside} of {total} routable nodes lie outside the "
+                     f"{R.name} polygon ({100 * (1 - frac):.2f}%) — agency data is "
+                     "bleeding past the state line (A156); ingest must clip")
+    else:
+        notes.append(f"region polygon: {inside:,} of {total:,} routable nodes inside "
+                     f"{R.name} ({100 * frac:.2f}%)")
+    if os.path.exists(pp):
+        P = json.load(open(pp)).get("p", [])
+        pin = sum(1 for r in P if statemask.inside(r["p"][0], r["p"][1]))
+        pf = pin / max(1, len(P))
+        if pf < 0.995:
+            fails.append(f"{len(P) - pin} of {len(P)} places lie outside the {R.name} "
+                         "polygon — foreign pins (A156)")
+        else:
+            notes.append(f"region polygon: {pin:,} of {len(P):,} places inside")
+
+
 # ── 6c2. Input integrity (take 120, landmine 201 addendum) ──────────────────
 # A killed ingest left a 935 KB aoi.json where 543 MB had been, with a fresh
 # timestamp, and every consumer read the stump: 323 summits quietly became
@@ -1583,7 +1630,7 @@ for fn in (check_handoff, check_stamps, check_offline,
            check_current,
            check_provision,
            check_regions, check_bundles, check_empty_artifacts,
-           check_input_integrity,
+           check_input_integrity, check_region_polygon,
            check_tools,
            check_manifest):
     try:
