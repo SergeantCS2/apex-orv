@@ -1,4 +1,34 @@
-# HANDOFF — through Take 122 · V2
+# HANDOFF — through Take 123 · V2
+
+## Take 123 — 2026-08-26 — A151 / A151b: pins that stay put
+
+Jacob's take-121 verdict: the pins "pop in/out like crazy". Measured cause
+(DIAGNOSIS-t121): 670 destination badges in one 10-mile view handed to the
+collision solver with overlap forbidden below z11.4, whose answer changed on
+every pan; and badge and name split into two layers that collided
+separately, so 24315 showed names with no badges and 24323 badges with no
+names.
+
+**Data thinned deterministically (poi.py).** Every place carries `pri`:
+0 camps / trailheads / day-use / views, 1 named launches and beaches,
+2 unnamed launches and beaches, 3 services. Unnamed launches within ~200 m
+of any other launch are collapsed (79 statewide — fewer than expected; most
+unnamed ramps are not clustered, which is an honest number). 24,567 places.
+
+**Layers rewritten (app).** Two symbol layers instead of four: badge and
+name share a layer with `text-optional:true`, so the badge always draws and
+the name only when it fits — they cannot disagree. The destination layer
+filters on `pri` per zoom (`step` on zoom at the filter's top level, the one
+place MapLibre allows it): rank 0 from z9.2, rank 1 from z10.5, all from
+z11.4. Overlap is allowed everywhere: once the data is thinned there is
+nothing left to fight over, so a pin that is on stays on while you pan. Text
+appears via a zoom `step` in `text-field` (services from z12.8, destinations
+from z11). Render's POI and Layers-panel checks retargeted from the removed
+label layers.
+
+Render 133/0 with the merged layers; smoke green.
+
+---
 
 ## Take 122 — 2026-08-26 — the diagnosis, fact-checked and worked in order
 
@@ -47,6 +77,19 @@ Parking Lot" are gone, Pontiac Lake Rec Area stays.
 
 Process lesson, paid twice this take: `pkill -f` with a pattern that appears
 in the calling shell's own command line kills the call. Kill by pid.
+
+**Sealed:** smoke 5 modes, render 133/0 inside the gate, gate PASSED with
+`region polygon: 340,914 of 341,190 routable nodes inside Michigan (99.92%)`
+and `24,646 of 24,646 places inside`. Bundle COMPLETE, 14 artifacts,
+graph 37.9 MB. The gate also refused statemask.py's first self-test for
+hardcoded coordinates (the take-14 law); it now derives its controls from
+regions.json — every anchor inside, every bbox corner outside.
+apex-seed-t122.zip sha256 4325e081…1bf7, 82 files.
+
+**Next, in the diagnosis order:** A151/A151b (POI prominence rank, dedupe
+unnamed launches within ~200 m, pair badge with name), A153 (dim roads on
+satellite; riding-area imagery patches), A147+A155 (guide key + rewrite),
+A148 (compass, after a real ride).
 
 ---
 

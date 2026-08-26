@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 122.* Ranked by blocking-ness, not by interest.
+*Current as of take 123.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2393,3 +2393,14 @@ subsystems disagreeing about what the region is.
 - **The missing assertion:** every check asks "inside the region BBOX" —
   which these pass. Nothing asks "inside the region POLYGON". Bbox and polygon
   were the same thing for 118 takes of box regions; statewide they are not.
+
+### Take 122 — shipped
+A150 (opaque controls, permanent dark readout), A154 (panels on --strip-h),
+A156 (state-polygon clip at ingest + POI, gate check_region_polygon, 3,774
+USFS features dropped, beach trails preserved by a 1 km dilation), A152
+(trailhead needs a trail within 150 m: 1,902 -> 732).
+- **Ruled out for A156:** the 1:20m polygon context.py draws — too coarse for
+  keep/drop on the shoreline; the undilated 1:500k mask — dropped 82 real
+  Michigan beach trails.
+Open: A151/A151b, A153, A147/A155, A148, A139, private MX parks, DNR Boating
+Access Sites.

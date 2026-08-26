@@ -167,6 +167,56 @@ def main():
         out = [r for r in out if statemask.inside(r["p"][0], r["p"][1])]
         if before != len(out):
             print(f"poi: clip — {before - len(out)} place(s) outside {R.name} dropped")
+    # A151 (take 123) · PROMINENCE. Jacob's field verdict on take 121: the
+    # pins "pop in/out like crazy". Cause: 670 destination badges in one
+    # 10-mile view handed to a collision solver whose answer changes with
+    # every pan. The fix is to thin the DATA deterministically, not fight the
+    # placement — every place gets a rank, the layer filters on it per zoom,
+    # and a pin that is on stays on while you pan. Ranks:
+    #   0  the reason you load the trailer: camps, trailheads, day-use, views
+    #   1  named launches and beaches
+    #   2  unnamed launches and beaches (a place you may put in, no name)
+    #   3  services — fuel, food, stores, info, water, toilets, shelters
+    PRI0 = {"camp", "trailhead", "dayuse", "view"}
+    PRI1 = {"launch", "beach"}
+    for r in out:
+        if r["k"] in PRI0:
+            r["pri"] = 0
+        elif r["k"] in PRI1:
+            r["pri"] = 1 if r["n"] else 2
+        else:
+            r["pri"] = 3
+    # A151 · DEDUPE unnamed launches. 1,167 of 2,156 carried no name and many
+    # are several ramps on one lake within a few hundred metres — one pin
+    # says "you can put in here" as well as four do. An unnamed launch within
+    # ~200 m of any other launch is dropped; a named sibling always wins.
+    lg = {}
+    GD = 0.002
+    for r in out:
+        if r["k"] == "launch":
+            lg.setdefault((int(r["p"][0] / GD), int(r["p"][1] / GD)), []).append(r)
+    drop = set()
+    for r in out:
+        if r["k"] != "launch" or r["n"] or id(r) in drop:
+            continue
+        cx, cy = int(r["p"][0] / GD), int(r["p"][1] / GD)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for o in lg.get((cx + dx, cy + dy), ()):
+                    if o is r or id(o) in drop:
+                        continue
+                    ddx = (o["p"][0] - r["p"][0]) * 0.72
+                    if ddx * ddx + (o["p"][1] - r["p"][1]) ** 2 <= 0.0018 ** 2:
+                        drop.add(id(r))
+                        break
+                if id(r) in drop:
+                    break
+            if id(r) in drop:
+                break
+    if drop:
+        print(f"poi: launches — {len(drop)} unnamed within ~200 m of another launch "
+              f"collapsed (A151)")
+        out = [r for r in out if id(r) not in drop]
     out.sort(key=lambda r: (r["k"], r["n"] or ""))
     blob = json.dumps({"bbox": list(R.bbox), "p": out}, separators=(",", ":"))
     open("poi_payload.json", "w").write(blob)

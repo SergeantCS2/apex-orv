@@ -228,7 +228,7 @@ const zoomed = await page.evaluate(async (at) => {
   return out;
 }, site ? [site[1], site[2]] : null);
 (site && site[3] === 'site'
-   ? console.log(`  --   ${site[0]}: open riding AREA (dunes), not a trail network — line check skipped; area layer queued (take 117)`)
+   ? console.log(`  --   ${site[0]}: open riding AREA (dunes), not a trail network — line check skipped; the area polygon has its own check above (A140, take 119)`)
    : ok(zoomed.trails > 0,
    `z14.5 at ${site ? site[0] : 'centre'}: ${zoomed.trails} trail segments drawn`));
 /* The escape clause exists because a run where nothing drew must not be read as
@@ -299,7 +299,10 @@ if (zoomed.trails === 0) {
     const q = (id) => { try { return m.queryRenderedFeatures({ layers: [id] }); }
                         catch (e) { return []; } };
     return { srcN, dots: q("poi-dot").length,
-             labels: [...new Set(q("poi-label").map((f) => f.properties.n))] };
+             /* A151: badge and name share a layer now; a placed feature
+                with a non-empty name IS a drawn label */
+             labels: [...new Set(q("poi-dot").concat(q("poi-dot-major"))
+                       .map((f) => f.properties.n).filter(Boolean))] };
   });
   ok(poi.dots > 0,
      `places drawn: ${poi.dots} pins of ${poi.srcN} in the source`);
@@ -1164,7 +1167,7 @@ if (zoomed.trails === 0) {
     // toggle Places off
     panel.querySelector('[data-lg="0"]').click();
     await sleep(400);
-    const afterPoi = { dot: vis("poi-dot"), label: vis("poi-label") };
+    const afterPoi = { dot: vis("poi-dot"), label: vis("poi-dot-major") };
     panel.querySelector('[data-lg="0"]').click();
     await sleep(300);
     // toggle All labels off — must reach the layers the old chip missed
@@ -1172,7 +1175,7 @@ if (zoomed.trails === 0) {
     panel.querySelector(`[data-lg="${li}"]`).click();
     await sleep(400);
     const afterLabels = { ref: vis("lbl-ref"), lake: vis("lbl-lake"),
-                          poi: vis("poi-label"), trail: vis("lbl-trail") };
+                          poi: vis("poi-dot"), trail: vis("lbl-trail") };
     panel.querySelector(`[data-lg="${li}"]`).click();
     await sleep(300);
     document.getElementById("c-layers").click();
