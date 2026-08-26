@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 125.* Ranked by blocking-ness, not by interest.
+*Current as of take 126.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2431,3 +2431,15 @@ drawn by default. Build order: MODES table + chip → draw foot/bike → walk
 machine → water data (marina, DNR BAS, A139) → hunt/fish data after Jacob's
 onX screenshots are transcribed (landmine 190).
 - **Blocked on Jacob:** the onX Hunt / Fish screenshots, for step 5 only.
+
+### Take 125 — shipped
+A136/A137 step 1: MODES table + chip (Ride / Outdoors / Water), each a preset
+over act, POI kinds, layer groups, basemap; persisted; restored on load.
+New activities `ride` (ORV + two-track + MTB) and `none`. Five render
+assertions per mode from resolved style state.
+- **Ruled out:** Ride dropping any pin kind — Ride must be exactly today's
+  map (the place-tap check enforced it).
+- **Ruled out:** rebuilding the Layers panel while hidden — its opacity-0
+  rows still count against the accent budget.
+- **Next (step 2):** Jacob's field verdict on 69,628 foot routes at state
+  zoom; if hairball, a `pri` rank for show-only routes like the pins got.

@@ -2728,23 +2728,53 @@ function buildActPanel(){
    Design: docs/DESIGN-modes.md. Hunt/Fish data waits for Jacob's onX
    screenshots (landmine 190: transcribe, do not invent). */
 var MODES=[
-  /* Ride carries EVERY pin kind: it must be exactly today's map (the first
-     draft dropped launches and beaches and the place-tap check caught it) */
+  /* Jacob, take 125 field: "if I'm planning an MTB or dirt-bike trip I'd use
+     Ride" — launches and beaches belong to Water (the take-125 rule that Ride
+     is today's map is overruled by the rider), and the wall of store/food
+     badges at 3000 ft is noise on a riding map, so those demote to z13. */
   {k:'ride',     h:'Ride',     act:'ride',
-   kinds:['trailhead','camp','fuel','dayuse','view','info','water','toilet','shelter','store','food','launch','beach'],
+   kinds:['trailhead','camp','fuel','dayuse','view','info','water','toilet','shelter','store','food'],
+   demote:['store','food','info'],
    groups:{areas:true,peaks:false,contour:false,relief:false,paddle:false,places:true},
    basemap:'Map', zoom:9},
   {k:'outdoors', h:'Outdoors', act:'foot',
    kinds:['trailhead','camp','shelter','water','toilet','view','launch','beach','dayuse','info'],
-   groups:{areas:false,peaks:true,contour:true,relief:true,paddle:true,places:true},
+   /* relief OFF: the statewide z10 hillshade upscaled to 5 mi is grey
+      blotches (Jacob, 24416). Named hills and paddling carry the mode. */
+   groups:{areas:false,peaks:true,contour:true,relief:false,paddle:true,places:true},
    basemap:'Map', zoom:11},
   {k:'water',    h:'Water',    act:'none',
    kinds:['launch','beach','camp','dayuse','info','toilet','fuel'],
+   boost:['launch','beach'],
    groups:{areas:false,peaks:false,contour:false,relief:false,paddle:true,places:true},
    basemap:'Hybrid', zoom:10}
 ];
 var mode='ride', POI_BASE={};
 function modeOf(k){return MODES.filter(function(m){return m.k===k})[0]||MODES[0]}
+/* A zoom `step` is legal ONLY at the top of a filter (the same rule that
+   rejected the whole style at take 121, landmine 52). The base destination
+   filter IS a top-level step on zoom, so the mode's constraints are applied
+   to each of its branches, and the step stays on top.
+     kinds  — whitelist for the mode
+     boost  — kinds that ARE the mode (Water's launches): pass at every zoom
+     demote — kinds that are noise for the mode (Ride's stores): wait for z13 */
+function modeFilter(base,m,id){
+  var inK=['in',['get','k'],['literal',m.kinds]];
+  var wrap=function(br){
+    var f=['all',inK,(m.boost&&id==='poi-dot-major')
+      ?['any',['in',['get','k'],['literal',m.boost]],br]:br];
+    return f};
+  if(Array.isArray(base)&&base[0]==='step'){
+    var out=['step',base[1],wrap(base[2])];
+    for(var i=3;i<base.length;i+=2){out.push(base[i]);out.push(wrap(base[i+1]))}
+    return out}
+  var b=(base===true)?['literal',true]:base;
+  if(m.demote&&id==='poi-dot')
+    return ['step',['zoom'],
+      ['all',inK,b,['!',['in',['get','k'],['literal',m.demote]]]],
+      13,['all',inK,b]];
+  return ['all',inK,b]}
+
 function applyMode(k,opts){
   opts=opts||{};var m=modeOf(k);mode=m.k;
   try{localStorage.setItem('apex.mode',mode)}catch(e){}
@@ -2755,7 +2785,7 @@ function applyMode(k,opts){
   ['poi-dot','poi-dot-major'].forEach(function(id){
     try{
       if(!POI_BASE[id])POI_BASE[id]=map.getFilter(id)||true;
-      map.setFilter(id,['all',POI_BASE[id],['in',['get','k'],['literal',m.kinds]]])
+      map.setFilter(id,modeFilter(POI_BASE[id],m,id))
     }catch(e){}});
   /* layer groups */
   LYRGROUPS.forEach(function(g){if(g.k in m.groups)lyrSet(g,m.groups[g.k])});
@@ -2802,9 +2832,14 @@ function setBasemap(i){
      keep their weight. The Map basemap is untouched. Roads stay exempt from
      the ORV selector on purpose (applyAct): you still need to know where
      the road is, especially when the answer to "can I ride this" is no. */
-  var roadA=sat?0.5:1, roadC=sat?'#F1EBDD':PAL.minor;
+  /* Take 126, Jacob on 24414: at 5 mi the half-opacity grid still read as
+     the subject of the picture. On imagery the residential grid is not
+     needed until you are close enough to turn onto it: minor roads fade in
+     from z12; highways stay, at a third. */
+  var roadA=sat?0.35:1, roadC=sat?'#F1EBDD':PAL.minor;
   try{
-    map.setPaintProperty('minor','line-opacity',roadA);
+    map.setPaintProperty('minor','line-opacity',sat
+      ?['interpolate',['linear'],['zoom'],11.5,0,12.5,0.45]:1);
     map.setPaintProperty('paved','line-opacity',roadA);
     map.setPaintProperty('minor','line-color',roadC);
     map.setPaintProperty('paved','line-color',roadC);
@@ -4511,6 +4546,9 @@ function stLabels(cb){
     var n=NODES[e.a],dx=n[0]-CTR[0],dy=n[1]-CTR[1],d=dx*dx*0.51+dy*dy;
     if(d<best){best=d;at=n}}
   if(!at){stInfo('RENDER','trail-names','no designated trail in this region — skipped');return cb()}
+  /* modes can hide the designated lines (Outdoors does); the check controls
+     its layer state as well as its viewport, and puts both back */
+  var wasAct=act;if(act!=='all'){act='all';try{applyAct()}catch(e){}}
   map.jumpTo({center:at,zoom:14.5});
   var q=function(ids){try{return map.queryRenderedFeatures({layers:ids}).length}
     catch(e){return -1}};
@@ -4522,6 +4560,7 @@ function stLabels(cb){
         tl+' names for '+segs+' trail segments at z14.5 near '+at[1].toFixed(3)+','+
         at[0].toFixed(3)+' — knowing WHICH trail you are on is the point');
       map.jumpTo({center:[was.c.lng,was.c.lat],zoom:was.z});
+      if(wasAct!==act){act=wasAct;try{applyAct()}catch(e){}}
       return cb()}
     setTimeout(poll,300)})()}
 

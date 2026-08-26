@@ -1,4 +1,55 @@
-# HANDOFF — through Take 125 · V2
+# HANDOFF — through Take 126 · V2
+
+## Take 126 — 2026-08-26 — Jacob's first field pass on modes
+
+Three screenshots and a log. Every item below is his verdict, then the
+cause, then what changed.
+
+**"Outdoors just changes relief to on, which looks incredibly bad."** True
+on both counts. At 5 mi the 69,628 hiking routes do not draw yet (show-only
+minzoom), so relief was the only visible change — and the statewide
+hillshade was an 850 px JPEG of 6400 px of z10 tiles, 7.5× downsampled,
+then upscaled: grey blotches (24416). Outdoors now defaults relief OFF;
+named hills and paddling carry the mode. Separately the hillshade is
+rendered at 4096 px statewide (3.9 MB).
+
+**"In Ride I see all beaches/boat launches."** The take-125 rule that Ride
+must be today's map is overruled by the rider: a riding trip has no use for
+launches. Ride's whitelist drops launch/beach, and store/food/info demote
+to z13 — the wall of purple badges at 3000 ft (24412) was noise on a riding
+map. The render drill that taps a pin now picks a trailhead, which every
+mode draws. Water promotes launch/beach to rank 0 so they show from the
+layer's first zoom — at 5 mi (24414) Water showed no launches at all.
+
+**Filters, safely.** MapLibre allows a zoom `step` only at the TOP of a
+filter (landmine 52). The base destination filter is such a step, so
+`modeFilter()` applies the mode's kinds / boost / demote to each branch and
+leaves the step on top, rather than wrapping it in `all`.
+
+**"Roads still showing as white, looks really bad."** Half-opacity was not
+enough at 5 mi. On imagery, minor roads now fade in from z12 (you only
+need the residential grid when you are about to turn onto it) and highways
+sit at 0.35. The Map basemap is untouched — Jacob: "the default white view
+looks better."
+
+**"Hybrid is super pixelated."** The statewide mosaic was 1500 px — about
+464 m/px — from tiles that are 150 m/px. 4096 px is every GPU's texture
+floor (the Fold reports 8192): ~234 m/px, 1.7 MB, from tiles already
+cached. Bundle 136.5 MB. Real sharpness at riding zoom still needs the
+per-area tile patches (A153 second half, not started).
+
+**Three orange dots.** My ON-indicator broke the one-accent rule three
+times on one screen (24414). Bone now.
+
+**Self-test `trail-names` FAIL.** It ran while Jacob was in Outdoors, which
+hides ORV lines, so it counted names over 0 segments. The check now
+controls its layer state (act → all) as well as its viewport, and restores
+both. Mio Δ30 "at the nearest node, 985 ft away" is now readable: the
+anchor sits 300 m off the network.
+
+Render 138/0 (+2 mode assertions), smoke 5 modes.
+
+---
 
 ## Take 125 — 2026-08-26 — Modes, step 1: Ride / Outdoors / Water
 
@@ -25,6 +76,12 @@ after `applyMachine` so legality paint survives.
 Harness lesson: `#lyrpanel` hides via opacity, so building it while hidden
 leaves rows the accent counter can see. `applyMode` rebuilds it only when
 open.
+
+Sealed: smoke 5 modes, gate PASSED with render 138 green inside it.
+Two gate refusals on the way, both correct: the harness stub lacked
+`getFilter` (added), and the "No trails" legend row used a hex literal
+(landmine 98 — now PAL.showother). apex-seed-t125.zip sha256 6734abd3…aa4a,
+83 files.
 
 Still to build (DESIGN-modes.md steps 2–6): field-check 69,628 foot routes
 at state zoom; `walk` machine + profile; marina + DNR Boating Access Sites +

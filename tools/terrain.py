@@ -143,6 +143,12 @@ shade = Image.fromarray(np.clip(v * 255, 0, 255).astype(np.uint8), "L")
 # throwaway script, which meant a clean run produced a 428 KB shade nobody
 # noticed until take 13 (landmine 32 — no hand steps).
 OUT_W = 850
+# Take 126: statewide the 850 px shade is 7.5x downsampled from 6400 px of
+# z10 tiles — upscaled to a 5-mile view it is grey blotches (Jacob, 24416).
+# 4096 px is every GPU's minimum texture size (the Fold reports 8192); the
+# box keeps 850, which was already native there.
+if R.bulk:
+    OUT_W = 4096
 shade = shade.resize((OUT_W, int(OUT_W * Hp / Wp)), Image.LANCZOS)
 buf = io.BytesIO()
 shade.save(buf, "JPEG", quality=58, optimize=True, progressive=True)

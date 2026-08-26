@@ -393,7 +393,7 @@ if (zoomed.trails === 0) {
     ok(false, "mode bridge missing");
   } else {
     ok(modes.ride.chip === "Ride" && modes.ride.trail50 && modes.ride.areas && !modes.ride.peaks,
-       "Ride: ORV lines and riding areas on, hills off — today's map");
+       "Ride: ORV lines and riding areas on, hills off");
     ok(modes.outdoors.chip === "Outdoors" && !modes.outdoors.trail50 && modes.outdoors.show
        && /foot/.test(modes.outdoors.showF || "") && modes.outdoors.peaks && modes.outdoors.paddle,
        "Outdoors: ORV lines hidden, hiking routes drawn, named hills and rivers on");
@@ -404,6 +404,10 @@ if (zoomed.trails === 0) {
        `Water asks for Hybrid (got ${modes.water.basemap}; Map only when satellite is unavailable)`);
     ok(!modes.outdoors.fuelIn && modes.ride.fuelIn,
        "fuel is a Ride pin, not an Outdoors pin");
+    ok(!modes.ride.launchIn,
+       "Ride does NOT carry launches — a riding trip, not today's map (Jacob, take 125)");
+    ok(/"boost"|launch/.test(modes.water.showF || "") || modes.water.launchIn,
+       "Water promotes launches and beaches to the first zoom");
   }
 
   /* A115/A112 · the paddle corridor, and the hazards that make it shippable.
@@ -825,8 +829,12 @@ if (zoomed.trails === 0) {
                      inline: body.getAttribute("style") || "(none)",
                      maxH: getComputedStyle(body).maxHeight };
     // a tap on something opens it
+    /* Take 126: pick a pin the CURRENT mode draws — Ride no longer shows
+       launches and beaches, and src[0] happened to be one. A trailhead is
+       in every mode's whitelist. */
     const src = window.map.getStyle().sources.poi.data.features;
-    const at = src[0].geometry.coordinates;
+    const pick = src.find((f) => f.properties.k === "trailhead") || src[0];
+    const at = pick.geometry.coordinates;
     /* Take 121: this drill jumps to the FIRST POI in the payload — statewide
        that is in the Keweenaw — and left the camera there, so the app's own
        self-test counted roads in a view holding none and reported 0 on a run

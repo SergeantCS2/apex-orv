@@ -171,5 +171,8 @@ def tiles(zmax):
 
 if __name__ == "__main__":
     budget()
-    mosaic(R.imagery_zoom)
+    # Take 126: statewide the 1500 px mosaic was ~464 m/px from tiles that
+    # are 150 m/px — "super pixelated" on Hybrid (Jacob). 4096 px is the
+    # universal GPU texture floor; ~234 m/px from tiles already cached.
+    mosaic(R.imagery_zoom, out_w=4096 if R.bulk else 1500, quality=60 if R.bulk else 62)
     tiles(R.imagery_max_zoom)
