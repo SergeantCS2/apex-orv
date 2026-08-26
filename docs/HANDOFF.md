@@ -79,6 +79,16 @@ Second lesson: the sandbox drops its swap file silently between calls
 a puppeteer protocol error that looks like a product failure and is not —
 `swapon /tmp/sw` and rerun. Check `free -m` before believing a render crash.
 
+### After the seal: why t119 never reached CI (landmine 202)
+
+Jacob uploaded t119 and CI kept saying 118. The take-118 workflow paste had
+no `seed` job — the job that unpacks the zip was dropped when the file was
+regenerated — and the zip was not in push.paths, so uploads no longer
+triggered anything. Restored in ci/build.yml as Stage -1 (`seed`, with
+`bundle: needs: seed`), zip added to the trigger paths. Seed resealed with
+the corrected file. ONE manual step for Jacob again: paste ci/build.yml over
+.github/workflows/build.yml.
+
 ### Verified
 
 Smoke 5 modes, 0 real failures. Gate PASSED. **Render PASSED, 133 checks.**

@@ -10,8 +10,12 @@ died on `ci/bundle.sh: line 12: APEX_REGION: unbound variable` — take 118
 removed the pin from your workflow and left this one reader of it behind.
 Fixed: the script now asks `regions.json` (via region.py) for the region.
 
-**No manual step this time.** Your `.github/workflows/build.yml` is already
-right. Upload the seed as usual. Expect ~15 min with warm caches, and the
+**ONE manual step, and it is my fault.** The take-118 workflow I gave you
+had no `seed` job — nothing unpacked your uploads any more, and an upload
+did not even start a run. **Paste `ci/build.yml` from this seed over
+`.github/workflows/build.yml` first**, then upload the seed zip (any name
+matching `apex-seed*.zip`) to the repo root. The upload itself triggers the
+run; the seed job unpacks it, commits, and the bundle job builds take 119. Expect ~15 min with warm caches, and the
 summary line `verified: region michigan, bundle ~132 MB`. If the cache
 serves stale box payloads the guard names its remedy (bump DATA_V).
 

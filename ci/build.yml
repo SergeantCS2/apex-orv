@@ -11,6 +11,9 @@ on:
   workflow_dispatch:
   push:
     paths:
+      # The seed zip is what Jacob uploads; without it here an upload does
+      # not even start a run (take 119, landmine 202).
+      - 'apex-seed*.zip'
       - BUILD
       - 'src/**'
       - 'tools/**'
@@ -42,8 +45,52 @@ env:
   DATA_V: v3   # bump only to force a clean data pull
 
 jobs:
+  # ── Stage -1: unpack the seed ───────────────────────────────────────────
+  # TAKE 119 (landmine 202): the take-118 paste of this file DROPPED this job.
+  # It was the only thing that ever moved a seed zip into the tree, so every
+  # run after the paste rebuilt whatever source was already committed — take
+  # 118, forever — while the bundle job's comments went on describing a seed
+  # job that no longer existed. If the workflow file is ever rewritten again:
+  # this job must survive, and 'apex-seed*.zip' must stay in push.paths.
+  #
+  # Pushes with GITHUB_TOKEN do not start workflows, which is why bundle runs
+  # in THIS workflow with `needs: seed` and checks out ref_name (landmine 85).
+  # GITHUB_TOKEN cannot write .github/workflows, which is why the seed carries
+  # ci/build.yml for hand-pasting and never the workflow itself (landmine 46).
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Unpack any seed zip at the repo root and commit it
+        run: |
+          shopt -s nullglob
+          zips=(apex-seed*.zip)
+          if [ ${#zips[@]} -eq 0 ]; then
+            echo "no seed zip at root — building the committed tree as-is"
+            exit 0
+          fi
+          z="${zips[-1]}"
+          echo "seed: $z  sha256 $(sha256sum "$z" | cut -c1-16)…"
+          unzip -o -q "$z" -x '.github/*'
+          rm -f apex-seed*.zip
+          take=$(grep -oP 'OFFROAD_TAKE=\K[0-9]+' BUILD || echo '?')
+          git config user.name  "apex-seed"
+          git config user.email "apex-seed@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "seed identical to the tree — nothing to commit (take $take)"
+            exit 0
+          fi
+          git commit -q -m "seed: take $take from $z"
+          git push
+          echo "committed take $take"
+
   # ────────────────────────────────────────────────────────────────────────
   bundle:
+    needs: seed
     runs-on: ubuntu-latest
     timeout-minutes: 90   # statewide first build ~40-60 min; cached ~10-15
     steps:

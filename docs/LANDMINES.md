@@ -153,6 +153,7 @@ Start here. Do not read top to bottom.
 | One upstream 503 fails the build | 57 |
 | OOM in a step that "only" samples points | 200 |
 | Importing a tool runs the whole pipeline step | 201 |
+| Uploading the seed does nothing; CI keeps building the old take | 202 |
 
 ---
 
@@ -2560,3 +2561,12 @@ why osm_local.py reads POI_TAGS out of ingest.py by AST rather than importing
 it — the reason was never written down, so the next tool imported it. If a
 module runs work at top level, either guard it or say in its docstring that it
 must be read, not imported.
+
+**202. A hand-pasted file rewritten from what you can see loses the job you
+cannot.** Take 118 regenerated ci/build.yml from the bundle/pages/apk jobs to
+kill the APEX_REGION pin — and dropped the `seed` job, the only thing that
+ever unpacked a seed zip into the tree, along with 'apex-seed*.zip' in
+push.paths. Every run after the paste rebuilt the committed take-118 source;
+uploading t119 did not even start a run. The surviving comments still
+described the missing job, which is how it was found. When replacing a file
+someone pastes by hand, diff it against the file it replaces, job by job.
