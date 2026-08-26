@@ -213,6 +213,8 @@ class MapStub {
   }
   unproject(p) { return { lng: this._up ? this._up[0] : -84.09, lat: this._up ? this._up[1] : 44.57 }; }
   setFilter(id, f) { (record.filters ||= []).push([id, f]); }
+  /* take 125: applyMode captures each POI layer's base filter once */
+  getFilter(id) { const l = (record.filters || []).filter((x) => x[0] === id); return l.length ? l[l.length - 1][1] : undefined; }
   setLayoutProperty(id, k, v) { record.layout.push([id, k, v]); }
   setPaintProperty(id, k, v) { record.paint.push([id, k, v]); this._paint.set(id + "|" + k, v); }
   /* Machine legality reads the CURRENT paint back out of the style to find each

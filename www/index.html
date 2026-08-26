@@ -186,7 +186,8 @@
   .basebtn.on>span::before{content:'';display:inline-block;width:7px;height:7px;
     border-radius:50%;background:var(--flag);margin-right:7px;vertical-align:1px}
   .actbtn{top:136px}
-  #lyrpanel{position:absolute;left:11px;top:136px;z-index:6;max-width:min(248px,76vw);
+  .modebtn{top:186px}
+  #lyrpanel{position:absolute;left:11px;top:186px;z-index:6;max-width:min(248px,76vw);
     background:rgba(24,22,18,.96);border:1px solid rgba(255,255,255,.22);
     border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45);
     max-height:70vh;overflow-y:auto}
@@ -482,7 +483,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 123</span>
+    <span id="title"><b>APEX</b> ORV · Take 125</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -501,6 +502,7 @@
          telling a rider what any of them mean; this says so and filters at the
          same time (take 67). -->
     <button id="c-act" class="basebtn actbtn">__IC_vehicle__<span>All routes</span></button>
+    <button id="c-mode" class="basebtn modebtn">__IC_mountain__<span>Ride</span></button>
     <div id="actpanel" hidden></div>
     <!-- A91 · one place that owns what is on the map. The tools strip had
          reached sixteen chips with basemap, relief and labels scattered among

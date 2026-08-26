@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 123.* Ranked by blocking-ness, not by interest.
+*Current as of take 125.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2404,3 +2404,30 @@ USFS features dropped, beach trails preserved by a 1 km dilation), A152
   Michigan beach trails.
 Open: A151/A151b, A153, A147/A155, A148, A139, private MX parks, DNR Boating
 Access Sites.
+
+### Take 123 — shipped
+A151/A151b: prominence rank `pri` in poi.py (0 camps/trailheads/day-use/
+views, 1 named launch/beach, 2 unnamed, 3 services), zoom-stepped filter on
+the destination layer, overlap allowed everywhere, badge + name in ONE layer
+with text-optional. 79 clustered unnamed launches collapsed.
+- **Ruled out:** smaller badges (density, not size, was the variable).
+- **Ruled out:** clustering at runtime — a deterministic rank is stable under
+  panning; a cluster re-forms on every camera move, which is the flicker.
+
+### Take 124 — shipped
+A153 (roads dim/narrow/warm on satellite only), elevAt exact on the grid
+(Mio Δ27 was stride sampling, not terrain), trail-names a real assertion in
+data-derived trail country (was vacuous at Silver Lake for three takes).
+- **Ruled out:** dimming roads on the Map basemap too — that one reads
+  correctly and was never the complaint.
+- **Ruled out:** hardcoding a trail-country coordinate for trail-names
+  (landmine 197) — it is derived from the nearest designated edge to CTR.
+
+### A136/A137 · Modes — DESIGNED, not built (docs/DESIGN-modes.md)
+Three modes as presets over tables that already exist: Ride (ORV/MTB),
+Outdoors (hike/camp/fish/hunt), Water (beach/kayak/tube/boat). Foot routes
+(69,628) and bike routes (2,949) are already in the bundle, show-only, never
+drawn by default. Build order: MODES table + chip → draw foot/bike → walk
+machine → water data (marina, DNR BAS, A139) → hunt/fish data after Jacob's
+onX screenshots are transcribed (landmine 190).
+- **Blocked on Jacob:** the onX Hunt / Fish screenshots, for step 5 only.

@@ -366,6 +366,46 @@ if (zoomed.trails === 0) {
     ok(area.n >= 1, `${area.n} DNR scramble area(s) carried in the payload`);
   }
 
+  /* A136/A137 · MODES (take 125). Each mode must produce the map it promises,
+     measured from resolved style state — not from the table. And Ride must
+     be exactly today's map, so a rider who never touches the chip sees no
+     change. Drills put back what they moved. */
+  const modes = await page.evaluate(async () => {
+    const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const M = window.__mode; if (!M) return { missing: true };
+    const vis = (id) => { try { return m.getLayoutProperty(id, "visibility") !== "none"; } catch (e) { return null; } };
+    const was = M.get();
+    const out = {};
+    for (const k of ["ride", "outdoors", "water"]) {
+      M.apply(k, { silent: true }); await sleep(350);
+      let poiF = null; try { poiF = JSON.stringify(m.getFilter("poi-dot-major")); } catch (e) { }
+      out[k] = { chip: document.querySelector("#c-mode span").textContent,
+                 trail50: vis("trail50"), show: vis("show-line"),
+                 showF: (() => { try { return JSON.stringify(m.getFilter("show-line")); } catch (e) { return null; } })(),
+                 peaks: vis("peak-dot"), paddle: vis("pad-line"), areas: vis("area-fill"),
+                 basemap: document.querySelector("#c-base span").textContent,
+                 launchIn: /"launch"/.test(poiF || ""), fuelIn: /"fuel"/.test(poiF || "") };
+    }
+    M.apply(was, { silent: true }); await sleep(200);
+    return out;
+  });
+  if (modes.missing) {
+    ok(false, "mode bridge missing");
+  } else {
+    ok(modes.ride.chip === "Ride" && modes.ride.trail50 && modes.ride.areas && !modes.ride.peaks,
+       "Ride: ORV lines and riding areas on, hills off — today's map");
+    ok(modes.outdoors.chip === "Outdoors" && !modes.outdoors.trail50 && modes.outdoors.show
+       && /foot/.test(modes.outdoors.showF || "") && modes.outdoors.peaks && modes.outdoors.paddle,
+       "Outdoors: ORV lines hidden, hiking routes drawn, named hills and rivers on");
+    ok(modes.water.chip === "Water" && !modes.water.trail50 && !modes.water.show
+       && modes.water.paddle && modes.water.launchIn && !modes.water.areas,
+       "Water: no trail lines, paddling on, launches in the pin set, riding areas off");
+    ok(modes.water.basemap === "Hybrid" || modes.water.basemap === "Map",
+       `Water asks for Hybrid (got ${modes.water.basemap}; Map only when satellite is unavailable)`);
+    ok(!modes.outdoors.fuelIn && modes.ride.fuelIn,
+       "fuel is a Ride pin, not an Outdoors pin");
+  }
+
   /* A115/A112 · the paddle corridor, and the hazards that make it shippable.
      Centred on the Au Sable from the payload, not from where I happen to be
      looking (landmine 130). */

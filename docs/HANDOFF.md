@@ -1,4 +1,75 @@
-# HANDOFF — through Take 123 · V2
+# HANDOFF — through Take 125 · V2
+
+## Take 125 — 2026-08-26 — Modes, step 1: Ride / Outdoors / Water
+
+Jacob renamed "Trail" to **Outdoors**. Built exactly what DESIGN-modes.md
+step 1 promised: a `MODES` table and a chip, each mode a preset over tables
+that already existed — act, POI kinds, layer groups, basemap — applied
+through the existing setters, persisted in `apex.mode`, restored on load
+after `applyMachine` so legality paint survives.
+
+- **Ride** — act `ride` (new: ORV + two-track + bike), every pin kind,
+  riding areas on, hills/contours/relief off, Map. **Exactly today's map**;
+  the first draft dropped launches and beaches from Ride's pins and the
+  place-tap check caught it.
+- **Outdoors** — act `foot` (69,628 hiking routes drawn, ORV lines hidden
+  one tap away), camp/shelter/water/toilet/view/launch/beach/dayuse pins,
+  named hills + contours + relief + paddling on, riding areas off.
+- **Water** — act `none` (new: no trail lines), launch/beach/camp/dayuse
+  pins, paddling on, Hybrid when satellite is available.
+- `bike` admitted to the show-only whitelist (it fell through to the
+  'other' colour; a palette row is step 2).
+- Five render assertions measure each mode from RESOLVED style state, not
+  the table, and put the mode back. Render 138/0.
+
+Harness lesson: `#lyrpanel` hides via opacity, so building it while hidden
+leaves rows the accent counter can see. `applyMode` rebuilds it only when
+open.
+
+Still to build (DESIGN-modes.md steps 2–6): field-check 69,628 foot routes
+at state zoom; `walk` machine + profile; marina + DNR Boating Access Sites +
+A139; hunt/fish data after Jacob's onX screenshots (landmine 190); guide.
+
+---
+
+## Take 124 — 2026-08-26 — A153 and two self-test truths, before modes
+
+Jacob's t123 log: dispatch 662 → **217 ms**, worst frame 16 ms, Bull Gap Δ3,
+graph 468,940 edges after the clip. He is holding his remaining notes for a
+later round and asked for A153 and the open checks to be closed before the
+modes work begins.
+
+**A153 · roads step back on satellite.** `minor`/`paved` are #FFFFFF by
+take-113 design; statewide the 246,883 context ways painted the whole
+suburban grid white over the photo (24319). On Satellite/Hybrid only:
+opacity 0.5, warm `#F1EBDD`, ~40 % narrower; two-track and forest-road
+casings dimmed. Designated-trail casing untouched — that is data. The Map
+basemap is untouched. Roads remain exempt from the ORV selector, on purpose.
+Imagery patches over the riding areas are NOT in this take (see below).
+
+**Mio Δ27 explained and fixed.** `elevAt` sampled every 7th node. After the
+take-122 clip re-noded the graph, the stride landed on a different node
+~300 m into the Au Sable valley: 974 → 938 ft with no DEM change. It walks
+the A96 grid now — exact nearest node — and the check prints how far that
+node is, so a Δ reads as terrain or as distance.
+
+**trail-names was vacuous for three takes.** It jumped to the 'site' anchor
+(Silver Lake Dunes, an area with no trail lines by design) and passed on
+"0 names for 0 segments" via `segs===0||tl>0` — landmine 85. It now finds
+the designated trail edge nearest the region centre from the DATA, requires
+both segments and names, and settles with a bounded poll instead of a
+1.8 s nap.
+
+Render 133/0, app self-test 41/0 inside it.
+
+**Deferred, with reasons.** Riding-area imagery patches (the other half of
+A153): a bounded z14–15 pyramid over 8 polygons is the right shape, but the
+app's tile source and imagery.py's budget machinery are box-era and need
+reading before a sparse pyramid is promised — a full take, not a tail.
+A147/A155 (guide) waits for the modes design, which changes what the guide
+must teach. A148 (compass) waits for a ride.
+
+---
 
 ## Take 123 — 2026-08-26 — A151 / A151b: pins that stay put
 
@@ -26,7 +97,14 @@ appears via a zoom `step` in `text-field` (services from z12.8, destinations
 from z11). Render's POI and Layers-panel checks retargeted from the removed
 label layers.
 
-Render 133/0 with the merged layers; smoke green.
+Render 133/0 with the merged layers; smoke 5 modes; gate PASSED (polygon
+99.92% / 100%). apex-seed-t123.zip sha256 f33ce4bb…1158, 82 files.
+Also retired render.mjs's "area layer queued (take 117)" note — it shipped
+at 119.
+
+**Next:** A153 (dim minor/paved on satellite; riding-area imagery patches),
+A147+A155 (guide key + rewrite), A148 (compass, after a ride), then A139
+Great Lakes POI, private MX parks, DNR Boating Access Sites.
 
 ---
 

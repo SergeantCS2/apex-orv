@@ -1,34 +1,34 @@
-**Take 123 — pins that stay put.**
+**Take 125 — Modes, step one: Ride · Outdoors · Water.**
 
-One item, the one you ranked highest after the colours: the pins popping in
-and out.
+A new chip under "All routes". One tap switches the whole map to a purpose.
+Every mode is a starting point, never a cage — everything it sets is still
+one tap away in the Layers and activity panels.
 
-### What changed
+- **Ride** — exactly today's map. ORV routes, two-track and mountain-bike
+  trails; every pin; riding areas on; hills and contours off.
+- **Outdoors** — for hiking, camping, fishing, hunting. ORV lines hidden
+  (one tap to bring back), the 69,628 hiking routes drawn, named hills,
+  contours, relief and rivers on. Pins: trailheads, camps, shelters, water,
+  toilets, viewpoints, launches, beaches, day-use.
+- **Water** — for beaches, kayaking, tubing, boating. No trail lines at all;
+  rivers and paddling on; launches, beaches, camps, day-use; Hybrid basemap
+  when satellite is available.
 
-- **Every place has a rank now, and the map thins by rank, not by luck.**
-  Camps, trailheads, day-use areas and viewpoints show from ~10 mi; named
-  launches and beaches from ~6 mi; unnamed launches and beaches from ~3 mi;
-  fuel, food and stores from ~3 mi at the small size. A pin that is on stays
-  on while you pan — the old behaviour handed 670 badges to a collision
-  solver whose answer changed every frame.
-- **A badge and its name can no longer disagree.** They were two layers that
-  collided separately, so you got names with no badge (your 24315) or
-  badges with no name (24323). They share one layer now: the badge always
-  draws, the name only when it fits.
-- Unnamed launches within ~200 m of another launch are collapsed to one
-  (79 statewide — most unnamed ramps turned out not to be clustered).
+Also two new rows in the activity panel: **Everything ridable** (ORV +
+two-track + MTB together) and **No trails**.
 
-Plus everything in 122: readable chips, dark elevation with a white outline,
-panels clear of the Tools row, no Wisconsin, trailheads that have a trail.
+Plus 124: roads step back on satellite; Mio's elevation reads at the true
+nearest node; trail-names measures where trails actually are.
 
 ### Check on the phone
+1. Tap the new chip three times; the label reads Ride → Outdoors → Water.
+2. Outdoors at 10 mi over the Pigeon River country: green dashed hiking
+   routes, no ORV lines. Is that a map or a hairball? Your call decides
+   whether hiking routes get the same prominence thinning the pins got.
+3. Water near Waterford: no trail lines, launches and beaches, Hybrid.
+4. Kill and relaunch the app: it opens in the mode you left it in.
 
-1. Oakland County at 10 mi, then pan slowly: pins should hold still.
-2. Waterford at 1 mi: every "Boat launch" name has a badge under it, and
-   every badge that has room shows its name.
-3. Zoom from 10 mi to 1 mi over the same spot: pins ADD as you zoom in;
-   nothing that was there disappears.
-
-### Next
-Dimmer roads on satellite and imagery patches over the riding areas (A153),
-then the guide (A147/A155), then the compass after a ride (A148).
+### Not yet
+A walking router profile; marinas and the DNR's named boat launches; Great
+Lakes destinations; hunt and fish data — the last two need your onX Hunt
+and Fish screenshots, which I will transcribe rather than guess at.
