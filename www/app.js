@@ -406,16 +406,22 @@ var showFeats=(SHOW&&SHOW.r?SHOW.r:[]).map(function(r){
    badge image to draw (makeBadges below); colours are the reference family —
    deep green for nature, brown for camping, blue for water access — with fuel
    and trailheads keeping their higher-urgency reds/oranges. */
+/* A143 (take 121) · TIERS. Jacob, planning a trip from the couch: "major pins
+   — trailheads, campgrounds, the dunes, launches — should be twice as big and
+   visible from ten miles out; the rest from about three." `d:1` marks a
+   DESTINATION (a reason to load the trailer); everything else is a service you
+   look for once you are already there. Two symbol layers, two minzooms, two
+   sizes — one table decides which. */
 var POIKIND={
   fuel:     {c:'#C1121F', h:'Fuel',        r:1, g:'fuel'},
-  trailhead:{c:'#D2500C', h:'Trailhead',   r:1, g:'flag'},
-  camp:     {c:'#7A5B3A', h:'Campground',  r:2, g:'tent'},
-  launch:   {c:'#2E7FA8', h:'Boat launch', r:2, g:'boat'},
-  beach:    {c:'#C9A227', h:'Beach',       r:3, g:'sun'},
-  dayuse:   {c:'#3D6B35', h:'Day use',     r:3, g:'tree'},
+  trailhead:{c:'#D2500C', h:'Trailhead',   r:1, d:1, g:'flag'},
+  camp:     {c:'#7A5B3A', h:'Campground',  r:2, d:1, g:'tent'},
+  launch:   {c:'#2E7FA8', h:'Boat launch', r:2, d:1, g:'boat'},
+  beach:    {c:'#C9A227', h:'Beach',       r:3, d:1, g:'sun'},
+  dayuse:   {c:'#3D6B35', h:'Day use',     r:3, d:1, g:'tree'},
   store:    {c:'#6B4FA0', h:'Store',       r:3, g:'bag'},
   food:     {c:'#6B4FA0', h:'Food',        r:4, g:'cup'},
-  view:     {c:'#3D6B35', h:'Viewpoint',   r:4, g:'eye'},
+  view:     {c:'#3D6B35', h:'Viewpoint',   r:4, d:1, g:'eye'},
   info:     {c:'#4A5560', h:'Information', r:5, g:'i'},
   water:    {c:'#2E7FA8', h:'Drinking water', r:5, g:'drop'},
   toilet:   {c:'#4A5560', h:'Toilets',     r:6, g:'i'},
@@ -484,7 +490,7 @@ function makeBadges(){
 var poif=((POIS&&POIS.p)||[]).map(function(r,i){
   var k=POIKIND[r.k]||{c:'#4A443B',h:r.k,r:7};
   return {type:'Feature',
-    properties:{i:i,k:r.k,h:k.h,c:k.c,r:k.r,
+    properties:{i:i,k:r.k,h:k.h,c:k.c,r:k.r,d:k.d?1:0,
       /* A beach has no name in OSM and is still a destination — it ships
          unnamed and is labelled by KIND. Saying "Beach" is honest; inventing
          "Island Lake Beach" from the day-use area 6 m away is not
@@ -1106,6 +1112,17 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        AllTrails' light map: warm light-grey base, landcover doing the work.
        The tan that drew a national forest as a desert dies here. */
     {id:'bg',type:'background',paint:{'background-color':'#F2F3F0'}},
+    /* A142 (take 121) · the state shape is GROUND, not a wash. It sat above
+       every ground, water and network layer, so at 20-mile scale the whole
+       peninsula read as a flat tan sheet with the trails faintly bleeding
+       through it — Jacob's field verdict, and the screenshot is unarguable.
+       It draws on the background now: land where there is no landcover yet,
+       forest / park / water on top of it where there is. Opaque, because it
+       IS the ground; the fade to nothing by z9.6 stays, since landcover has
+       the view by then. The outline stays above the data, where a line
+       orients without hiding anything. */
+    {id:'state-fill',type:'fill',source:'state',maxzoom:9.6,
+      paint:{'fill-color':'#EFE7D6','fill-opacity':1}},
     /* USGS ImageryOnly, NAIP-derived, public domain. Landmine 22: Esri, Google,
        Bing and Mapbox imagery are licensed and may not ship offline. */
     /* Public-land wash first (the Huron NF boundary — AllTrails' deeper tone
@@ -1264,11 +1281,10 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     /* Trail names ride along the line, the way a routed sign sits beside it.
        Designated line gets its name and number; advisory OSM line gets neither,
        so text itself carries provenance. */
-    /* Land filled, water left as the page ground: that contrast is what makes
-       the mitten read as the mitten. Both fade out before the real data. */
-    {id:'state-fill',type:'fill',source:'state',maxzoom:9.6,
-      paint:{'fill-color':'#EFE7D6',
-        'fill-opacity':['interpolate',['linear'],['zoom'],5,1,8.6,0.75,9.6,0]}},
+    /* The outline only — the fill moved to the bottom of the stack at take
+       121 (A142). Land filled, water left as page ground is what makes the
+       mitten read as the mitten; drawing that fill OVER the data made the
+       mitten read as a blank. */
     {id:'state-line',type:'line',source:'state',maxzoom:9.6,
       paint:{'line-color':'#8A8175',
         'line-width':['interpolate',['linear'],['zoom'],5,1.0,7,1.4,9.5,1.8],
@@ -1335,18 +1351,48 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        of picnic tables when they compete for space. */
     /* Badges, not dots (take 113 · T3): the id keeps 'poi-dot' because the
        layers panel and checks address it, but it is now the category badge. */
+    /* A143 · destinations first and twice the size, from ~10 mi out (z9.2);
+       services stay small and near (~3 mi, z11.4). Two layers rather than one
+       with expressions, because they need different minzooms — and the
+       destination layer is ABOVE the service layer, so when a trailhead and a
+       gas station collide, the reason you drove out here wins.
+       'icon-allow-overlap' is false on destinations only at low zoom: at state
+       scale 1,900 trailheads on top of each other is not a map. */
     {id:'poi-dot',type:'symbol',source:'poi',minzoom:11.4,
+      filter:['!=',['get','d'],1],
       layout:{'icon-image':['concat','bdg-',['get','k']],
         'icon-size':w(0.52,0.72,0.95),'icon-allow-overlap':true,
         'symbol-sort-key':['get','r']},
       paint:{}},
+    {id:'poi-dot-major',type:'symbol',source:'poi',minzoom:9.2,
+      filter:['==',['get','d'],1],
+      layout:{'icon-image':['concat','bdg-',['get','k']],
+        /* ONE zoom curve — w() is itself a zoom interpolate, and nesting two
+           made MapLibre reject the whole style, so nothing drew at all
+           (landmine 52, written in this file, walked into anyway at take
+           121). Stops: small at state zoom, ~2x the service badge by the
+           time you are close. */
+        'icon-size':['interpolate',['linear'],['zoom'],
+          9.2,0.60, 11.4,1.04, 14,1.44, 17,1.90],
+        'icon-allow-overlap':['step',['zoom'],false,11.4,true],
+        'icon-padding':2,'symbol-sort-key':['get','r']},
+      paint:{}},
     {id:'poi-label',type:'symbol',source:'poi',minzoom:12.8,
+      filter:['!=',['get','d'],1],
       layout:{'text-field':['get','n'],'text-font':['APEX'],
         'text-size':w(8.5,10,11.5),'text-max-width':9,
         'text-offset':[0,1.15],'text-anchor':'top','text-padding':3,
         'symbol-sort-key':['get','r']},
       paint:{'text-color':['get','c'],'text-halo-color':'#FFFFFF',
         'text-halo-width':1.7}},
+    {id:'poi-label-major',type:'symbol',source:'poi',minzoom:11.0,
+      filter:['==',['get','d'],1],
+      layout:{'text-field':['get','n'],'text-font':['APEX'],
+        'text-size':w(9.5,11,12.5),'text-max-width':9,
+        'text-offset':[0,1.5],'text-anchor':'top','text-padding':3,
+        'symbol-sort-key':['get','r']},
+      paint:{'text-color':['get','c'],'text-halo-color':'#FFFFFF',
+        'text-halo-width':1.9}},
     /* Only the INDEX contour carries a number. Labelling every 40 ft line puts
        sixteen numbers on one hillside; labelling every 200 ft is what a paper
        quad does and is readable. */
@@ -2709,6 +2755,8 @@ function setBasemap(i){
      symbol layer through labelLayers(), which is where that belongs (take 94). */
   setChip('c-base',sat?'sat':'map',m);
   el('c-base').className='basebtn'+(sat?' on':'');
+  /* A145: one class carries the light/dark rule to every floating readout */
+  try{document.body.classList.toggle('satmode',!!sat)}catch(e){}
 }
 
 /* LABELS block moved above the map constructor at take 15 — see the note where
@@ -3246,7 +3294,7 @@ function startSim(){
    a group is one entry here rather than a new toggle scattered in the strip. */
 var LYRGROUPS=[
   {k:'places', h:'Places',      s:'campgrounds, fuel, launches, trailheads',
-   ids:['poi-dot','poi-label']},
+   ids:['poi-dot','poi-dot-major','poi-label','poi-label-major']},
   {k:'water',  h:'Lakes & rivers', s:'water and its names',
    ids:['water','wway','lbl-lake','lbl-stream']},
   {k:'contour',h:'Contours',    s:'40 ft, labelled every 200 ft',
@@ -3808,8 +3856,16 @@ function stRender(){
      a known site and IS a real assertion (take 64). */
   stInfo('RENDER','trails',q(['trail50','route72','moto24','fstrail','mccct'])+
     ' designated · '+q(['track'])+' two-track in the view you left it on');
-  stAdd('RENDER','roads',q(['fsroad','minor','paved','track'])>0,
-    q(['fsroad','minor','paved','track'])+' features');
+  /* Take 121, twice. First it failed on a map drawing 22,782 road features,
+     because it counts the CURRENT viewport and the view it inherited held
+     none. Then jumping to a town anchor and counting in the same tick failed
+     too — a jump needs a frame before anything is rendered there, which is
+     why the trail-names check below waits. A synchronous check cannot do
+     that, so it stays where it is and NAMES the view it counted: a zero is
+     then readable as "nothing here" rather than "roads are broken". */
+  var _rc=map.getCenter(),_rn=q(['fsroad','minor','paved','track']);
+  stAdd('RENDER','roads',_rn>0,_rn+' features at '+_rc.lat.toFixed(3)+','+
+    _rc.lng.toFixed(3)+' z'+map.getZoom().toFixed(1));
   /* Counted at the CURRENT viewport, this reported 0 on a device whose screen
      was visibly showing "The Pink Store" — the map was simply zoomed somewhere
      with no label in frame. Jump to a known anchor, count, restore. Landmine 54
@@ -4141,7 +4197,12 @@ function stPerf(cb){
   var n=0,t0=performance.now(),d=[],last=t0,bgSeen=false;
   function _vis(){if(document.hidden)bgSeen=true}
   try{document.addEventListener('visibilitychange',_vis)}catch(e){}
-  var c=CTR;
+  /* A149 (take 121) · Jacob: "is the self-test supposed to take me to Bull
+     Gap? Is that the app zeroing itself?" No — this drill spins the camera at
+     the region centre to measure frame rate and never put it back, so every
+     self-test silently teleported him off whatever he was looking at. The
+     drill puts back what it moved (the same rule stRender already follows). */
+  var c=CTR, _cam={c:map.getCenter(),z:map.getZoom(),b:map.getBearing()};
   map.jumpTo({center:c,zoom:12.6});
   function step(){
     var t=performance.now();d.push(t-last);last=t;
@@ -4151,8 +4212,12 @@ function stPerf(cb){
       d.sort(function(a,b){return a-b});
       var avg=Math.round(1000/(d.reduce(function(a,b){return a+b},0)/d.length));
       var p99=Math.round(1000/d[Math.floor(d.length*0.99)]);
+      /* count at the drill's own zoom so the number stays comparable between
+         runs, THEN put the rider's view back */
       map.setBearing(0);map.jumpTo({center:c,zoom:11.4});
       var drew=renderedCount();
+      map.setBearing(_cam.b);
+      map.jumpTo({center:[_cam.c.lng,_cam.c.lat],zoom:_cam.z});
       /* Headless Chrome rasterises in software at single-digit fps, which says
          nothing about a phone. Judge the frame rate only on real hardware;
          everywhere else record it and judge that something DREW. */
@@ -4542,7 +4607,7 @@ map.on('click',function(e){
      so tapping it and getting the road underneath would be the wrong answer to
      an unambiguous gesture. */
   var pf=map.queryRenderedFeatures([[e.point.x-11,e.point.y-11],[e.point.x+11,e.point.y+11]],
-    {layers:['poi-dot']});
+    {layers:['poi-dot-major','poi-dot']});
   /* A feature with no geometry crashes the whole click handler, and a click
      handler that throws takes every other tap with it — the trail identify, the
      pin drop, everything. MapLibre always supplies geometry; a harness might

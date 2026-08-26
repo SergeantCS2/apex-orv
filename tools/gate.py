@@ -1436,6 +1436,36 @@ def check_empty_artifacts():
                      f"{seen} bundle(s), every one has content")
 
 
+# ── 6c2. Input integrity (take 120, landmine 201 addendum) ──────────────────
+# A killed ingest left a 935 KB aoi.json where 543 MB had been, with a fresh
+# timestamp, and every consumer read the stump: 323 summits quietly became
+# 264. For a bulk region the streamed AOI cannot be smaller than a tenth of
+# the extract it was read from; if it is, the input is a stump, not data.
+def check_input_integrity():
+    try:
+        sys.path.insert(0, HERE)
+        from region import R
+    except Exception:
+        return
+    aoi = os.path.join(ROOT, "aoi.json")
+    if not getattr(R, "bulk", False) or not os.path.exists(aoi):
+        return
+    cache = os.path.join(ROOT, "osm_cache")
+    pbfs = [os.path.join(cache, f) for f in os.listdir(cache)] if os.path.isdir(cache) else []
+    pbfs = [f for f in pbfs if f.endswith(".pbf")]
+    if not pbfs:
+        return
+    ext = max(os.path.getsize(f) for f in pbfs)
+    got = os.path.getsize(aoi)
+    if got < ext // 10:
+        return fails.append(
+            f"aoi.json is {got // 1048576} MB against a {ext // 1048576} MB extract — "
+            "a truncated stream, not the state (landmine 201). Delete it and rerun "
+            "ingest; every payload built since its timestamp is suspect.")
+    notes.append(f"input integrity: aoi.json {got // 1048576} MB vs extract "
+                 f"{ext // 1048576} MB — a whole stream")
+
+
 # ── 6d. Regions ─────────────────────────────────────────────────────────────
 # Take 14: the AOI was hardcoded in ten places across seven files. One
 # definition now, and nothing may reintroduce a literal.
@@ -1553,6 +1583,7 @@ for fn in (check_handoff, check_stamps, check_offline,
            check_current,
            check_provision,
            check_regions, check_bundles, check_empty_artifacts,
+           check_input_integrity,
            check_tools,
            check_manifest):
     try:

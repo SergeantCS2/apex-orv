@@ -226,7 +226,11 @@ def build_stream(out_path, rid=None):
     """build(), but each kept element streams straight to out_path so the
     element list never lives in RAM beside the parse (take 117)."""
     import json as _json
-    f = open(out_path, "w")
+    # Write beside, rename on success (take 120, landmine 201 addendum): an
+    # interrupted stream used to leave a truncated aoi.json wearing a fresh
+    # timestamp, and every later consumer read the stump without complaint.
+    tmp = out_path + ".part"
+    f = open(tmp, "w")
     f.write('{"source": "geofabrik", "elements": [')
     state = {"n": 0}
     def sink(el):
@@ -237,6 +241,7 @@ def build_stream(out_path, rid=None):
     els = build(rid, sink=sink)
     f.write("]}")
     f.close()
+    os.replace(tmp, out_path)
     print(f"  streamed aoi — {state['n']:,} elements, "
           f"{os.path.getsize(out_path)//1048576} MB")
     return state["n"]

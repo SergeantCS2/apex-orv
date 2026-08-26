@@ -528,6 +528,12 @@ if (zoomed.trails === 0) {
       return m.getLayoutProperty("peak-label", "visibility") === "none"; } catch (e) { return null; } })();
     ["peak-dot", "peak-label"].forEach((id) => {
       try { m.setLayoutProperty(id, "visibility", "visible"); } catch (e) {} });
+    /* Take 121: this jumped to the first peak — Mount Arvon, in the Huron
+       Mountains at z12.6 — and left the camera there. The app's own self-test
+       later counts road features in whatever view it inherits, so it reported
+       "roads 0" on a run that was drawing 22,782 of them. A drill puts back
+       what it moved; three other blocks in this file already say so. */
+    const _cam = { c: m.getCenter(), z: m.getZoom() };
     m.jumpTo({ center: src[0].geometry.coordinates, zoom: 12.6 });
     /* Take 119: statewide the first peak is Mount Arvon, in a corner of the
        UP no earlier check has tiled — a fixed 2.4 s nap lost to the source
@@ -545,6 +551,7 @@ if (zoomed.trails === 0) {
                   sample: src[0].properties.lb };
     ["peak-dot", "peak-label"].forEach((id) => {
       try { m.setLayoutProperty(id, "visibility", "none"); } catch (e) {} });
+    m.jumpTo({ center: [_cam.c.lng, _cam.c.lat], zoom: _cam.z });
     return out;
   });
   if (pk.artifactAbsent) {
@@ -777,13 +784,21 @@ if (zoomed.trails === 0) {
     // a tap on something opens it
     const src = window.map.getStyle().sources.poi.data.features;
     const at = src[0].geometry.coordinates;
+    /* Take 121: this drill jumps to the FIRST POI in the payload — statewide
+       that is in the Keweenaw — and left the camera there, so the app's own
+       self-test counted roads in a view holding none and reported 0 on a run
+       drawing 22,782. Put the view back at the end. */
+    const _cam = { c: window.map.getCenter(), z: window.map.getZoom() };
     window.map.jumpTo({ center: at, zoom: 15 });
     /* statewide sources tile slower than a fixed nap (the dam lesson,
        take 117): poll until the badge under the tap actually renders */
     for (let i = 0; i < 30; i++) {
       await s(400);
+      /* A143 split the pins in two: a destination draws on poi-dot-major,
+         everything else on poi-dot. Polling one layer would wait out the
+         full 12 s whenever the first POI is a trailhead or a launch. */
       try { if (window.map.queryRenderedFeatures(
-              { layers: ["poi-dot"] }).length) break; } catch (e) { }
+              { layers: ["poi-dot", "poi-dot-major"] }).length) break; } catch (e) { }
     }
     /* A synthetic map.fire("click") lacks fields MapLibre's own handlers read
        (originalEvent.target) and throws inside the library. Dispatch a real DOM
@@ -813,7 +828,9 @@ if (zoomed.trails === 0) {
              actsPinned: !!(_a && _b && !_b.contains(_a)
                             && document.getElementById("rail").contains(_a)),
              peekVisible: document.getElementById("peek")
-               .getBoundingClientRect().height > 10 };
+               .getBoundingClientRect().height > 10,
+             _restored: (() => { window.map.jumpTo(
+               { center: [_cam.c.lng, _cam.c.lat], zoom: _cam.z }); return true })() };
   });
   /* The CLASS is asserted, not the animated height. In headless the measured
      height lags the class by a step — railSet(true) reads folded:false h:0, then
@@ -1455,6 +1472,28 @@ await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } cat
 const mach = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const out = {};
+  /* Take 121: this block counted wherever the camera was left by an earlier
+     drill. When that view changed, bike measured 102 features and the
+     side-by-side 31 — not a legality bug, two machines measured at different
+     moments of the same tile load. It sets its own view now, derived from a
+     trail50 line in the payload (never a hardcoded coordinate — landmine
+     197), and lets it settle ONCE before either machine is read. */
+  const _pick = (() => {
+    try {
+      const f = window.map.getStyle().sources.net.data.features
+        .find((x) => x.properties && x.properties.c === "trail50");
+      const g = f && f.geometry && f.geometry.coordinates;
+      return g && (Array.isArray(g[0][0]) ? g[0][0] : g[0]);
+    } catch (e) { return null; }
+  })();
+  if (_pick) {
+    window.map.jumpTo({ center: _pick, zoom: 12.5 });
+    for (let i = 0; i < 30; i++) {
+      await sleep(400);
+      try { if (window.map.queryRenderedFeatures({ layers: ["trail50"] }).length) break; }
+      catch (e) { }
+    }
+  }
   for (const m of ["bike", "quad", "sxs"]) {
     window.__mach && window.__mach.set(m);
     await sleep(400);

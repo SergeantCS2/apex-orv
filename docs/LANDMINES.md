@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 120.*
+*Current as of take 121.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -2560,7 +2560,12 @@ RSS and the OOM killer, with nothing in the traceback naming ingest. This is
 why osm_local.py reads POI_TAGS out of ingest.py by AST rather than importing
 it — the reason was never written down, so the next tool imported it. If a
 module runs work at top level, either guard it or say in its docstring that it
-must be read, not imported.
+must be read, not imported. Addendum, found an hour later: the killed
+import had begun STREAMING a fresh aoi.json over the 543 MB one, leaving a
+935 KB stump with a plausible timestamp. Every later consumer read the stump
+(contour: 323 summits became 264) with no error anywhere. A tool that
+rewrites a large input in place should write to a temp name and rename on
+success — ingest.py now does.
 
 **202. A hand-pasted file rewritten from what you can see loses the job you
 cannot.** Take 118 regenerated ci/build.yml from the bundle/pages/apk jobs to
@@ -2570,3 +2575,10 @@ push.paths. Every run after the paste rebuilt the committed take-118 source;
 uploading t119 did not even start a run. The surviving comments still
 described the missing job, which is how it was found. When replacing a file
 someone pastes by hand, diff it against the file it replaces, job by job.
+
+**203. Two seals under one take number.** Take 120 was sealed, then resealed
+an hour later with more in it. Jacob built the first one; his self-test said
+"Take 120" and the elevation fix was simply absent, which read as a CI cache
+bug and nearly cost a take chasing it. The take number is the only handle he
+has on what is on his phone. A reseal is a new take — bump BUILD, bump the
+title, say what changed.

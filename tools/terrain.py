@@ -164,13 +164,92 @@ def dec(a):
     return p
 
 
+# ── riding-area patches (take 120) ─────────────────────────────────────────
+# The statewide z10 DEM is the trade (150 m/px); the Fold's self-test then
+# read Bull Gap 49 ft high while Mio and the Pink Store were within 10 ft —
+# a sharp sand hill is exactly what 150 m/px flattens. The state keeps z10;
+# every DNR scramble area (areas_payload.json, which now runs before this
+# step) gets a z13 patch — the area's bbox plus ~4 km, so the trails around
+# the hill are covered, not just the polygon — and any node or profile point
+# inside a patch samples the patch. ~50 tiles for the whole state instead of
+# 45,000. Absent-safe: no areas artifact, no patches, same result as before.
+PATCH_Z, PAD = 13, 0.045
+PATCHES = []
+def _grab_z(z, x, y):
+    fp = f"{CACHE}/{z}_{x}_{y}.png"
+    if not os.path.exists(fp):
+        u = f"https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+        for _ in range(3):
+            try:
+                open(fp, "wb").write(urllib.request.urlopen(u, timeout=60).read())
+                break
+            except Exception:
+                pass
+    if not os.path.exists(fp):
+        return None
+    a = np.asarray(Image.open(fp).convert("RGB"), dtype=np.float32)
+    return a[:, :, 0] * 256 + a[:, :, 1] + a[:, :, 2] / 256 - 32768
+
+def _build_patches():
+    if not R.bulk or not os.path.exists("areas_payload.json"):
+        return
+    areas = json.load(open("areas_payload.json")).get("a", [])
+    ntiles = 0
+    for ar in areas:
+        xs = [pt[0] for ring in ar["g"] for pt in ring]
+        ys = [pt[1] for ring in ar["g"] for pt in ring]
+        w, s_, e, n = min(xs) - PAD, min(ys) - PAD, max(xs) + PAD, max(ys) + PAD
+        x0, y0 = deg2tile(w, n, PATCH_Z); x1, y1 = deg2tile(e, s_, PATCH_Z)
+        rows = []
+        ok = True
+        for ty in range(y0, y1 + 1):
+            row = []
+            for tx in range(x0, x1 + 1):
+                t = _grab_z(PATCH_Z, tx, ty)
+                if t is None:
+                    ok = False
+                    break
+                row.append(t)
+                ntiles += 1
+            if not ok:
+                break
+            rows.append(np.hstack(row))
+        if not ok:
+            print(f"terrain: patch {ar['n']} — a z13 tile failed, area keeps z10")
+            continue
+        raw = np.vstack(rows)
+        raw[(raw < -100) | (raw > 1500)] = np.nan   # nodata clamp (take 117)
+        pw, pn = tile2deg(x0, y0, PATCH_Z)
+        pe, ps = tile2deg(x1 + 1, y1 + 1, PATCH_Z)
+        PATCHES.append({"n": ar["n"], "raw": raw, "w": pw, "e": pe, "s": ps, "n_": pn,
+                        "my0": mercY(pn), "my1": mercY(ps)})
+    print(f"terrain: {len(PATCHES)} riding-area z13 patch(es) from {ntiles} tiles — "
+          + ", ".join(p["n"] for p in PATCHES))
+
+def sample_at(lon, lat):
+    for P in PATCHES:
+        if P["w"] <= lon <= P["e"] and P["s"] <= lat <= P["n_"]:
+            raw = P["raw"]; Hq, Wq = raw.shape
+            fx = (lon - P["w"]) / (P["e"] - P["w"]) * (Wq - 1)
+            fy = (mercY(lat) - P["my0"]) / (P["my1"] - P["my0"]) * (Hq - 1)
+            fx = min(max(fx, 0.0), Wq - 1.001); fy = min(max(fy, 0.0), Hq - 1.001)
+            x0, y0 = int(fx), int(fy); tx, ty = fx - x0, fy - y0
+            a, b = raw[y0, x0], raw[y0, x0 + 1]; c, d = raw[y0 + 1, x0], raw[y0 + 1, x0 + 1]
+            v = (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty
+            if not np.isnan(v):
+                return float(v)
+            break   # nodata inside the patch: fall through to z10
+    return sample_raw(lon, lat)
+
+_build_patches()
+
 nodes = dec(g["n"])
-node_elev = [round(sample_raw(p[0], p[1])) for p in nodes]
+node_elev = [round(sample_at(p[0], p[1])) for p in nodes]
 
 prof, gain, loss = [], [], []
 for k, enc in enumerate(g["g"]):
     pts = dec(enc)
-    es = [round(sample_raw(p[0], p[1])) for p in pts]
+    es = [round(sample_at(p[0], p[1])) for p in pts]
     up = sum(max(0, es[i] - es[i - 1]) for i in range(1, len(es)))
     dn = sum(max(0, es[i - 1] - es[i]) for i in range(1, len(es)))
     gain.append(up); loss.append(dn)

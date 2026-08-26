@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 120.* Ranked by blocking-ness, not by interest.
+*Current as of take 121.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2224,3 +2224,80 @@ Spatial grid SHIPPED for nearestEdge / nearestNode / nearestEdgeTo — exact
 - **Open:** nearestPavement (40 ms) and addressAt/addressNear (41 ms each)
   are the next linear scans; the address index (53.7 MB) wants the same
   grid treatment and a size diet together.
+
+## Take-120 field report (Jacob, 2026-08-26) — everything, ranked
+
+Self-test on the Fold: PASS 46, dispatch 654 → 300 ms (grid), fps 117.
+Bundle hash `4d051023100b9aff` = t119's — CI restored cached payloads and
+skipped terrain, so the riding-area patches never ran (Δ49 unchanged).
+
+### A141 — WITHDRAWN, and the reason matters
+First read: "CI restored cached payloads and skipped terrain, landmine 196
+again." Checked instead of asserted: the local bundle carrying the terrain
+patches hashes 3509f18cb103eac3; Jacob's t120 build hashes 4d051023100b9aff,
+byte-identical to his t119. Identical data is exactly what the FIRST t120
+zip (grid only, app-side) should produce — it was sealed before the patch
+work and resealed after. He built the pre-reseal zip. No cache bug; the
+patches have simply never run in CI yet. Landmine 203: two seals under one
+take number is a trap — the take number is the only handle Jacob has, so a
+reseal must bump the take, not reuse it.
+- **Do:** verify Δ on Bull Gap after the next build; if it is still 49 ft
+  with a bundle hash of 3509f18c or later, THEN the cache is the suspect.
+
+### A142 — the tan state wash covers the map · P1 · statewide visual
+At state/regional zoom the context land polygon draws OVER landcover: the
+whole peninsula reads as a flat tan sheet with a dark outline (Jacob's
+"tan overlay covers the map"). Move the land fill beneath the ground
+layers or fade it out by z8; keep the outline.
+
+### A143 — POI prominence tiers · P2 · trip planning
+"Major" places — trailheads, campgrounds, riding areas, dunes, launches —
+should be ~2× the badge size and visible from ~10 mi out (z≈9); food, fuel,
+stores from ~3 mi (z≈11+). Today one size, one minzoom. Two tiers in the
+poi payload (`t: 1|2`), two symbol layers.
+
+### A144 — bottom sheet bleeds into the Layers/Locate/Search row · P2
+Screenshots at Silver Lake: the folded sheet's top edge overlaps the
+button row. Fold height vs button row bottom margin; check on the Fold's
+411×960 inner screen with the Android gesture bar.
+
+### A145 — elevation readout + basemap selector: move up, recolour · P3
+Now the quick chips are gone the top-left stack can rise; the readout is
+white and invisible on the light map (fine on Hybrid). Use the chrome
+dark on light, white on sat — same rule as the labels' halo.
+
+### A146 — missing lake access: beaches, launches, parks · P2 · data
+Waterford: Pontiac Lake beach, Dodge Park, public kayak launches absent.
+poi.py tags to widen: leisure=beach_resort, natural=beach (named),
+leisure=slipway, canoe=put_in / canoe=yes, leisure=park with water access,
+DNR Boating Access Sites (DNR has a BAS layer — authoritative, like the
+scramble areas). Ties into A139 (Great Lakes destinations).
+
+### A147 — How-to guide did not open on first launch · P3
+It works from Tools; one launch showed a broken card (screenshot
+6ddfb0.jpg) that self-healed after load. Likely a race between the guide
+and the loader on the 38 MB graph parse.
+
+### A148 — compass phases in and out · P3
+Heading reads well but skips/fades while in use. Magnetometer sample
+smoothing / stale-reading fallback to GPS course while moving.
+
+### A149 — self-test drives the map to Bull Gap · P4 · box-era premise
+stRouting drills Bull Gap → Pink Store (hardcoded box anchors, landmine
+197) and leaves the map there; Jacob read it as the app "zeroing". Derive
+the drill from the anchors nearest the rider and restore the view after.
+
+### Ruled out (take 121)
+- **Ruled out:** a CI cache bug behind the unchanged Bull Gap elevation —
+  bundle hashes prove Jacob built the pre-reseal t120 (A141, landmine 203).
+- **Ruled out:** one POI layer with zoom expressions for A143 — destinations
+  and services need different minzooms, which a single layer cannot carry.
+- **Ruled out:** fading the state fill instead of restacking it (A142) — a
+  translucent sheet over data is still a sheet over data.
+- **Ruled out:** naming Waterford's nameless launches from nearby features
+  (A146) — that is the invention poi.py's beach exception exists to refuse.
+
+### Order of attack (take 121)
+A142 (tan wash — the whole state reads wrong) → A144 (sheet overlaps the
+button row) → A145 (readout invisible on light) → A143 (POI tiers) →
+A146 (lake access data) → A149 (self-test hijacks the view) → A147/A148.

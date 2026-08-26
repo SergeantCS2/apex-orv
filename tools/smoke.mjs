@@ -697,9 +697,15 @@ ok((record.setData.alt || []).length > 0 &&
        + `routes against a fuel range since take 36 and never showed where fuel is`);
     /* Named-only, except beaches. That is the rule poi.py states; assert it
        rather than trusting the comment. */
+    /* Take 121: launches joined beaches under the same rule — a place you may
+       put a boat in is a destination whether or not OSM names it (A146; 66 of
+       Waterford's 81 slipways were nameless and invisible). The check moves
+       with the policy: these two kinds and no others. */
     const unnamed = P.p.filter((r) => !r.n);
-    ok(unnamed.every((r) => r.k === "beach"),
-       `only beaches ship unnamed (${unnamed.length} unnamed, all beaches)`);
+    const exempt = new Set(["beach", "launch"]);
+    ok(unnamed.every((r) => exempt.has(r.k)),
+       `only beaches and launches ship unnamed (${unnamed.length} unnamed, `
+       + `${[...new Set(unnamed.map((r) => r.k))].sort().join(" + ")})`);
     ok(P.p.every((r) => Array.isArray(r.p) && r.p.length === 2
                         && r.p[0] >= manifest.bbox[0] && r.p[0] <= manifest.bbox[2]
                         && r.p[1] >= manifest.bbox[1] && r.p[1] <= manifest.bbox[3]),

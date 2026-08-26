@@ -1,4 +1,56 @@
-# HANDOFF — through Take 120 · V2
+# HANDOFF — through Take 121 · V2
+
+## Take 121 — 2026-08-26 — Jacob's field report, worked in his order
+
+Nine items came off the Fold (A141–A149 in AGENDA, verbatim). Six are done.
+
+**A141 withdrawn, and it matters.** First read was "CI served a stale cache,
+landmine 196 again." Checked instead: the local bundle with the terrain
+patches hashes 3509f18c, Jacob's build hashes 4d051023 — byte-identical to
+his t119, which is exactly what the FIRST t120 zip (grid only) produces. He
+built the pre-reseal zip. Two seals under one take number caused it;
+landmine 203.
+
+**A142 · the tan wash.** `state-fill` sat ABOVE landcover, water and the
+network, so at 20-mile scale the whole peninsula was a flat tan sheet with
+trails bleeding through — the single worst thing on the state map, and
+invisible in the box era where you never sit at z7. Moved to the bottom of
+the stack, directly on the background: land where there is no landcover,
+forest/park/water on top where there is. Outline stays above; a line
+orients without hiding.
+
+**A143 · POI tiers.** Trailheads, campgrounds, launches, beaches, day-use
+and viewpoints are DESTINATIONS (`d:1`): ~2× badge, from z9.2 (~10 mi), on
+their own layer above the services, with labels from z11. Fuel/food/store/
+info/water/toilet/shelter stay at z11.4 and small. Collision is allowed to
+suppress destinations below z11.4 — 1,900 trailheads stacked is not a map.
+
+**A144 · the sheet ate the buttons.** #rail is pulled up 14 px by design;
+the Layers/Locate/Search strip sat inside that lip. 24 px bottom padding.
+
+**A145 · readout.** Stack rises 22 px (the quick chips are gone), and the
+elevation/scale take the colour of the ground: near-black with a bone halo
+on the light map, white on satellite, via body.satmode. It was white-on-
+white before — unreadable on exactly the basemap that ships by default.
+
+**A146 · the missing kayak drops.** Jacob named Waterford. Of 81 slipways
+there, 66 have no name in OSM and were dropped: beaches got the "absence is
+the point" exception at take 89 and launches never did, for no stated
+reason. Statewide 989 → 2,156 launches. The smoke rule moved with the
+policy — beaches AND launches, no others.
+
+**A149 · the Bull Gap teleport.** Not the app zeroing itself: stPerf jumps
+to the region centre (-84.6, 44.62) to spin the camera for the fps
+measurement and never put the view back. It now restores centre, zoom and
+bearing after counting.
+
+Deferred with reasons: A147 (guide race on first launch — not reproduced
+yet), A148 (compass phasing — needs sample smoothing, wants a real ride to
+judge), and the DNR Boating Access Sites service (found: bravob_dnr
+"DNR State Sponsored Developed Boating Access Sites" — authoritative
+launches with names, the same shape as the scramble-area win; next take).
+
+---
 
 ## Take 120 — 2026-08-26 — A96: the spatial grid. Box-era scans, state-era cost.
 
@@ -25,8 +77,26 @@ vm; Chrome dispatch `nearestEdge` 304 → 41 ms INCLUDING the one-time build.
 Next in that line (not done): nearestPavement 40 ms, addressAt/addressNear
 41 ms each — the address index is the next scan to ring-walk.
 
-Sealed with take-119's other content unchanged. Render PASSED 133, smoke 5
-modes green.
+### Riding-area terrain patches (same take)
+
+The Fold's self-test read Bull Gap 49 ft high: statewide DEM is z10, the
+box was z13, and a sand hill is what 150 m/px flattens. terrain.py now
+patches z13 over every DNR scramble area's bbox + ~4 km (areas runs before
+terrain in the pipeline now): 8 patches, 114 tiles, 4,850 nodes re-sampled.
+Bull Gap anchor 1,115 → 1,066 ft against 1,070 surveyed; Mio and the Pink
+Store unchanged (outside any area, already within 10 ft).
+
+### And the stump (landmine 201 addendum, found by this)
+
+Re-running contour after the terrain change gave 264 summits, not 323.
+aoi.json was 935 KB: the take-119 `import ingest` accident had started
+streaming a new file over the 543 MB one before the OOM killer stopped it.
+Nothing downstream complained. Regenerated (ingest, 9 min); osm_local.py
+now streams to .part and renames; gate has check_input_integrity (a bulk
+aoi.json smaller than a tenth of its extract is refused). The t119/t120
+seeds were NOT affected — their contour payload predates 23:07.
+
+Sealed: render PASSED 133, smoke 5 modes green, gate PASSED.
 
 ---
 

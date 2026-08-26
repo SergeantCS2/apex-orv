@@ -23,11 +23,12 @@ STEPS = [
     ("poi",        ["poi.py"],         "places you can ride to"),
     ("graph",      ["graph.py"],       "conflate and node the network"),
     ("emit_graph", ["emit_graph.py"],  "client payload"),
+    # areas before terrain (take 120): terrain patches z13 DEM over each area
+    ("areas",     ["areas.py"],       "DNR scramble areas — open riding ground as polygons"),
     ("terrain",    ["terrain.py"],     "DEM, climb, hillshade"),
     ("contour",    ["contour.py"],     "contour lines from the same DEM"),
     ("corridor",   ["corridor.py"],    "a river beyond the box, ordered downstream"),
     ("landcover", ["landcover.py"], "the ground itself — forest, wetland, park and public-land polygons"),
-    ("areas",     ["areas.py"],       "DNR scramble areas — open riding ground as polygons"),
     ("glyphs",     ["glyphs.py"],      "SDF label pack"),
     ("context",    ["context.py"],     "state outline for orientation"),
     ("address",    ["address.py"],     "offline address index"),

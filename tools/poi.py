@@ -34,7 +34,12 @@ from region import R
 # a campground with a shop tag is a campground.
 KINDS = [
     ("trailhead", "amenity",  ["parking"],                          False),
-    ("launch",    "leisure",  ["slipway"],                          False),
+    # take 121: unnamed ships, exactly as for beaches below. Jacob asked why
+    # Waterford's kayak drops were missing: of 81 slipways there, 66 carry no
+    # name in OSM and were being dropped. A place you may put a boat in is a
+    # destination whether or not somebody typed a name on it; "Boat launch" is
+    # honest, and silence is not (A146).
+    ("launch",    "leisure",  ["slipway"],                          True),
     ("camp",      "tourism",  ["camp_site"],                        False),
     ("beach",     "natural",  ["beach"],                            True),
     ("dayuse",    "tourism",  ["picnic_site"],                      False),

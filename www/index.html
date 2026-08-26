@@ -164,7 +164,7 @@
 
   #stage{position:relative;min-height:0}
   #map{position:absolute;inset:0;background:var(--sand)}
-  .basebtn{position:absolute;left:11px;top:104px;z-index:4;
+  .basebtn{position:absolute;left:11px;top:86px;z-index:4;
     font:600 var(--t-sm)/1 'Barlow Condensed',Barlow,system-ui,sans-serif;
     letter-spacing:.05em;display:inline-flex;align-items:center;gap:7px;
     color:var(--bone);background:rgba(30,28,24,.92);
@@ -175,8 +175,8 @@
      for a settings control. Its on-state is now a quiet white tint; orange
      belongs to the one primary action only (reference study). */
   .basebtn.on{background:rgba(245,239,226,.16);border-color:rgba(255,255,255,.28)}
-  .actbtn{top:150px}
-  #lyrpanel{position:absolute;left:11px;top:150px;z-index:6;max-width:min(248px,76vw);
+  .actbtn{top:136px}
+  #lyrpanel{position:absolute;left:11px;top:136px;z-index:6;max-width:min(248px,76vw);
     background:rgba(24,22,18,.96);border:1px solid rgba(255,255,255,.22);
     border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45);
     max-height:70vh;overflow-y:auto}
@@ -225,20 +225,37 @@
   .sw{flex:0 0 auto;width:22px;height:5px;border-radius:3px;
     box-shadow:0 0 0 1.5px rgba(255,255,255,.85)}
   .sw.dash{background-image:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 9px)}
-  #readout{position:absolute;left:13px;top:82px;pointer-events:none;z-index:3;
-    font:700 var(--t-md)/1.25 Barlow,Roboto,system-ui,sans-serif;color:#fff;
+  /* A145 (take 121) · Jacob: "elevation and the view selector can move up now
+     the quick buttons are gone, and white is invisible on the light map."
+     Both true. The stack rises 22 px, and the readout takes the colour of the
+     ground it sits on — near-black with a bone halo on the light map, white
+     with a dark shadow on satellite — the same rule the map labels follow.
+     body.satmode is set by the basemap toggle, so one class flips both. */
+  #readout{position:absolute;left:13px;top:60px;pointer-events:none;z-index:3;
+    font:700 var(--t-md)/1.25 Barlow,Roboto,system-ui,sans-serif;
+    color:#26231E;
+    text-shadow:0 1px 2px rgba(255,255,255,.95),0 0 3px rgba(255,255,255,.9)}
+  body.satmode #readout{color:#fff;
     text-shadow:0 1px 3px rgba(0,0,0,.85),0 0 2px rgba(0,0,0,.9)}
   .maplibregl-ctrl-scale{background:transparent!important;border:none!important;
-    border-bottom:2px solid rgba(255,255,255,.95)!important;
-    color:#fff!important;font:700 var(--t-sm)/1.2 Barlow,Roboto,system-ui,sans-serif!important;
-    text-shadow:0 1px 3px rgba(0,0,0,.85);padding:0 0 1px!important;margin:0!important}
-  .maplibregl-ctrl-bottom-left{left:9px;bottom:auto;top:60px}
+    border-bottom:2px solid rgba(38,35,30,.9)!important;
+    color:#26231E!important;font:700 var(--t-sm)/1.2 Barlow,Roboto,system-ui,sans-serif!important;
+    text-shadow:0 1px 2px rgba(255,255,255,.95);padding:0 0 1px!important;margin:0!important}
+  body.satmode .maplibregl-ctrl-scale{
+    border-bottom-color:rgba(255,255,255,.95)!important;color:#fff!important;
+    text-shadow:0 1px 3px rgba(0,0,0,.85)}
+  .maplibregl-ctrl-bottom-left{left:9px;bottom:auto;top:38px}
   .maplibregl-ctrl-attrib{font-size:var(--t-xs)}.maplibregl-ctrl-top-right{display:none}
   .strip{position:absolute;left:0;right:0;display:flex;gap:6px;padding:8px 11px;
     overflow-x:auto;scrollbar-width:none}
   .strip::-webkit-scrollbar{display:none}
   #chips{top:0;background:linear-gradient(180deg,rgba(228,215,188,.96),rgba(228,215,188,0))}
-  #tools{bottom:0;background:linear-gradient(0deg,rgba(228,215,188,.96),rgba(228,215,188,0))}
+  /* A144 (take 121) · #rail is pulled up 14 px so its rounded top overlaps the
+     map — and it was overlapping the Layers / Locate / Search row with it
+     (Jacob's screenshots: the dark sheet crosses the buttons). The strip sits
+     clear of the lip now; the gradient still fades into the sheet. */
+  #tools{bottom:0;padding-bottom:24px;
+    background:linear-gradient(0deg,rgba(228,215,188,.96),rgba(228,215,188,0))}
   /* An icon inside a control: inherits colour, sits on the text baseline, and
      never stretches — flex would squash it in a narrow chip. */
   .ic{flex:0 0 auto;margin-right:6px;vertical-align:-2px;opacity:.9}
@@ -450,7 +467,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 120</span>
+    <span id="title"><b>APEX</b> ORV · Take 121</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
