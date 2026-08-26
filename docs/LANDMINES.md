@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 117.*
+*Current as of take 119.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -151,6 +151,8 @@ Start here. Do not read top to bottom.
 | A rate extrapolated from a sample too small | 66 |
 | Downloaded detail thrown away before shipping | 67 |
 | One upstream 503 fails the build | 57 |
+| OOM in a step that "only" samples points | 200 |
+| Importing a tool runs the whole pipeline step | 201 |
 
 ---
 
@@ -2523,3 +2525,38 @@ takes on a box small enough to tile inside the nap.
 The pattern is now standard: poll until the queried quantity exists or two
 consecutive readings agree, bounded, then assert. Fixed sleeps in front of
 queryRenderedFeatures are box-scale luck.
+
+**199. A hand-pasted file holding a region override beats every declaration
+the seed makes.**
+Take 117's seed declared ALL OF MICHIGAN. The GitHub workflow — which the seed
+cannot update (landmine 46/84) — still carried `APEX_REGION: neml-bullgap`
+from the box era, and the env var outranks regions.json by design. CI shipped
+the test square wearing take 117: same speed, same size, full green. Jacob's
+own field eye ("I'd imagine all of Michigan would be 100 MB and take a while")
+was the only detector that fired.
+
+Three defences now, none of them memory: region authority lives ONLY in
+regions.json (the workflow derives its cache key from it and pins nothing);
+ingest stamps every data run and bundle REFUSES payloads stamped for another
+region (negative-controlled); and ci/bundle.sh — which the seed CAN update —
+verifies the built manifest names the declared region, with a size floor no
+box can fake. The general law: any value that exists in two places where one
+is hand-synced will eventually disagree, and the hand-synced copy wins
+silently; move the decision to the single place the machine reads.
+
+**200. A file the brief says never to json.load will be json.loaded by the
+one tool nobody re-read.** Take 117 built `aoi_stream.py` and converted graph,
+pack and poi to it — and blamed the summit OOM on peak detection, when
+`contour.py` still did `json.load(open("aoi.json"))` on the 542 MB file below
+a mosaic it never needed. Removal fixed it: stream the 323 peaks, decode one
+tile each. When a big-input rule is introduced, grep every consumer of that
+input the same take; a diagnosis that names an allocation should point at a
+line that allocates.
+
+**201. A tool with no `__main__` guard is a tool you cannot import.**
+`from ingest import query` ran the statewide ingest at import time: 3.9 GB
+RSS and the OOM killer, with nothing in the traceback naming ingest. This is
+why osm_local.py reads POI_TAGS out of ingest.py by AST rather than importing
+it — the reason was never written down, so the next tool imported it. If a
+module runs work at top level, either guard it or say in its docstring that it
+must be read, not imported.

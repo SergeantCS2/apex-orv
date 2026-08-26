@@ -277,6 +277,16 @@ def tiger_roads():
     return els
 
 
+
+def _region_stamp():
+    """Take 118: CI's cache restored the BOX's payloads under a michigan build
+    and shipped Bull Gap wearing take 117 — same speed, same size, and the
+    workflow was green. The stamp makes that impossible: ingest writes which
+    region this data run belongs to, and bundle.py REFUSES to package payloads
+    stamped for another region. A stale cache now fails loudly with its remedy
+    instead of shipping the wrong state."""
+    json.dump({"region": R.id}, open("region_stamp.json", "w"))
+
 def fetch_osm(path="aoi.json"):
     """OSM context roads. Advisory only — never authoritative (landmine 12).
 
@@ -285,6 +295,7 @@ def fetch_osm(path="aoi.json"):
     `aoi.json` survived on disk the whole time, so nothing failed (landmine 32).
     """
     import os
+    _region_stamp()
     if os.path.exists(path):
         # A TIGER-derived aoi.json must NOT be sticky. CI caches this file, and
         # fetch_osm skips when it exists — so one Overpass outage would pin the

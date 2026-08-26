@@ -25,6 +25,14 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 - **Fetched by** `ingest.py`
 - **Refresh** seasonal — closures change in-season
 
+### Michigan DNR ORV Scramble Areas
+
+- **Host** `services3.arcgis.com`
+- **Provides** Designated open-riding area polygons (Silver Lake, St. Helen, Holly Oaks, The Mounds, Bull Gap Hill Climb…) — the DNR publishes these on ArcGIS Online, not in its trails MapServer
+- **Licence** Public domain (State of Michigan open data)
+- **Fetched by** `areas.py`
+- **Refresh** rarely — designations change by rulemaking
+
 ### USDA Forest Service MVUM
 
 - **Host** `apps.fs.usda.gov`
@@ -108,11 +116,11 @@ and are shown to rule statewide OUT, not to plan for it.
 
 | zoom | m/px | tiles | AOI | statewide |
 |---|---|---|---|---|
-| z12 | 27.23 | 36 | 1 MB | 0.1 GB |
-| z13 | 13.61 | 110 | 2 MB | 0.4 GB |
-| z14 | 6.81 | 380 | 8 MB | 1.8 GB |
-| z15 | 3.4 | 1,482 | 37 MB | 8.6 GB |
-| z16 | 1.7 | 5,772 | 159 MB | 36.6 GB |
+| z12 | 27.02 | 10,573 | 104 MB | 0.1 GB |
+| z13 | 13.51 | 41,904 | 400 MB | 0.2 GB |
+| z14 | 6.75 | 167,228 | 1834 MB | 0.9 GB |
+| z15 | 3.38 | 668,050 | 10024 MB | 4.9 GB |
+| z16 | 1.69 | 2,667,378 | 38344 MB | 18.9 GB |
 
 **z16 (1.7 m/px) is the useful ceiling: 159 MB for a riding area.**
 That is one wifi download the night before. Statewide at the same

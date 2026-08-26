@@ -60,10 +60,12 @@ j('bundle/manifest.json').then(function(man){
     have.contour?j('bundle/'+have.contour):Promise.resolve(null),
     /* A115. Optional and absent-safe like the rest. */
     have.paddle?j('bundle/'+have.paddle):Promise.resolve(null),
-    have.ground?j('bundle/'+have.ground):Promise.resolve(null)]);
+    have.ground?j('bundle/'+have.ground):Promise.resolve(null),
+    /* A140 (take 119). DNR scramble areas — optional, absent-safe. */
+    have.areas?j('bundle/'+have.areas):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
-  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -515,6 +517,15 @@ var poif=((POIS&&POIS.p)||[]).map(function(r,i){
    would be actively dangerous, and A112 makes that a ship-blocker, not a
    nice-to-have. They are drawn on top of everything, in the closure colour, and
    they are never hidden by anything else on this layer. */
+/* A140 · DNR scramble areas (take 119). Open-riding GROUND, not trail: Silver
+   Lake is 447 acres you may ride anywhere on, and the DNR draws it as a
+   polygon. Absent-safe like every optional layer. */
+var areaf=((AREAS&&AREAS.a)||[]).map(function(a){
+  return {type:'Feature',properties:{n:a.n,ac:a.ac,o:a.o,c:a.c},
+    geometry:{type:'Polygon',coordinates:a.g}}});
+var areapt=((AREAS&&AREAS.a)||[]).map(function(a){
+  return {type:'Feature',properties:{n:a.n,ac:a.ac,o:a.o,lb:a.n+'\n'+a.ac+' ac'},
+    geometry:{type:'Point',coordinates:a.c}}});
 var padf=[],padpin=[];
 ((PADDLE&&PADDLE.c)||[]).forEach(function(c){
   (c.g||[]).forEach(function(reach,i){
@@ -795,6 +806,19 @@ function runCard(a,b,riv){
   if(cb)cb.addEventListener('click',function(){runClear();show('Run cleared.','')});
   RUNFROM=null}
 
+function areaCard(pr){
+  logAct('tap  area '+pr.n);
+  var c=null;try{c=typeof pr.c==='string'?JSON.parse(pr.c):pr.c}catch(e){}
+  return show('<b>'+pr.n+'</b>'+
+    '<div class="sub">DNR scramble area \u00b7 '+pr.o+' land</div>'+
+    '<div class="k">OPEN RIDING</div>'+
+    '<div class="sub">About '+pr.ac+' acres you may ride anywhere on \u2014 '+
+    'this is ground, not a trail, so Return home and Directions route to its '+
+    'edge, never across it. ORV licence and trail permit required.</div>'+
+    (c?'<div class="k">WHERE</div><span class="tn">'+c[1].toFixed(5)+'  '+c[0].toFixed(5)+'</span>'+
+       '<div class="sub">'+placeDist(c)+'</div>':''),'');
+}
+
 function paddleCard(ft){
   var pr=ft.properties, riv=pr.riv||pr.n, mi=+pr.mi;
   var c=null,i;
@@ -1061,6 +1085,8 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     peaks:{type:'geojson',data:{type:'FeatureCollection',features:peakf}},
     paddle:{type:'geojson',data:{type:'FeatureCollection',features:padf}},
     padpin:{type:'geojson',data:{type:'FeatureCollection',features:padpin}},
+    areas:{type:'geojson',data:{type:'FeatureCollection',features:areaf}},
+    areapt:{type:'geojson',data:{type:'FeatureCollection',features:areapt}},
 
     net:{type:'geojson',data:{type:'FeatureCollection',features:nf2}},
     strokes:{type:'geojson',data:{type:'FeatureCollection',features:strokes}},
@@ -1098,6 +1124,11 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     {id:'lc-park',type:'fill',source:'ground',
       filter:['==',['get','k'],'park'],
       paint:{'fill-color':'#C9E2B6','fill-opacity':0.9}},
+    /* A140 · riding areas wash in the legal-route green: the one ground on the
+       map you may ride anywhere on, so it carries the colour the network uses
+       for "yours". Under the network, above the landcover. */
+    {id:'area-fill',type:'fill',source:'areas',
+      paint:{'fill-color':'#0FAE57','fill-opacity':0.22}},
     /* The onX satellite trick is INVERSION: dim and desaturate the imagery so
        the network becomes the brightest thing on screen. Dark ground, luminous
        data (take 113, reference study). */
@@ -1125,6 +1156,13 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       filter:['==',['get','i'],1],
       paint:{'line-color':'#8A6A42','line-width':w(0.9,1.7,2.8),
         'line-opacity':0.8}},
+    /* Relation-assembled water (take 118): the Great Lakes and every
+       island-holding lake — the way-only reader can never see them, and take
+       117 shipped Michigan lakeless of its namesakes. Same paint, same seat,
+       one water. */
+    {id:'lc-water',type:'fill',source:'ground',
+      filter:['==',['get','k'],'water'],
+      paint:{'fill-color':'#A9D3E6'}},
     {id:'water',type:'fill',source:'wtr',filter:['==',['get','c'],'water'],
       paint:{'fill-color':'#A9D3E6'}},
     {id:'wway',type:'line',source:'wtr',filter:['==',['get','c'],'waterway'],
@@ -1370,6 +1408,15 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-allow-overlap':false,'text-padding':2},
       filter:['==',['get','k'],'dam'],
       paint:{'text-color':'#8E0F19','text-halo-color':'#FFFFFF','text-halo-width':2.2}},
+    {id:'area-line',type:'line',source:'areas',
+      paint:{'line-color':'#0B7A3E','line-width':w(1,1.6,2.6),'line-dasharray':[3,1.5]}},
+    /* One label per area at its centre, from state zoom down, so Silver Lake
+       and St. Helen read as destinations before their polygon has any size. */
+    {id:'area-label',type:'symbol',source:'areapt',minzoom:7,
+      layout:{'text-field':['get','lb'],'text-font':['APEX'],
+        'text-size':w(10,11.5,13),'text-anchor':'center','text-max-width':9,
+        'text-allow-overlap':false,'text-padding':2},
+      paint:{'text-color':'#0B7A3E','text-halo-color':'#FFFFFF','text-halo-width':2}},
     /* A84 · your own marks. Drawn above the world's places: a POI is something
        that is there, a waypoint is something YOU decided mattered, and when
        they collide yours wins. */
@@ -1982,6 +2029,9 @@ function routeToPoint(dest,label){
     if(a<0||b<0)return show('<b>Nothing legal nearby</b> for a '+
       MACHINE[machine].lbl.replace(/^\S+\s/,'')+'. Every line within reach is off limits for that machine.','fail');
     var sa=snapMiles(ME,a),sb=snapMiles(dest,b);
+    /* __routeDbg is a DELIBERATE bridge (take 117, kept at the 118 audit),
+       sibling to __restrict: snap ids, snap miles, per-profile outcome and
+       timing. It solved the statewide routing mystery once and costs bytes. */
     var _dbg={a:a,b:b,sa:sa,sb:sb,tSnap:Math.round(_tSnap),got:[]};
     try{window.__routeDbg=_dbg}catch(e){}
     var _crow=mi(ME,dest);
@@ -3143,6 +3193,8 @@ var LYRGROUPS=[
    ids:['cont-line','cont-index','cont-label']},
   {k:'peaks',  h:'Named hills', s:'summits with their height',
    ids:['peak-dot','peak-label']},
+  {k:'areas',  h:'Riding areas', s:'DNR scramble areas \u2014 ride anywhere inside',
+   ids:['area-fill','area-line','area-label']},
   {k:'paddle', h:'Rivers & paddling', s:'runs, launches, campgrounds and dams',
    ids:['pad-case','pad-line','pad-dot','pad-lbl','pad-dam','pad-damlbl']},
   {k:'relief', h:'Relief',      s:'hillshade', ids:['hillshade']},
@@ -3576,6 +3628,8 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
                     machineLegal:machineLegal,EDGES:EDGES,ADJ:ADJ,attrs:attrs,
                     setMachine:function(m){if(MACHINE[m])machine=m},
                     get ME(){return ME}};
+    /* A140 · areas bridge, harness only, same shape as the rest. */
+    window.__areas={card:areaCard,groups:LYRGROUPS};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};
     /* the layout matrix must be able to put the HUD on screen at four device
@@ -4413,6 +4467,14 @@ map.on('click',function(e){
   var padf2=dam.length?dam:map.queryRenderedFeatures(box,{layers:['pad-dot']});
   if(padf2.length&&padf2[0].geometry&&padf2[0].geometry.coordinates)
     return paddleCard(padf2[0]);
+  /* A140 · a riding area under the finger, but only where nothing sharper is:
+     a trail INSIDE Silver Lake still identifies as itself, so areas are checked
+     after pins and only claim the tap when no network edge is there. */
+  var af=map.queryRenderedFeatures(box,{layers:['area-fill']});
+  if(af.length&&af[0].properties&&af[0].properties.n){
+    var nf=map.queryRenderedFeatures([[e.point.x-9,e.point.y-9],[e.point.x+9,e.point.y+9]],
+      {layers:HIT.concat(HIT_SHOW)});
+    if(!nf.length)return areaCard(af[0].properties);}
 
   /* A110 · a place is checked FIRST. A pin sits on top of the line it is beside,
      so tapping it and getting the road underneath would be the wrong answer to

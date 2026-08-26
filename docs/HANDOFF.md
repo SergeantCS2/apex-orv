@@ -1,4 +1,152 @@
-# HANDOFF — through Take 117 · V2
+# HANDOFF — through Take 119 · V2
+
+## Take 119 — 2026-08-25 — Riding areas, summits without a mosaic, and the line that killed CI
+
+### Jacob's GitHub build reached all of Michigan — and died one line later
+
+Take 118's workflow paste worked: CI built the state in 1,637 s, 474,047
+edges, 130 MB, five smoke modes green, `graph.json 01cdc37a60d5` byte-identical
+to the same build in the sandbox. Then `ci/bundle.sh: line 12: APEX_REGION:
+unbound variable` — take 118 deleted the pin from the workflow and left ONE
+reader of it behind, in the script that runs under `set -u`. Landmine 199's
+own corollary, the same take it was written. `bundle.sh` now asks region.py.
+
+### Statewide summits — the diagnosis was wrong, the fix was removal
+
+Take 117 blamed "peak-detection allocations at 45M px". The summit block does
+a 5×5 window per peak; there are no candidate arrays. What it DID do was
+`json.load(open("aoi.json"))` — the 542 MB statewide file, several GB as
+Python objects — after assembling three 45M-px float32 arrays that summits
+never needed. Bulk mode now streams peaks from `aoi_stream`, decodes only the
+one z10 tile each sits on, ships `l: []`. **323 named summits, 17 KB, memory
+flat** (landmine 200). Mount Arvon reads 1,972 ft against its official 1,979:
+z10's ~150 m/px undersamples a peak by a few feet, recorded not fudged; Bull
+Gap's four are within ±14 ft of the take-94 z13 figures. `bundle.py`'s contour
+counter counts lines + peaks, or the take-76 empty-artifact guard would refuse
+a payload of 323 real hills. First **COMPLETE** statewide bundle.
+
+### A140 · Riding areas — the DNR draws Silver Lake as a polygon, and so do we
+
+Jacob's take-117 call: Silver Lake Dunes is an open-riding AREA. The DNR
+trails MapServer we have ingested for 118 takes holds only two short ACCESS
+routes into it (1.1 mi, both open, 72"). The perimeter lives in a SEPARATE
+service on ArcGIS Online — `DNR_ORV_Scramble_Areas`, MichiganDNR — eight
+polygons statewide: St. Helen Motorsport Area 1,285 ac, **Silver Lake ORV
+Area 447** (the DNR's published "450"), Holly Oaks 239, The Mounds 213, Black
+Mountain 64, Gladwin 20, Rock Climb 10, and Bull Gap Hill Climb 3. Server
+count 8 = 8 shipped. Jacob: draw every one — the small ones are how a rider
+finds the hill. Private MX parks (Ogemaw Hills) are NOT in the designated
+layer and belong to the POI pass, not a legal riding-area layer (open).
+
+`tools/areas.py` is a pipeline step with its own cached, retried read —
+because **importing ingest.py RUNS the statewide ingest** (no `__main__`
+guard; 3.9 GB and the OOM killer on the first attempt; landmine 201).
+Wired end to end: PROVISION host `services3.arcgis.com`, bundle artifact +
+counter, both loader paths, `AREAS` decl, source, legal-green fill under the
+network, dashed outline and centre label above the paddle layers, a "Riding
+areas" Layers group ON by default, a tap card that yields to any trail under
+the finger and says routing goes to the edge, never across. Seven smoke
+assertions; render proves St. Helen draws as a polygon and is labelled.
+
+### What the record must say plainly
+
+The sandbox VM rebooted mid-session (swap dropped with it — re-enable before
+landcover, which peaks at 3.9 GB flex_mem statewide). The seed carries no
+data: the full statewide rebuild here was ingest 7 min, graph 7 min,
+corridor 5 min, landcover 5 min, everything else under a minute each.
+
+### Three render lines, all harness, all classified before the seal
+
+1. Area card — the probe called `window.areaCard`; app functions are not
+   globals, the bridge is `window.__areas.card` (landmine 54, made twice in
+   one take: the smoke draft did the same).
+2. Summits — Mount Arvon is the first peak and sits in a corner of the UP no
+   earlier check had tiled; a fixed 2.4 s nap lost to the source worker and
+   reported 0 of 323. Bounded poll (landmine 198).
+3. Compass "bearing to home" — the perf block polled the panel for `PASS`,
+   which the statewide report never contains ("39 passed, 5 failed"), gave up
+   at 20 s with the self-test STILL RUNNING, and its teardown show() landed on
+   the drill's pin card 60 lines later. The drill's own diagnostic (added this
+   take) said it: pcHome false, panel = self-test report. Now waits on
+   `__selfTestReport`. Whether this predates 119 is unknowable: CI never
+   reached render.mjs (bundle.sh died first) and 117/118's render counts are
+   box-era.
+
+Environment lesson: one headless Chrome at a time on this box — a second
+launch beside a running suite produced protocol timeouts, not failures.
+Second lesson: the sandbox drops its swap file silently between calls
+(swapon shows 0 with no reboot). The gate's in-process render then dies with
+a puppeteer protocol error that looks like a product failure and is not —
+`swapon /tmp/sw` and rerun. Check `free -m` before believing a render crash.
+
+### Verified
+
+Smoke 5 modes, 0 real failures. Gate PASSED. **Render PASSED, 133 checks.**
+Palette PASSED. Bundle COMPLETE, 132.4 MB.
+
+---
+
+
+## Take 118 — 2026-08-25 — The Great Lakes, and the audit of the statewide arc
+
+### Michigan gets its namesakes
+
+The way-only water reader can never see a multipolygon relation — so take 117
+shipped the state lakeless of Superior, Michigan and Huron, and of every
+island-holding inland lake. landcover.py's area handler (which assembles
+relations natively) grew a `water` kind with one filter that matters:
+**relation-assembled only** (`not a.from_way()`), because simple closed-way
+lakes are already pack.py's. **738 water bodies**, landcover now 8,882 areas /
+7.8 MB, drawn as `lc-water` seated directly beside the way-water fill — same
+paint, one water. The state-overview screenshot is the milestone: the Mitten,
+both peninsulas, the big three, Drummond in the St. Marys.
+
+Jacob's direction recorded as **A139**: the big lakes get DESTINATION POI in a
+future pass (major launches, lighthouses, famous grounds — Manistee the
+archetype), never corridor treatment.
+
+### The audit Jacob ordered ("you made a ton of changes")
+
+Seventeen statewide-arc mechanisms verified present and correctly shaped in
+one adversarial pass — HOME spec end to end, open-view, ME-at-centre, the
+machine-keyed memo and its five clear sites, the expansion cap, the
+length-filter-before-summarise layering, the terrain alignment guard and
+absent-safe edgeProfile, the edge-aware dispatch budget, connector-only
+residential, relation-only water, drills standing on land. Zero misses, zero
+TODOs, temp instrumentation stripped from the harness. `__routeDbg` is KEPT
+deliberately and documented as a bridge beside `__restrict` — it solved the
+routing mystery once and costs bytes.
+
+### The take-117 GitHub build shipped the box — root cause and cure
+
+Jacob installed the michigan seed and got the test square wearing take 117,
+same speed and size as ever. Root cause, found in the workflow's own words:
+`.github/workflows/build.yml` — hand-pasted, un-updatable by the seed
+(landmine 84) — still pinned `APEX_REGION: neml-bullgap`, and the env var
+outranks regions.json by design. His field intuition was the only alarm that
+fired (landmine 199).
+
+Cure, defence in depth, none of it hand-synced: (1) **region authority lives
+only in regions.json** — the corrected `ci/build.yml` derives its cache key
+from the declared region and pins nothing (one hand-paste required, loudly
+documented in the file header; timeout 25→90 min for statewide; auth_cache and
+the stamp join the cache paths); (2) **ingest stamps every data run**
+(`region_stamp.json`) and **bundle refuses foreign payloads** — negative
+control fired correctly; a stale CI cache now fails with its remedy printed;
+(3) **ci/bundle.sh** — which the seed CAN update — verifies the built manifest
+names the declared region, rejects any lingering APEX_REGION pin by name, and
+enforces a 90 MB floor on a michigan bundle that no box can fake. A region
+switch also clears the old stamp (region.py DERIVED_EXTRA).
+
+### Verified
+
+Smoke 5/5 modes, render 124+ with the Great Lakes in frame, gate green with
+the scaled stopwatch, the stamp guard's negative control fired and reset.
+Sealed as `apex-seed-t118.zip`, hash in the message. **Jacob's one manual
+action: paste ci/build.yml over .github/workflows/build.yml.**
+
+---
+
 
 ## Take 117 — 2026-08-25 — ALL OF MICHIGAN. Built, routed, suites green, sealed.
 

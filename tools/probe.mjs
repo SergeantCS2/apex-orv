@@ -50,6 +50,14 @@ if (mode === "shots") {
     try { localStorage.removeItem("apex.guide.v1"); } catch(e){}
     window.guideShow(); }); await s(500); await shot("5-first-run-guide");
   console.log("screens written to /mnt/user-data/outputs/screens/");
+} else if (mode === "state") {
+  const out = "/mnt/user-data/outputs/screens"; mkdirSync(out, { recursive: true });
+  const s = (ms) => new Promise((r) => setTimeout(r, ms));
+  await pg.evaluate(() => { try { window.guideClose(true); } catch (e) {} });
+  await pg.evaluate(() => window.map.jumpTo({ center: [-85.7, 44.9], zoom: 5.75 }));
+  await s(9000);
+  await pg.screenshot({ path: `${out}/state-overview.png` });
+  console.log("state shot written");
 } else if (mode === "basemaps") {
   /* One screenshot per basemap state, named by the button's own label, plus a
      card open on hybrid — the state Jacob actually rides with (take 113). */

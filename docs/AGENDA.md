@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 117.* Ranked by blocking-ness, not by interest.
+*Current as of take 119.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2176,6 +2176,44 @@ route profiles at 84–102 ms, suites green (smoke 274+/5 modes, render 124).
 - **Ruled out:** keeping all residential (OOM at 3 GB) and dropping all
   residential (severed a third of the network) — the bridge subset is the
   proven middle.
-- **Open (Jacob's order):** Great Lakes polygons → tuning (Silver Lake riding
-  area, summits OOM, 53.7 MB address, corridor box-prose, A96 typed arrays,
-  residential display layer) → A136/A137 references and modes.
+- **Open (Jacob's order):** ~~Great Lakes polygons~~ SHIPPED take 118 (738
+  relation-assembled water bodies via the landcover area handler) → tuning
+  (Silver Lake riding area, summits OOM, 53.7 MB address, corridor box-prose,
+  A96 typed arrays, residential display layer) → A136/A137 references and
+  modes.
+
+## A139 — Great Lakes destination POI · RECORDED take 118 (Jacob)
+
+The big lakes are not rivers: no put-ins/take-outs, no float times — corridor
+treatment does not apply and never will. What they get instead, in a future
+data pass: the MAJOR destinations — principal boat launches, lighthouses,
+famous fishing grounds and hangouts (Jacob names Manistee's launch/lighthouse
+as the archetype; there are thousands of such places around the state).
+- **Ruled out:** corridor float treatment on the Great Lakes.
+- **Ruled out:** importing every ramp — MAJOR is the word; curation or a
+  quality signal (official designations) picks them.
+- **Open:** source selection (DNR boating access sites layer? USCG lights?)
+  and the badge classes, after tuning.
+
+## A140 — Riding areas: DNR scramble-area polygons · SHIPPED take 119
+
+Silver Lake is ground, not trail (Jacob, take 117). Source found at take 119:
+`DNR_ORV_Scramble_Areas` on ArcGIS Online — 8 designated areas statewide,
+server total = shipped.
+- **PROVEN:** 8 polygons in 9 KB; fill/outline/label draw in a real browser;
+  the tap card yields to any trail under the finger; group on by default.
+- **PROVEN:** the DNR trails MapServer holds only the two access routes into
+  Silver Lake — the perimeter was never going to come from the layers we had.
+- **Ruled out:** OSM as the source — nothing tagged as the riding area was in
+  the extract's tag set; the DNR layer is authoritative and complete.
+- **Ruled out:** importing ingest.query() — landmine 201.
+- **Open:** private motocross parks (Ogemaw Hills etc.) as a POI category in
+  the places pass, with a badge that says "private, fee" — Jacob wants them
+  drawn; they are businesses, not designated riding ground.
+- **Open:** routing awareness — Return Home and Directions still route to the
+  nearest edge; inside a scramble area "ride anywhere" could mean a straight
+  line to the edge. The card says so; the router does not yet.
+
+### A138 note (take 119)
+Summits OOM CLOSED (landmine 200) — 323 statewide, contour artifact ships
+lines-empty. Bundle now verifies COMPLETE.

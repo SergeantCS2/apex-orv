@@ -106,7 +106,9 @@ except ValueError as _e:
 DERIVED_EXTRA = ["aoi.json", "authoritative.json", "graph_raw.json",
                  "imagery_meta.json", "imagery_budget.json",
                  "imagery_tiles.json", "dem_meta.json",
-                 "hillshade.jpg", "imagery.jpg"]
+                 "hillshade.jpg", "imagery.jpg",
+    "region_stamp.json",  # take 118: a switch must clear the old stamp
+]
 DERIVED_DIRS = ["imagery_tiles"]
 
 

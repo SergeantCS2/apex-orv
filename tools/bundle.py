@@ -43,6 +43,7 @@ ARTIFACTS = [
     ("poi_payload.json",     "poi.json",         "places",   False),
     ("contour_payload.json", "contour.json",     "contour",  False),
     ("corridor_payload.json","corridor.json",    "paddle",   False),
+    ("areas_payload.json",   "areas.json",       "areas",    False),
 ]
 
 # How many things are actually IN a payload. A layer with no features in it is
@@ -61,8 +62,11 @@ ARTIFACTS = [
 COUNTERS = {
     "ground":  lambda d: len(d.get("f") or []),
     "hydro":   lambda d: sum(len(v) for v in (d.get("l") or {}).values()),
-    "contour": lambda d: len(d.get("l") or []),
+    # take 119: statewide ships summits with NO lines — a payload of 300
+    # named hills is not empty. Lines + peaks, or the guard refuses real data.
+    "contour": lambda d: len(d.get("l") or []) + len(d.get("pk") or []),
     "paddle":  lambda d: len(d.get("c") or []),
+    "areas":   lambda d: len(d.get("a") or []),
     "other":   lambda d: len(d.get("r") or []),
     "places":  lambda d: len(d.get("p") or []),
     "context": lambda d: len(d.get("counties") or []) + len(d.get("rings") or []),
@@ -91,6 +95,27 @@ def sha256(path):
 
 def build(rid):
     reg = Region(rid)
+    # Take 118 (landmine 199): refuse payloads that belong to another region.
+    # CI's cache once restored the box's payloads under a michigan build and
+    # shipped the wrong state at full green. The stamp is written by ingest;
+    # absent or foreign means the data on disk is not this region's — say so,
+    # name the remedy, stop.
+    sp = os.path.join(ROOT, "region_stamp.json")
+    stamped = None
+    try:
+        stamped = json.load(open(sp)).get("region")
+    except Exception:
+        pass
+    if stamped != rid:
+        sys.exit(
+            f"bundle: payloads on disk are stamped for "
+            f"{stamped or 'NO REGION (pre-stamp or restored cache)'} but this "
+            f"build targets {rid}.\n"
+            f"  This is a stale cache or a mixed workspace — the exact failure "
+            f"that shipped the box wearing take 117.\n"
+            f"  Remedy: clear cached *_payload.json / aoi.json / "
+            f"authoritative.json (in CI: bump the cache key) and rerun the "
+            f"pipeline from ingest.")
     dest = os.path.join(OUT, rid)
     os.makedirs(dest, exist_ok=True)
 

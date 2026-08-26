@@ -323,6 +323,46 @@ if (zoomed.trails === 0) {
   ok(rf.placed.length > 0,
      `route numbers on the map: ${rf.placed.length} of ${rf.srcN} strokes — `
      + `${rf.placed.slice(0, 5).join(", ") || "(none placed)"}`);
+  /* A140 · DNR scramble areas as polygons (take 119). Centred on the LARGEST
+     area in the payload — not a hardcoded coordinate, which is a region
+     assumption with a fuse (landmine 197). Settle-then-measure (198). */
+  const area = await page.evaluate(async () => {
+    const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    let src = null;
+    try { src = m.getStyle().sources.areas.data.features; } catch (e) { }
+    if (!src || !src.length) return { n: 0 };
+    const on = (() => { try {
+      return m.getLayoutProperty("area-fill", "visibility") !== "none"; } catch (e) { return null; } })();
+    const big = src.slice().sort((a, b) => b.properties.ac - a.properties.ac)[0];
+    /* raw array in the style source, JSON string after queryRenderedFeatures */
+    const c = typeof big.properties.c === "string" ? JSON.parse(big.properties.c) : big.properties.c;
+    m.jumpTo({ center: c, zoom: 12.4 });
+    let fill = [], lbl = [];
+    for (let i = 0; i < 40; i++) {
+      await sleep(500);
+      try { fill = m.queryRenderedFeatures({ layers: ["area-fill"] });
+            lbl = m.queryRenderedFeatures({ layers: ["area-label"] }); } catch (e) { }
+      if (fill.length && lbl.length) break;
+    }
+    const card = (() => { try {
+      /* through the harness bridge — app functions are not window globals
+         (the smoke draft made the same mistake the same take; landmine 54) */
+      window.__areas.card(big.properties);
+      return document.getElementById("panel").innerHTML; } catch (e) { return "ERR " + e; } })();
+    return { n: src.length, on, name: big.properties.n, ac: big.properties.ac,
+             fill: fill.length, lbl: lbl.map((f) => f.properties.lb.split("\n")[0]), card };
+  });
+  if (area.n === 0) {
+    ok(true, "no riding-area artifact — areas skipped, not failed");
+  } else {
+    ok(area.on === true, "riding areas are ON by default — legal ORV ground is not optional");
+    ok(area.fill > 0, `${area.name} (${area.ac} ac) draws as a polygon (${area.fill} fill feature(s) in view)`);
+    ok(area.lbl.indexOf(area.name) >= 0, `…and is labelled: ${area.lbl.join(", ")}`);
+    ok(area.card.indexOf(area.name) >= 0 && area.card.indexOf("never across") >= 0,
+       "the area card names the ground and says routing stops at its edge");
+    ok(area.n >= 1, `${area.n} DNR scramble area(s) carried in the payload`);
+  }
+
   /* A115/A112 · the paddle corridor, and the hazards that make it shippable.
      Centred on the Au Sable from the payload, not from where I happen to be
      looking (landmine 130). */
@@ -489,9 +529,16 @@ if (zoomed.trails === 0) {
     ["peak-dot", "peak-label"].forEach((id) => {
       try { m.setLayoutProperty(id, "visibility", "visible"); } catch (e) {} });
     m.jumpTo({ center: src[0].geometry.coordinates, zoom: 12.6 });
-    await sleep(2400);
+    /* Take 119: statewide the first peak is Mount Arvon, in a corner of the
+       UP no earlier check has tiled — a fixed 2.4 s nap lost to the source
+       worker and reported 0 of 323 summits drawn. Settle-then-measure,
+       bounded (landmine 198). */
     const q = (id) => { try { return m.queryRenderedFeatures({ layers: [id] }); }
                         catch (e) { return []; } };
+    for (let i = 0; i < 40; i++) {
+      await sleep(500);
+      if (q("peak-dot").length && q("peak-label").length) break;
+    }
     const out = { srcN: src.length, off,
                   dots: q("peak-dot").length,
                   names: [...new Set(q("peak-label").map((f) => f.properties.n))],
@@ -578,8 +625,9 @@ if (zoomed.trails === 0) {
   });
   ok(ct.offByDefault === true, "contours are off until asked for");
   if (!ct.srcN) {
-    console.log("  --   contours: artifact honestly absent for this region "
-      + "(bulk skip, take 75/117) — checks skipped, absence is named");
+    console.log("  --   contours: no contour LINES for this region (statewide "
+      + "lines ruled out at take 75; summits ship without them since take 119) "
+      + "— line checks skipped, absence is named");
   } else {
     ok(ct.line > 0 && ct.index > 0,
        `contours draw: ${ct.line} intermediate + ${ct.index} index of ${ct.srcN} in the source`);
@@ -797,9 +845,15 @@ if (zoomed.trails === 0) {
     const s = (ms) => new Promise((r) => setTimeout(r, ms));
     document.querySelector('#tabs .tab[data-go="tools"]').click(); await s(150);
     document.getElementById("c-diag").click(); await s(200);
+    /* Take 119: this polled the panel for the word PASS, which the statewide
+       report never contains ("39 passed, 5 failed") — so it gave up at 20 s
+       with the self-test STILL RUNNING, and its teardown show() later landed
+       on top of the compass drill's pin card, 60 lines down. Wait for the
+       self-test's own completion signal, bounded (landmine 198). */
+    try { window.__selfTestReport = null; } catch (e) { }
     document.getElementById("c-selftest").click();
-    for (let i = 0; i < 80; i++) {
-      if (/PASS/.test(document.getElementById("panel").innerText || "")) break;
+    for (let i = 0; i < 480; i++) {
+      if (window.__selfTestReport) break;
       await s(250);
     }
     const ST = typeof window.__st === "function" ? window.__st() : [];
@@ -895,10 +949,18 @@ if (zoomed.trails === 0) {
     await s(900);
     cv.dispatchEvent(new TouchEvent("touchend",
       { touches: [], changedTouches: [t], bubbles: true }));
-    await s(400);
-    const b = document.getElementById("pc-home");
+    /* landmine 198, caught in this very drill under gate load: the card can
+       out-wait any fixed nap. Poll for the button, bounded. */
+    let b = null;
+    for (let i = 0; i < 25 && !b; i++) {
+      await s(400);
+      b = document.getElementById("pc-home");
+    }
     if (b) b.click();
-    await s(250);
+    await s(400);
+    window.__cmpDrill = { pcHome: !!b, centre: [c.lng.toFixed(3), c.lat.toFixed(3)],
+      zoom: m.getZoom().toFixed(1),
+      panel: (document.getElementById("panel").innerText || "").slice(0, 120) };
   });
   const cmp = await page.evaluate(async () => {
     const s = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -931,6 +993,12 @@ if (zoomed.trails === 0) {
      `given a heading it reads it: ${(cmp.moving.split("\n")[0] || "").slice(0, 40)}`);
   ok(/Home/.test(cmp.moving) && /left|right|ahead/.test(cmp.moving),
      "and gives a bearing to home with which way to turn");
+  if (!/Home/.test(cmp.moving)) {
+    /* say what the drill saw, so a failure here is diagnosable from the log
+       and not from a rerun (take 119) */
+    const d = await page.evaluate(() => JSON.stringify(window.__cmpDrill));
+    console.log("  ..   home drill saw: " + d);
+  }
   ok(/you are here/.test(cmp.moving),
      "a waypoint at your own position reads 'you are here', not a 0.0 mi bearing");
   ok(/Marked/.test(cmp.marked), "Mark this spot saves a waypoint in one tap");

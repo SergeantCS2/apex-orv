@@ -34,6 +34,17 @@ SOURCES = [
         "refresh": "seasonal — closures change in-season",
     },
     {
+        "host": "services3.arcgis.com",
+        "name": "Michigan DNR ORV Scramble Areas",
+        "what": "Designated open-riding area polygons (Silver Lake, St. Helen, "
+                "Holly Oaks, The Mounds, Bull Gap Hill Climb…) — the DNR "
+                "publishes these on ArcGIS Online, not in its trails MapServer",
+        "licence": "Public domain (State of Michigan open data)",
+        "tool": "areas.py",
+        "phase": "provision",
+        "refresh": "rarely — designations change by rulemaking",
+    },
+    {
         "host": "apps.fs.usda.gov",
         "name": "USDA Forest Service MVUM",
         "what": "Motor Vehicle Use Map roads and trails, per-vehicle legality",

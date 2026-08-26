@@ -707,6 +707,42 @@ ok((record.setData.alt || []).length > 0 &&
   }
 }
 
+/* 5x2 · A140 — DNR scramble areas as open-riding polygons (take 119).
+   Optional like places. Asserts the SHAPE the app relies on (rings, a
+   centre, acres) and that the tap handler and layer group exist — a source
+   nobody draws is landmine 69 and the gate covers that; this covers the card. */
+{
+  const aj = manifest.artifacts.find((a) => a.kind === "areas");
+  if (!aj) {
+    ok(true, "no riding-area artifact in this bundle — areas skipped, not failed");
+  } else {
+    const A = sandbox.AREAS;
+    ok(A && Array.isArray(A.a) && A.a.length > 0,
+       `riding areas loaded: ${A && A.a ? A.a.length : 0} DNR scramble area(s)`);
+    ok(A.a.every((r) => r.n && r.ac > 0 && Array.isArray(r.g) && r.g[0].length >= 4
+                        && Array.isArray(r.c) && r.c.length === 2),
+       "every area carries a name, acres, a centre and a closed ring");
+    ok(A.a.every((r) => r.c[0] >= manifest.bbox[0] && r.c[0] <= manifest.bbox[2]
+                        && r.c[1] >= manifest.bbox[1] && r.c[1] <= manifest.bbox[3]),
+       "every area centre is inside the region bbox");
+    /* App internals are reached through the window.__ bridges, not as
+       sandbox globals — the first draft asked for sandbox.areaCard and the
+       harness, not the product, failed (landmine 54). */
+    const AB = sandbox.window.__areas || {};
+    const grp = (AB.groups || []).find((g) => g.k === "areas");
+    ok(!!grp && grp.ids.indexOf("area-fill") >= 0,
+       "Layers panel has a Riding areas group governing area-fill");
+    ok(typeof AB.card === "function", "areaCard is wired");
+    const html = AB.card ? AB.card({n: A.a[0].n, ac: A.a[0].ac, o: A.a[0].o,
+                                   c: JSON.stringify(A.a[0].c)}) : "";
+    const txt = grab("panel")._html || String(html || "");
+    ok(txt.indexOf(A.a[0].n) >= 0 && txt.indexOf("acres") >= 0,
+       `area card names the area and its acreage (${A.a[0].n}, ${A.a[0].ac} ac)`);
+    ok(txt.indexOf("never across") >= 0,
+       "area card says routing goes to the edge, never across the ground");
+  }
+}
+
 /* 5y · A60 — route both, draw one (take 86).
    The promise is not "fewer lines". It is that every edge stays ROUTABLE while
    only one copy of a duplicated road is DRAWN. Asserted against the real

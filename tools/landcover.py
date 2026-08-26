@@ -32,18 +32,26 @@ from region import R
 
 OUT = os.path.join(ROOT, "landcover_payload.json")
 
-KINDS = {"forest", "wetland", "park", "public"}
-MIN_M2 = {"forest": 30000, "wetland": 25000, "park": 8000, "public": 50000}
+KINDS = {"forest", "wetland", "park", "public", "water"}
+# water here means RELATION-ASSEMBLED water only (see the area callback): the
+# way-only reader in pack.py already carries every simple closed-way lake, but
+# the Great Lakes and every island-holding lake are multipolygon relations it
+# can never see — take 117 shipped Michigan lakeless of its namesakes.
+MIN_M2 = {"forest": 30000, "wetland": 25000, "park": 8000, "public": 50000,
+          "water": 150000}
 # Statewide, the wash needs the SHAPE of the forests, not every stand — at the
 # box thresholds Michigan would emit hundreds of thousands of slivers. Bulk
 # regions raise the floor ~30x and simplify twice as hard (take 114).
 BULK_M2 = {"forest": 1_000_000, "wetland": 800_000, "park": 60_000,
-           "public": 500_000}
+           "public": 500_000, "water": 400_000}
 TOL_DEG = 0.00025          # ~25 m Douglas-Peucker
 RND = 5                    # coordinate rounding
 
 
 def kind_of(tags):
+    if tags.get("natural") == "water" or tags.get("water") in (
+            "lake", "reservoir"):
+        return "water"
     lu = tags.get("landuse"); na = tags.get("natural"); le = tags.get("leisure")
     bd = tags.get("boundary")
     if lu == "forest" or na == "wood":
@@ -128,6 +136,9 @@ def main():
             k = kind_of(dict((t.k, t.v) for t in a.tags))
             if not k:
                 return
+            if k == "water" and a.from_way():
+                return   # simple closed-way lakes are pack.py's; only the
+                         # relation-assembled ones are missing from the map
             try:
                 for outer in a.outer_rings():
                     pts = [(p.lon, p.lat) for p in outer]

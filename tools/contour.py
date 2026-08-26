@@ -112,6 +112,80 @@ def rdp(pts, eps):
     return [pts[i] for i in sorted(keep)]
 
 
+def decode_tile(fp):
+    """One Terrarium tile as metres, nodata clamped (take 117's seam lesson)."""
+    a = np.asarray(Image.open(fp).convert("RGB"), dtype=np.float32)
+    elev = (a[:, :, 0] * 256 + a[:, :, 1] + a[:, :, 2] / 256) - 32768
+    elev[(elev < -100) | (elev > 1500)] = np.nan
+    return elev
+
+
+def summits_bulk():
+    """Statewide named summits without a mosaic and without json.load."""
+    import aoi_stream
+    W, S, E, N = R.bbox
+    cache = os.path.join(ROOT, "dem_cache")
+    out = os.path.join(ROOT, "contour_payload.json")
+    aoi = os.path.join(ROOT, "aoi.json")
+    if not os.path.exists(aoi):
+        print("contour: no aoi.json — run ingest first; summits skipped")
+        if os.path.exists(out):
+            os.remove(out)
+        return
+    cand = []
+    for e in aoi_stream.elements(aoi):
+        t = e.get("tags") or {}
+        if t.get("natural") != "peak":
+            continue
+        nm = (t.get("name") or "").strip()
+        lon, lat = e.get("lon"), e.get("lat")
+        if not nm or lon is None or lat is None:
+            continue
+        if not (W <= lon <= E and S <= lat <= N):
+            continue
+        cand.append((nm, lon, lat))
+    print(f"contour: bulk — {len(cand)} named peaks streamed from aoi.json")
+    # group by tile so each tile is decoded exactly once; peak memory is one
+    # tile (256x256 float32) plus the candidate list
+    by_tile = {}
+    for nm, lon, lat in cand:
+        fx, fy = tile_xy(lon, lat, Z)
+        by_tile.setdefault((int(fx), int(fy)), []).append((nm, lon, lat, fx, fy))
+    peaks, missing = [], 0
+    for (tx, ty), items in by_tile.items():
+        fp = os.path.join(cache, f"{Z}_{tx}_{ty}.png")
+        if not os.path.exists(fp):
+            missing += len(items)
+            continue
+        elev = decode_tile(fp)
+        for nm, lon, lat, fx, fy in items:
+            px = int((fx - tx) * 256)
+            py = int((fy - ty) * 256)
+            win = elev[max(0, py - 2):py + 3, max(0, px - 2):px + 3]
+            if not win.size or np.all(np.isnan(win)):
+                missing += 1
+                continue
+            ft = int(round(float(np.nanmax(win)) / FT))
+            peaks.append({"n": nm, "ft": ft, "p": [round(lon, 5), round(lat, 5)]})
+    peaks.sort(key=lambda x: -x["ft"])
+    if not peaks:
+        print(f"contour: bulk — no summit could be sampled ({missing} without a "
+              "DEM tile); run the terrain step first. Artifact absent, the app "
+              "names it.")
+        if os.path.exists(out):
+            os.remove(out)
+        return
+    payload = {"bbox": [W, S, E, N], "step": INTERVAL_FT,
+               "index": INTERVAL_FT * INDEX_EVERY, "l": [], "pk": peaks}
+    blob = json.dumps(payload, separators=(",", ":"))
+    open(out, "w").write(blob)
+    print(f"contour: bulk — {len(peaks)} summits, 0 lines (statewide lines "
+          f"ruled out at take 75), {len(blob) // 1024} KB; {missing} peak(s) "
+          "had no DEM sample")
+    print("contour: summits — " +
+          " · ".join(f"{p['n']} {p['ft']} ft" for p in peaks[:6]))
+
+
 def main():
     bulk = R.bulk
     if bulk:
@@ -119,16 +193,15 @@ def main():
         # lines — the state rendered peakless. Lines stay ruled out (take 75:
         # enormous, unreadable at state zoom); summits are a few hundred named
         # points and ship for the whole state.
-        # Take 117 UNRESOLVED: statewide summit extraction OOMs even at z10
-        # with the nodata clamp in place — the killer strikes after mosaic
-        # assembly, suspect is the peak-detection allocations themselves at
-        # 45M px. Resume there next session (dims print + clamp are staged).
-        # Until then: honest full skip, artifact absent, the app names it.
-        print("contour: bulk region — no statewide lines OR summits yet "
-              "(summit extraction OOMs at state scale, take 117 open item)")
-        out = os.path.join(ROOT, "contour_payload.json")
-        if os.path.exists(out):
-            os.remove(out)
+        #
+        # Take 119: the OOM was never the peak detection. The summit block
+        # below did `json.load(open("aoi.json"))` — 542 MB statewide, several
+        # GB as Python objects on a 3 GB box (aoi_stream.py exists precisely
+        # because of this; landmine 200). The mosaic (three 45M-px float32
+        # arrays) was the second cost, and summits never needed it: a named
+        # peak needs the ONE z10 tile it sits on. So: stream the peaks,
+        # decode each tile once, sample the window, ship lines empty.
+        summits_bulk()
         return
     W, S, E, N = R.bbox
     x0, y0 = tile_xy(W, N, Z)

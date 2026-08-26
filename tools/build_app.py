@@ -23,7 +23,7 @@ WWW = os.path.join(ROOT, "www")
 # One line, and it must match src/app.html BYTE FOR BYTE — these are stripped
 # by exact string match, so a two-line form with different indentation left
 # `CONT = __CONT__` in the shipped app and the map never constructed (take 91).
-DECLS = ('var WATER = __WATER__, GR = __GRAPH__, TR = __TERRAIN__, POIS = __POIS__, CONT = __CONT__, PADDLE = __PADDLE__, LAND = __LAND__;',
+DECLS = ('var WATER = __WATER__, GR = __GRAPH__, TR = __TERRAIN__, POIS = __POIS__, CONT = __CONT__, PADDLE = __PADDLE__, LAND = __LAND__, AREAS = __AREAS__;',
          'var SHADE = "__SHADE__";', 'var SAT = "__SAT__";',
          'var SATB = __SATB__;', 'var GLYPHS = __GLYPHS__;')
 
@@ -39,6 +39,7 @@ IN_BUNDLE = {"graph_payload.json": "graph.json",
              "contour_payload.json": "contour.json",
              "corridor_payload.json": "corridor.json",
              "landcover_payload.json": "landcover.json",
+             "areas_payload.json": "areas.json",
              "address_payload.json": "address.json",
              "other_payload.json": "other.json",
              "hillshade.jpg": "hillshade.jpg",
@@ -138,10 +139,12 @@ j('bundle/manifest.json').then(function(man){
     have.contour?j('bundle/'+have.contour):Promise.resolve(null),
     /* A115. Optional and absent-safe like the rest. */
     have.paddle?j('bundle/'+have.paddle):Promise.resolve(null),
-    have.ground?j('bundle/'+have.ground):Promise.resolve(null)]);
+    have.ground?j('bundle/'+have.ground):Promise.resolve(null),
+    /* A140 (take 119). DNR scramble areas — optional, absent-safe. */
+    have.areas?j('bundle/'+have.areas):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
-  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -270,6 +273,7 @@ def single(out):
             f'CONT = {rd("contour_payload.json") or "null"};\n'
             f'PADDLE = {rd("corridor_payload.json") or "null"};\n'
             f'LAND = {rd("landcover_payload.json") or "null"};\n'
+            f'AREAS = {rd("areas_payload.json") or "null"};\n'
             f'var SHADE = "{uri("hillshade.jpg")}";\n'
             f'var SAT = "{uri("imagery.jpg")}";\n'
             f'var SATB = {json.dumps(json.loads(meta)["b"]) if meta else "[0,0,0,0]"};\n'

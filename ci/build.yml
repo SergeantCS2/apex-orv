@@ -32,16 +32,20 @@ permissions:
 
 env:
   # The region — bbox, anchors, imagery zoom — lives in regions.json.
-  # Change which one CI builds here; bump TILES_KEY in the same commit or the
-  # cache will hand back the previous region's artifacts.
-  APEX_REGION: neml-bullgap
-  TILES_KEY: neml-v2
+  # ── TAKE 118: REGION AUTHORITY LIVES IN THE SEED, NOT HERE ──────────────
+  # This file once pinned APEX_REGION and a hand-bumped TILES_KEY. When the
+  # seed switched to ALL OF MICHIGAN, this override kept commanding the box —
+  # CI shipped the wrong state wearing take 117 at full green (landmine 199).
+  # Now: regions.json's `default` decides, a step below derives the cache key
+  # from it, and ci/bundle.sh (seed-updated) verifies the built bundle names
+  # the declared region. NEVER add APEX_REGION back here.
+  DATA_V: v3   # bump only to force a clean data pull
 
 jobs:
   # ────────────────────────────────────────────────────────────────────────
   bundle:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 90   # statewide first build ~40-60 min; cached ~10-15
     steps:
       # ref is REQUIRED here. checkout defaults to the commit that TRIGGERED the
       # run; the seed job pushes a newer one, so a default checkout lands on a
@@ -73,6 +77,13 @@ jobs:
           fi
           echo "source present — take $(grep -oP 'OFFROAD_TAKE=\K[0-9]+' BUILD)"
 
+      - name: Derive region from the seed (take 118)
+        id: region
+        run: |
+          R=$(python3 -c "import json;print(json.load(open('regions.json'))['default'])")
+          echo "id=$R" >> "$GITHUB_OUTPUT"
+          echo "Seed declares region: $R"
+
       - name: Restore region artifacts
         id: tilecache
         uses: actions/cache@v4
@@ -99,7 +110,9 @@ jobs:
             dem_cache
             img_cache
             osm_cache
-          key: region-${{ env.TILES_KEY }}
+            auth_cache
+            region_stamp.json
+          key: region-${{ steps.region.outputs.id }}-${{ env.DATA_V }}
 
       - uses: actions/setup-python@v5
         with:

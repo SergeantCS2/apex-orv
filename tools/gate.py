@@ -850,7 +850,9 @@ def check_smoke():
     total, bad = 0, []
     for mode in ([], ["--no-gps"], ["--fatal-drill"], ["--dead-renderer"], ["--away"]):
         r = subprocess.run(["node", sm] + mode, capture_output=True, text=True,
-                           timeout=240)
+    # Take 118: statewide smoke runs the box-era 240 s out (same scale-up
+    # as render's stopwatch, same take-117 lesson). The suite must still PASS.
+                           timeout=900)
         total += sum(1 for l in r.stdout.splitlines() if l.startswith("  ok"))
         if r.returncode:
             hit = [l for l in r.stdout.splitlines() if "FAIL" in l][:2]
