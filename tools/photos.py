@@ -48,6 +48,16 @@ UA = {"User-Agent": "APEX-Offroad/1.0 (SergeantCS2 on GitHub, repo apex; offline
 # PROVISION ledger and this tool agree on the hosts it reaches
 THUMB_HOST = "https://upload.wikimedia.org"   # manifest.scan_hosts reads URLs
 PAUSE = 0.35
+# Take 135: a fresh CI runner has an empty cache, and ~2,940 lookups at ~59
+# per minute is ~50 minutes of SILENCE — Jacob watched two builds sit after
+# "address:" with no output and one of them time out. Two rules now:
+# (1) progress is printed every 100 lookups, so a long step is never mute
+# (landmine 32's spirit: a silent step is indistinguishable from a hung one);
+# (2) a TIME BUDGET: after BUDGET_S the step ships what it has and says how
+# many remain. The cache (img_cache/photos/, carried by CI's region cache)
+# accumulates across builds, so the next build resumes where this one
+# stopped. Photos land progressively; the build never waits on them.
+BUDGET_S = int(os.environ.get("APEX_PHOTO_BUDGET_S", "1500"))
 KINDS = {"camp", "system", "mtb", "beach", "lighthouse", "marina", "launch"}
 # how far a Commons photo may sit from the pin and still be "of" it
 NEAR = {"area": 700, "camp": 500, "beach": 400, "launch": 250, "marina": 300,
@@ -227,11 +237,34 @@ def main():
     # that way. Orphans (files no longer in the index) are removed at the end.
     os.makedirs(OUTDIR, exist_ok=True)
     index, hits = {}, 0
+    t0, done, deferred = time.time(), 0, 0
+    # cached candidates first (instant), then the rest until the budget runs out
+    def cached(c):
+        ck = os.path.join(CACHE, hashlib.sha1(key(*c).encode()).hexdigest()[:16] + ".json")
+        return os.path.exists(ck)
+    order = sorted(cands, key=lambda c: (not cached(c)))
+    def guarded(c):
+        nonlocal done, deferred
+        if time.time() - t0 > BUDGET_S and not cached(c):
+            deferred += 1
+            return None
+        r = lookup(*c)
+        done += 1
+        if done % 100 == 0:
+            print(f"  photos: {done:,} of {len(cands):,} looked up, {hits_box[0]} with a photo, "
+                  f"{int(time.time() - t0)} s", flush=True)
+        return r
+    hits_box = [0]
     with ThreadPoolExecutor(max_workers=3) as ex:
-        for (k, n, p), res in zip(cands, ex.map(lambda c: lookup(*c), cands)):
+        for (k, n, p), res in zip(order, ex.map(guarded, order)):
             if res:
                 index[key(k, n, p)] = res
                 hits += 1
+                hits_box[0] = hits
+    if deferred:
+        print(f"photos: time budget of {BUDGET_S} s reached — {deferred:,} pin(s) not yet "
+              "looked up; the cache carries this build's work and the next build "
+              "continues from here", flush=True)
     # honesty check: every indexed file is on disk
     index = {kk: v for kk, v in index.items() if os.path.exists(os.path.join(OUTDIR, v["f"]))}
     keep = {v["f"] for v in index.values()}

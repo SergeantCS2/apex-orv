@@ -1,4 +1,27 @@
-# HANDOFF — through Take 134 · V2
+# HANDOFF — through Take 135 · V2
+
+## Take 135 — 2026-08-27 — the photo step no longer holds CI hostage
+
+Jacob's CI: two builds sat after `address:` with no output; one was
+cancelled by the next upload, the second was heading for the 90-minute job
+timeout. Cause: `photos.py` (take 131) on a runner with an EMPTY cache does
+~2,940 Wikipedia lookups at ~59/min — ~50 minutes — and printed nothing
+until the end. Landmine 32's spirit: a silent long step is indistinguishable
+from a hung one.
+
+Two rules in photos.py now: progress every 100 lookups; and a TIME BUDGET
+(`APEX_PHOTO_BUDGET_S`, default 1,500 s = 25 min) after which the step
+ships what it has and prints how many pins remain. Cached candidates are
+processed first (instant), so a warm cache runs in seconds and a cold one
+fills progressively across builds — the cache (img_cache/photos/) is in
+CI's region cache list. Proven: warm cache 3 s with 608 photos; a 20-second
+cold budget stopped, shipped 5, and reported 2,924 deferred.
+
+Expect Jacob's next CI run: ~30 min to address, 25 min of photos (with a
+line every ~2 min), then render + gate — under the 90. The run after that
+gets the rest of the photos from cache.
+
+---
 
 ## Take 133 — 2026-08-27 — the guide, rewritten and versioned
 
@@ -52,6 +75,19 @@ that hung three times on the 75 MB graph completes on this one.
 
 Ruled out: routing only the pinned systems' geometry (it would not have
 cut the noding), harder RDP (already 10 m; not the cause).
+
+**Gate refusal, and the law it protects.** `show-only classes also marked
+ridable: ['foot']` — unnamed OSM paths were drawn from the show-only
+payload under the same class the walk machine may route. Rather than teach
+the gate an exception, the unnamed paths became class `path` (drawn dashed
+in the hiking green, never routable), so "a class is routable OR show-only,
+never both" holds unchanged. Gate PASSED, render 161 inside it.
+apex-seed-t134.zip sha256 b1cdbaf0…0e9e, 85 files, carries take 133.
+
+**Next:** typed hunting waypoints (stand / camera / sign / water / gate);
+DMU county-based layer once Jacob sends the digest page; contours over
+public land as patches; address index diet (the last ~900 ms of dispatch).
+
 
 ---
 

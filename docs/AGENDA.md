@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 134.* Ranked by blocking-ness, not by interest.
+*Current as of take 135.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2497,3 +2497,15 @@ stamp + header-only skip check, shapely in CI.
   published layer — blocked on the digest).
 - **Ruled out:** six photo workers — Wikimedia 429; 3 workers + contact UA +
   pause sustains ~59 lookups/min.
+
+### Takes 133–134 — shipped
+133: guide rewritten for state + modes, key apex.guide.v2 (A147/A155).
+134: hiking (`foot`) routable for the walk machine; noder thins shared-run
+junctions with foot lines (998k → 577k edges, graph 46.6 MB); unnamed OSM
+paths are class `path` (drawn, never routed); nearestJunction +
+nearestPavement on the grid (dispatch 3,445 → 87 ms); ROUTE_CAP scales with
+NODES.
+- **Ruled out:** routing only the 455 pinned systems — the doubling was
+  two-track being chopped by the noder, not hiking edges.
+- **Ruled out:** a gate exception for foot in the walk list — the
+  routable-or-show-only law stands; the data got a second class instead.
