@@ -191,6 +191,10 @@ def build(rid):
         man["imagery_tiles"] = {
             "zmin": meta["zmin"], "zmax": meta["zmax"], "count": count,
             "bytes": nbytes,
+            # take 127: sparse patches ride ON TOP of the mosaic; the app must
+            # know, and it must know where the tiles are so nothing else is
+            # ever requested
+            "sparse": bool(meta.get("sparse")), "boxes": meta.get("boxes", []),
             "sha256": hashlib.sha256("\n".join(sorted(listing)).encode()).hexdigest()}
         print(f"  opt  imagery/           {nbytes/1048576:6.1f} MB  {count} tiles "
               f"z{meta['zmin']}-z{meta['zmax']}")

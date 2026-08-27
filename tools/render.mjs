@@ -406,8 +406,139 @@ if (zoomed.trails === 0) {
        "fuel is a Ride pin, not an Outdoors pin");
     ok(!modes.ride.launchIn,
        "Ride does NOT carry launches — a riding trip, not today's map (Jacob, take 125)");
+  }
+  /* Take 130 · Jacob: "let me select what mode I want rather than it swapping
+     between them." The chip opens a picker; a row selects directly. */
+  const pick = await page.evaluate(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const M = window.__mode; if (!M) return { missing: true };
+    const was = M.get();
+    document.getElementById("c-mode").click(); await sleep(150);
+    const p = document.getElementById("modepanel");
+    const rows = [...p.querySelectorAll("[data-mode]")];
+    const open = !p.hidden;
+    const labels = rows.map((r) => r.querySelector("span").textContent);
+    const water = rows.find((r) => r.dataset.mode === "water");
+    if (water) water.click(); await sleep(250);
+    const after = M.get(), closed = p.hidden;
+    const chip = document.querySelector("#c-mode span").textContent;
+    M.apply(was, { silent: true }); await sleep(150);
+    return { open, labels, after, closed, chip };
+  });
+  if (pick.missing) { ok(false, "mode bridge missing"); } else {
+    ok(pick.open && pick.labels.length === 3 && pick.labels.join() === "Ride,Outdoors,Water",
+       `the mode chip opens a picker with three rows (${pick.labels.join(" · ")})`);
+    ok(pick.after === "water" && pick.closed && pick.chip === "Water",
+       "choosing Water selects it directly and closes the picker");
+  }
+
+  /* Take 129 · transcribed from onX: county lines + names, trail-system pins,
+     summits from z9 — all in Outdoors, measured from resolved state. */
+  const od = await page.evaluate(async () => {
+    const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const M = window.__mode; if (!M) return { missing: true };
+    const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+    M.apply("outdoors", { silent: true });
+    m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: 8.6 }); await sleep(300);
+    let lines = 0, labels = 0;
+    for (let i = 0; i < 30; i++) { await sleep(300);
+      try { lines = m.queryRenderedFeatures({ layers: ["county-line"] }).length;
+            labels = m.queryRenderedFeatures({ layers: ["county-label"] }).length; } catch (e) { }
+      if (lines && labels) break; }
+    const vis = (id) => { try { return m.getLayoutProperty(id, "visibility") !== "none"; } catch (e) { return null; } };
+    const peakMin = (() => { try { return m.getLayer("peak-dot").minzoom; } catch (e) { return null; } })();
+    const src = m.getStyle().sources.poi.data.features;
+    const systems = src.filter((f) => f.properties.k === "system").length;
+    const mtb = src.filter((f) => f.properties.k === "mtb").length;
+    const withMi = src.filter((f) => f.properties.mi > 0).length;
+    const poiF = (() => { try { return JSON.stringify(m.getFilter("poi-dot-major")); } catch (e) { return ""; } })();
+    M.apply("ride", { silent: true }); await sleep(200);
+    const rideCounty = vis("county-line"), ridePeak = (() => { try { return m.getLayer("peak-dot").minzoom; } catch (e) { return null; } })();
+    M.apply(was, { silent: true }); m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+    return { lines, labels, peakMin, systems, mtb, withMi, hasSystem: /"system"/.test(poiF), rideCounty, ridePeak };
+  });
+  if (od.missing) { ok(false, "mode bridge missing"); } else {
+    ok(od.lines > 0 && od.labels > 0, `Outdoors draws county lines and names at 8.6 (${od.lines} lines, ${od.labels} names)`);
+    ok(od.peakMin === 9, `Outdoors shows summits from z9 (minzoom ${od.peakMin})`);
+    ok(od.systems > 100 && od.mtb > 50 && od.withMi === od.systems + od.mtb,
+       `trail-system pins in the payload: ${od.systems} hiking, ${od.mtb} MTB, every one with mileage`);
+    ok(od.hasSystem, "Outdoors' pin set includes trail systems");
+    ok(od.rideCounty === false && od.ridePeak === 10.6, "Ride puts county lines away and summits back to z10.6");
+  }
+
+  /* DESIGN-modes step 3 (take 128) · the walking profile. Measured, not
+     read off the table: Outdoors puts the router on foot, an edge's time is
+     its length at 3 mph, and leaving Outdoors hands the rider's machine back. */
+  const walk = await page.evaluate(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const M = window.__mode, R = window.__route;
+    if (!M || !R || !R.MACHINE || !R.MACHINE.walk) return { missing: true };
+    R.setMachine("sxs");
+    M.apply("outdoors", { silent: true }); await sleep(200);
+    const inOut = R.machine;
+    const e = R.EDGES.find((x) => x.c === "fsroad") || R.EDGES[0];
+    const hrsWalk = (e.L / 1609.34) / R.spd(e);
+    M.apply("ride", { silent: true }); await sleep(200);
+    const back = R.machine;
+    const hrsRide = (e.L / 1609.34) / R.spd(e);
+    M.apply("ride", { silent: true });
+    return { inOut, back, mphWalk: (e.L / 1609.34) / hrsWalk, mphRide: (e.L / 1609.34) / hrsRide,
+             chip: document.querySelector("#c-machine span").textContent };
+  });
+  if (walk.missing) {
+    ok(false, "walk machine or route bridge missing");
+  } else {
+    ok(walk.inOut === "walk", `Outdoors puts the router on foot (machine=${walk.inOut})`);
+    ok(Math.abs(walk.mphWalk - 3) < 0.01, `a walker's edge time is its length at 3 mph (got ${walk.mphWalk.toFixed(2)})`);
+    ok(walk.back === "sxs" && walk.mphRide > 10,
+       `leaving Outdoors gives the side-by-side back (${walk.back}, ${walk.mphRide.toFixed(0)} mph on a forest road)`);
     ok(/"boost"|launch/.test(modes.water.showF || "") || modes.water.launchIn,
        "Water promotes launches and beaches to the first zoom");
+  }
+
+  /* A153 · sparse imagery patches (take 127). The proof is not that a file
+     exists: it is that at a riding area on Satellite the patch layer is a
+     raster layer, visible, and its source has LOADED tiles — and that a
+     request outside every patch box comes back blank rather than as a map
+     error (map.on('error') decides RENDER FAIL). Drill puts back the basemap
+     and the camera. */
+  const patch = await page.evaluate(async () => {
+    const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const T = window.__sat && window.__sat.tiles;   // BUNDLE is not a window global
+    if (!T || !T.sparse) return { sparse: false };
+    let src = null; try { src = m.getStyle().sources.areas.data.features; } catch (e) { }
+    if (!src || !src.length) return { sparse: true, noAreas: true };
+    const big = src.slice().sort((a, b) => b.properties.ac - a.properties.ac)[0];
+    const c = typeof big.properties.c === "string" ? JSON.parse(big.properties.c) : big.properties.c;
+    const cam = { c: m.getCenter(), z: m.getZoom() };
+    const bm = document.querySelector("#c-base span").textContent;
+    m.jumpTo({ center: c, zoom: 14.2 });
+    document.getElementById("c-base").click(); await sleep(300);   // Satellite
+    let loaded = false, errBefore = window.__mapErr || null;
+    for (let i = 0; i < 40; i++) {
+      await sleep(400);
+      try { if (m.getSource("satpatch").loaded()) { loaded = true; break; } } catch (e) { }
+    }
+    const type = (() => { try { return m.getLayer("sat-patch").type; } catch (e) { return null; } })();
+    const vis = (() => { try { return m.getLayoutProperty("sat-patch", "visibility"); } catch (e) { return null; } })();
+    // a tile no patch declares must answer blank, not throw
+    const errAfter = window.__mapErr || null;
+    // back
+    while (document.querySelector("#c-base span").textContent !== bm) {
+      document.getElementById("c-base").click(); await sleep(150); }
+    m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+    return { sparse: true, name: big.properties.n, type, vis, loaded,
+             boxes: (T.boxes || []).length, count: T.count, errRaised: errAfter !== errBefore };
+  });
+  if (!patch.sparse) {
+    ok(true, "no sparse imagery patches in this bundle — skipped, not failed");
+  } else if (patch.noAreas) {
+    ok(false, "sparse patches declared but no riding areas to anchor them");
+  } else {
+    ok(patch.type === "raster" && patch.vis === "visible",
+       `sat-patch is a visible raster layer on Satellite at ${patch.name}`);
+    ok(patch.loaded, `the patch source loaded its tiles at ${patch.name} (${patch.count} tiles in ${patch.boxes} boxes)`);
+    ok(!patch.errRaised, "no map error was raised while tiles outside the patches were requested");
   }
 
   /* A115/A112 · the paddle corridor, and the hazards that make it shippable.

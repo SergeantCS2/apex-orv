@@ -88,6 +88,76 @@ nearest lake; Trail: z11) but not a place — position is position.
    DNR game areas, public-land ownership, hunting units; lake cards.
 6. The guide rewrite (A155) teaches modes; its key bumps (A147).
 
+## Transcribed from Jacob's onX screenshots (take 128)
+
+Four screens, transcribed — what is ON them, then what we already hold for
+each. Nothing below is invented; where a source is unknown it says so.
+
+### 24269 — onX Backcountry-style MTB view (Grayling / West Branch)
+On screen: hillshaded terrain; **named summits with heights and a vertical
+leader** (Murray Hill 1,375 ft, Wagon Wheel Hill 1,460 ft); **trail-SYSTEM
+pins** with a cyclist glyph and the system's name — "Au Sable State Forest -
+North", "West Branch", "Ogemaw Hills Pathway" — at regional zoom, with only
+short fragments of the actual trail lines beside them; public land as a
+translucent green wash (state forest); route shields (30, 33).
+- We have: 323 summits with heights (drawn from z10.6 — onX shows them at
+  roughly z9); 2,949 bike routes (show-only); public land as 87 landcover
+  polygons (too few — see Hunt below).
+- We lack: the **trail-system pin** — one pin per named system, not per
+  segment. Derivable: DNR biking/hiking layers carry `TrailNamePrimary`
+  ("Ogemaw Hills Pathway"); one pin at the centroid of each distinct named
+  system is a poi.py pass, no new source. Ride/MTB and Outdoors both want it.
+
+### 24280 — onX Hunt "My Content · Hunt Areas" (Wisconsin sample)
+On screen: satellite with **orange contour lines labelled in feet** (900 ft,
+1,000 ft); **public land boundary in bright green** ("STATE OF WISCONSIN");
+**private parcel boundaries in red with owner names** ("ELK ROD & GUN CLUB
+INC", "FLURY, JONATHIN J"); a user-drawn hunt area; **typed waypoints** —
+tree stand (blue), trail camera (yellow C), feeder / food plot (red), deer
+sign (white antler), water (white), gate / parking (blue); **wind tags at
+stands** ("← 4E"); dashed cyan walk-in tracks. Premium ("Get Access").
+- We have: waypoints (untyped), breadcrumb tracks, satellite patches.
+- We lack: contours (ruled out statewide at take 75; could be PATCHED over
+  public land the way imagery was), parcel ownership (county GIS; not a
+  free statewide layer in Michigan — likely out of scope), waypoint TYPES
+  (a picker on the existing waypoint: stand / camera / sign / water / gate
+  — cheap), wind (weather; offline app — out of scope).
+
+### 24278 — onX "Public & Private Land Info"
+On screen: satellite; parcel boundaries in orange-red; owner names in bold
+white caps ("DONALDS AND BROWN LLC", "GREENFIELDS LLC"); creek labels; a
+Private Land / Public Land toggle. Premium.
+- The Public Land half is the buildable half: Michigan DNR publishes state
+  forest, game area and recreation area boundaries ("DNR Managed Sites",
+  MichiganDNR, found at take 119 while chasing scramble areas) — the same
+  shape as A140. Private parcels: see above.
+
+### 24276 — onX Hunt overview (Roscommon / Oscoda / Ogemaw)
+On screen: topo-style base; **county boundaries dashed, labelled along the
+line** (ROSCOMMON COUNTY, OSCODA COUNTY, OGEMAW COUNTY, MISSAUKEE COUNTY);
+**named hills at regional zoom with a triangle, name and height** (Cote Dame
+Marie 1,499 ft, Pioneer Ski Hill 1,339, Murray Hill 1,375, Brants Hill
+1,335, Wagon Wheel Hill 1,460, Preachers Hill 1,391, Emery Hill 1,362,
+Timberline Mountain 1,240, Mio Mountain 1,283, "Possible High Point");
+lakes named (Higgins, Houghton, Lake Saint Helen); **route shields** (I-75,
+US-127, M-18/28/30/33/55/72/76/97); highways orange, roads white; public
+land as darker green patches; controls: Weather, compass, Topo/2D, Hunt Map
+Layers, Offline Maps, My Content, Tools, Trail Cameras, Go & Track.
+- We have: the summits (drawn later than onX does), lakes named, 83 county
+  rings in the context payload (used for countyAt, never drawn).
+- We lack, cheaply: **county lines + labels** at regional zoom (the rings
+  exist); summits from z9 in Outdoors; route shields (numbers exist in the
+  address/road data as `ref` — a label layer).
+
+### What this changes in the build order
+- Step 2 (draw foot/bike) gains: **trail-system pins** from DNR
+  `TrailNamePrimary` — the single most useful thing in 24269.
+- Step 5 (Hunt) is now specified: DNR public-land polygons (state forest /
+  game areas / rec areas, bright boundary + wash), Deer Management Unit
+  boundaries (DNR open data), county lines + labels, typed waypoints,
+  summits from z9. Contours as patches over public land, later. Parcels and
+  wind: out of scope, stated.
+
 ## What I need from Jacob before step 5
 
 The onX Hunt and onX Fish screenshots he holds — what is on screen, what

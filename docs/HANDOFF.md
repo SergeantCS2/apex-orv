@@ -1,4 +1,126 @@
-# HANDOFF — through Take 126 · V2
+# HANDOFF — through Take 130 · V2
+
+## Take 130 — 2026-08-26 — the mode picker
+
+Jacob: "make the mode switcher pop out, let me select what mode I want
+rather than it swapping between them." The chip now opens a picker built the
+way the activity chip's is — three rows, each with the mode's name and a
+one-line description of what it is FOR ("Beach, kayak, tube, boat —
+launches and rivers, no trail lines"), so the choice is made from the
+description rather than from remembering a cycle order. The three panels
+(layers, activity, mode) close each other. Render: the chip opens three
+rows in order, choosing Water selects it and closes the picker — 153/0.
+
+---
+
+## Take 129 — 2026-08-26 — three things transcribed from onX, built from held data
+
+**Trail-system pins** (onX 24269). poi.py groups DNR foot / bike / horse
+features by `n` (TrailNamePrimary), sums their length, and pins the
+centroid: kind `system` (hiking) or `mtb` (biking, when half or more of the
+features are the bike class). Statewide corridors — anything spanning more
+than ~40 km (North Country Trail, Iron Belle, Shore To Shore) — and systems
+under half a mile get no pin; 139 skipped. **343 hiking systems, 112 MTB
+systems**, each carrying `mi`, which the card shows ("Black Mountain
+Pathway · 93.8 mi of trail"). Rank 0. Outdoors shows both; Ride shows MTB
+only. Glyph is the day-use tree for now — a dedicated system glyph is a
+badge-sheet change for later.
+
+**County lines and names** (onX 24276). The 83 county rings have been in
+the context payload since take 100, used only by countyAt. Now `county-line`
+(dashed, z5.5–13) and `county-label` (uppercase, letter-spaced, z7–11.5)
+from a source filled in drawCoverage. A "County lines" layer group: on in
+Outdoors, off in Ride and Water — a hunter thinks in counties, a rider in
+trail systems.
+
+**Summits from z9 in Outdoors** (onX 24276 shows them at regional zoom).
+`MODES.peaksFrom` drives setLayerZoomRange on peak-dot / peak-label; Ride
+and Water put them back to 10.6.
+
+Render measures all three in Outdoors and their absence in Ride: 151/0.
+Gate PASSED after one correct refusal (the stub lacked setLayerZoomRange).
+apex-seed-t129.zip sealed; sha256 in chat.
+
+---
+
+## Take 128 — 2026-08-26 — the walking router, and Jacob's onX screens transcribed
+
+**Transcribed, not invented (landmine 190).** Jacob sent four onX screens —
+one MTB (Backcountry-style), three Hunt. DESIGN-modes.md now carries a
+line-by-line transcription of each, paired with what we already hold and
+what is missing. The two cheap, high-value things they reveal:
+- **trail-SYSTEM pins** (24269): one pin per named system — "Ogemaw Hills
+  Pathway", "Au Sable State Forest - North" — at regional zoom, not per
+  segment. Derivable from DNR `TrailNamePrimary`; a poi.py pass.
+- **county lines + labels and summits from z9** (24276): the county rings
+  are already in the context payload, never drawn.
+Hunt is now specified: DNR public-land polygons (state forest / game / rec
+areas), Deer Management Units, typed waypoints (stand / camera / sign /
+water / gate). Parcels with owner names and wind at a stand are out of
+scope, stated.
+
+**DESIGN-modes step 3 · a machine that walks.** `MACHINE.walk` — legal on
+every class a person may stand on, 3 mph regardless of class via `spd()`,
+which overrides the per-class SPEED table the three route-time sites used
+to read directly. Outdoors sets `walk` on entry and hands the rider's
+machine back on exit (`rideMachine`). Foot-only routes remain show-only:
+a hiker is routed along two-track, forest road and ORV trail — honest about
+what the graph holds, and the design says so. Render measures it: machine
+becomes walk, an edge's time is its length at 3.00 mph, leaving Outdoors
+restores sxs at 22 mph. 146/0. Gate PASSED, smoke 5 modes.
+apex-seed-t128.zip sha256 f0591f14…41b2, 83 files.
+
+**Next, in order:** trail-system pins from DNR TrailNamePrimary + county
+lines/labels + summits from z9 in Outdoors (all from held data); marina tag
++ DNR Boating Access Sites + A139 for Water; Hunt data (DNR public-land
+polygons, DMUs, typed waypoints); guide (A147/A155). Open decision for
+Jacob: put the 69,628 foot routes INTO the routing graph (walkable, at a
+graph-size cost) or keep them show-only.
+
+---
+
+## Take 127 — 2026-08-26 — A153 second half: crisp imagery where a rider rides
+
+Statewide the z12+ pyramid was measured impossible at take 75 (8.6 GB at
+z15). It is possible SPARSELY: `imagery.py` now fetches z12–z15 over every
+DNR riding area's bbox + ~2.5 km — **818 tiles, 17.9 MB, 3.4 m/px** — on top
+of the 4096 px statewide mosaic (~234 m/px) that stays underneath. 464 →
+234 → 3.4 m/px across three takes, from the same USGS source.
+
+The app keeps the mosaic on `sat` and adds `satpatch`, a raster source read
+through an `apexsat://` protocol handler (the glyph pack's pattern). Two
+rules make sparse tiles safe: a tile outside a declared box is never
+requested — the box list ships in the manifest (`imagery_tiles.boxes`) —
+and a requested-but-missing tile answers with a blank PNG, never an error,
+because `map.on('error')` decides RENDER FAIL. `sat-patch` toggles with
+`sat`; a zero-radius circle layer stands in when a bundle has no patches so
+the id is stable for the toggle and the harness.
+
+Smoke's box-era rule ("if the bundle carries tiles, `sat` is raster") was
+taught the sparse shape. Render asserts, at the largest riding area on
+Satellite, that the patch layer is a visible raster whose source LOADED,
+and that out-of-box requests raise no error — 143/0. The first version of
+that check silently skipped because it read `window.BUNDLE`, which does not
+exist (app.js is wrapped; areaCard at 121 was the same lesson); it reads
+`window.__sat` now. A count that goes up by 1 instead of 3 is a check that
+took its skip branch — read the log, do not trust the total.
+
+Bundle ~154 MB. Field: Hybrid over Silver Lake or St. Helen at street zoom
+is a sharp photo; 3 km outside the polygon it drops back to the state
+mosaic, by design.
+
+Gate PASSED after one correct refusal: check_orphan_sources discovers source
+names by the character after `name:` and did not admit `(` — the take-127
+`sat:(TILES&&!SPARSE)?…` opens with one. Regex widened; the comment above
+it already described the conditional case. apex-seed-t127.zip sha256
+db816651…b82c, 83 files.
+
+**Next:** `walk` machine + profile (DESIGN-modes step 3); marina tag + DNR
+Boating Access Sites + A139 for Water; hunt/fish after Jacob's onX
+screenshots; guide (A147/A155). Open from the field: 69,628 foot routes at
+state zoom — Jacob's verdict pending.
+
+---
 
 ## Take 126 — 2026-08-26 — Jacob's first field pass on modes
 
@@ -47,7 +169,13 @@ controls its layer state (act → all) as well as its viewport, and restores
 both. Mio Δ30 "at the nearest node, 985 ft away" is now readable: the
 anchor sits 300 m off the network.
 
-Render 138/0 (+2 mode assertions), smoke 5 modes.
+Render 140/0 (+2 mode assertions), smoke 5 modes, gate PASSED.
+apex-seed-t126.zip sha256 908aeb68…9e97, 83 files, bundle 136.5 MB.
+
+**Next:** per-area imagery tiles (A153 second half — read the app's tile
+source and imagery.py's budget machinery first; both are box-era); `walk`
+machine + profile; marina + DNR Boating Access Sites + A139 for Water;
+hunt/fish after Jacob's onX screenshots (landmine 190); guide (A147/A155).
 
 ---
 

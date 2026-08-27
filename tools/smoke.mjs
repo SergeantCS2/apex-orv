@@ -216,6 +216,8 @@ class MapStub {
   /* take 125: applyMode captures each POI layer's base filter once */
   getFilter(id) { const l = (record.filters || []).filter((x) => x[0] === id); return l.length ? l[l.length - 1][1] : undefined; }
   setLayoutProperty(id, k, v) { record.layout.push([id, k, v]); }
+  /* take 129: Outdoors moves the summit layers' minzoom */
+  setLayerZoomRange(id, a, b) { (record.zoomRanges ||= []).push([id, a, b]); }
   setPaintProperty(id, k, v) { record.paint.push([id, k, v]); this._paint.set(id + "|" + k, v); }
   /* Machine legality reads the CURRENT paint back out of the style to find each
      layer's base opacity, rather than keeping a second copy of it (take 80).
@@ -1115,7 +1117,19 @@ if (NO_GPS) {
 {
   const sat = record.sources.sat;
   const tiles = manifest.imagery_tiles;
-  if (tiles) {
+  if (tiles && tiles.sparse) {
+    /* Take 127: statewide the pyramid is SPARSE — patches over the riding
+       areas on a second raster source, above the mosaic that covers the
+       state. Both shapes are asserted: the mosaic stays, the patches are
+       real tiles, and every tile the app may ask for is in a declared box. */
+    const sp = record.sources.satpatch;
+    ok(sat && sat.type === "image", "statewide mosaic stays underneath (image source)");
+    ok(sp && sp.type === "raster" && sp.maxzoom === tiles.zmax,
+       `riding-area patches are a raster source to z${sp && sp.maxzoom}`);
+    ok(Array.isArray(tiles.boxes) && tiles.boxes.length >= 4,
+       `${tiles.boxes.length} patch boxes declared — nothing outside them is ever requested`);
+    ok(tiles.count > 100, `${tiles.count} tiles, ${(tiles.bytes / 1048576).toFixed(0)} MB over the riding areas`);
+  } else if (tiles) {
     ok(sat && sat.type === "raster", `satellite is a raster tile source (${sat && sat.type})`);
     ok(sat && sat.maxzoom === tiles.zmax, `tiles served to z${sat && sat.maxzoom}`);
     ok(tiles.count > 100, `${tiles.count} tiles, ${(tiles.bytes / 1048576).toFixed(0)} MB`);

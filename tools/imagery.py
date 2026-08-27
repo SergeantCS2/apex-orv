@@ -134,8 +134,8 @@ def tiles(zmax):
         z12-z16 158 MB   1.7 m/px
     """
     if R.bulk:
-        print('imagery: bulk region — the z12+ tile pyramid was measured impossible statewide at take 75 (8.6 GB at z15); the low-zoom underlay ships, the pyramid does not, and Hybrid says so')
-        return
+        print('imagery: bulk region — the z12+ tile pyramid was measured impossible statewide at take 75 (8.6 GB at z15); the low-zoom underlay ships everywhere, and the pyramid ships as PATCHES over the riding areas (take 127)')
+        return patches(zmax)
 
     root = "imagery_tiles"
     if os.path.isdir(root):
@@ -167,6 +167,57 @@ def tiles(zmax):
                "bytes": bytes_}, open("imagery_tiles.json", "w"))
     print(f"tiles: {total} files, {mb:.1f} MB, z12-z{zmax} "
           f"({156543.03 * math.cos(math.radians((S + N) / 2)) / (2 ** zmax):.2f} m/px)")
+
+
+def patches(zmax=15, pad=0.03):
+    """A153 second half (take 127): sparse z12–z15 tiles over every DNR riding
+    area (areas_payload.json, which runs before this step) plus ~2.5 km of
+    the trails around it. Crisp imagery exactly where a rider rides, on top of
+    the statewide mosaic that stays underneath everything else. The app reads
+    the tiles through a protocol that answers a missing tile with a blank one,
+    so no tile outside a patch is ever an error. ~1,200 tiles, ~25 MB."""
+    if not os.path.exists("areas_payload.json"):
+        print("imagery: no areas_payload.json — no imagery patches")
+        if os.path.exists("imagery_tiles.json"):
+            os.remove("imagery_tiles.json")
+        return
+    areas = json.load(open("areas_payload.json")).get("a", [])
+    root = "imagery_tiles"
+    if os.path.isdir(root):
+        import shutil
+        shutil.rmtree(root)
+    boxes, total, bytes_, seen = [], 0, 0, set()
+    for ar in areas:
+        xs = [pt[0] for ring in ar["g"] for pt in ring]
+        ys = [pt[1] for ring in ar["g"] for pt in ring]
+        w, s_, e, n = min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad
+        for z in range(12, zmax + 1):
+            x0, y0 = t_xy(w, n, z)
+            x1, y1 = t_xy(e, s_, z)
+            boxes.append([z, x0, y0, x1, y1])
+            jobs = [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)
+                    if (z, x, y) not in seen]
+            for j in jobs:
+                seen.add((z,) + j)
+
+            def one(j):
+                x, y = j
+                return j, fetch(z, x, y)
+
+            with ThreadPoolExecutor(max_workers=10) as ex:
+                for (x, y), b in ex.map(one, jobs):
+                    if not b:
+                        continue
+                    d = os.path.join(root, str(z), str(x))
+                    os.makedirs(d, exist_ok=True)
+                    open(os.path.join(d, f"{y}.jpg"), "wb").write(b)
+                    total += 1
+                    bytes_ += len(b)
+        print(f"  patch {ar['n']}: z12–z{zmax}")
+    json.dump({"zmin": 12, "zmax": zmax, "tiles": total, "bytes": bytes_,
+               "sparse": True, "boxes": boxes}, open("imagery_tiles.json", "w"))
+    print(f"tiles: {total} files, {bytes_ / 1048576:.1f} MB, sparse patches over "
+          f"{len(areas)} riding area(s)")
 
 
 if __name__ == "__main__":

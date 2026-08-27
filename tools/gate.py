@@ -924,7 +924,8 @@ def check_orphan_sources():
     j = a.index("layers:[", i)
     # a source may be declared conditionally — `sat:TILES?{type:'raster'...}` —
     # so match the NAME at this indent, not the shape that follows it
-    srcs = set(re.findall(r"^\s{4}([a-z]+):(?=\s*[\{A-Za-z])", a[i:j], re.M))
+    # ...and take 127's `sat:(TILES&&!SPARSE)?{...}` opens with a paren
+    srcs = set(re.findall(r"^\s{4}([a-z]+):(?=\s*[\{\(A-Za-z])", a[i:j], re.M))
     lays = set(re.findall(r"source:'([a-z]+)'", a[j:]))
     orphan = sorted(srcs - lays)
     ghost = sorted(lays - srcs)

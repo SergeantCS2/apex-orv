@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 126.* Ranked by blocking-ness, not by interest.
+*Current as of take 130.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2443,3 +2443,37 @@ assertions per mode from resolved style state.
   rows still count against the accent budget.
 - **Next (step 2):** Jacob's field verdict on 69,628 foot routes at state
   zoom; if hairball, a `pri` rank for show-only routes like the pins got.
+
+### Take 126 — shipped
+Jacob's modes field pass: Outdoors relief OFF (hillshade also 850 → 4096 px
+statewide); Ride drops launch/beach and demotes store/food/info to z13; Water
+boosts launch/beach to rank 0; minor roads on imagery fade in from z12,
+highways at 0.35; statewide mosaic 1500 → 4096 px (~464 → ~234 m/px); ON-dot
+bone not orange; trail-names check controls act as well as viewport.
+- **Ruled out:** wrapping the destination layer's zoom-step filter inside
+  `all` for the mode constraints — a zoom step is legal only at the top of
+  a filter (landmine 52); modeFilter() applies constraints per branch.
+- **Ruled out:** a 6400 px native mosaic — the Fold's 8192 texture allows
+  it, but 4096 is the floor other devices guarantee.
+
+### Take 127 — shipped
+A153 second half: sparse z12–z15 imagery patches over the 8 riding areas
+(818 tiles, 17.9 MB, 3.4 m/px) on a second raster source above the
+statewide mosaic, read through an apexsat:// protocol that answers out-of-
+box and missing tiles with a blank — never a map error. Render proves the
+layer is visible and its source loaded at St. Helen; 143/0.
+- **Ruled out:** a statewide pyramid (8.6 GB at z15, take 75 stands).
+- **Ruled out:** plain tile URLs — a 404 is a map error, and map.on('error')
+  decides RENDER FAIL.
+- **Ruled out:** reading window.BUNDLE from the harness — app.js is wrapped;
+  the check silently skipped and only the count (141, not 143) gave it away.
+
+### Take 128 — shipped
+DESIGN-modes step 3: `walk` machine (3 mph via spd() override; Outdoors
+enters on foot and restores the rider's machine on exit). Four onX screens
+transcribed into DESIGN-modes.md; Hunt specified from them.
+- **Ruled out:** routing over the 69,628 foot routes now — they are
+  show-only by graph design; adding them is a size/conflation decision for
+  Jacob, recorded as open.
+- **Ruled out:** parcel owner names and wind-at-stand for Hunt — no free
+  statewide source / needs weather; stated in the design rather than faked.

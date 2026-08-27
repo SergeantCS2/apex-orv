@@ -114,10 +114,10 @@
   /* Panels rise rather than blink. transform+opacity only — both composite on
      the GPU, so this costs no layout work on a phone that is also drawing a
      map. */
-  #lyrpanel,#actpanel{transform-origin:top left;
+  #lyrpanel,#actpanel,#modepanel{transform-origin:top left;
     transition:opacity var(--m-base) var(--m-ease),
                transform var(--m-base) var(--m-ease)}
-  #lyrpanel[hidden],#actpanel[hidden]{display:block !important;
+  #lyrpanel[hidden],#actpanel[hidden],#modepanel[hidden]{display:block !important;
     opacity:0;transform:translateY(-6px) scale(.98);pointer-events:none;
     visibility:hidden}
   .chip,.basebtn,.act{transition:background-color var(--m-fast) var(--m-ease),
@@ -148,7 +148,7 @@
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{transition-duration:1ms !important;
       animation-duration:1ms !important}
-    #lyrpanel[hidden],#actpanel[hidden]{display:none !important}
+    #lyrpanel[hidden],#actpanel[hidden],#modepanel[hidden]{display:none !important}
   }
   #shell{display:grid;grid-template-rows:1fr auto auto;height:100dvh;
     padding-top:env(safe-area-inset-top)}
@@ -225,6 +225,20 @@
     background:rgba(24,22,18,.95);border:1px solid rgba(255,255,255,.22);
     border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45)}
   #actpanel[hidden]{display:none}
+  /* take 130 · Jacob: "let me select what mode I want rather than it
+     swapping between them." The chip opens a picker like the activity chip
+     does; each row says what the mode is FOR, so the choice is made from the
+     description, not from memory of a cycle order. */
+  #modepanel{position:absolute;left:11px;top:246px;z-index:5;max-width:min(268px,78vw);
+    background:rgba(24,22,18,.95);border:1px solid rgba(255,255,255,.22);
+    border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45)}
+  #modepanel[hidden]{display:none}
+  .moderow{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
+    min-height:44px;padding:7px 10px;background:none;border:0;border-radius:7px;color:#F2ECE0;
+    font:700 var(--t-md)/1.2 Barlow,Roboto,system-ui,sans-serif;text-align:left}
+  .moderow .msub{font:500 var(--t-sm)/1.25 Barlow,Roboto,system-ui,sans-serif;color:#B8B0A2}
+  .moderow.on{background:rgba(245,239,226,.12)}
+  .moderow.on::before{content:'';display:none}
   .actrow{display:flex;align-items:center;gap:9px;width:100%;min-height:38px;
     padding:5px 8px;background:none;border:0;border-radius:7px;color:#F2ECE0;
     font:600 var(--t-md)/1.2 Barlow,Roboto,system-ui,sans-serif;text-align:left}
@@ -483,7 +497,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 126</span>
+    <span id="title"><b>APEX</b> ORV · Take 130</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -504,6 +518,7 @@
     <button id="c-act" class="basebtn actbtn">__IC_vehicle__<span>All routes</span></button>
     <button id="c-mode" class="basebtn modebtn">__IC_mountain__<span>Ride</span></button>
     <div id="actpanel" hidden></div>
+    <div id="modepanel" hidden></div>
     <!-- A91 · one place that owns what is on the map. The tools strip had
          reached sixteen chips with basemap, relief and labels scattered among
          ride actions, and the 59 places added at take 89 had no toggle at all.

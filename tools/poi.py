@@ -143,6 +143,52 @@ def main():
             for part in parts if g.get("type") in ("LineString", "MultiLineString") else []:
                 for pt in part:
                     _tadd(pt[0], pt[1])
+    # Trail SYSTEMS (take 129, transcribed from Jacob's onX screen 24269): one
+    # pin per named DNR hiking / biking / horse system — "Ogemaw Hills
+    # Pathway", "Black Mountain Pathway" — at the system's centroid, carrying
+    # its total mileage. Statewide corridors (North Country Trail, Iron Belle,
+    # Shore To Shore) are lines, not places: anything spanning more than
+    # ~40 km keeps its line and gets no pin. Hiking systems are kind
+    # `system`; biking systems are `mtb`, so Ride can show them alone.
+    if os.path.exists("authoritative.json"):
+        import math
+        sysd = {}
+        for f in json.load(open("authoritative.json")):
+            if f.get("src") != "dnr" or f.get("c") not in ("foot", "bike", "horse"):
+                continue
+            nm = (f.get("n") or "").strip()
+            g = f.get("geometry") or {}
+            if not nm or g.get("type") not in ("LineString", "MultiLineString"):
+                continue
+            parts = g["coordinates"] if g["type"] == "MultiLineString" else [g["coordinates"]]
+            d = sysd.setdefault(nm, {"xs": [], "ys": [], "m": 0.0, "bike": 0, "n": 0})
+            for part in parts:
+                for a, b in zip(part, part[1:]):
+                    dx = (b[0] - a[0]) * 111320 * math.cos(math.radians(a[1]))
+                    dy = (b[1] - a[1]) * 111320
+                    d["m"] += math.hypot(dx, dy)
+                for pt in part:
+                    d["xs"].append(pt[0]); d["ys"].append(pt[1])
+            d["bike"] += 1 if f.get("c") == "bike" else 0
+            d["n"] += 1
+        added = skipped = 0
+        for nm, d in sysd.items():
+            if not d["xs"]:
+                continue
+            span = math.hypot((max(d["xs"]) - min(d["xs"])) * 111320 * 0.72,
+                              (max(d["ys"]) - min(d["ys"])) * 111320)
+            if span > 40000 or d["m"] < 800:
+                skipped += 1
+                continue
+            kind = "mtb" if d["bike"] * 2 >= d["n"] else "system"
+            out.append({"k": kind, "n": nm,
+                        "p": [round(sum(d["xs"]) / len(d["xs"]), 5),
+                              round(sum(d["ys"]) / len(d["ys"]), 5)],
+                        "mi": round(d["m"] / 1609.34, 1)})
+            added += 1
+        print(f"poi: trail systems — {added} pinned ({skipped} skipped as statewide "
+              f"corridors or under half a mile)")
+
     th_before = sum(1 for r in out if r["k"] == "trailhead")
     out = [r for r in out if r["k"] != "trailhead" or _near_trail(r["p"][0], r["p"][1])]
     th_after = sum(1 for r in out if r["k"] == "trailhead")
@@ -177,7 +223,7 @@ def main():
     #   1  named launches and beaches
     #   2  unnamed launches and beaches (a place you may put in, no name)
     #   3  services — fuel, food, stores, info, water, toilets, shelters
-    PRI0 = {"camp", "trailhead", "dayuse", "view"}
+    PRI0 = {"camp", "trailhead", "dayuse", "view", "system", "mtb"}
     PRI1 = {"launch", "beach"}
     for r in out:
         if r["k"] in PRI0:

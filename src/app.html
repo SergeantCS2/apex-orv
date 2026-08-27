@@ -114,10 +114,10 @@
   /* Panels rise rather than blink. transform+opacity only — both composite on
      the GPU, so this costs no layout work on a phone that is also drawing a
      map. */
-  #lyrpanel,#actpanel{transform-origin:top left;
+  #lyrpanel,#actpanel,#modepanel{transform-origin:top left;
     transition:opacity var(--m-base) var(--m-ease),
                transform var(--m-base) var(--m-ease)}
-  #lyrpanel[hidden],#actpanel[hidden]{display:block !important;
+  #lyrpanel[hidden],#actpanel[hidden],#modepanel[hidden]{display:block !important;
     opacity:0;transform:translateY(-6px) scale(.98);pointer-events:none;
     visibility:hidden}
   .chip,.basebtn,.act{transition:background-color var(--m-fast) var(--m-ease),
@@ -148,7 +148,7 @@
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{transition-duration:1ms !important;
       animation-duration:1ms !important}
-    #lyrpanel[hidden],#actpanel[hidden]{display:none !important}
+    #lyrpanel[hidden],#actpanel[hidden],#modepanel[hidden]{display:none !important}
   }
   #shell{display:grid;grid-template-rows:1fr auto auto;height:100dvh;
     padding-top:env(safe-area-inset-top)}
@@ -225,6 +225,20 @@
     background:rgba(24,22,18,.95);border:1px solid rgba(255,255,255,.22);
     border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45)}
   #actpanel[hidden]{display:none}
+  /* take 130 · Jacob: "let me select what mode I want rather than it
+     swapping between them." The chip opens a picker like the activity chip
+     does; each row says what the mode is FOR, so the choice is made from the
+     description, not from memory of a cycle order. */
+  #modepanel{position:absolute;left:11px;top:246px;z-index:5;max-width:min(268px,78vw);
+    background:rgba(24,22,18,.95);border:1px solid rgba(255,255,255,.22);
+    border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45)}
+  #modepanel[hidden]{display:none}
+  .moderow{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
+    min-height:44px;padding:7px 10px;background:none;border:0;border-radius:7px;color:#F2ECE0;
+    font:700 var(--t-md)/1.2 Barlow,Roboto,system-ui,sans-serif;text-align:left}
+  .moderow .msub{font:500 var(--t-sm)/1.25 Barlow,Roboto,system-ui,sans-serif;color:#B8B0A2}
+  .moderow.on{background:rgba(245,239,226,.12)}
+  .moderow.on::before{content:'';display:none}
   .actrow{display:flex;align-items:center;gap:9px;width:100%;min-height:38px;
     padding:5px 8px;background:none;border:0;border-radius:7px;color:#F2ECE0;
     font:600 var(--t-md)/1.2 Barlow,Roboto,system-ui,sans-serif;text-align:left}
@@ -483,7 +497,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 126</span>
+    <span id="title"><b>APEX</b> ORV · Take 130</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -504,6 +518,7 @@
     <button id="c-act" class="basebtn actbtn">__IC_vehicle__<span>All routes</span></button>
     <button id="c-mode" class="basebtn modebtn">__IC_mountain__<span>Ride</span></button>
     <div id="actpanel" hidden></div>
+    <div id="modepanel" hidden></div>
     <!-- A91 · one place that owns what is on the map. The tools strip had
          reached sixteen chips with basemap, relief and labels scattered among
          ride actions, and the 59 places added at take 89 had no toggle at all.
@@ -719,7 +734,7 @@ function decode(a){var p=[],x=0,y=0;for(var i=0;i<a.length;i+=2){x+=a[i];y+=a[i+
    `highclearancevehicle` are fetched by ingest and dropped before the bundle.
    It falls back to the class rule, which excludes fstrail entirely, so it is
    conservative rather than wrong. Recorded as open — see A86. */
-var MACH_FLAG={bike:'moto',quad:'atv',sxs:null};
+var MACH_FLAG={bike:'moto',quad:'atv',sxs:null,walk:null};
 
 /* ══ SPECIAL RESTRICTIONS (A101) ════════════════════════════════════════════
    The DNR publishes a free-text restriction on 180 features statewide. It is
@@ -830,14 +845,22 @@ el('b-src').className='badge good';
 var MACHINE={
   bike:{lbl:'🏍 Dirt bike 24"',ok:['route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track']},
   quad:{lbl:'🛻 Quad 50"',ok:['route72','trail50','mccct','fstrail','fsroad','paved','minor','track']},
-  sxs:{lbl:'🚙 Side-by-side 72"',ok:['route72','fsroad','paved','minor']}
+  sxs:{lbl:'🚙 Side-by-side 72"',ok:['route72','fsroad','paved','minor']},
+  /* DESIGN-modes step 3 (take 128): a machine that walks. Legal on every
+     class a person may stand on; 3 mph regardless of class (`spd` overrides
+     the per-class SPEED table). The router already routes by machine, so a
+     walking profile is a table row, not new routing. Foot-only routes are
+     still show-only — a hiker is routed along two-track, forest road and
+     ORV trail, which is honest about what the graph holds. */
+  walk:{lbl:'🥾 On foot',ok:['route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track'],spd:3}
 };
+function spd(e){var m=MACHINE[machine];return (m&&m.spd)||SPEED[e.c]||14}
 /* machIdx, not `mi` — take 15: `mi=0` here silently overwrote the mi(a,b)
    distance function (hoisted from the safety block below), so every Phase-4
    distance call was invoking the number 0 from take 7 onward. The Python
    verifiers mirror the maths and structurally cannot catch a wiring collision
    like this; only executing the shipped file did. */
-var ORDER=['bike','quad','sxs'],machIdx=0,machine='bike';
+var ORDER=['bike','quad','sxs','walk'],machIdx=0,machine='bike',rideMachine='bike';
 var SPEED={route72:25,fsroad:22,trail50:16,fstrail:14,mccct:11,moto24:11,
   paved:45,minor:28,track:14};
 var EFFORT={paved:1,route72:1.05,fsroad:1.1,minor:1.15,trail50:1.5,fstrail:1.7,
@@ -1023,6 +1046,11 @@ var POIKIND={
   launch:   {c:'#2E7FA8', h:'Boat launch', r:2, d:1, g:'boat'},
   beach:    {c:'#C9A227', h:'Beach',       r:3, d:1, g:'sun'},
   dayuse:   {c:'#3D6B35', h:'Day use',     r:3, d:1, g:'tree'},
+  /* take 129 · transcribed from onX 24269: one pin per named trail SYSTEM,
+     not per segment — "Ogemaw Hills Pathway" is a destination. Hiking
+     systems and MTB systems are separate kinds so Ride can show MTB alone. */
+  system:   {c:'#2F7D4F', h:'Trail system', r:1, d:1, g:'tree'},
+  mtb:      {c:'#1F7A6B', h:'MTB trail system', r:1, d:1, g:'tree'},
   store:    {c:'#6B4FA0', h:'Store',       r:3, g:'bag'},
   food:     {c:'#6B4FA0', h:'Food',        r:4, g:'cup'},
   view:     {c:'#3D6B35', h:'Viewpoint',   r:4, d:1, g:'eye'},
@@ -1099,7 +1127,7 @@ var poif=((POIS&&POIS.p)||[]).map(function(r,i){
          unnamed and is labelled by KIND. Saying "Beach" is honest; inventing
          "Island Lake Beach" from the day-use area 6 m away is not
          (poi.py explains the exception). */
-      n:r.n||k.h,named:r.n?1:0},
+      n:r.n||k.h,named:r.n?1:0,mi:r.mi||0},
     geometry:{type:'Point',coordinates:r.p}}});
 
 /* A87 · contour lines, a fifth product of the DEM ingest that already runs.
@@ -1653,6 +1681,26 @@ var placeFC={type:'FeatureCollection',features:PLACES.map(function(p){
    what cannot be shown. */
 var TILES=BUNDLE.tiles||null;
 var TILEURL='bundle/imagery/{z}/{x}/{y}.jpg';
+/* A153 (take 127) · SPARSE tiles. Statewide the pyramid ships only over the
+   riding areas, ON TOP of the mosaic that covers the state. Two rules keep
+   that honest: (1) a tile outside a declared box is never requested — the
+   box list comes with the bundle; (2) a tile that is requested and missing
+   comes back as a blank tile, not an error, because map.on('error') is what
+   decides RENDER FAIL and a rider zoomed on Manistee must not see it. Both
+   live in one protocol handler, like the glyph pack's. */
+var SPARSE=!!(TILES&&TILES.sparse);
+var BLANK_PNG=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='),function(c){return c.charCodeAt(0)});
+function inPatch(z,x,y){var b=(TILES&&TILES.boxes)||[];
+  for(var i=0;i<b.length;i++){var q=b[i];
+    if(q[0]===z&&x>=q[1]&&x<=q[3]&&y>=q[2]&&y<=q[4])return true}
+  return false}
+if(SPARSE)maplibregl.addProtocol('apexsat',function(params){
+  var m=/apexsat:\/\/(\d+)\/(\d+)\/(\d+)/.exec(params.url||'');
+  var blank=function(){return {data:BLANK_PNG.buffer.slice(0)}};
+  if(!m||!inPatch(+m[1],+m[2],+m[3]))return Promise.resolve(blank());
+  return fetch('bundle/imagery/'+m[1]+'/'+m[2]+'/'+m[3]+'.jpg')
+    .then(function(r){return r.ok?r.arrayBuffer().then(function(b){return {data:b}}):blank()})
+    .catch(blank)});
 var SAT_OK=!!TILES||!!(SAT&&SATB&&(SATB[2]-SATB[0])>1e-6&&(SATB[3]-SATB[1])>1e-6);
 var SATBOX=SAT_OK?SATB:(BUNDLE.bbox||[0,0,1,1]);
 var SATURL=SAT_OK?SAT:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -1671,12 +1719,15 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        two-track is one metre wide, which is why the satellite layer was
        unusable (take 42). The mosaic stays as the fallback for the
        single-file build, which cannot carry 2,000 files. */
-    sat:TILES?{type:'raster',tiles:[TILEURL],tileSize:256,
+    sat:(TILES&&!SPARSE)?{type:'raster',tiles:[TILEURL],tileSize:256,
       minzoom:TILES.zmin,maxzoom:TILES.zmax,
       bounds:[SATBOX[0],SATBOX[1],SATBOX[2],SATBOX[3]],
       attribution:'USGS'}
      :{type:'image',url:SATURL,
       coordinates:[[SATBOX[0],SATBOX[3]],[SATBOX[2],SATBOX[3]],[SATBOX[2],SATBOX[1]],[SATBOX[0],SATBOX[1]]]},
+    satpatch:SPARSE?{type:'raster',tiles:['apexsat://{z}/{x}/{y}'],tileSize:256,
+      minzoom:TILES.zmin,maxzoom:TILES.zmax,attribution:'USGS'}
+      :{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     hs:{type:'image',url:SHADE,
       coordinates:[[TR.b[0],TR.b[3]],[TR.b[2],TR.b[3]],[TR.b[2],TR.b[1]],[TR.b[0],TR.b[1]]]},
     ground:{type:'geojson',data:(function(){
@@ -1703,6 +1754,8 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     shortpts:{type:'geojson',data:shortPts},
     showonly:{type:'geojson',data:{type:'FeatureCollection',features:showFeats}},
     state:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
+    county:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
+    countylbl:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     lakes:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     approach:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     alt:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
@@ -1757,6 +1810,12 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       paint:{'raster-opacity':1,'raster-fade-duration':0,
         'raster-saturation':-0.35,'raster-brightness-max':0.82,
         'raster-contrast':0.06}},
+    /* A153 · crisp tiles over the riding areas, above the mosaic. Toggled
+       with 'sat'. A geojson stand-in when the bundle has no patches keeps
+       the layer id stable for the toggle and the harness. */
+    SPARSE?{id:'sat-patch',type:'raster',source:'satpatch',layout:{visibility:'none'},
+      paint:{'raster-opacity':1,'raster-fade-duration':150}}
+      :{id:'sat-patch',type:'circle',source:'satpatch',layout:{visibility:'none'},paint:{'circle-radius':0}},
     /* Relief under the map, multiplied into the sand rather than laid over it,
        so trails stay the loudest thing on screen. */
     {id:'hillshade',type:'raster',source:'hs',
@@ -1893,6 +1952,20 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       paint:{'line-color':'#8A8175',
         'line-width':['interpolate',['linear'],['zoom'],5,1.0,7,1.4,9.5,1.8],
         'line-opacity':['interpolate',['linear'],['zoom'],5,0.9,8.6,0.7,9.6,0]}},
+    /* take 129 · county lines and names (transcribed from onX 24276, which
+       draws them dashed with the name along the line). The 83 county rings
+       have been in the context payload since take 100, used only to answer
+       "what county am I in". Off in Ride and Water, on in Outdoors — a
+       hunter thinks in counties; a rider thinks in trail systems. */
+    {id:'county-line',type:'line',source:'county',minzoom:5.5,maxzoom:13,
+      layout:{visibility:'none'},
+      paint:{'line-color':'#6F6759','line-width':w(0.8,1.2,1.6),
+        'line-dasharray':[4,2.5],'line-opacity':0.8}},
+    {id:'county-label',type:'symbol',source:'countylbl',minzoom:7,maxzoom:11.5,
+      layout:{visibility:'none','text-field':['get','n'],'text-font':['APEX'],
+        'text-size':w(9.5,11,12.5),'text-letter-spacing':0.12,'text-transform':'uppercase',
+        'text-allow-overlap':false,'text-padding':4},
+      paint:{'text-color':'#6F6759','text-halo-color':'#F2F3F0','text-halo-width':1.6}},
     {id:'lake-label',type:'symbol',source:'lakes',maxzoom:8.4,
       layout:{'text-field':['get','n'],'text-font':['APEX'],
         'text-size':['interpolate',['linear'],['zoom'],5,9.5,7.5,12],
@@ -2407,7 +2480,7 @@ function summarise(path){
      approved, partly approved, or not" — crossing M-33 is inevitable and fine,
      riding a road for ten miles is a different trip (take 58). */
   var mDes=0,mDirt=0,mRoad=0;
-  path.forEach(function(e){var L=e.L/1609.34;mi+=L;hrs+=L/(SPEED[e.c]||14);
+  path.forEach(function(e){var L=e.L/1609.34;mi+=L;hrs+=L/spd(e);
     if(DESIG[e.c])mDes+=L; else if(DIRT[e.c])mDirt+=L; else mRoad+=L;
     if(!PAVED[e.c])off+=L;
     var a=attrs(e);if(a.auth!=='legal')adv+=L;
@@ -2445,7 +2518,7 @@ var PROFILES=[
      expensive but never forbidden: crossing M-33 is inevitable. */
   {k:'trail',h:'Most trail',f:function(e){
      return e.L*(DESIG[e.c]?0.55:DIRT[e.c]?1.3:8)}},
-  {k:'fast',h:'Fastest',f:function(e){return e.L/(SPEED[e.c]||14)}},
+  {k:'fast',h:'Fastest',f:function(e){return e.L/spd(e)}},
   {k:'easy',h:'Easiest',f:function(e){return e.L*(EFFORT[e.c]||2)+UP[e.i]*CLIMB_K}},
   {k:'pave',h:'Pavement soonest',f:function(e){return e.L*(PAVED[e.c]?1:9)}},
   {k:'short',h:'Shortest',f:function(e){return e.L}},
@@ -2844,7 +2917,7 @@ function buildLoops(startNode,targetMi){
   var shapes=[
     {h:'Loop · most trail',k:'ltrail',f:function(e){
         return e.L*(DESIG[e.c]?0.55:DIRT[e.c]?1.3:8)}},
-    {h:'Loop · fastest',k:'lfast',f:function(e){return e.L/(SPEED[e.c]||14)}}
+    {h:'Loop · fastest',k:'lfast',f:function(e){return e.L/spd(e)}}
   ];
   shapes.forEach(function(sh){
     var best=null;
@@ -3336,21 +3409,22 @@ var MODES=[
      Ride" — launches and beaches belong to Water (the take-125 rule that Ride
      is today's map is overruled by the rider), and the wall of store/food
      badges at 3000 ft is noise on a riding map, so those demote to z13. */
-  {k:'ride',     h:'Ride',     act:'ride',
-   kinds:['trailhead','camp','fuel','dayuse','view','info','water','toilet','shelter','store','food'],
+  {k:'ride',     h:'Ride',     s:'ORV, dirt bike, side-by-side, MTB — trails, riding areas, fuel', act:'ride',
+   kinds:['trailhead','camp','fuel','dayuse','view','info','water','toilet','shelter','store','food','mtb'],
    demote:['store','food','info'],
-   groups:{areas:true,peaks:false,contour:false,relief:false,paddle:false,places:true},
+   groups:{areas:true,peaks:false,contour:false,relief:false,paddle:false,places:true,county:false},
    basemap:'Map', zoom:9},
-  {k:'outdoors', h:'Outdoors', act:'foot',
-   kinds:['trailhead','camp','shelter','water','toilet','view','launch','beach','dayuse','info'],
+  {k:'outdoors', h:'Outdoors', s:'Hike, camp, hunt, fish — on foot, with hills, counties and rivers', act:'foot', machine:'walk',
+   kinds:['trailhead','camp','shelter','water','toilet','view','launch','beach','dayuse','info','system','mtb'],
+   peaksFrom:9,
    /* relief OFF: the statewide z10 hillshade upscaled to 5 mi is grey
       blotches (Jacob, 24416). Named hills and paddling carry the mode. */
-   groups:{areas:false,peaks:true,contour:true,relief:false,paddle:true,places:true},
+   groups:{areas:false,peaks:true,contour:true,relief:false,paddle:true,places:true,county:true},
    basemap:'Map', zoom:11},
-  {k:'water',    h:'Water',    act:'none',
+  {k:'water',    h:'Water',    s:'Beach, kayak, tube, boat — launches and rivers, no trail lines', act:'none',
    kinds:['launch','beach','camp','dayuse','info','toilet','fuel'],
    boost:['launch','beach'],
-   groups:{areas:false,peaks:false,contour:false,relief:false,paddle:true,places:true},
+   groups:{areas:false,peaks:false,contour:false,relief:false,paddle:true,places:true,county:false},
    basemap:'Hybrid', zoom:10}
 ];
 var mode='ride', POI_BASE={};
@@ -3391,8 +3465,21 @@ function applyMode(k,opts){
       if(!POI_BASE[id])POI_BASE[id]=map.getFilter(id)||true;
       map.setFilter(id,modeFilter(POI_BASE[id],m,id))
     }catch(e){}});
+  /* machine: Outdoors walks; leaving it gives the rider's machine back */
+  try{
+    if(m.machine){if(machine!==m.machine){if(machine!=='walk')rideMachine=machine;
+        machine=m.machine;_legalMemo={}}}
+    else if(machine==='walk'){machine=rideMachine||'bike';_legalMemo={}}
+    machIdx=Math.max(0,ORDER.indexOf(machine));
+    setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''));
+    applyMachine();
+  }catch(e){}
   /* layer groups */
   LYRGROUPS.forEach(function(g){if(g.k in m.groups)lyrSet(g,m.groups[g.k])});
+  /* summits from further out where the mode is about the land (onX 24276
+     shows them at regional zoom): Outdoors from z9, others as built */
+  try{var pz=m.peaksFrom||10.6;map.setLayerZoomRange('peak-dot',pz,24);
+      map.setLayerZoomRange('peak-label',Math.max(pz,9.6),24)}catch(e){}
   /* basemap — never force satellite when it is unavailable */
   var bi=BASEMAPS.indexOf(m.basemap);
   if(bi>=0&&(bi===0||SAT_OK)&&bi!==bmi)setBasemap(bi);
@@ -3408,10 +3495,12 @@ var BASEMAPS=['Map','Satellite','Hybrid'],bmi=0;
 function setBasemap(i){
   if(!SAT_OK){bmi=0;setChip('c-base','map','Map');
     map.setLayoutProperty('sat','visibility','none');
+    try{map.setLayoutProperty('sat-patch','visibility','none')}catch(e){}
     return}
   bmi=i%BASEMAPS.length;
   var m=BASEMAPS[bmi],sat=(m!=='Map');
   map.setLayoutProperty('sat','visibility',sat?'visible':'none');
+  try{map.setLayoutProperty('sat-patch','visibility',sat?'visible':'none')}catch(e){}
   /* The casing is no longer a satellite-only trick: it separates a
      difficulty-coloured trail from the road network on ANY base, and this
      line was switching it off on the default map (take 46). */
@@ -4027,6 +4116,8 @@ var LYRGROUPS=[
    ids:['peak-dot','peak-label']},
   {k:'areas',  h:'Riding areas', s:'DNR scramble areas \u2014 ride anywhere inside',
    ids:['area-fill','area-line','area-label']},
+  {k:'county', h:'County lines', s:'83 counties, named at regional zoom',
+   ids:['county-line','county-label']},
   {k:'paddle', h:'Rivers & paddling', s:'runs, launches, campgrounds and dams',
    ids:['pad-case','pad-line','pad-dot','pad-lbl','pad-dam','pad-damlbl']},
   {k:'relief', h:'Relief',      s:'hillshade', ids:['hillshade']},
@@ -4086,10 +4177,18 @@ function buildLyrPanel(){
    immediately — its basemap checks encode behaviour worth keeping (take 90).
    The panel is a separate chip. */
 el('c-base').addEventListener('click',function(){setBasemap(bmi+1)});
-/* A136 · the mode chip cycles like the basemap chip: one tap, in gloves */
+/* take 130 · the mode chip opens a PICKER (Jacob: choose, don't cycle) */
+function buildModePanel(){
+  var p=el('modepanel');
+  p.innerHTML=MODES.map(function(m){
+    return '<button class="moderow'+(m.k===mode?' on':'')+'" data-mode="'+m.k+'">'+
+      '<span>'+m.h+'</span><span class="msub">'+m.s+'</span></button>'}).join('');
+  Array.prototype.forEach.call(p.querySelectorAll('[data-mode]'),function(b){
+    b.addEventListener('click',function(){
+      applyMode(b.dataset.mode);p.hidden=true;logAct('tap','mode '+b.dataset.mode)})})}
 el('c-mode').addEventListener('click',function(){
-  var i=MODES.map(function(m){return m.k}).indexOf(mode);
-  applyMode(MODES[(i+1)%MODES.length].k)});
+  var p=el('modepanel');buildModePanel();p.hidden=!p.hidden;
+  try{el('actpanel').hidden=true;el('lyrpanel').hidden=true}catch(e){}});
 /* A154 · the Tools strip tells the panels how tall it is. Measured, not
    assumed: chip height follows the type scale and the safe-area inset. */
 function stripH(){try{var t=el('tools');if(t)document.documentElement.style
@@ -4162,10 +4261,11 @@ el('c-diag').addEventListener('click',function(){
 
 el('c-layers').addEventListener('click',function(){
   var p=el('lyrpanel');buildLyrPanel();p.hidden=!p.hidden;
-  if(!p.hidden)el('actpanel').hidden=true;
+  if(!p.hidden){el('actpanel').hidden=true;try{el('modepanel').hidden=true}catch(e){}}
   logAct('tap  c-layers')});
 el('c-act').addEventListener('click',function(){
-  var p=el('actpanel');buildActPanel();p.hidden=!p.hidden});
+  var p=el('actpanel');buildActPanel();p.hidden=!p.hidden;
+  if(!p.hidden)try{el('modepanel').hidden=true;el('lyrpanel').hidden=true}catch(e){}});
 el('c-about').addEventListener('click',function(){show(ABOUT,'')});
 /* Every label layer, DERIVED from the style rather than listed here.
    This was a hand-kept array of five and the comment above it claimed it was
@@ -4225,7 +4325,19 @@ function drawCoverage(){
   try{map.getSource('state').setData({type:'FeatureCollection',features:feats})}catch(e){}
   var labs=(CTX.labels||[]).map(function(l){
     return {type:'Feature',properties:{n:l.n},geometry:{type:'Point',coordinates:l.at}}});
-  try{map.getSource('lakes').setData({type:'FeatureCollection',features:labs})}catch(e){}}
+  try{map.getSource('lakes').setData({type:'FeatureCollection',features:labs})}catch(e){}
+  /* take 129 · counties: rings as lines, one label at each ring's centroid */
+  var cl=[],cp=[];
+  (CTX.counties||[]).forEach(function(co){
+    (co.r||[]).forEach(function(r){
+      var ring=r.slice();
+      if(ring[0][0]!==ring[ring.length-1][0]||ring[0][1]!==ring[ring.length-1][1])ring.push(ring[0]);
+      cl.push({type:'Feature',properties:{n:co.n},geometry:{type:'LineString',coordinates:ring}})});
+    var big=(co.r||[]).slice().sort(function(a,b){return b.length-a.length})[0];
+    if(big&&big.length){var sx=0,sy=0;big.forEach(function(q){sx+=q[0];sy+=q[1]});
+      cp.push({type:'Feature',properties:{n:co.n},geometry:{type:'Point',coordinates:[sx/big.length,sy/big.length]}})}});
+  try{map.getSource('county').setData({type:'FeatureCollection',features:cl});
+      map.getSource('countylbl').setData({type:'FeatureCollection',features:cp})}catch(e){}}
 map.on('load',drawCoverage);
 /* The map must reflect the current machine from the first frame, not only after
    someone taps the chip — a rider who never touches it is exactly the one who
@@ -4478,10 +4590,14 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.__route={buildLoops:buildLoops,nearestNode:nearestNode,
                     machineLegal:machineLegal,EDGES:EDGES,ADJ:ADJ,attrs:attrs,
                     setMachine:function(m){if(MACHINE[m])machine=m},
+                    get machine(){return machine},spd:spd,MACHINE:MACHINE,
                     get ME(){return ME}};
     /* A140 · areas bridge, harness only, same shape as the rest. */
     window.__areas={card:areaCard,groups:LYRGROUPS};
     window.__mode={apply:applyMode,get:function(){return mode},MODES:MODES};
+    /* take 127: BUNDLE is not a window global (app.js is wrapped — the same
+       lesson as areaCard at 121); the harness reads imagery facts here */
+    window.__sat={tiles:TILES,sparse:SPARSE,inPatch:inPatch};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};
     /* the layout matrix must be able to put the HUD on screen at four device
@@ -5381,7 +5497,7 @@ map.on('click',function(e){
         pc='<span class="tn">'+pp[1].toFixed(5)+'  '+pp[0].toFixed(5)+'</span>';
     logAct('tap  place '+(pr.n||pr.k));
     return show('<b>'+(pr.named?pr.n:pr.h)+'</b>'+
-      (pr.named?'<div class="sub">'+pr.h+'</div>':
+      (pr.named?'<div class="sub">'+pr.h+(pr.mi?' \u00b7 '+pr.mi+' mi of trail':'')+'</div>':
                 '<div class="sub">Unnamed in the source \u2014 shown by what it is</div>')+
       '<div class="k">WHERE</div>'+pc+
       '<div class="sub">'+placeDist(pf[0].geometry.coordinates)+'</div>','');
