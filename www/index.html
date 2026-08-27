@@ -225,6 +225,13 @@
     background:rgba(24,22,18,.95);border:1px solid rgba(255,255,255,.22);
     border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45)}
   #actpanel[hidden]{display:none}
+  /* take 131 · the pin photo: full width of the card, fixed aspect so the
+     card does not jump when it loads, attribution as a hairline caption */
+  .ph{margin:8px 0 4px;border-radius:9px;overflow:hidden;background:rgba(255,255,255,.06)}
+  .ph img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover}
+  .phd{margin:2px 0 6px}
+  .phby{font:500 var(--t-xs,11px)/1.3 Barlow,Roboto,system-ui,sans-serif;color:#9A9285;
+    padding:4px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* take 130 · Jacob: "let me select what mode I want rather than it
      swapping between them." The chip opens a picker like the activity chip
      does; each row says what the mode is FOR, so the choice is made from the
@@ -497,7 +504,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 130</span>
+    <span id="title"><b>APEX</b> ORV · Take 132</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>

@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 130.*
+*Current as of take 132.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -154,6 +154,7 @@ Start here. Do not read top to bottom.
 | OOM in a step that "only" samples points | 200 |
 | Importing a tool runs the whole pipeline step | 201 |
 | Uploading the seed does nothing; CI keeps building the old take | 202 |
+| A tool call dies (-1, no output) right after a pkill/pgrep | 204 |
 
 ---
 
@@ -2582,3 +2583,13 @@ an hour later with more in it. Jacob built the first one; his self-test said
 bug and nearly cost a take chasing it. The take number is the only handle he
 has on what is on his phone. A reseal is a new take — bump BUILD, bump the
 title, say what changed.
+
+**204. `pkill -f` / `pgrep -f` match the shell that runs them.** Three
+times in two takes a "kill the stale process" command killed the tool call
+instead — the pattern (`tools/photos.py`, `tools/`) was also in the calling
+shell's own command line, including inside a python heredoc that merely
+NAMED the file. The bracket trick (`photo[s]`) does not help when the file
+name appears elsewhere in the same command. Rule: get the pid in a call
+that does not mention the file (`ps aux | grep "[p]hoto[s].py"`), kill it,
+and edit the file in a SEPARATE call. Symptom index: a tool call returning
+-1 with no output right after a kill.

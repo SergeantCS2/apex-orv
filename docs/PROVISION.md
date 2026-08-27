@@ -25,6 +25,30 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 - **Fetched by** `ingest.py`
 - **Refresh** seasonal — closures change in-season
 
+### Wikipedia (geosearch + lead image)
+
+- **Host** `en.wikipedia.org`
+- **Provides** Photos for MAJOR pins — camps, trail systems, riding areas, named beaches — matched by name near the pin (take 131)
+- **Licence** CC BY-SA / public domain per image; author and licence shipped and shown on the card
+- **Fetched by** `photos.py`
+- **Refresh** rarely
+
+### Wikimedia Commons (geosearch)
+
+- **Host** `commons.wikimedia.org`
+- **Provides** A geotagged photo taken AT a pin that has no article — beaches, launches, campgrounds (take 131)
+- **Licence** per image; author and licence shipped and shown
+- **Fetched by** `photos.py`
+- **Refresh** rarely
+
+### Wikimedia Commons (thumbnails)
+
+- **Host** `upload.wikimedia.org`
+- **Provides** The 320 px lead image itself
+- **Licence** per image (see en.wikipedia.org entry)
+- **Fetched by** `photos.py`
+- **Refresh** rarely
+
 ### Michigan DNR ORV Scramble Areas
 
 - **Host** `services3.arcgis.com`

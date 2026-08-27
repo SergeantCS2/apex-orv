@@ -44,6 +44,8 @@ ARTIFACTS = [
     ("contour_payload.json", "contour.json",     "contour",  False),
     ("corridor_payload.json","corridor.json",    "paddle",   False),
     ("areas_payload.json",   "areas.json",       "areas",    False),
+    ("photos_index.json",    "photos.json",      "photos",   False),
+    ("publicland_payload.json","publicland.json",  "publicland",False),
 ]
 
 # How many things are actually IN a payload. A layer with no features in it is
@@ -67,6 +69,8 @@ COUNTERS = {
     "contour": lambda d: len(d.get("l") or []) + len(d.get("pk") or []),
     "paddle":  lambda d: len(d.get("c") or []),
     "areas":   lambda d: len(d.get("a") or []),
+    "photos":  lambda d: len(d or {}),
+    "publicland": lambda d: len(d.get("a") or []),
     "other":   lambda d: len(d.get("r") or []),
     "places":  lambda d: len(d.get("p") or []),
     "context": lambda d: len(d.get("counties") or []) + len(d.get("rings") or []),
@@ -173,6 +177,17 @@ def build(rid):
     # Imagery tiles are a directory, not a file. Copy the tree, hash the
     # sorted (path, size) listing — cheap, and still detects a truncated or
     # partial copy, which is what matters here (take 42).
+    # take 131: photos for major pins ride beside the index, like tiles
+    psrc = os.path.join(ROOT, "photos")
+    if os.path.isdir(psrc) and os.path.exists(os.path.join(ROOT, "photos_index.json")):
+        pdst = os.path.join(dest, "photos")
+        if os.path.isdir(pdst):
+            shutil.rmtree(pdst)
+        shutil.copytree(psrc, pdst)
+        pn = sum(len(f) for _, _, f in os.walk(pdst))
+        pb = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(pdst) for f in fs)
+        man["photos"] = {"count": pn, "bytes": pb}
+        print(f"  opt  photos/            {pb/1048576:6.1f} MB  {pn} photos")
     tsrc = os.path.join(ROOT, "imagery_tiles")
     if os.path.isdir(tsrc):
         tdst = os.path.join(dest, "imagery")

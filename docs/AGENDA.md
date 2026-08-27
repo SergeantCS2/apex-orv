@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 130.* Ranked by blocking-ness, not by interest.
+*Current as of take 132.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2477,3 +2477,12 @@ transcribed into DESIGN-modes.md; Hunt specified from them.
   Jacob, recorded as open.
 - **Ruled out:** parcel owner names and wind-at-stand for Hunt — no free
   statewide source / needs weather; stated in the design rather than faked.
+
+### Takes 129–130 — shipped
+129: trail-system pins (343 hiking / 112 MTB, mileage on the card; corridors
+>40 km stay lines), county lines + labels (Outdoors on), summits from z9 in
+Outdoors. 130: mode picker replaces the cycle.
+- **Ruled out:** one pin for statewide corridors (North Country Trail,
+  Iron Belle) — a centroid of a 500-mile line is nowhere.
+- **Ruled out:** keeping the cycle with a long-press picker — Jacob asked
+  to choose, and a description beats a remembered order.

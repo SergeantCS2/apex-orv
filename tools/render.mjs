@@ -407,6 +407,66 @@ if (zoomed.trails === 0) {
     ok(!modes.ride.launchIn,
        "Ride does NOT carry launches — a riding trip, not today's map (Jacob, take 125)");
   }
+  /* Take 132 · DNR public land. Measured in Outdoors at the largest game
+     area: the wash draws, the boundary draws, the card names the tract and
+     its acreage. Ride keeps it off. Drill restores everything. */
+  const pub = await page.evaluate(async () => {
+    const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const M = window.__mode; if (!M) return { missing: true };
+    let src = null; try { src = m.getStyle().sources.pubs.data.features; } catch (e) { }
+    if (!src || !src.length) return { absent: true };
+    const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+    const game = src.filter((f) => f.properties.t === "game").sort((a, b) => b.properties.ac - a.properties.ac)[0];
+    const ring = game.geometry.coordinates.sort((a, b) => b[0].length - a[0].length)[0][0];
+    const cx = ring.reduce((s, q) => s + q[0], 0) / ring.length, cy = ring.reduce((s, q) => s + q[1], 0) / ring.length;
+    M.apply("outdoors", { silent: true });
+    m.jumpTo({ center: [cx, cy], zoom: 11 });
+    let fill = 0, line = 0;
+    for (let i = 0; i < 30; i++) { await sleep(300);
+      try { fill = m.queryRenderedFeatures({ layers: ["pub-fill"] }).length;
+            line = m.queryRenderedFeatures({ layers: ["pub-line"] }).length; } catch (e) { }
+      if (fill && line) break; }
+    const vis = (id) => { try { return m.getLayoutProperty(id, "visibility") !== "none"; } catch (e) { return null; } };
+    M.apply("ride", { silent: true }); await sleep(150);
+    const rideOff = !vis("pub-fill");
+    M.apply(was, { silent: true }); m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+    return { n: src.length, name: game.properties.n, ac: game.properties.ac, fill, line, rideOff,
+             acres: src.reduce((s, f) => s + f.properties.ac, 0) };
+  });
+  if (pub.missing) { ok(false, "mode bridge missing"); }
+  else if (pub.absent) { ok(true, "no public-land artifact — skipped, not failed"); }
+  else {
+    ok(pub.fill > 0 && pub.line > 0, `Outdoors draws public land at ${pub.name} (${pub.ac.toLocaleString()} ac): ${pub.fill} fill, ${pub.line} boundary features`);
+    ok(pub.acres > 4e6 && pub.acres < 5.5e6, `${pub.n} tracts carry ${(pub.acres / 1e6).toFixed(2)}M acres — Michigan's state land is ~4.6M`);
+    ok(pub.rideOff, "Ride keeps public land off by default");
+  }
+
+  /* Take 131 · photos on major pins. Measured: a pin the index names gets
+     markup with an <img> whose file the bundle actually serves; a pin the
+     index does not name gets NOTHING — no placeholder. Attribution rides
+     with the image. */
+  const ph = await page.evaluate(async () => {
+    const P = window.__ph; if (!P || !P.index) return { absent: true };
+    const keys = Object.keys(P.index);
+    if (!keys.length) return { absent: true };
+    const k = keys[0], [kind, name, lon, lat] = k.split("|");
+    const html = P.html(kind, name, [+lon, +lat]);
+    const m = /src="([^"]+)"/.exec(html || "");
+    let status = 0, bytes = 0;
+    if (m) { try { const r = await fetch(m[1]); status = r.status; bytes = (await r.arrayBuffer()).byteLength; } catch (e) { } }
+    const none = P.html("camp", "No Such Campground Anywhere", [-84.5, 44.5]);
+    return { n: keys.length, name, kind, hasImg: !!m, status, bytes,
+             attributed: /phby/.test(html || "") && /CC|Public|Commons|domain/i.test(html || ""), none };
+  });
+  if (ph.absent) {
+    ok(true, "no photo index in this bundle — skipped, not failed");
+  } else {
+    ok(ph.hasImg && ph.status === 200 && ph.bytes > 2000,
+       `${ph.name} (${ph.kind}) shows its photo, served from the bundle (${ph.bytes} bytes); ${ph.n} pins have one`);
+    ok(ph.attributed, "the photo carries its author / licence line");
+    ok(ph.none === "", "a pin without a photo gets no markup at all — no placeholder");
+  }
+
   /* Take 130 · Jacob: "let me select what mode I want rather than it swapping
      between them." The chip opens a picker; a row selects directly. */
   const pick = await page.evaluate(async () => {

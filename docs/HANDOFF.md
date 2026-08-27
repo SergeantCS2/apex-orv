@@ -1,4 +1,108 @@
-# HANDOFF — through Take 130 · V2
+# HANDOFF — through Take 132 · V2
+
+## Take 132 — 2026-08-27 — public land (the Hunt layer), photos finished, take 131 folded in
+
+Take 131 was never sealed (three VM reboots across the photo run); its
+content ships here. Bundle COMPLETE 138.8 MB.
+
+**Public land — DNR "Managed Lands", layer 2 of DNRLOTSParcelsOPENDATA.**
+136,026 parcels with ProjectUseType and ProjectName. `tools/publicland.py`
+pages them (the server caps at 1,000 per page — the first run assumed 2,000,
+got one page, and printed FIVE tracts for a state; fixed), dissolves per
+project with shapely, simplifies to ~10 m, drops slivers under 2 acres:
+**657 tracts, 4.70M acres** (Michigan's state land ≈ 4.6M — the dissolve is
+honest). Forest units 22 (Shingleton 375k ac), game areas 116 (Allegan
+49,716), parks/rec areas 109, rail trails 34, and **356 boating / water
+access sites** — the DNR's named launches, arriving as a by-product. Type
+strings were READ from the data ("State Park", "Recreational Areas",
+"RAIL TRAILS"), not guessed; Undedicated / Military / Right-of-way skipped.
+App: `pub-fill` wash by type under everything, `pub-line`, `pub-label` on
+tracts ≥ 2,000 ac, "Public land" group ON in Outdoors, off in Ride and
+Water, `pubCard` with type and acreage and a note to check DNR rules. Render:
+at Allegan in Outdoors the wash and boundary draw, acreage in range, Ride
+keeps it off.
+- Ruled out: layer 13 "Project Boundary" — Forest Management Unit boxes
+  (360k acres, private land inside), administrative not ownership.
+- Ruled out: private parcels with owner names — county GIS, not free
+  statewide. Stated, not faked.
+
+**Photos: 608 of 2,940 major pins**, 18 MB — beaches 57, camps 144,
+launches 82, lighthouses 80, marinas 113, MTB 22, systems 108, areas 2/8.
+`build_app split` copied the imagery folder but not the photos folder, so
+the first render fetched a 3-byte 404 body; fixed, re-render served
+28,821 bytes.
+
+Render 159/0, smoke 5 modes. Gate: see below.
+
+---
+
+## Take 131 — 2026-08-27 — photos on major pins, A139 lighthouses, and two old landmines found alive
+
+**Photos (Jacob's idea).** Measured first: OSM carries a photo link on
+~2 % of destinations, so `tools/photos.py` goes to Wikipedia — geosearch
+within 3 km, article matched on NAME (tokens minus stop words, ≥ 60 %
+overlap), lead image as a 320 px thumbnail, Commons author + licence for
+the card's caption. Google's photos are ruled out by licence (no caching
+= no offline). Scope: camps, trail systems, riding areas, named beaches,
+plus A139's lighthouses and marinas. First run: **56 of 1,538 matched**
+(systems 26, camps 15, beaches 10, MTB 5) — state-forest campgrounds
+rarely have articles, which is the honest shape of "major pins only".
+Two corrections from reading the hits: town articles ("Luna Pier,
+Michigan") matched beaches named after towns — rejected; and a FAILED
+search was being cached as "no photo", which is how Silver Lake State
+Park's article, 1,064 m from the riding area, was frozen out. Failed
+searches are never cached now. A third bug: the script cleared its output
+folder and then served cached hits without rewriting their files — it
+would have deleted every photo on the second run. Orphans are pruned at
+the end instead. Card shows the photo full-width above WHERE with a
+hairline attribution; a pin with no photo gets no markup at all.
+
+**A139 · Great Lakes destinations.** `man_made=lighthouse` and
+`leisure=marina` added to both ingest paths (they were never in the tag
+set — the state carried ONE lighthouse), kinds `lighthouse` (rank 0,
+boosted in Water) and `marina`; both in Water, lighthouse also in
+Outdoors; both are photo candidates — this is where the photo feature
+should shine.
+
+**Landmine 200, alive in ingest.** The "aoi.json present, skipping" check
+did `json.load` on the 543 MB file to read ONE key — 3.9 GB, and the OOM
+killer the moment swap was down. It reads 400 bytes now.
+
+**Landmine 196, again.** aoi.json was sticky across a tag-set change: the
+first A139 ingest "succeeded" in 4 minutes having done nothing, and the
+state still had one lighthouse. The stream now stamps a hash of the tag set
+into the file header; ingest rebuilds when it differs. Printed:
+"aoi.json was built with a different tag set — rebuilding".
+
+**Landmine 204** (pkill/pgrep matching the calling shell) is written; it
+cost four calls this take.
+
+**Jacob's reference (Google Maps place cards).** Photo carousel, rating,
+one-line description, address, hours. Offline reality: photo + description
++ address ship; rating, reviews and hours are Google's and cannot. The
+coverage he wants is beaches, launches, state parks / campgrounds, MTB
+systems — most of which have no Wikipedia ARTICLE. So a second source: a
+geotagged Wikimedia Commons photo within a per-kind radius of the pin
+(launch 250 m … area 700 m), preferring a filename that shares the pin's
+name. Plus the matched article's first sentence as `d` on the card, and
+named launches join the candidates (~2,800 total). Hit rate on fresh
+lookups went **3.5 % → ~20 %**.
+
+**Throttled, then fixed.** Six workers earned a 429 from Wikimedia and a
+9-second failure on every call; a user-agent WITH a contact URL (their
+policy), 3 workers, a 0.35 s pause per call and a 20 s back-off on 429
+runs at ~59 lookups/min with no refusals. The cache (img_cache/photos/,
+carried by CI's region cache) makes it a one-time cost.
+
+Two ingests, one honest: the first A139 ingest "succeeded" in 4 minutes
+having skipped the OSM pass on a sticky aoi.json — the tag-set stamp fix
+above came from that. After the real rebuild: **101 lighthouses, 322
+marinas** in the state.
+
+In progress at session end: the photo run (~2,800 candidates, ~35 min
+left). Then bundle → build → suites → seal. Nothing sealed under 131 yet.
+
+---
 
 ## Take 130 — 2026-08-26 — the mode picker
 
@@ -10,6 +114,12 @@ launches and rivers, no trail lines"), so the choice is made from the
 description rather than from remembering a cycle order. The three panels
 (layers, activity, mode) close each other. Render: the chip opens three
 rows in order, choosing Water selects it and closes the picker — 153/0.
+Gate PASSED, smoke 5 modes. apex-seed-t130.zip sealed (sha256 in chat).
+
+**Next, in order:** marina tag + DNR Boating Access Sites + A139 Great
+Lakes destinations for Water; Hunt data (DNR public-land polygons, DMUs,
+typed waypoints); guide (A147/A155). Jacob's open call: foot routes into
+the routing graph.
 
 ---
 

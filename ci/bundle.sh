@@ -5,7 +5,7 @@
 # belongs here, where seeding a new zip updates it (landmine 84).
 set -euo pipefail
 
-python3 -m pip install --quiet pillow numpy scipy pyyaml osmium scikit-image
+python3 -m pip install --quiet pillow numpy scipy pyyaml osmium scikit-image shapely
 
 python3 tools/pipeline.py
 

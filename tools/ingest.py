@@ -303,10 +303,26 @@ def fetch_osm(path="aoi.json"):
         # OSM paths, and nothing would ever retry (landmine 90). Jacob's manual
         # rerun succeeded precisely because the cache held a GOOD OSM copy, which
         # is the same mechanism working in his favour.
+        # Take 131: this used to json.load the whole file to read ONE key —
+        # 3.9 GB on the statewide aoi.json and the OOM killer (landmine 200,
+        # alive in the tool that wrote landmine 200's fix). Read the header.
+        # And the file is no longer sticky across a tag-set change: the header
+        # carries the hash of the tags that produced it (landmine 196's shape —
+        # a cache invalidated by everything that mutates its inputs).
         try:
-            if json.load(open(path)).get("source") == "tiger":
+            import re as _re
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import osm_local
+            head = open(path, "rb").read(400).decode("utf-8", "ignore")
+            m_src = _re.search(r'"source":\s*"([^"]+)"', head)
+            m_tag = _re.search(r'"tags":\s*"([^"]+)"', head)
+            if m_src and m_src.group(1) == "tiger":
                 print("osm: cached aoi.json came from the TIGER fallback — "
                       "retrying OSM before settling for it again")
+            elif R.bulk and (not m_tag or m_tag.group(1) != osm_local.tagset_hash()):
+                print(f"osm: {path} was built with a different tag set — rebuilding "
+                      "(landmine 196: a cache is invalidated by everything that "
+                      "mutates its inputs)")
             else:
                 print(f"osm: {path} present, skipping fetch")
                 return
@@ -334,6 +350,8 @@ def fetch_osm(path="aoi.json"):
   nwr["shop"~"^({shop})$"]({S_},{W_},{N_},{E_});
   nwr["leisure"="slipway"]({S_},{W_},{N_},{E_});
   nwr["natural"="beach"]({S_},{W_},{N_},{E_});
+  nwr["man_made"="lighthouse"]({S_},{W_},{N_},{E_});
+  nwr["leisure"="marina"]({S_},{W_},{N_},{E_});
   node["natural"="peak"]({S_},{W_},{N_},{E_});
 );
 out geom;"""

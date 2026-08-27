@@ -158,6 +158,27 @@ Layers, Offline Maps, My Content, Tools, Trail Cameras, Go & Track.
   summits from z9. Contours as patches over public land, later. Parcels and
   wind: out of scope, stated.
 
+## Hunt data, status at take 132
+
+- **Public land — SHIPPED.** DNR Managed Lands, dissolved: 657 tracts,
+  4.70M acres, by type (forest / game / park / trail / access site). On in
+  Outdoors. This is the layer onX 24278's "Public Land" toggle shows.
+- **Deer Management Units — NOT PUBLISHED as a GIS layer.** Searched ArcGIS
+  Online three ways; the DNR's `DNRManagementBoundariesOPENDATA` carries
+  Wildlife MANAGEMENT Units (its own administrative regions), not DMUs.
+  Michigan's DMUs are published in the annual Hunting Digest as county-based
+  units (most DMU numbers are the county's alphabetical index: Alcona 001 …
+  Wexford 083) plus special units that split or merge counties (the UP's
+  486/487, the NLP's 352/355 etc.). Faithful DMU polygons therefore need
+  EITHER a DNR layer that does not exist as of 2026-08-27, OR the exception
+  list from the current digest applied over our county rings. Landmine 190:
+  not invented. Blocked on a source; Jacob's digest page would unblock the
+  county-based part.
+- **Typed waypoints** (stand / camera / sign / water / gate) — next; a picker
+  on the existing waypoint, no new data.
+- **Contours over public land** — patches, later.
+- **Wind, parcel owners** — out of scope, stated.
+
 ## What I need from Jacob before step 5
 
 The onX Hunt and onX Fish screenshots he holds — what is on screen, what

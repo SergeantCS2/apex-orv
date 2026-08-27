@@ -25,6 +25,7 @@ STEPS = [
     ("emit_graph", ["emit_graph.py"],  "client payload"),
     # areas before terrain (take 120): terrain patches z13 DEM over each area
     ("areas",     ["areas.py"],       "DNR scramble areas — open riding ground as polygons"),
+    ("publicland", ["publicland.py"],  "DNR public land — state forest, game areas, parks, dissolved"),
     ("terrain",    ["terrain.py"],     "DEM, climb, hillshade"),
     ("contour",    ["contour.py"],     "contour lines from the same DEM"),
     ("corridor",   ["corridor.py"],    "a river beyond the box, ordered downstream"),
@@ -32,6 +33,7 @@ STEPS = [
     ("glyphs",     ["glyphs.py"],      "SDF label pack"),
     ("context",    ["context.py"],     "state outline for orientation"),
     ("address",    ["address.py"],     "offline address index"),
+    ("photos",     ["photos.py"],      "photos for major pins (Wikipedia lead images)"),
     ("imagery",    ["imagery.py"],      "satellite basemap"),
     ("bundle",     ["bundle.py", "build", None], "region bundle"),
     ("build_app",  ["build_app.py", "split"], "assemble www/"),

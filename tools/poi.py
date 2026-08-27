@@ -40,6 +40,11 @@ KINDS = [
     # destination whether or not somebody typed a name on it; "Boat launch" is
     # honest, and silence is not (A146).
     ("launch",    "leisure",  ["slipway"],                          True),
+    # A139 (take 131): Great Lakes DESTINATIONS — the reason you drive to the
+    # coast. Lighthouses are the archetype (Manistee); marinas are where a
+    # boat gets fuel and a slip. Both destinations, not corridor treatment.
+    ("lighthouse","man_made", ["lighthouse"],                       False),
+    ("marina",    "leisure",  ["marina"],                           False),
     ("camp",      "tourism",  ["camp_site"],                        False),
     ("beach",     "natural",  ["beach"],                            True),
     ("dayuse",    "tourism",  ["picnic_site"],                      False),
@@ -223,7 +228,7 @@ def main():
     #   1  named launches and beaches
     #   2  unnamed launches and beaches (a place you may put in, no name)
     #   3  services — fuel, food, stores, info, water, toilets, shelters
-    PRI0 = {"camp", "trailhead", "dayuse", "view", "system", "mtb"}
+    PRI0 = {"camp", "trailhead", "dayuse", "view", "system", "mtb", "lighthouse"}
     PRI1 = {"launch", "beach"}
     for r in out:
         if r["k"] in PRI0:

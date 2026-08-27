@@ -34,6 +34,36 @@ SOURCES = [
         "refresh": "seasonal — closures change in-season",
     },
     {
+        "host": "en.wikipedia.org",
+        "name": "Wikipedia (geosearch + lead image)",
+        "what": "Photos for MAJOR pins — camps, trail systems, riding areas, "
+                "named beaches — matched by name near the pin (take 131)",
+        "licence": "CC BY-SA / public domain per image; author and licence "
+                   "shipped and shown on the card",
+        "tool": "photos.py",
+        "phase": "provision",
+        "refresh": "rarely",
+    },
+    {
+        "host": "commons.wikimedia.org",
+        "name": "Wikimedia Commons (geosearch)",
+        "what": "A geotagged photo taken AT a pin that has no article — beaches, "
+                "launches, campgrounds (take 131)",
+        "licence": "per image; author and licence shipped and shown",
+        "tool": "photos.py",
+        "phase": "provision",
+        "refresh": "rarely",
+    },
+    {
+        "host": "upload.wikimedia.org",
+        "name": "Wikimedia Commons (thumbnails)",
+        "what": "The 320 px lead image itself",
+        "licence": "per image (see en.wikipedia.org entry)",
+        "tool": "photos.py",
+        "phase": "provision",
+        "refresh": "rarely",
+    },
+    {
         "host": "services3.arcgis.com",
         "name": "Michigan DNR ORV Scramble Areas",
         "what": "Designated open-riding area polygons (Silver Lake, St. Helen, "

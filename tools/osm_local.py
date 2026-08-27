@@ -94,7 +94,9 @@ POI = poi_tags()
 # Kept in step with the extra clauses at the bottom of ingest.py's Overpass
 # query. `peak` is NOT a POI — poi.py's KINDS does not classify it, so it rides
 # through aoi.json and is picked up by contour.py, which owns terrain (A76).
-POI_EXTRA = {"leisure": ["slipway"], "natural": ["beach", "peak"]}
+# A139 (take 131): Great Lakes destinations — lighthouses and marinas
+POI_EXTRA = {"leisure": ["slipway", "marina"], "natural": ["beach", "peak"],
+             "man_made": ["lighthouse"]}
 
 
 def region(rid=None):
@@ -222,6 +224,14 @@ def build(rid=None, sink=None):
     return h.out
 
 
+def tagset_hash():
+    """A fingerprint of everything that decides which elements are kept."""
+    import hashlib
+    src = json.dumps({"extra": POI_EXTRA, "poi": sorted(
+        (k, sorted(v)) for k, v in poi_tags().items())}, sort_keys=True)
+    return hashlib.sha1(src.encode()).hexdigest()[:12]
+
+
 def build_stream(out_path, rid=None):
     """build(), but each kept element streams straight to out_path so the
     element list never lives in RAM beside the parse (take 117)."""
@@ -231,7 +241,10 @@ def build_stream(out_path, rid=None):
     # timestamp, and every later consumer read the stump without complaint.
     tmp = out_path + ".part"
     f = open(tmp, "w")
-    f.write('{"source": "geofabrik", "elements": [')
+    # take 131: stamp the TAG SET that produced this file into its header, so
+    # ingest can tell "the same extract, different tags" from "already done"
+    # by reading a few hundred bytes — not by json.load-ing 543 MB.
+    f.write('{"source": "geofabrik", "tags": "%s", "elements": [' % tagset_hash())
     state = {"n": 0}
     def sink(el):
         if state["n"]:
