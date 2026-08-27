@@ -1,30 +1,26 @@
-**Take 132 — photos on major pins, public land, lighthouses.**
+**Take 134 — hiking trails you can route on, and the guide that finally shows.**
 
-- **Photos.** Tap a beach, campground, boat launch, lighthouse, marina,
-  trail system or riding area: if Wikipedia or Wikimedia Commons has a
-  picture of the place, it is on the card with its author and licence, and
-  where there is an article, a one-line description. 608 places statewide
-  (57 beaches, 144 campgrounds, 82 launches, 80 lighthouses, 113 marinas,
-  130 trail systems). A place with no photo shows nothing — no grey box.
-  Rating, reviews and hours are Google's and cannot ship offline.
-- **Public land.** 4.7 million acres of DNR state forest, game areas, parks
-  and access sites as 657 tracts, dissolved from 136,026 parcels. Green
-  wash and boundary, names on big tracts, a card with type and acreage.
-  On in Outdoors; Layers → Public land elsewhere.
-- **Lighthouses and marinas.** 101 lighthouses (Big Sable, Au Sable Point,
-  Beaver Head…) and 322 marinas, in Water and Outdoors. The state carried
-  ONE lighthouse before — the tag was never ingested.
-
-Also: an ingest that skips honestly (it rebuilds when the tag set changes,
-and no longer loads 543 MB to read one key), and shapely in CI.
+- **Hiking trails are routable in Outdoors.** The whole DNR hiking network
+  — ~12,000 miles — is now part of the map's routing graph for the On foot
+  machine only. Tap a hiking trail and it identifies like an ORV trail;
+  Return home walks you along it at 3 mph. No ORV machine can be routed
+  onto one — the gate checks that against the built data.
+- **It cost nothing you will feel.** The first build doubled the graph; the
+  cause was the noder splitting two-track at every point where a hiking
+  trail ran alongside it. Fixed at the source: 576k edges, 46.6 MB graph,
+  bundle 142.7 MB — 18 MB over take 132, most of it hiking geometry.
+  Dispatch scanning: 87 ms in a desktop browser (it was 3.4 s mid-take).
+- **The guide shows on next launch.** Rewritten for the whole state and the
+  three modes. Your phone had dismissed the old one at an early take; the
+  key is versioned now, so this one shows once, then lives under Tools.
+- Unnamed paths from OpenStreetMap are still drawn, dashed, but not routed
+  — they are a separate class now (`path`), so the "either routable or
+  show-only, never both" law holds.
 
 ### Check on the phone
-1. Tap Silver Lake, Bull Gap, Dodge #4, or a Lake Michigan lighthouse:
-   photo + caption. Tap a state-forest campground: no photo, no box.
-2. Outdoors at 10 mi over Allegan: green state land, boundary, name; tap
-   inside for acreage.
-3. Water mode: lighthouses along the coast from far out.
-
-### Not available
-Deer Management Units are not published as a GIS layer; the digest's DMU
-map page would unblock the county-based part.
+1. Launch: the guide. Read it once; it will not return on its own.
+2. Outdoors → the machine chip reads On foot. Tap a green dashed trail:
+   its name and card. Return home: a walking route along trails.
+3. Self-test: dispatch-scan well under a second.
+4. Ride: hiking trails are hidden by default; the activity chip's Hiking
+   row brings them back, drawn but never routed for an ORV.

@@ -236,7 +236,7 @@ var MACHINE={
      walking profile is a table row, not new routing. Foot-only routes are
      still show-only — a hiker is routed along two-track, forest road and
      ORV trail, which is honest about what the graph holds. */
-  walk:{lbl:'🥾 On foot',ok:['route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track'],spd:3}
+  walk:{lbl:'🥾 On foot',ok:['foot','route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track'],spd:3}
 };
 function spd(e){var m=MACHINE[machine];return (m&&m.spd)||SPEED[e.c]||14}
 /* machIdx, not `mi` — take 15: `mi=0` here silently overwrote the mi(a,b)
@@ -397,7 +397,7 @@ function chainStrokes(key){
    function, snap or loop can reach them; here they are only drawn. */
 var SHOWN={foot:'foot / hike',horse:'equestrian',snow:'ski',snowmob:'snowmobile',
   nfsmoto:'NFS trail — MVUM governs',cycle:'cycleway',race:'raceway',
-  bike:'bike trail',mou:'permit / MOU',railtrail:'rail trail'};
+  bike:'bike trail',mou:'permit / MOU',railtrail:'rail trail',path:'path (unnamed, not routed)'};
 var showFeats=(SHOW&&SHOW.r?SHOW.r:[]).map(function(r){
   return {type:'Feature',properties:{c:r.c,n:r.n||'',u:r.u||SHOWN[r.c]||r.c},
     geometry:{type:'LineString',coordinates:r.g}}});
@@ -1329,6 +1329,9 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        the two-track gets a casing (take 61). */
     lyr('fsroad','fsroad',PAL.fsroad,w(0.6,1.4,3.2)),
     lyr('track','track',PAL.track,w(0.7,1.8,3.9)),
+    /* take 134 · hiking routes are ROUTABLE now (walk machine); they draw
+       from the net source, dashed in the hiking green, above two-track */
+    lyr('foot','foot',PAL.foot,w(1.0,1.8,3.0),[2,2]),
     /* Trails, by difficulty. Widest/easiest drawn first so the hard singletrack
        sits on top where it matters. */
     lyr('route72','route72',PAL.route72,w(1.7,4.1,9.5)),
@@ -1350,7 +1353,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
          snowmobile route looked identical, and both looked like "some line".
          Colour by use; dashed still means "not yours to ride" (take 66). */
       paint:{'line-color':['match',['get','c'],
-          'foot',PAL.foot,'horse',PAL.horse,'snow',PAL.snow,
+          'foot',PAL.foot,'path',PAL.foot,'horse',PAL.horse,'snow',PAL.snow,
           'snowmob',PAL.snowmob,'nfsmoto',PAL.nfsmoto,PAL.showother],
         'line-width':w(1.1,2,3.2),
         'line-dasharray':[2,2],'line-opacity':0.9}},
@@ -1869,6 +1872,7 @@ function snapMiles(ll,ni){if(ni<0)return 0;
   var dx=(NODES[ni][0]-ll[0])*0.714*69,dy=(NODES[ni][1]-ll[1])*69;
   return Math.sqrt(dx*dx+dy*dy)}
 
+var ROUTE_CAP=Math.max(150000,Math.ceil(NODES.length*1.2));
 function route(from,to,cost){
   var N=NODES.length,dist=new Float64Array(N),prev=new Int32Array(N),
       pe=new Int32Array(N),done=new Uint8Array(N);
@@ -1892,7 +1896,11 @@ function route(from,to,cost){
   var _exp=0;
   while(heap.length){var cur=pop(),d=cur[0],u=cur[1];
     if(done[u])continue;done[u]=1;if(u===to)break;
-    if(++_exp>150000)return null;
+    /* Take 134: 150,000 was a box-era cap (20k nodes). With hiking routable
+       the state has 582k nodes, and Silver Lake -> Mio ran out of budget at
+       the first profile. The cap scales with the graph: a full traversal is
+       always allowed, and the grid keeps a local route cheap regardless. */
+    if(++_exp>ROUTE_CAP)return null;
     var ad=ADJ[u];
     for(var k=0;k<ad.length;k++){var e=ad[k];
       if(e.c==='closed'||e.c==='fsclosed')continue;   /* never route through a closure */
@@ -2007,7 +2015,12 @@ var WPKEY='apex.waypoints.v1';
    anywhere and there is nothing to opt out of. If storage is unavailable the
    guide simply shows every time rather than failing: an extra tap is a smaller
    harm than a first-time rider getting no explanation at all. */
-var GUIDEKEY='apex.guide.v1';
+/* A147 / A155 (take 133): the key is VERSIONED with the guide's content.
+   v1 was set on Jacob's phone at an early take and survived every install
+   since (same package, same localStorage), so the rewritten guide would
+   never have shown. v2 shows itself once — exactly when it became worth
+   reading — and then only under Tools. */
+var GUIDEKEY='apex.guide.v2';
 
 function guideSeen(){
   if(!svAvailable())return false;
@@ -2724,7 +2737,7 @@ var ACTS=[
   {k:'dirt', h:'Two-track',         sw:PAL.track,  cls:['track']},
   {k:'_fr',  h:'  forest road · drivable', sw:PAL.fsroad, tier:1},
   {k:'_cl',  h:'  closed · do not ride',   sw:PAL.closed, tier:1},
-  {k:'foot', h:'Hiking',            sw:PAL.foot,   cls:['foot'], dash:1},
+  {k:'foot', h:'Hiking',            sw:PAL.foot,   cls:['foot','path'], dash:1},
   {k:'horse',h:'Equestrian',        sw:PAL.horse,  cls:['horse'], dash:1},
   {k:'snow', h:'Snowmobile / ski',  sw:PAL.snow,   cls:['snow','snowmob'], dash:1},
   {k:'nfs',  h:'NFS trails',        sw:PAL.nfsmoto,cls:['nfsmoto'], dash:1},
@@ -2782,7 +2795,7 @@ function machineIllegal(){
   return ['route72','trail50','fstrail','mccct','moto24','track','fsroad']
     .filter(function(c){return ok.indexOf(c)<0})}
 
-var TRAIL_LAYERS=['route72','trail50','moto24','mccct','fstrail'];
+var TRAIL_LAYERS=['route72','trail50','moto24','mccct','fstrail','foot'];
 var act='all';
 
 function actLabel(){
@@ -2800,7 +2813,7 @@ function applyAct(){
   map.setLayoutProperty('track','visibility',
     (!sel||sel.indexOf('track')>=0)?'visible':'none');
   var showCls=(a.cls||[]).filter(function(c){
-    return ['foot','horse','snow','snowmob','nfsmoto','bike'].indexOf(c)>=0});
+    return ['horse','snow','snowmob','nfsmoto','bike','path'].indexOf(c)>=0});
   if(!sel){map.setFilter('show-line',null);map.setFilter('lbl-show',null);
     map.setLayoutProperty('show-line','visibility','visible');
     map.setLayoutProperty('lbl-show','visibility','visible')}
@@ -3045,8 +3058,22 @@ function elevNear(ll){
 /* 4.6 — nearest pavement. Not a route: a straight-line bearing to the closest
    thing a truck can reach you on. Answers "which way do I walk" when the bike
    will not move, and needs no router. */
+/* Take 134: the last linear scan in the dispatch card. With hiking routable
+   the graph is 995k edges and this took 3.4 s in headless — the whole
+   dispatch budget. It walks the A96 grid now: exact (the ring stops when it
+   is farther than the best hit), and pavement is usually within a few cells
+   of anywhere a phone can be. The linear body stays as the fallback. */
 function nearestPavement(ll){
-  var best=1e9,bp=null,be=null;
+  var G=gridBuild(),best=1e9,bp=null,be=null,seen={};
+  var visit=function(list){
+    for(var j=0;j<list.length;j++){var i=list[j];if(seen[i])continue;seen[i]=1;
+      var e=EDGES[i];if(e.c!=='paved'&&e.c!=='minor')continue;
+      var g=decode(GR.g[i]);
+      for(var k=0;k<g.length;k++){var d=mi(ll,g[k]);if(d<best){best=d;bp=g[k];be=e}}}};
+  visit.done=function(r){return be!==null&&ringMi(r+1)>best};
+  gridRings(ll,G.edges,visit,400);
+  if(be)return {p:bp,d:best,e:be};
+  best=1e9;
   for(var i=0;i<EDGES.length;i++){var e=EDGES[i];
     if(e.c!=='paved'&&e.c!=='minor')continue;
     var g=decode(GR.g[i]);
@@ -3329,8 +3356,16 @@ function nearestEdge_linear(ll){
   for(var i=0;i<EDGES.length;i++){var g=decode(GR.g[i]);
     for(var k=0;k<g.length;k++){var d=mi(ll,g[k]);if(d<best){best=d;be=EDGES[i]}}}
   return {e:be,d:best}}
+/* Take 134: the last linear scan in dispatch, 723 ms over the junction table
+   once hiking doubled the graph. Rings over the node grid, keeping only
+   junction nodes; exact, and the linear body stays as the fallback. */
 function nearestJunction(ll){
-  var best=1e9,bn=null;
+  var G=gridBuild(),best=1e9,bn=null;
+  var visit=function(list){for(var j=0;j<list.length;j++){var i=list[j];
+    if(!JX[i])continue;var d=mi(ll,NODES[i]);if(d<best){best=d;bn=i}}};
+  visit.done=function(r){return bn!==null&&ringMi(r+1)>best};
+  gridRings(ll,G.nodes,visit,400);
+  if(bn!==null)return {n:bn,d:best};
   for(var k in JX){var n=+k,p=[NODES[n][0],NODES[n][1]],d=mi(ll,p);
     if(d<best){best=d;bn=n}}
   return {n:bn,d:best}}
@@ -4889,7 +4924,7 @@ el('c-lost').addEventListener('click',function(){
   show('Veering off at the next junction — this is the failure the whole app exists to catch.','')});
 
 /* ── inspect / place ───────────────────────────────────────────────────── */
-var HIT=['route72','trail50','moto24','mccct','fstrail','fsroad','closed','fsclosed','track','paved','minor'];
+var HIT=['route72','trail50','moto24','mccct','fstrail','fsroad','closed','fsclosed','track','paved','minor','foot'];
 /* Tapping a dashed line has to answer "what is that and may I ride it".
    Show-only features are not in EDGES, so the identify branch below cannot
    describe them — they get their own branch that says plainly what they are. */

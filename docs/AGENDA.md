@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 132.* Ranked by blocking-ness, not by interest.
+*Current as of take 134.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2486,3 +2486,14 @@ Outdoors. 130: mode picker replaces the cycle.
   Iron Belle) — a centroid of a 500-mile line is nowhere.
 - **Ruled out:** keeping the cycle with a long-press picker — Jacob asked
   to choose, and a description beats a remembered order.
+
+### Takes 131–132 — shipped
+Photos on major pins (608; Wikipedia article + Commons geosearch fallback;
+description line; attribution), A139 lighthouses (101) and marinas (322),
+DNR public land (657 tracts, 4.70M acres, Outdoors on), ingest tag-set
+stamp + header-only skip check, shapely in CI.
+- **Ruled out:** Google photos (licence forbids caching); layer 13 project
+  boundaries (administrative); parcel owner names (county GIS); DMUs (no
+  published layer — blocked on the digest).
+- **Ruled out:** six photo workers — Wikimedia 429; 3 workers + contact UA +
+  pause sustains ~59 lookups/min.

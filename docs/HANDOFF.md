@@ -1,4 +1,59 @@
-# HANDOFF — through Take 132 · V2
+# HANDOFF — through Take 134 · V2
+
+## Take 133 — 2026-08-27 — the guide, rewritten and versioned
+
+Jacob: "the tutorial still doesn't show up on app launch." Not a race with
+the location prompt — `apex.guide.v1` survived every install since an early
+take (A147). The guide is rewritten for the whole state and the three modes
+(what each is for; a mode is a starting point, never a cage; public land,
+photos, 76 rivers) and its key is now **`apex.guide.v2`**, so it shows once
+on the next launch. Render asserts it teaches Ride / Outdoors / Water and
+the state, not the old test box; one harness check had hardcoded `v1` and
+now reads the key by prefix. 160/0.
+
+## Take 134 — 2026-08-27 — hiking trails routable in Outdoors
+
+Jacob's answer to the open question: hiking trails "should be added to
+Outdoors and highlight the paths / start / end like we would for ORV."
+`foot` leaves SHOW_ONLY in graph.py and becomes a routable class, legal for
+the `walk` machine ONLY (the gate's class-legality check guards that no ORV
+allow-list names it). A `foot` line layer draws from the net source, dashed
+in the hiking green; it is in TRAIL_LAYERS (the activity chip governs it)
+and HIT (tappable).
+
+**The cost, measured.** First build: 476k → **1,100,431 edges** — every
+unnamed OSM `path` in the state came along (sidewalks were already
+excluded). Rule applied: DNR hiking routes and NAMED OSM paths route;
+unnamed OSM paths stay drawn, not routed. Second build: **998,382 edges,
+582,127 nodes, graph 75 MB, bundle 176 MB.** The named rule barely moved it
+— the DNR hiking network itself (69,628 features, ~12,000 mi of wiggly
+geometry) is the bulk, and it IS the feature. 96.2 % of the network routable
+together (footpaths connect what two-track did not).
+
+**And it broke routing, which the self-test caught.** `route()` gave up after
+150,000 node expansions — a box-era cap for a 20k-node graph. Silver Lake →
+Mio failed at the first profile. `ROUTE_CAP` scales with NODES (×1.2, floor
+150k); 6/6 profiles again, smoke green.
+
+**The doubling was never foot edges.** Measured by class: `track` 652,968
+of 995k edges (65 %); foot not in the top eight. The 12,451 DNR hiking
+features average 65 vertices, and a trail that RUNS ALONG a two-track shares
+every snapped vertex with it — every shared vertex was a junction, so both
+lines were chopped into confetti. Jacob's instinct ("455 routes sounds much
+more reasonable") pointed at the right symptom; the cause was the noder.
+Fix in graph.py: within a run of consecutive vertices shared with a foot
+line, only the run's ENDS stay junctions (join the road, leave the road); a
+single shared vertex — a true crossing — is a junction as before; non-foot
+pairs untouched. Result: **576,597 edges, 421k nodes, graph 46.6 MB, bundle
+142.7 MB**, hiking fully routable, 96 % connected. Dispatch card 3,445 →
+**87 ms** (nearestJunction and nearestPavement joined nearestEdge on the
+grid). Route cap scales with the graph. Render 161/0 — the summit block
+that hung three times on the 75 MB graph completes on this one.
+
+Ruled out: routing only the pinned systems' geometry (it would not have
+cut the noding), harder RDP (already 10 m; not the cause).
+
+---
 
 ## Take 132 — 2026-08-27 — public land (the Hunt layer), photos finished, take 131 folded in
 
@@ -32,7 +87,17 @@ launches 82, lighthouses 80, marinas 113, MTB 22, systems 108, areas 2/8.
 the first render fetched a 3-byte 404 body; fixed, re-render served
 28,821 bytes.
 
-Render 159/0, smoke 5 modes. Gate: see below.
+Render 159/0, smoke 5 modes. Gate PASSED after four correct refusals (the
+HANDOFF race; shapely missing from ci/bundle.sh; a GitHub URL in a
+user-agent read as an undeclared host; upload.wikimedia.org declared but
+never named as a URL — now a constant the tool ENFORCES). Two VM reboots
+killed the gate mid-run; third run clean. apex-seed-t132.zip sha256
+21fc76b0…df40, 85 files (the first zip lacked tools/photos.py — an `echo -e`
+line in the seed list; caught by the manifest check before sending).
+
+**DMUs: not published** (see DESIGN-modes.md). **Next:** typed waypoints;
+contours over public land as patches; guide; Jacob's call on foot routes
+in the router.
 
 ---
 

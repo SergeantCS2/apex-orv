@@ -66,6 +66,9 @@ console.log(`render: serving ${WWW} on :${port}`);
 
 const browser = await puppeteer.launch({
   headless: "new",
+  /* take 134: a 75 MB graph makes single evaluate() calls in headless slow
+     enough to trip the 180 s default protocol timeout (the summit block did) */
+  protocolTimeout: 480000,
   args: ["--no-sandbox", "--disable-setuid-sandbox",
          "--use-gl=swiftshader", "--enable-unsafe-swiftshader",
          "--disable-dev-shm-usage"],
@@ -380,7 +383,7 @@ if (zoomed.trails === 0) {
       M.apply(k, { silent: true }); await sleep(350);
       let poiF = null; try { poiF = JSON.stringify(m.getFilter("poi-dot-major")); } catch (e) { }
       out[k] = { chip: document.querySelector("#c-mode span").textContent,
-                 trail50: vis("trail50"), show: vis("show-line"),
+                 trail50: vis("trail50"), show: vis("show-line"), foot: vis("foot"),
                  showF: (() => { try { return JSON.stringify(m.getFilter("show-line")); } catch (e) { return null; } })(),
                  peaks: vis("peak-dot"), paddle: vis("pad-line"), areas: vis("area-fill"),
                  basemap: document.querySelector("#c-base span").textContent,
@@ -394,9 +397,10 @@ if (zoomed.trails === 0) {
   } else {
     ok(modes.ride.chip === "Ride" && modes.ride.trail50 && modes.ride.areas && !modes.ride.peaks,
        "Ride: ORV lines and riding areas on, hills off");
-    ok(modes.outdoors.chip === "Outdoors" && !modes.outdoors.trail50 && modes.outdoors.show
-       && /foot/.test(modes.outdoors.showF || "") && modes.outdoors.peaks && modes.outdoors.paddle,
-       "Outdoors: ORV lines hidden, hiking routes drawn, named hills and rivers on");
+    /* take 134: `foot` is a NETWORK layer now (routable), not a show-only class */
+    ok(modes.outdoors.chip === "Outdoors" && !modes.outdoors.trail50 && modes.outdoors.foot === true
+       && modes.outdoors.peaks && modes.outdoors.paddle,
+       "Outdoors: ORV lines hidden, hiking routes drawn (routable), named hills and rivers on");
     ok(modes.water.chip === "Water" && !modes.water.trail50 && !modes.water.show
        && modes.water.paddle && modes.water.launchIn && !modes.water.areas,
        "Water: no trail lines, paddling on, launches in the pin set, riding areas off");
@@ -954,7 +958,9 @@ if (zoomed.trails === 0) {
     document.getElementById("guide-go").click(); await s(300);
     out.closes = !!g.hidden;
     out.remembered = (() => { try {
-      return localStorage.getItem("apex.guide.v1") === "1"; } catch (e) { return null; } })();
+      /* by prefix: the key is versioned with the guide's content (take 133),
+         and a check that names a version is stale the moment it is bumped */
+      return Object.keys(localStorage).some((k) => /^apex\.guide\.v\d+$/.test(k) && localStorage.getItem(k) === "1"); } catch (e) { return null; } })();
     // and it comes back on request
     document.querySelector('#tabs .tab[data-go="tools"]').click(); await s(180);
     const chip = document.getElementById("c-howto");
@@ -982,6 +988,14 @@ if (zoomed.trails === 0) {
      "it explains the destinations, the map and dispatch");
   ok(guide.closes && guide.remembered === true,
      "dismissing it records that, so it never shows again on its own");
+  /* take 133: the guide teaches the state and the three modes, and its key
+     is versioned so a rewritten guide shows once even on a phone that
+     dismissed an old one (A147). */
+  ok(/Ride/.test(guide.text) && /Outdoors/.test(guide.text) && /Water/.test(guide.text)
+     && /Michigan/.test(guide.text) && !/Rose City/.test(guide.text),
+     "it teaches Ride / Outdoors / Water and the whole state, not the old test box");
+  const gk = await page.evaluate(() => { try { return Object.keys(localStorage).filter((k) => /apex\.guide/.test(k)).join(","); } catch (e) { return ""; } });
+  ok(/apex\.guide\.v2/.test(gk), `the guide key is versioned (${gk})`);
   ok(guide.chipVisible && guide.reopens,
      "Tools -> How to use brings it back");
   ok(guide.backdropCloses, "tapping the blurred backdrop closes it too");

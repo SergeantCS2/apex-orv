@@ -126,8 +126,13 @@ net = dnr + kept
 # a separate payload and drawn distinctly. The gate re-checks this against the
 # built data, because two lists that must agree is how a footpath becomes a
 # suggested route.
-SHOW_ONLY = {"foot", "horse", "snow", "snowmob", "nfsmoto", "bike", "mou",
-             "railtrail", "cycle", "race"}
+# Take 134, Jacob: hiking trails "should be added to Outdoors and highlight
+# the paths / start / end like we would for ORV". `foot` leaves this set and
+# becomes a ROUTABLE class — legal for the `walk` machine only (the gate
+# checks that no ORV machine's allow-list names it). 69,628 routes join the
+# graph; the walking router can finally use the trail a hiker is standing on.
+SHOW_ONLY = {"horse", "snow", "snowmob", "nfsmoto", "bike", "mou",
+             "railtrail", "cycle", "race", "path"}
 show = [r for r in net if r["c"] in SHOW_ONLY]
 net = [r for r in net if r["c"] not in SHOW_ONLY]
 
@@ -318,7 +323,18 @@ for e in aoi_stream.elements():
     # they are ("two east of M 33") and it is on every sign; the street name
     # often is not. Multi-value refs arrive semicolon-separated ("M 33;M 72")
     # and are split later, at the point where they are drawn.
-    (show if c in SHOW_ONLY else net).append({"c": c, "src": "osm", "auth": "advisory",
+    # Take 134: routable `foot` doubled the graph (476k -> 1.1M edges) because
+    # every unnamed OSM path in the state came with it — park loops, informal
+    # tracks. A hiker routes on a trail with a NAME (or a DNR route, which
+    # arrives via the agency path, always routable). Unnamed OSM paths stay
+    # drawn, not routed. "Optimize backwards": the cost is measured first.
+    _show_only = c in SHOW_ONLY or (c == "foot" and not (t.get("name") or "").strip())
+    # the gate's law: a class is routable OR show-only, never both. An unnamed
+    # OSM path is drawn, not routed, so it is class `path` — `foot` means a
+    # hiking trail the walk machine may route (take 134).
+    if _show_only and c == "foot":
+        c = "path"
+    (show if _show_only else net).append({"c": c, "src": "osm", "auth": "advisory",
                 "n": t.get("name"), "ref": (t.get("ref") or "").strip() or None,
                 "geometry": {"type": "LineString",
                              "coordinates": [[p["lon"], p["lat"]] for p in g]}})
@@ -362,12 +378,37 @@ def node_at(p):
         nodes.append(p)
     return nid[k]
 
+# Take 134: hiking (foot) became routable and the graph DOUBLED — not in foot
+# edges (12,451 DNR features) but in `track`, 653k edges: a hiking trail that
+# runs ALONG a two-track shares every snapped vertex with it, and every shared
+# vertex was a junction, so both lines were chopped into confetti. A walker
+# needs the junction where the trail joins the road and where it leaves it,
+# not one every 13 m in between. Within a run of consecutive vertices shared
+# with a foot line, only the run's ends stay junctions; a single shared vertex
+# (a true crossing) is a junction as before. Non-foot pairs are untouched.
+footpi = {pi for pi, (f, _) in enumerate(polys) if f["c"] == "foot"}
+def _jflags(pts):
+    fs = [key(q) in junction and bool(touch[key(q)] & footpi) and len(touch[key(q)]) >= 2
+          for q in pts]
+    out = []
+    for i, q in enumerate(pts):
+        k = key(q)
+        if k not in junction:
+            out.append(False)
+        elif fs[i] and 0 < i < len(pts) - 1 and fs[i - 1] and fs[i + 1]:
+            out.append(False)          # interior of a shared run: no junction
+        else:
+            out.append(True)
+    out[0] = out[-1] = True
+    return out
+
 edges = []
 for f, pts in polys:
+    isj = _jflags(pts)
     cur, run = node_at(pts[0]), [pts[0]]
-    for p in pts[1:]:
+    for pi_, p in enumerate(pts[1:], 1):
         run.append(p)
-        if key(p) in junction:
+        if isj[pi_]:
             n2 = node_at(p)
             if n2 != cur:
                 L = sum(m(run[i], run[i + 1]) for i in range(len(run) - 1))

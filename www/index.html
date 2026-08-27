@@ -504,7 +504,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 132</span>
+    <span id="title"><b>APEX</b> ORV · Take 134</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -642,47 +642,65 @@
        reappears unless asked for. -->
   <div id="guide" hidden>
     <div id="guide-card">
-      <h2>APEX <span>Bull Gap · Mio · Rose City</span></h2>
-      <p class="lede">An offline map for riding and paddling north-east Michigan.
-        Everything works with no signal — the whole map, the routing and the
-        rivers are already on your phone.</p>
+      <h2>APEX <span>all of Michigan</span></h2>
+      <p class="lede">An offline map for riding, hiking, hunting and the water,
+        both peninsulas. Everything works with no signal — the trails, the
+        routing, the rivers and the photos are already on your phone.</p>
+
+      <h3>Pick a mode</h3>
+      <ul>
+        <li><b>Ride</b> — ORV, dirt bike, side-by-side, MTB. Trails by
+          difficulty, riding areas, fuel. What your machine may legally use.</li>
+        <li><b>Outdoors</b> — hike, camp, hunt, fish. Hiking routes, trail
+          systems, named hills, county lines and public land. Routes on foot.</li>
+        <li><b>Water</b> — beach, kayak, tube, boat. Launches, beaches, marinas,
+          lighthouses, rivers with float times. No trail lines.</li>
+      </ul>
+      <p>The mode chip is top-left. A mode is a starting point, never a cage:
+        everything it sets is one tap away in <b>Layers</b> and the activity
+        chip.</p>
 
       <h3>Getting around</h3>
       <ul>
         <li><b>Map</b> — layers, search, find yourself</li>
         <li><b>Plan</b> — your machine, home, fuel range, loops, saved routes</li>
         <li><b>Ride</b> — start recording, mark a wrong turn</li>
-        <li><b>Tools</b> — compass, mark a spot, diagnostics</li>
+        <li><b>Tools</b> — compass, mark a spot, diagnostics, this guide</li>
       </ul>
 
       <h3>The map</h3>
       <ul>
-        <li><b>Tap a trail, road or pin</b> for details. The panel slides up and
-          folds away when you tap empty ground or pan off.</li>
-        <li><b>Press and hold</b> anywhere to drop a pin — then save it as a
-          waypoint.</li>
-        <li><b>Layers</b> turns on contours, named hills, places and rivers.</li>
+        <li><b>Tap a trail, road, pin or green land</b> for its card. Major
+          places carry a photo when one exists; the panel folds away when you
+          tap empty ground.</li>
+        <li><b>Press and hold</b> anywhere to drop a pin — then save it, make
+          it home, or start a route from it.</li>
+        <li><b>Hybrid</b> shows the photo of the state; every riding area is
+          sharp to street level, the rest of Michigan is a broad view.</li>
       </ul>
 
       <h3>What it knows</h3>
       <ul>
         <li>Which trails <b>your machine may legally use</b>, from the DNR and
-          the Forest Service — it will not route you somewhere you cannot ride.</li>
-        <li><b>Closed trails</b> are drawn red and never routed through.</li>
-        <li><b>Six rivers</b> with every launch, campground and dam. Pick two
-          points for the float between them.</li>
+          the Forest Service — it will not route you somewhere you cannot ride.
+          Closed trails are red and never routed through.</li>
+        <li><b>4.7 million acres of state land</b> — forest, game areas, parks —
+          with their boundaries. Check the DNR for the rules of the unit before
+          you hunt.</li>
+        <li><b>76 rivers</b> with launches, campgrounds, dams and portages.
+          Pick two points for the float between them.</li>
       </ul>
 
       <h3>If something goes wrong</h3>
       <p><b>Dispatch</b> gives you your position, the nearest junction and the
         nearest pavement, in words you can read aloud on a phone call. It refuses
-        to guess: if it does not know where you are, it says so instead of
-        showing a number.</p>
+        to guess: if it does not know where you are, it says so.</p>
 
       <p class="foot">This guide lives under <b>Tools → How to use</b>.
         It will not show again on its own.</p>
-      <button id="guide-go">Start riding</button>
+      <button id="guide-go">Let's go</button>
     </div>
+  </div>
   </div>
 
   <nav id="tabs">
