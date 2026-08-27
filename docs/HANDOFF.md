@@ -1,4 +1,22 @@
-# HANDOFF — through Take 135 · V2
+# HANDOFF — through Take 136 · V2
+
+## Take 136 — 2026-08-27 — CI never talks to Wikimedia
+
+Take 135's budget was not enough: build #55 (t135) sat on "address:" for
+36+ minutes with no progress line at all. Wikimedia rate-limits GitHub's
+cloud runners far harder than this sandbox; with the 20-second 429 back-off
+a lookup could take a minute, so the first "100 looked up" line never
+printed. Landmine 205. The fix removes the dependency: the 608 photos are
+fetched here, re-encoded to 320 px / q68 (18 → 9.6 MB), and ship IN THE
+SEED (photos/ + photos_index.json, neither ignored, committed by the seed
+job); `ci/bundle.sh` exports `APEX_PHOTO_BUDGET_S=0` and photos.py then
+uses the shipped set as-is with one line of output. Seed ~12 MB — still a
+phone upload. Future fetches save at the smaller size.
+
+Jacob's builds: #53 (t131) timed out at 1h30; #54 cancelled by the next
+upload; #55 (t135) will time out too — cancel it and upload t136.
+
+---
 
 ## Take 135 — 2026-08-27 — the photo step no longer holds CI hostage
 
@@ -20,6 +38,8 @@ cold budget stopped, shipped 5, and reported 2,924 deferred.
 Expect Jacob's next CI run: ~30 min to address, 25 min of photos (with a
 line every ~2 min), then render + gate — under the 90. The run after that
 gets the rest of the photos from cache.
+
+Gate PASSED. apex-seed-t135.zip sealed (sha256 in chat).
 
 ---
 

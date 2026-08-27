@@ -94,6 +94,18 @@ def _api(params, base=API):
 def _save(k, n, p, img, by, lic, title, desc=""):
     f = hashlib.sha1(key(k, n, p).encode()).hexdigest()[:12] + ".jpg"
     os.makedirs(OUTDIR, exist_ok=True)
+    try:
+        # 320 px, quality 68: ~16 KB each, so 600 photos ride in a 10 MB seed
+        import io
+        from PIL import Image
+        im = Image.open(io.BytesIO(img)).convert("RGB")
+        if im.width > 320:
+            im = im.resize((320, int(320 * im.height / im.width)), Image.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=68, optimize=True, progressive=True)
+        img = buf.getvalue()
+    except Exception:
+        pass
     open(os.path.join(OUTDIR, f), "wb").write(img)
     r = {"f": f, "by": by[:80], "lic": lic[:40], "t": title}
     if desc:
@@ -216,6 +228,22 @@ def lookup(k, n, p):
 
 
 def main():
+    # Take 136: CI never fetches. GitHub Actions runners are cloud IPs that
+    # Wikimedia rate-limits hard; with the 429 back-off each lookup could take
+    # a minute, so two builds sat on "address:" and timed out at 90 minutes
+    # (build #53, #55). The photos are FETCHED HERE, shipped in the seed
+    # (photos/ + photos_index.json, ~10 MB), and CI uses them as-is — the
+    # pipeline-verified-locally-fails-in-CI pattern the ledgers already name.
+    # ci/bundle.sh sets APEX_PHOTO_BUDGET_S=0.
+    if BUDGET_S <= 0:
+        if os.path.exists(INDEX) and os.path.isdir(OUTDIR):
+            idx = json.load(open(INDEX))
+            have = sum(1 for v in idx.values() if os.path.exists(os.path.join(OUTDIR, v["f"])))
+            print(f"photos: budget 0 — using the {have} shipped photo(s) ({len(idx)} indexed); "
+                  "no network on this runner")
+        else:
+            print("photos: budget 0 and nothing shipped — artifact absent")
+        return
     cands = []
     pp = os.path.join(ROOT, "poi_payload.json")
     if os.path.exists(pp):

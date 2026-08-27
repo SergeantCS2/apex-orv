@@ -6,6 +6,11 @@
 set -euo pipefail
 
 python3 -m pip install --quiet pillow numpy scipy pyyaml osmium scikit-image shapely
+# Take 136: the photo step does NOT fetch on CI. Wikimedia rate-limits cloud
+# runners so hard that two builds sat on "address:" until the 90-minute
+# timeout. The photos are fetched locally and shipped in the seed; this
+# tells photos.py to use them as-is.
+export APEX_PHOTO_BUDGET_S=0
 
 python3 tools/pipeline.py
 

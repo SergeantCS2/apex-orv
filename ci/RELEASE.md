@@ -1,15 +1,15 @@
-**Take 135 — the build finishes.**
+**Take 136 — the build finishes, for real this time.**
 
-Your last two builds sat after "address:" with no output. That was the
-photo step doing ~2,940 Wikipedia lookups on an empty cache — about 50
-minutes — silently. Now it prints progress every 100 lookups and stops
-after 25 minutes, shipping what it has; the cache carries over, so the
-next build picks up where this one left off. Photos arrive across two
-builds instead of one build that never lands.
+Take 135's fix was not enough: GitHub's runners are rate-limited by
+Wikimedia far harder than my sandbox, so the photo step still sat silent.
+The dependency is gone. The 608 photos are fetched on my side and ship in
+the seed itself (about 10 MB); the build just uses them. Nothing on the
+runner talks to Wikipedia any more.
 
-Plus 134: hiking trails routable on foot, the guide that shows on launch.
+Same map as 134: hiking trails routable on foot, the guide on launch,
+public land, photos, lighthouses.
 
-### What to expect from this build
-About 30 minutes to "address:", then photo progress lines every couple of
-minutes for up to 25 minutes, then render and gate. The self-test's photo
-count may read a few hundred on this build and the full 608 on the next.
+### What to expect
+About 30 minutes to "address:", then `photos: budget 0 — using the 608
+shipped photo(s)` within seconds, then render and gate. If build #55 is
+still running, cancel it first.

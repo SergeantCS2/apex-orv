@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 135.*
+*Current as of take 136.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -155,6 +155,7 @@ Start here. Do not read top to bottom.
 | Importing a tool runs the whole pipeline step | 201 |
 | Uploading the seed does nothing; CI keeps building the old take | 202 |
 | A tool call dies (-1, no output) right after a pkill/pgrep | 204 |
+| CI sits on one step with no output until the job timeout | 205 |
 
 ---
 
@@ -2593,3 +2594,14 @@ name appears elsewhere in the same command. Rule: get the pid in a call
 that does not mention the file (`ps aux | grep "[p]hoto[s].py"`), kill it,
 and edit the file in a SEPARATE call. Symptom index: a tool call returning
 -1 with no output right after a kill.
+
+**205. A pipeline step that fetches from a third party will be throttled on
+CI.** photos.py ran at ~59 lookups/min from the sandbox and printed nothing
+for the first 100; on GitHub Actions — cloud IPs Wikimedia rate-limits
+hard, with the tool's own 20-second back-off on 429 — a single lookup could
+take a minute, so builds #53 and #55 sat on "address:" until the 90-minute
+timeout, and Jacob read it as stuck. The ledgers already knew the shape
+(landmine 199-era: "pipelines verified locally have twice failed in clean
+environments"). Rule: anything fetched from a public API is fetched HERE
+and shipped in the seed; CI consumes, it does not fetch. `APEX_PHOTO_
+BUDGET_S=0` in ci/bundle.sh; photos/ + photos_index.json ride in the seed.
