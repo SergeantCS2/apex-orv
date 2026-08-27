@@ -1015,6 +1015,13 @@ var shortPts={type:'FeatureCollection',features:strokes.filter(function(f){
    any single mid-tone loses to one of them — lighter candidates gained on
    satellite exactly as fast as they lost on sand. fsroad is fixed with a
    CASING, the same answer as designated trail and two-track, not with paint. */
+/* Take 137 · typed waypoints, transcribed from Jacob's onX Hunt screen
+   (24280): tree stand, trail camera, deer sign, water, gate. A type is a
+   colour and a prefix on the name; the record is the same waypoint record,
+   so nothing that reads waypoints has to change. Offered in Outdoors only —
+   a rider dropping a pin does not need a stand. */
+var WPTYPES={stand:{h:'Stand',c:'#2E7FA8'},camera:{h:'Camera',c:'#C9A227'},
+  sign:{h:'Deer sign',c:'#F5EFE2'},water:{h:'Water',c:'#4FB3C9'},gate:{h:'Gate',c:'#7A5B3A'}};
 var PAL={
   /* designated ORV line, by difficulty. green / blue / black is what every
      trail map on earth uses, so it is learnable before it is explained. */
@@ -1111,7 +1118,11 @@ var TILEURL='bundle/imagery/{z}/{x}/{y}.jpg';
    decides RENDER FAIL and a rider zoomed on Manistee must not see it. Both
    live in one protocol handler, like the glyph pack's. */
 var SPARSE=!!(TILES&&TILES.sparse);
-var BLANK_PNG=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='),function(c){return c.charCodeAt(0)});
+/* Take 138: the first "blank" tile was a half-transparent BLUE pixel
+   (0,0,255,127) typed from memory — Jacob's Hybrid turned blue from z12 up
+   everywhere outside a patch. This one is generated (PIL, RGBA 0,0,0,0) and
+   render asserts the decoded alpha is zero. */
+var BLANK_PNG=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=='),function(c){return c.charCodeAt(0)});
 function inPatch(z,x,y){var b=(TILES&&TILES.boxes)||[];
   for(var i=0;i<b.length;i++){var q=b[i];
     if(q[0]===z&&x>=q[1]&&x<=q[3]&&y>=q[2]&&y<=q[4])return true}
@@ -1582,7 +1593,9 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        that is there, a waypoint is something YOU decided mattered, and when
        they collide yours wins. */
     {id:'wpt-dot',type:'circle',source:'wpts',minzoom:10.5,
-      paint:{'circle-radius':w(3.4,5.2,7),'circle-color':'#E2570F',
+      paint:{'circle-radius':w(3.4,5.2,7),
+        'circle-color':['match',['get','t']].concat(Object.keys(WPTYPES).reduce(function(a,k){
+          return a.concat([k,WPTYPES[k].c])},[])).concat(['#E2570F']),
         'circle-stroke-color':'#FFFFFF','circle-stroke-width':1.8}},
     {id:'wpt-label',type:'symbol',source:'wpts',minzoom:12.2,
       layout:{'text-field':['get','n'],'text-font':['APEX'],
@@ -3972,6 +3985,8 @@ function placeCard(at,kind,title){
   acts.push('<button class="chip" id="pc-go">⤢ Centre</button>');
   if(kind==='drop'){
     acts.push('<button class="chip" id="pc-wpt">☆ Save as waypoint</button>');
+    if(mode==='outdoors')acts.push(Object.keys(WPTYPES).map(function(k){
+      return '<button class="chip" data-wpt="'+k+'">'+WPTYPES[k].h+'</button>'}).join(''));
     acts.push('<button class="chip" id="pc-drop">✕ Remove pin</button>')}
   show(rows.join('<br>')+'<div style="margin-top:9px">'+acts.join(' ')+'</div>','');
   var on=function(id,fn){var b=el(id);if(b)b.addEventListener('click',fn)};
@@ -4003,13 +4018,22 @@ function placeCard(at,kind,title){
     show('Saved as <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
       'Find it again under \u2606 Saved.</span>','pass')});
   on('pc-drop',function(){clearDrop();show('Pin removed.','')});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-wpt]'),function(b){
+    b.addEventListener('click',function(){
+      var k=b.dataset.wpt,nm=WPTYPES[k].h+' \u00b7 '+wpName(at);
+      if(!wpAdd({n:nm,t:k,p:at.slice(),r:BUNDLE.region||null,ts:Date.now()}))
+        return show('<b>Could not save.</b>','fail');
+      logAct('act  saved waypoint '+k);
+      wpDraw();clearDrop();
+      show('Saved <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
+        'Find it again under \u2606 Saved.</span>','pass')})});
 }
 
 function wpDraw(){
   var a=wpLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region});
   try{map.getSource('wpts').setData({type:'FeatureCollection',
     features:a.map(function(x){return {type:'Feature',
-      properties:{n:x.n,ts:x.ts||0},
+      properties:{n:x.n,ts:x.ts||0,t:x.t||''},
       geometry:{type:'Point',coordinates:x.p}}})})}catch(e){}
   return a}
 
@@ -4071,7 +4095,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.__mode={apply:applyMode,get:function(){return mode},MODES:MODES};
     /* take 127: BUNDLE is not a window global (app.js is wrapped — the same
        lesson as areaCard at 121); the harness reads imagery facts here */
-    window.__sat={tiles:TILES,sparse:SPARSE,inPatch:inPatch};
+    window.__sat={tiles:TILES,sparse:SPARSE,inPatch:inPatch,blank:Array.from(BLANK_PNG)};
     window.__ph={index:PHOTOS,html:photoHTML};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};

@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 136.* Ranked by blocking-ness, not by interest.
+*Current as of take 138.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2509,3 +2509,12 @@ NODES.
   two-track being chopped by the noder, not hiking edges.
 - **Ruled out:** a gate exception for foot in the walk list — the
   routable-or-show-only law stands; the data got a second class instead.
+
+### Takes 135–137 — shipped
+135: photo step progress + time budget. 136: CI never fetches — photos ship
+in the seed (landmine 205: 12× throttle on GitHub runners, measured).
+137: typed hunting waypoints (stand / camera / sign / water / gate) in
+Outdoors, one WPTYPES table, colour by type.
+- **Ruled out:** a bigger CI budget for photos — 12.5 s per lookup means
+  ~120 photos per 25-minute build; shipping them is the honest fix.
+Open Hunt items: DMUs (need the digest page), contours over public land.

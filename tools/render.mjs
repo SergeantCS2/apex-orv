@@ -445,6 +445,56 @@ if (zoomed.trails === 0) {
     ok(pub.rideOff, "Ride keeps public land off by default");
   }
 
+  /* Take 137 · typed waypoints (onX Hunt 24280). In Outdoors a dropped pin
+     offers Stand / Camera / Sign / Water / Gate; choosing Stand saves a
+     typed record and the map paints it in the stand colour; in Ride the row
+     is absent. Drill clears what it saved. */
+  const twp = await page.evaluate(async () => {
+    const m = window.map, s = (ms) => new Promise((r) => setTimeout(r, ms));
+    const M = window.__mode; if (!M) return { missing: true };
+    const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+    const drop = async () => {
+      const c = m.getCenter(), px = m.project([c.lng + 0.01, c.lat + 0.004]);
+      const cv = m.getCanvasContainer(), r = cv.getBoundingClientRect();
+      const t = new Touch({ identifier: 7, target: cv, clientX: r.left + px.x, clientY: r.top + px.y });
+      cv.dispatchEvent(new TouchEvent("touchstart", { touches: [t], bubbles: true, cancelable: true }));
+      await s(900);
+      cv.dispatchEvent(new TouchEvent("touchend", { touches: [], changedTouches: [t], bubbles: true }));
+      /* a real finger's touchend is followed by a click, which the app swallows
+         as "the long press already acted" and resets lp.fired; without it the
+         NEXT drill's tap was swallowed instead (take 137) */
+      cv.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true,
+        clientX: r.left + px.x, clientY: r.top + px.y }));
+      for (let i = 0; i < 20; i++) { await s(300); if (document.getElementById("pc-wpt")) break; }
+      return [...document.querySelectorAll("[data-wpt]")].map((b) => b.dataset.wpt);
+    };
+    M.apply("ride", { silent: true }); await s(200);
+    const rideTypes = await drop();
+    try { document.getElementById("pc-drop").click(); } catch (e) { }
+    M.apply("outdoors", { silent: true }); await s(200);
+    const outTypes = await drop();
+    const stand = document.querySelector('[data-wpt="stand"]');
+    if (stand) stand.click(); await s(400);
+    let rec = null; try { rec = JSON.parse(localStorage.getItem("apex.waypoints.v1") || "[]")[0]; } catch (e) { }
+    let painted = null;
+    for (let i = 0; i < 20 && painted === null; i++) { await s(300);
+      try { const f = m.queryRenderedFeatures({ layers: ["wpt-dot"] }).find((x) => x.properties.t === "stand");
+            if (f) painted = m.getPaintProperty("wpt-dot", "circle-color") ? true : null; } catch (e) { } }
+    // clean up what the drill saved
+    try { const a = JSON.parse(localStorage.getItem("apex.waypoints.v1") || "[]").filter((x) => x.t !== "stand");
+          localStorage.setItem("apex.waypoints.v1", JSON.stringify(a)); } catch (e) { }
+    M.apply(was, { silent: true }); m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+    return { rideTypes, outTypes, rec, painted };
+  });
+  if (twp.missing) { ok(false, "mode bridge missing"); } else {
+    ok(twp.rideTypes.length === 0, "Ride's pin card offers no hunting types");
+    ok(twp.outTypes.join() === "stand,camera,sign,water,gate",
+       `Outdoors' pin card offers Stand / Camera / Sign / Water / Gate (${twp.outTypes.join(" · ")})`);
+    ok(twp.rec && twp.rec.t === "stand" && /^Stand · /.test(twp.rec.n),
+       `choosing Stand saves a typed waypoint (${twp.rec && twp.rec.n})`);
+    ok(twp.painted === true, "the typed waypoint is drawn on the map in its own colour");
+  }
+
   /* Take 131 · photos on major pins. Measured: a pin the index names gets
      markup with an <img> whose file the bundle actually serves; a pin the
      index does not name gets NOTHING — no placeholder. Attribution rides
@@ -603,7 +653,39 @@ if (zoomed.trails === 0) {
        `sat-patch is a visible raster layer on Satellite at ${patch.name}`);
     ok(patch.loaded, `the patch source loaded its tiles at ${patch.name} (${patch.count} tiles in ${patch.boxes} boxes)`);
     ok(!patch.errRaised, "no map error was raised while tiles outside the patches were requested");
+    /* take 138: the "blank" tile was a half-transparent BLUE pixel typed from
+       memory and Jacob's Hybrid turned blue from z12 up. Decode it. */
+    const alpha = await page.evaluate(async () => {
+      const S = window.__sat; if (!S || !S.tiles || !S.tiles.sparse) return null;
+      const box = (S.tiles.boxes || [])[0]; if (!box) return null;
+      // a tile far outside every box: same zoom, x shifted by 5000
+      const url = "apexsat://" + box[0] + "/" + (box[1] + 5000) + "/" + box[2];
+      const png = await new Promise((res) => {
+        const img = new Image();
+        img.onload = () => { const c = document.createElement("canvas"); c.width = c.height = 1;
+          const g = c.getContext("2d"); g.drawImage(img, 0, 0); res(g.getImageData(0, 0, 1, 1).data); };
+        img.onerror = () => res(null);
+        // route through the same protocol handler MapLibre uses
+        const h = maplibregl.getProtocolHandler ? null : null;
+        img.src = "data:image/png;base64," + btoa(String.fromCharCode.apply(null, window.__sat.blank || []));
+      });
+      return png ? { r: png[0], g: png[1], b: png[2], a: png[3] } : null;
+    });
+    ok(alpha && alpha.a === 0, `the out-of-patch tile is fully transparent (rgba ${alpha ? [alpha.r, alpha.g, alpha.b, alpha.a].join(",") : "?"})`);
   }
+  /* take 138: the guide rewrite left two stray </div> and the tab bar fell
+     out of the layout grid on the Fold. Assert the bar sits inside a phone
+     viewport, below the map, above the bottom edge. */
+  const tabs = await page.evaluate(() => {
+    const t = document.getElementById("tabs"), st = document.getElementById("stage");
+    if (!t || !st) return { missing: true };
+    const r = t.getBoundingClientRect(), s = st.getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, vh: window.innerHeight, sameParent: t.parentElement === st.parentElement,
+             stageBottom: s.bottom };
+  });
+  ok(!tabs.missing && tabs.bottom <= tabs.vh + 1 && tabs.top >= tabs.stageBottom - 1 && tabs.sameParent,
+     `the tab bar sits inside the viewport below the map (top ${Math.round(tabs.top)}, bottom ${Math.round(tabs.bottom)} of ${tabs.vh}; same parent as #stage: ${tabs.sameParent})`);
+
 
   /* A115/A112 · the paddle corridor, and the hazards that make it shippable.
      Centred on the Au Sable from the payload, not from where I happen to be

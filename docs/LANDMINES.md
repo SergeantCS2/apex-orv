@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 136.*
+*Current as of take 138.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -156,6 +156,7 @@ Start here. Do not read top to bottom.
 | Uploading the seed does nothing; CI keeps building the old take | 202 |
 | A tool call dies (-1, no output) right after a pkill/pgrep | 204 |
 | CI sits on one step with no output until the job timeout | 205 |
+| A layer or control vanishes on the phone but not in headless | 206 |
 
 ---
 
@@ -2600,8 +2601,15 @@ CI.** photos.py ran at ~59 lookups/min from the sandbox and printed nothing
 for the first 100; on GitHub Actions — cloud IPs Wikimedia rate-limits
 hard, with the tool's own 20-second back-off on 429 — a single lookup could
 take a minute, so builds #53 and #55 sat on "address:" until the 90-minute
-timeout, and Jacob read it as stuck. The ledgers already knew the shape
+timeout, and Jacob read it as stuck. Measured on #55: 100 lookups in 1,251 s
+— 12.5 s each against ~1 s here, a 12× throttle. The ledgers already knew the shape
 (landmine 199-era: "pipelines verified locally have twice failed in clean
 environments"). Rule: anything fetched from a public API is fetched HERE
 and shipped in the seed; CI consumes, it does not fetch. `APEX_PHOTO_
 BUDGET_S=0` in ci/bundle.sh; photos/ + photos_index.json ride in the seed.
+
+**206. A constant typed from memory is a claim.** The "transparent 1×1 PNG"
+base64 in take 127 was blue at 50 % alpha; nothing decoded it until Jacob's
+Hybrid went blue. Generate such constants with a tool and assert the decoded
+value. Companion: a markup edit that searches for `  </div>` will match
+inside `    </div>`; count opens and closes after any edit to the DOM.
