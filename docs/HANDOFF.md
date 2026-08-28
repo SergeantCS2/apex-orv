@@ -1,4 +1,59 @@
-# HANDOFF — through Take 138 · V2
+# HANDOFF — through Take 140 · V2
+
+## Take 140 — 2026-08-28 — the readout outline, and a statewide imagery base
+
+Jacob's 138 self-test: PASS 47 / FAIL 0, dispatch 88 ms on the Fold (was
+654 at take 119), imagery "tiles z12-z15 · 3.40 m/px", trail-names 4 for
+25 segments. Two field notes:
+
+**"The i's have two white dots behind the black; a white line above the
+mileage."** The A150 outline was four ±1 px white text-shadows; at dpr 2.6
+they separate into dots. The scale bar's `0 -1px 0 #fff` box-shadow was
+the line above. A shadow is not an outline: `-webkit-text-stroke` +
+`paint-order: stroke fill` (Chrome 152 in the WebView supports it) on the
+readout and scale; the scale keeps only the shadow BELOW.
+
+**"Map fidelity is still very bad for hybrid."** At 1 mi the screen is
+~11 m/px; the 4096 px state mosaic is 234 m/px — 20× too coarse outside
+the eight patches. The sparse pyramid now carries a STATEWIDE z11 BASE
+(2,695 tiles, ~38 MB, 54 m/px, 4× the mosaic) under the z12–15 patches.
+MapLibre detail that decides the design: a raster source overzooms only
+from its own maxzoom, so the base is its own source (`satbase`, min = max =
+11) and layer (`sat-base`, between mosaic and patches) — otherwise every
+z12+ tile outside a patch answers blank and the base never shows past z11.
+Render: at a point outside every box, on Satellite at z13, the base source
+has loaded and the layer is visible. 168/0. Imagery 55.9 MB / 3,513 tiles.
+
+**Jacob's call, with numbers:** z12 statewide is 10,573 tiles / 104 MB
+(27 m/px, 9× the mosaic); z13 is 400 MB. `APEX_IMAGERY_BASE_Z=12` in
+ci/bundle.sh is the one-line switch if he wants it.
+
+---
+
+## Take 139 — 2026-08-27 — the address index diet
+
+The 52 MB address index was ten decimal numbers per segment as text, 770k
+segments. Every one carries house numbers (0 droppable), so the diet is
+encoding: sorted by name then position, coordinates as delta integers at
+1e-5° (1e-4 saved 2 MB more and cost fidelity — not taken), ranges as
+from + span, zips as an index. **52 → 28 MB; bundle 142.7 → 118.8 MB.**
+The app decodes v2 back into the same `segs` arrays on load (~100 ms), so
+the fifteen consumers are untouched. `addressAt` walks a midpoint grid
+(reach = cap + 2 cells) instead of all 770k — the last linear scan in the
+dispatch card. bundle.py's empty-artifact guard learned the v2 count (it
+correctly refused the first build as "EMPTY — not staged").
+
+The reverse-geocode probe took `segs[0]`, which moved from the 1400-block
+to the 4200-block of the same road when the file was sorted and read as a
+changed answer; it now takes the first segment of the first street name.
+A probe must not depend on file order.
+
+Render 167/0: dispatch card 2 ms of scanning, every lookup on a grid. Gate
+PASSED, smoke 5 modes. apex-seed-t139.zip sealed, photos inside (sha256 in
+chat). **Next:** DMUs on Jacob's digest page; contours over public land as
+patches; Jacob's 138 bug report.
+
+---
 
 ## Take 138 — 2026-08-27 — two regressions from Jacob's 136 test, both mine
 
@@ -19,7 +74,8 @@ grid, below the screen. Headless did not show it because 412×915 with no
 system bar still had room; the Fold did not. Balanced now, and render
 asserts #tabs sits inside the viewport below #stage with the same parent.
 
-Render 167/0.
+Render 167/0. Gate PASSED, smoke 5 modes. apex-seed-t138.zip sealed,
+photos inside (sha256 in chat).
 
 ---
 

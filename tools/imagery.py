@@ -187,6 +187,31 @@ def patches(zmax=15, pad=0.03):
         import shutil
         shutil.rmtree(root)
     boxes, total, bytes_, seen = [], 0, 0, set()
+    # Take 140 · a STATEWIDE base for the sparse pyramid. Jacob at 1 mi:
+    # "fidelity is still very bad" — 11 m per screen pixel against a 234 m/px
+    # mosaic. One whole-state box at BASE_Z (11: ~2,650 tiles, ~26 MB,
+    # 54 m/px, 4x the mosaic) under the z12–15 riding-area patches; z12
+    # statewide would be 10,573 tiles / 104 MB (27 m/px) — Jacob's call.
+    BASE_Z = int(os.environ.get("APEX_IMAGERY_BASE_Z", "11"))
+    if BASE_Z >= 11:
+        bx0, by0 = t_xy(W, N, BASE_Z)
+        bx1, by1 = t_xy(E, S, BASE_Z)
+        boxes.append([BASE_Z, bx0, by0, bx1, by1])
+        jobs = [(x, y) for x in range(bx0, bx1 + 1) for y in range(by0, by1 + 1)]
+        def one0(j):
+            x, y = j
+            return j, fetch(BASE_Z, x, y)
+        with ThreadPoolExecutor(max_workers=10) as ex:
+            for (x, y), b in ex.map(one0, jobs):
+                if not b:
+                    continue
+                seen.add((BASE_Z, x, y))
+                d = os.path.join(root, str(BASE_Z), str(x))
+                os.makedirs(d, exist_ok=True)
+                open(os.path.join(d, f"{y}.jpg"), "wb").write(b)
+                total += 1
+                bytes_ += len(b)
+        print(f"  statewide base z{BASE_Z}: {len(jobs)} tiles", flush=True)
     for ar in areas:
         xs = [pt[0] for ring in ar["g"] for pt in ring]
         ys = [pt[1] for ring in ar["g"] for pt in ring]
@@ -214,8 +239,9 @@ def patches(zmax=15, pad=0.03):
                     total += 1
                     bytes_ += len(b)
         print(f"  patch {ar['n']}: z12–z{zmax}")
-    json.dump({"zmin": 12, "zmax": zmax, "tiles": total, "bytes": bytes_,
-               "sparse": True, "boxes": boxes}, open("imagery_tiles.json", "w"))
+    json.dump({"zmin": min(BASE_Z, 12) if BASE_Z >= 11 else 12, "zmax": zmax,
+               "tiles": total, "bytes": bytes_, "sparse": True, "boxes": boxes},
+              open("imagery_tiles.json", "w"))
     print(f"tiles: {total} files, {bytes_ / 1048576:.1f} MB, sparse patches over "
           f"{len(areas)} riding area(s)")
 

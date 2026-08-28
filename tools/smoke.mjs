@@ -591,7 +591,11 @@ ok(grab("hits")._html.length > 0 && !/No match/.test(grab("hits")._html),
   const g = sandbox.window.__geo;
   ok(!!g && !!g.ADDR, "address index loaded from the bundle");
   if (g && g.ADDR) {
-    const seg = g.ADDR.segs[0];
+    /* take 139: not segs[0] — the file is sorted now and "first" moved from
+       the 1400-block to the 4200-block of the same road, which read as a
+       changed answer. A probe must not depend on file order: take the
+       first segment of the first street name, which is stable. */
+    const seg = g.ADDR.segs.find((x) => x[0] === 0) || g.ADDR.segs[0];
     const mid = [(seg[1] + seg[3]) / 2, (seg[2] + seg[4]) / 2];
     const rev = g.addressAt(mid);
     ok(!!rev && /\d+\s+\S/.test(rev.txt), `reverse geocode works (${rev ? rev.txt : "null"})`);

@@ -271,15 +271,17 @@
      readout change colour under him. Four hard ±1 px shadows make an outline;
      a single blurred shadow reads as grey fringing over imagery, which is why
      it looked "sometimes white, sometimes black" in the field. */
+  /* Take 140, Jacob on the Fold: the four ±1 px shadows separated into
+     white dots behind every "i" at dpr 2.6 — a shadow is not an outline. A
+     real stroke, painted UNDER the fill, is. */
   #readout{position:absolute;left:13px;top:60px;pointer-events:none;z-index:3;
     font:700 var(--t-md)/1.25 Barlow,Roboto,system-ui,sans-serif;
-    color:#1C1A16;
-    text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,
-                0 0 3px rgba(255,255,255,.9)}
+    color:#1C1A16;-webkit-text-stroke:3px #fff;paint-order:stroke fill;
+    text-shadow:none}
   .maplibregl-ctrl-scale{background:transparent!important;border:none!important;
-    border-bottom:2px solid #1C1A16!important;box-shadow:0 1px 0 #fff,0 -1px 0 #fff;
+    border-bottom:2px solid #1C1A16!important;box-shadow:0 1px 0 #fff;   /* below only — the -1px twin was Jacob's "white line above" */
     color:#1C1A16!important;font:700 var(--t-sm)/1.2 Barlow,Roboto,system-ui,sans-serif!important;
-    text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;
+    -webkit-text-stroke:2.5px #fff;paint-order:stroke fill;text-shadow:none;
     padding:0 0 1px!important;margin:0!important}
   .maplibregl-ctrl-bottom-left{left:9px;bottom:auto;top:38px}
   .maplibregl-ctrl-attrib{font-size:var(--t-xs)}.maplibregl-ctrl-top-right{display:none}
@@ -504,7 +506,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 138</span>
+    <span id="title"><b>APEX</b> ORV · Take 140</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>

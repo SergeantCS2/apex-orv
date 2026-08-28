@@ -116,7 +116,22 @@ def main():
                          lf or 0, lt or 0, rf or 0, rt or 0,
                          int(zp) if zp.isdigit() else 0])
 
-    payload = {"names": names, "segs": segs}
+    # Take 139 · the index was 52 MB of decimal text — ten floats and ints per
+    # segment, 770k segments. Sorted by name then position and stored as
+    # DELTA INTEGERS at 1e-5 degrees (~1 m; 1e-4 saved only 2 MB more and
+    # cost fidelity), with house-number ranges as from + span and zips as an
+    # index: 28 MB, same information. The app decodes it back into the same
+    # `segs` arrays on load, so every consumer is unchanged.
+    segs.sort(key=lambda g: (g[0], g[1], g[2]))
+    zips = sorted({g[9] for g in segs})
+    zi = {z: i for i, z in enumerate(zips)}
+    flat, px, py, pn = [], 0, 0, 0
+    for g in segs:
+        x1, y1, x2, y2 = [round(v * 1e5) for v in g[1:5]]
+        flat.extend([g[0] - pn, x1 - px, y1 - py, x2 - x1, y2 - y1,
+                     g[5], g[6] - g[5], g[7], g[8] - g[7], zi[g[9]]])
+        pn, px, py = g[0], x1, y1
+    payload = {"v": 2, "names": names, "zips": zips, "p": 100000, "n": len(segs), "f": flat}
     blob = json.dumps(payload, separators=(",", ":"))
     open(os.path.join(ROOT, "address_payload.json"), "w").write(blob)
     print(f"address: {len(segs)} segments of {seen} scanned, "

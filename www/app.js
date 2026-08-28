@@ -1158,8 +1158,15 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       attribution:'USGS'}
      :{type:'image',url:SATURL,
       coordinates:[[SATBOX[0],SATBOX[3]],[SATBOX[2],SATBOX[3]],[SATBOX[2],SATBOX[1]],[SATBOX[0],SATBOX[1]]]},
+    /* take 140 · a statewide z11 BASE as its own source: a raster source
+       overzooms only from its own maxzoom, so z11 tiles stretch under
+       z12–15 everywhere outside a patch instead of going blank. Layer
+       order: mosaic, base, patches. */
+    satbase:(SPARSE&&TILES.zmin<=11)?{type:'raster',tiles:['apexsat://{z}/{x}/{y}'],tileSize:256,
+      minzoom:11,maxzoom:11,attribution:'USGS'}
+      :{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     satpatch:SPARSE?{type:'raster',tiles:['apexsat://{z}/{x}/{y}'],tileSize:256,
-      minzoom:TILES.zmin,maxzoom:TILES.zmax,attribution:'USGS'}
+      minzoom:Math.max(12,TILES.zmin),maxzoom:TILES.zmax,attribution:'USGS'}
       :{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     hs:{type:'image',url:SHADE,
       coordinates:[[TR.b[0],TR.b[3]],[TR.b[2],TR.b[3]],[TR.b[2],TR.b[1]],[TR.b[0],TR.b[1]]]},
@@ -1254,6 +1261,9 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     /* A153 · crisp tiles over the riding areas, above the mosaic. Toggled
        with 'sat'. A geojson stand-in when the bundle has no patches keeps
        the layer id stable for the toggle and the harness. */
+    (SPARSE&&TILES.zmin<=11)?{id:'sat-base',type:'raster',source:'satbase',layout:{visibility:'none'},
+      paint:{'raster-opacity':1,'raster-fade-duration':150}}
+      :{id:'sat-base',type:'circle',source:'satbase',layout:{visibility:'none'},paint:{'circle-radius':0}},
     SPARSE?{id:'sat-patch',type:'raster',source:'satpatch',layout:{visibility:'none'},
       paint:{'raster-opacity':1,'raster-fade-duration':150}}
       :{id:'sat-patch',type:'circle',source:'satpatch',layout:{visibility:'none'},paint:{'circle-radius':0}},
@@ -2958,12 +2968,14 @@ var BASEMAPS=['Map','Satellite','Hybrid'],bmi=0;
 function setBasemap(i){
   if(!SAT_OK){bmi=0;setChip('c-base','map','Map');
     map.setLayoutProperty('sat','visibility','none');
-    try{map.setLayoutProperty('sat-patch','visibility','none')}catch(e){}
+    try{map.setLayoutProperty('sat-patch','visibility','none');
+        map.setLayoutProperty('sat-base','visibility','none')}catch(e){}
     return}
   bmi=i%BASEMAPS.length;
   var m=BASEMAPS[bmi],sat=(m!=='Map');
   map.setLayoutProperty('sat','visibility',sat?'visible':'none');
-  try{map.setLayoutProperty('sat-patch','visibility',sat?'visible':'none')}catch(e){}
+  try{map.setLayoutProperty('sat-patch','visibility',sat?'visible':'none');
+      map.setLayoutProperty('sat-base','visibility',sat?'visible':'none')}catch(e){}
   /* The casing is no longer a satellite-only trick: it separates a
      difficulty-coloured trail from the road network on ANY base, and this
      line was switching it off on the default map (take 46). */
@@ -3860,6 +3872,28 @@ function flyToYou(){
 
    Both directions are offline. Coverage is partial out here, and when there is
    no address the card shows nothing rather than announcing an absence. */
+/* Take 139 · the index ships delta-encoded (v2); decoded here into the same
+   `segs` arrays the fifteen consumers below have always read. ~100 ms. */
+function addrDecode(){
+  if(!ADDR||!ADDR.f||ADDR.segs)return;
+  var f=ADDR.f,n=ADDR.n,p=ADDR.p||100000,zips=ADDR.zips||[],segs=new Array(n);
+  var pn=0,px=0,py=0,k=0;
+  for(var i=0;i<n;i++){
+    var nm=pn+f[k],x1=px+f[k+1],y1=py+f[k+2],x2=x1+f[k+3],y2=y1+f[k+4];
+    segs[i]=[nm,x1/p,y1/p,x2/p,y2/p,f[k+5],f[k+5]+f[k+6],f[k+7],f[k+7]+f[k+8],zips[f[k+9]]];
+    pn=nm;px=x1;py=y1;k+=10}
+  ADDR.segs=segs;ADDR.f=null}
+try{addrDecode()}catch(e){}
+/* and a grid over segment midpoints for addressAt — the last linear scan in
+   the dispatch card (646 + 282 ms in headless at take 134) */
+var AGRID=null;
+function addrGrid(){
+  if(AGRID)return AGRID;
+  var m=new Map(),S=ADDR.segs;
+  for(var i=0;i<S.length;i++){var g=S[i];
+    var c=gcell([(g[1]+g[3])/2,(g[2]+g[4])/2]),kk=gkey(c[0],c[1]);
+    var a=m.get(kk);if(a)a.push(i);else m.set(kk,[i])}
+  AGRID=m;return m}
 var ADDR_CAP=0.09;                 /* miles; inside this, it IS your address */
 /* Beyond ADDR_CAP the app said nothing at all, and that threw away a true and
    useful answer: Mio sits 307 m from an addressed road and Luzerne 377 m, so
@@ -3900,9 +3934,14 @@ function countyAt(at){
 function addressAt(at,wide){
   if(!ADDR||!ADDR.segs)return null;
   var S=ADDR.segs,best=null,bd=wide?ADDR_NEAR:ADDR_CAP;
-  for(var i=0;i<S.length;i++){var g=S[i];
-    var r=segNear(at,[g[1],g[2]],[g[3],g[4]]);
-    if(r.d<bd){bd=r.d;best={g:g,r:r}}}
+  /* rings over the midpoint grid; a segment up to ~1 km long can have its
+     midpoint two cells away, so the walk goes two cells past the cap */
+  var G=addrGrid(),c=gcell(at),reach=Math.ceil(bd/(GCS*0.714*69))+2;
+  for(var dx=-reach;dx<=reach;dx++)for(var dy=-reach;dy<=reach;dy++){
+    var list=G.get(gkey(c[0]+dx,c[1]+dy));if(!list)continue;
+    for(var j=0;j<list.length;j++){var g=S[list[j]];
+      var r=segNear(at,[g[1],g[2]],[g[3],g[4]]);
+      if(r.d<bd){bd=r.d;best={g:g,r:r}}}}
   if(!best)return null;
   var g=best.g,r=best.r;
   var f=r.side==='L'?g[5]:g[7], t=r.side==='L'?g[6]:g[8];

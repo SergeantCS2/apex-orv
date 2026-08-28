@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 138.* Ranked by blocking-ness, not by interest.
+*Current as of take 140.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2518,3 +2518,10 @@ Outdoors, one WPTYPES table, colour by type.
 - **Ruled out:** a bigger CI budget for photos — 12.5 s per lookup means
   ~120 photos per 25-minute build; shipping them is the honest fix.
 Open Hunt items: DMUs (need the digest page), contours over public land.
+
+### Takes 138–139 — shipped
+138: transparent blank tile (was blue at 50 %), guide markup balanced (tab
+bar back). 139: address index v2 delta-int (52 → 28 MB), addressAt on a
+midpoint grid — dispatch card 2 ms in headless.
+- **Ruled out:** 1e-4° precision for the index (2 MB for lost fidelity).
+- **Ruled out:** dropping unnumbered segments — there are none.

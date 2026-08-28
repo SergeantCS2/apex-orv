@@ -673,6 +673,31 @@ if (zoomed.trails === 0) {
     });
     ok(alpha && alpha.a === 0, `the out-of-patch tile is fully transparent (rgba ${alpha ? [alpha.r, alpha.g, alpha.b, alpha.a].join(",") : "?"})`);
   }
+  /* take 140 · the statewide z11 base under the patches: at a point OUTSIDE
+     every patch box, on Satellite at z13, the base source has loaded tiles
+     (its own source, maxzoom 11, so MapLibre overzooms it there). */
+  const base = await page.evaluate(async () => {
+    const m = window.map, s = (ms) => new Promise((r) => setTimeout(r, ms));
+    const S = window.__sat; if (!S || !S.sparse || S.tiles.zmin > 11) return { skip: true };
+    const cam = { c: m.getCenter(), z: m.getZoom() };
+    const bm = document.querySelector("#c-base span").textContent;
+    // a point no patch covers: walk east from the region centre until inPatch is false at z13
+    const c0 = m.getCenter(); let lon = c0.lng, lat = c0.lat, tries = 0;
+    const tile = (ln, la, z) => { const n = 2 ** z; const r = la * Math.PI / 180;
+      return [Math.floor((ln + 180) / 360 * n), Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n)]; };
+    while (tries++ < 40) { const t = tile(lon, lat, 13); if (!S.inPatch(13, t[0], t[1])) break; lon += 0.05; }
+    m.jumpTo({ center: [lon, lat], zoom: 13 });
+    document.getElementById("c-base").click(); await s(300);
+    let loaded = false;
+    for (let i = 0; i < 40; i++) { await s(400); try { if (m.getSource("satbase").loaded()) { loaded = true; break; } } catch (e) { } }
+    const vis = (() => { try { return m.getLayoutProperty("sat-base", "visibility"); } catch (e) { return null; } })();
+    while (document.querySelector("#c-base span").textContent !== bm) { document.getElementById("c-base").click(); await s(150); }
+    m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+    return { loaded, vis, at: [lon.toFixed(2), lat.toFixed(2)] };
+  });
+  if (base.skip) ok(true, "no statewide imagery base in this bundle — skipped, not failed");
+  else ok(base.loaded && base.vis === "visible", `the statewide z11 base is loaded and visible at z13 outside every patch (${base.at})`);
+
   /* take 138: the guide rewrite left two stray </div> and the tab bar fell
      out of the layout grid on the Fold. Assert the bar sits inside a phone
      viewport, below the map, above the bottom edge. */

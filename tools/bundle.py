@@ -74,7 +74,9 @@ COUNTERS = {
     "other":   lambda d: len(d.get("r") or []),
     "places":  lambda d: len(d.get("p") or []),
     "context": lambda d: len(d.get("counties") or []) + len(d.get("rings") or []),
-    "address": lambda d: len(d.get("segs") or []),
+    # take 139: v2 ships delta-encoded — the count is `n`, the segments are
+    # rebuilt in the app
+    "address": lambda d: (d.get("n") if d.get("v") == 2 else len(d.get("segs") or [])),
 }
 
 
