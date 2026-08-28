@@ -19,6 +19,12 @@ ROOT = os.path.dirname(HERE)
 
 STEPS = [
     ("ingest",     ["ingest.py"],      "DNR + USFS + OSM"),
+    # take 151/150 · these fetch small inventories LATER stages consume (poi
+    # and corridor read bas_payload) — on a fresh CI runner they must run
+    # before poi, not after corridor, or the first v2 build ships without
+    # the DNR ramps it was sealed with. Caught at the seal, not in CI.
+    ("bas",        ["bas.py"],         "DNR boating access sites (A169)"),
+    ("gauges",     ["gauges.py"],      "USGS gauge inventory (live values are the app's, on a tap)"),
     ("pack",       ["pack.py"],        "water layer"),
     ("poi",        ["poi.py"],         "places you can ride to"),
     ("graph",      ["graph.py"],       "conflate and node the network"),

@@ -23,7 +23,7 @@ WWW = os.path.join(ROOT, "www")
 # One line, and it must match src/app.html BYTE FOR BYTE — these are stripped
 # by exact string match, so a two-line form with different indentation left
 # `CONT = __CONT__` in the shipped app and the map never constructed (take 91).
-DECLS = ('var WATER = __WATER__, GR = __GRAPH__, TR = __TERRAIN__, POIS = __POIS__, CONT = __CONT__, PADDLE = __PADDLE__, LAND = __LAND__, AREAS = __AREAS__, PHOTOS = __PHOTOS__, PUBS = __PUBS__;',
+DECLS = ('var WATER = __WATER__, GR = __GRAPH__, TR = __TERRAIN__, POIS = __POIS__, CONT = __CONT__, PADDLE = __PADDLE__, LAND = __LAND__, AREAS = __AREAS__, PHOTOS = __PHOTOS__, PUBS = __PUBS__, GAUGES = __GAUGES__;',
          'var SHADE = "__SHADE__";', 'var SAT = "__SAT__";',
          'var SATB = __SATB__;', 'var GLYPHS = __GLYPHS__;')
 
@@ -38,6 +38,9 @@ IN_BUNDLE = {"graph_payload.json": "graph.json",
              "poi_payload.json": "poi.json",
              "contour_payload.json": "contour.json",
              "corridor_payload.json": "corridor.json",
+             # take 150 · A164 — the second explicit map that had to learn a
+             # new artifact by hand (bundle.py's manifest was the first).
+             "gauges_payload.json": "gauges.json",
              "landcover_payload.json": "landcover.json",
              "areas_payload.json": "areas.json",
              "photos_index.json": "photos.json",
@@ -146,10 +149,12 @@ j('bundle/manifest.json').then(function(man){
     have.areas?j('bundle/'+have.areas):Promise.resolve(null),
     /* take 131 · photos for major pins — optional, absent-safe */
     have.photos?j('bundle/'+have.photos):Promise.resolve(null),
-    have.publicland?j('bundle/'+have.publicland):Promise.resolve(null)]);
+    have.publicland?j('bundle/'+have.publicland):Promise.resolve(null),
+    /* take 150 · A164: gauge inventory — optional, absent-safe */
+    have.gauges?j('bundle/'+have.gauges):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
-  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -289,7 +294,7 @@ def single(out):
             f'LAND = {rd("landcover_payload.json") or "null"};\n'
             f'AREAS = {rd("areas_payload.json") or "null"};\n'
             f'PHOTOS = {rd("photos_index.json") or "null"};\n'
-            f'PUBS = {rd("publicland_payload.json") or "null"};\n'
+            f'PUBS = {rd("publicland_payload.json") or "null"};\n'            f'GAUGES = {rd("gauges_payload.json") or "null"};\n'
             f'var SHADE = "{uri("hillshade.jpg")}";\n'
             f'var SAT = "{uri("imagery.jpg")}";\n'
             f'var SATB = {json.dumps(json.loads(meta)["b"]) if meta else "[0,0,0,0]"};\n'

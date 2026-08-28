@@ -1,4 +1,111 @@
-# HANDOFF — through Take 145 · V2
+# HANDOFF — through Take 152 · V2 (147–152 sealed as one batch)
+
+## Takes 147–150 — 2026-08-28/29 — the tester batch (Jacob: "do not seal
+## until all of these are hit... every mode should plan something")
+
+Order of work, one at a time: 147 liveries into Water (A166, new ingest
+tag amenity=boat_rental -> a real livery kind, not name-guessing);
+148 self-test style-loaded settles before it measures (A161); 149 Water
+plans on the water — boats as the machine (A165) and corridor routing
+put-in to take-out with float time (A163), plus per-mode plan proof
+(Off-road machine, Outdoors foot, Hunt foot, Water river); 150 live USGS
+gauges on rivers under §8's in-app rules (A164). Single seal at the end;
+suites run per milestone, gate last.
+
+## Take 147 — liveries into Water (A166)
+
+The tester's "canoe rentals show in Ride, vanish in Water": those pins
+are camps and stores by classification (58 of 83 canoe-named places are
+launches; the liveries landed as camp/food/store). amenity=boat_rental
+joins POI_TAGS (tag-set stamp forces the honest re-ingest), poi.py
+classifies livery ahead of camp so a rental-campground pins as the thing
+a paddler needs, Water (and Outdoors) carry the kind.
+
+## Take 148 — self-test settles the style flag (A161)
+
+stRender is async now: style-loaded polls isStyleLoaded() up to 5 s and
+reports its settle time, and every RENDER read downstream sees a settled
+style. The self-test chain awaits it; nothing else moved.
+
+## Take 149 — Water plans on the water (A163 + A165)
+
+What existed: the whole run system — paddleCard's two-tap flow, runCard's
+put-in/take-out with downstream flip, dams-as-portages, livery-calibrated
+paddleHours. What the tester proved missing: reachability and pace. Now:
+kayak/canoe/raft join MACHINE (ok:[] — a boat is legal on no land class;
+Water never graph-routes), the chip cycles craft in Water and remembers
+your boat like it remembers your machine, paddleHours and the run card
+follow the craft, and a launch/livery/marina PIN within ~300 m of a
+mapped river carries the same run actions — the tester tapped pins, and
+pins now answer. Every mode plans: Off-road and MTB by machine on the
+graph, Outdoors and Hunt on foot, Water by river runs.
+
+## Take 150 — live USGS gauges (A164)
+
+gauges.py ships the NWIS inventory (241 MI surface-water sites, 22 KB —
+the tester's 04137500 Au Sable gauge among them); the river card offers
+"River conditions (USGS, live)" when a gauge sits within 12 mi, and the
+values are fetched ON TAP under §8's in-app rules (waterservices.usgs.gov
+allowlisted, PROVISION declares both roles). Stale values are never
+shipped — live or absent, nothing in between. First gauges.py run sent
+stateCd=Michigan and got HTTP 400: NWIS wants the postal code, and the
+region record carries prose — explicit map now, because a wrong guess
+here is a silent empty inventory. A drill first shipped with a
+tautological check (`? true : true`) — caught and made falsifiable
+before it ever ran.
+
+## Takes 151–152 — 2026-08-29 — the Rifle River report (A168, A169)
+
+Mid-batch field report two: "rifle river" found a street, and Jacob has
+dropped at ramps the app never showed. 151: DNR Boating Access Sites
+(1,325; the layer verified to exist before anything was promised —
+landmine 190) merge into launches (+280) and corridor candidates; the
+Rifle goes from 2 named accesses to the DNR's seven; the state-sponsored-
+only limit is written in bas.py where it bites. 152: corridors are search
+rows; a river hit fits the whole river and opens its summary.
+
+Smoke's two batch reds, closed with causes: the exposure block died at my
+GAUGES line and took __ride down (exposures now come last, defensively —
+order is not load-bearing); and stRender's promise chain structurally
+cannot complete under a harness that pumps timers, never microtasks — it
+is a setTimeout chain now, the pattern the file already used.
+
+SEAL (the batch, takes 147–152 as one — Jacob: "do not seal until all of
+these are hit"): smoke 5/5 modes, render 195/0 (184 + the water batch +
+the Rifle pair), gate PASSED. The gauges artifact had to be taught to
+THREE explicit maps (bundle manifest, IN_BUNDLE, the split loader's fetch
+list) — a 404 at boot took the whole app down in the harness, which is
+exactly the loud failure the offline-integrity check exists to make.
+README.md rewritten for v2 in Jacob's own README voice — every capability,
+stated honestly, limits included. Two more gate refusals answered on the
+way: the HANDOFF title line, and NWIS missing from manifest.py — the
+declaration of RECORD, not just PROVISION's prose (the gate knew the
+difference; I didn't, briefly). And a CI ordering landmine caught at the
+seal: bas/gauges sat after the stages that consume them — a fresh runner
+would have built poi and corridor dataless. Moved before poi. apex-seed-t152.zip sealed (sha256 in
+chat). This is v2's candidate build.
+
+---
+
+## Take 146 — 2026-08-28 — the Ride mode is called Off-road (A167)
+
+Jacob's direct call from the first EXTERNAL tester session. Label, mode
+subtitle context and guide only — the internal key 'ride' and the
+recording verb ("Ride it", the Ride tab) deliberately stay: saved state
+hangs off the key, and "go for a ride" is the activity, not the mode's
+name. Three render matchers moved with the label (chip text, picker
+labels, guide regex); smoke asserts from MODES data and followed for
+free. Descriptive check prose still saying "Ride" sweeps later — text
+matchers were the correctness surface.
+
+SEAL: render 184/0 with the three moved matchers green. Gate PASSED.
+apex-seed-t146.zip sealed (sha256 in chat).
+
+The same session filed A161–A166 (self-test check timing, one first-
+paint frame stall, paddle planning on the corridors, USGS gauge data,
+boats as Water's machine, liveries into Water) — recorded, designs next.
+
+---
 
 ## Take 145 — 2026-08-28 — the HD chip and "Save HD for this view"
 

@@ -141,7 +141,15 @@ def project(pts, cum, pt):
     return best
 
 
+_BAS = []
+
+
 def main():
+    global _BAS
+    if os.path.exists("bas_payload.json"):
+        _BAS = json.load(open("bas_payload.json"))["b"]
+        print(f"corridor: {len(_BAS)} DNR boating access sites join the "
+              "feature candidates (A169)")
     cfg = json.load(open(os.path.join(ROOT, "regions.json")))
     declared = cfg["regions"][R.id].get("corridors")
     out_path = os.path.join(ROOT, "corridor_payload.json")
@@ -342,6 +350,23 @@ def main():
         rs = min(p[1] for p in flat) - 0.02; rn = max(p[1] for p in flat) + 0.02
         cand = [f for f in h.feats
                 if rw <= f["p"][0] <= re_ and rs <= f["p"][1] <= rn]
+        # take 151 · A169: DNR boating access sites join the candidates. OSM
+        # held two named accesses on the Rifle's 60.8 mi; the DNR holds
+        # seven. A site within 120 m of an OSM access is the same ramp seen
+        # twice — OSM's copy wins (it usually carries the fuller name).
+        for b in _BAS:
+            if not (rw <= b["p"][0] <= re_ and rs <= b["p"][1] <= rn):
+                continue
+            twin = [f for f in cand if f["k"] in ("launch", "access")
+                    and metres(f["p"], b["p"]) < 120]
+            if twin:
+                # same ramp, seen twice. If OSM's copy is NAMELESS, the DNR
+                # knows what it is called — adopt the name (Moffatt Bridge
+                # was an unnamed OSM access until this line).
+                if not any(f.get("n") for f in twin):
+                    twin[0]["n"] = b["n"]
+                continue
+            cand.append({"k": "launch", "n": b["n"], "p": b["p"]})
 
         on = []
         for f in cand:

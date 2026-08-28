@@ -506,7 +506,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 145</span>
+    <span id="title"><b>APEX</b> ORV · Take 152</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -528,7 +528,7 @@
          telling a rider what any of them mean; this says so and filters at the
          same time (take 67). -->
     <button id="c-act" class="basebtn actbtn">__IC_vehicle__<span>All routes</span></button>
-    <button id="c-mode" class="basebtn modebtn">__IC_mountain__<span>Ride</span></button>
+    <button id="c-mode" class="basebtn modebtn">__IC_mountain__<span>Off-road</span></button>
     <div id="actpanel" hidden></div>
     <div id="modepanel" hidden></div>
     <!-- A91 · one place that owns what is on the map. The tools strip had
@@ -655,7 +655,7 @@
 
       <h3>Pick a mode</h3>
       <ul>
-        <li><b>Ride</b> — ORV, dirt bike, side-by-side, MTB. Trails by
+        <li><b>Off-road</b> — ORV, dirt bike, side-by-side, MTB. Trails by
           difficulty, riding areas, fuel. What your machine may legally use.</li>
         <li><b>Outdoors</b> — hike, camp, fish. Hiking routes, trail systems,
           named hills and rivers. Routes on foot.</li>
@@ -720,7 +720,7 @@
 
 <script>__MLGJS__</script>
 <script>
-var WATER = __WATER__, GR = __GRAPH__, TR = __TERRAIN__, POIS = __POIS__, CONT = __CONT__, PADDLE = __PADDLE__, LAND = __LAND__, AREAS = __AREAS__, PHOTOS = __PHOTOS__, PUBS = __PUBS__;
+var WATER = __WATER__, GR = __GRAPH__, TR = __TERRAIN__, POIS = __POIS__, CONT = __CONT__, PADDLE = __PADDLE__, LAND = __LAND__, AREAS = __AREAS__, PHOTOS = __PHOTOS__, PUBS = __PUBS__, GAUGES = __GAUGES__;
 var SHADE = "__SHADE__";
 var SAT = "__SAT__";
 var SATB = __SATB__;
@@ -884,7 +884,15 @@ var MACHINE={
      walking profile is a table row, not new routing. Foot-only routes are
      still show-only — a hiker is routed along two-track, forest road and
      ORV trail, which is honest about what the graph holds. */
-  walk:{lbl:'🥾 On foot',ok:['foot','route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track'],spd:3}
+  walk:{lbl:'🥾 On foot',ok:['foot','route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track'],spd:3},
+  /* take 149 · A165 (first external tester): Water's machine is a boat.
+     ok:[] is honest — a kayak is legal on no land class, and Water plans by
+     river runs, never the graph. mph±spread feeds paddleHours; the numbers
+     are the livery calibration the run card has always cited (Hinchman's
+     posted Au Sable times work out to 2.5–3 mph in a canoe). */
+  kayak:{lbl:'🛶 Kayak',ok:[],mph:3.0,spread:0.5},
+  canoe:{lbl:'🛶 Canoe',ok:[],mph:2.5,spread:0.5},
+  raft:{lbl:'🛟 Raft / tube',ok:[],mph:1.8,spread:0.4}
 };
 function spd(e){var m=MACHINE[machine];return (m&&m.spd)||SPEED[e.c]||14}
 /* machIdx, not `mi` — take 15: `mi=0` here silently overwrote the mi(a,b)
@@ -893,6 +901,7 @@ function spd(e){var m=MACHINE[machine];return (m&&m.spd)||SPEED[e.c]||14}
    verifiers mirror the maths and structurally cannot catch a wiring collision
    like this; only executing the shipped file did. */
 var ORDER=['bike','quad','sxs','walk'],machIdx=0,machine='bike',rideMachine='bike';
+var WORDER=['kayak','canoe','raft'],waterCraft='kayak';
 var SPEED={route72:25,fsroad:22,trail50:16,fstrail:14,mccct:11,moto24:11,
   paved:45,minor:28,track:14};
 var EFFORT={paved:1,route72:1.05,fsroad:1.1,minor:1.15,trail50:1.5,fstrail:1.7,
@@ -1088,6 +1097,7 @@ var POIKIND={
   lighthouse:{c:'#B23A48', h:'Lighthouse', r:0, d:1, g:'eye'},
   marina:   {c:'#2E7FA8', h:'Marina',      r:2, d:1, g:'boat'},
   ski:      {c:'#3D6CB3', h:'Ski & snowboard hill', r:1, d:1, g:'ski'},
+  livery:   {c:'#1E8C7A', h:'Canoe & kayak livery', r:1, d:1, g:'boat'},
   mtb:      {c:'#1F7A6B', h:'MTB trail system', r:1, d:1, g:'bike'},
   store:    {c:'#6B4FA0', h:'Store',       r:3, g:'bag'},
   food:     {c:'#6B4FA0', h:'Food',        r:4, g:'cup'},
@@ -1287,7 +1297,11 @@ var PADKIND={dam:'Dam',launch:'Boat launch',access:'Canoe access',
 var PADDLE_MPH=2.5, PADDLE_SPREAD=0.5;
 
 function paddleHours(miles){
-  var slow=miles/(PADDLE_MPH-PADDLE_SPREAD), fast=miles/(PADDLE_MPH+PADDLE_SPREAD);
+  /* take 149 · the craft sets the pace (A165); without one the historic
+     2.5±0.5 mph livery calibration stands */
+  var mc=MACHINE[machine]||{};
+  var mph=mc.mph||PADDLE_MPH, spr=mc.mph?(mc.spread||PADDLE_SPREAD):PADDLE_SPREAD;
+  var slow=miles/(mph-spr), fast=miles/(mph+spr);
   var fmt=function(h){
     if(h<1)return Math.round(h*60)+' min';
     var w=Math.floor(h),mn=Math.round((h-w)*60);
@@ -1306,6 +1320,49 @@ function paddleHours(miles){
 var RUNFROM=null;
 
 function runClear(){RUNFROM=null}
+
+/* take 149 · the tester planned launch-to-launch and got walked down
+   Telegraph Road: the run flow lived only on the river's own paddle
+   features. A launch, livery or marina pin within ~300 m of a mapped
+   river projects to its nearest stop and carries the same run actions. */
+function nearStop(p){
+  var best=null,bd=0.19;
+  ((PADDLE&&PADDLE.c)||[]).forEach(function(c){(c.f||[]).forEach(function(f){
+    if(!f.p)return;
+    var d=mi(p,f.p);
+    if(d<bd){bd=d;best={riv:c.n,stop:f}}})});
+  return best}
+
+/* take 150 · A164: live river conditions from USGS, on a tap and only on a
+   tap (PROTOCOL §8 in-app rules; waterservices.usgs.gov is on the
+   allowlist, declared in PROVISION.md). The bundle ships the 241-site
+   INVENTORY; a level from build time is worse than none, so values are
+   always live or absent — never stale. fetchIV is a seam for the drill. */
+var GAUGE=(function(){
+  var IV='https://waterservices.usgs.gov/nwis/iv/?format=json&sites={id}&parameterCd=00060,00065,00010&siteStatus=all';
+  function near(p,maxMi){
+    var best=null,bd=maxMi||12;
+    ((GAUGES&&GAUGES.g)||[]).forEach(function(g){
+      var d=mi(p,g.p);if(d<bd){bd=d;best={g:g,mi:d}}});
+    return best}
+  function fetchIV(id){
+    return fetch(IV.replace('{id}',id)).then(function(r){
+      if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})}
+  function fmt(j){
+    var out={};
+    try{(j.value.timeSeries||[]).forEach(function(ts){
+      var code=ts.variable.variableCode[0].value;
+      var vs=ts.values&&ts.values[0]&&ts.values[0].value;
+      if(!vs||!vs.length)return;
+      var v=vs[vs.length-1];
+      out[code]={v:parseFloat(v.value),t:v.dateTime}})}catch(e){}
+    var rows=[],t=null;
+    if(out['00060']&&out['00060'].v>-99){rows.push('Flow <b>'+out['00060'].v.toLocaleString()+' cfs</b>');t=out['00060'].t}
+    if(out['00065']&&out['00065'].v>-99){rows.push('Stage <b>'+out['00065'].v+' ft</b>');t=t||out['00065'].t}
+    if(out['00010']&&out['00010'].v>-99){rows.push('Water <b>'+Math.round(out['00010'].v*9/5+32)+'\u00b0F</b>');t=t||out['00010'].t}
+    return {rows:rows,t:t}}
+  return {near:near,fetchIV:fetchIV,fmt:fmt};
+})();
 
 /* ══ COMPASS (A119) ═════════════════════════════════════════════════════════
    The ride HUD has carried a compass ribbon since take 78, but only while a
@@ -1491,9 +1548,12 @@ function runCard(a,b,riv){
   if(swapped)
     rows.push('<span class="sub">Tapped in the other order — a river only runs '+
       'one way, so this is the run.</span>');
+  var _mc=MACHINE[machine]||{}, _craft=_mc.mph?_mc.lbl.replace(/^\S+\s/,''):null;
   rows.push('Roughly <b>'+paddleHours(hi-lo)+'</b> of paddling'+
     (dams.length?' plus the portage'+(dams.length>1?'s':''):'')+
-    ' <span class="sub">at 2\u20133 mph, which is what these floats work out at '+
+    ' <span class="sub">'+(_craft?'as a '+_craft.toLowerCase()+' at '+
+      (_mc.mph-_mc.spread)+'\u2013'+(_mc.mph+_mc.spread)+' mph, calibrated '
+      :'at 2\u20133 mph, which is what these floats work out at ')+
     'against the liveries\u2019 own times</span>');
   logAct('act  run '+nm(putIn)+' -> '+nm(takeOut));
   show('<div class="tn">The run \u2014 <span class="sub">'+riv+'</span></div>'+
@@ -1606,9 +1666,30 @@ function paddleCard(ft){
         (RUNFROM.n||PADKIND[RUNFROM.k]||'there')+' to here</span></button> '+
         '<button class="chip" id="pd-cancel">'+ic('close')+'<span>Cancel</span></button>'
       : '<button class="chip" id="pd-from">'+ic('route')+'<span>Plan a run from here</span></button>';}
+  /* take 150 · a gauge within 12 mi offers live conditions on a tap */
+  var _gp=(ft.geometry&&ft.geometry.coordinates)||null;
+  var _gn=(_gp&&GAUGES)?GAUGE.near(_gp,12):null;
   show('<div class="tn">'+head+'</div>'+rows.join('<br>')+
+    (_gn?'<div class="sub" id="pd-cond" style="margin-top:8px">'+
+      '<button class="chip" id="pd-gauge">'+ic('info')+
+      '<span>River conditions (USGS, live)</span></button></div>':'')+
     (acts?'<div class="sub" style="margin-top:8px">'+acts+'</div>':''),
     isDam?'fail':'');
+  var gb=el('pd-gauge');
+  if(gb)gb.addEventListener('click',function(){
+    var slot=el('pd-cond');
+    slot.innerHTML='Fetching from USGS\u2026';
+    logAct('act  gauge '+_gn.g.id);
+    GAUGE.fetchIV(_gn.g.id).then(function(j){
+      var f=GAUGE.fmt(j);
+      slot.innerHTML=f.rows.length
+        ? f.rows.join(' \u00b7 ')+'<br><span class="sub">as of '+
+          (f.t?new Date(f.t).toLocaleString():'now')+' \u00b7 USGS '+_gn.g.id+
+          ' \u00b7 '+_gn.g.n+' \u00b7 '+_gn.mi.toFixed(1)+' mi from here</span>'
+        : 'The gauge answered but reported nothing usable right now.';
+    }).catch(function(e){
+      slot.innerHTML='Couldn\u2019t reach USGS \u2014 live conditions need '+
+        'signal. The map and your saved runs work fine without them.';})});
   var f1=el('pd-from');
   if(f1)f1.addEventListener('click',function(){
     RUNFROM={mi:here.mi,n:pr.n,k:pr.k,riv:riv};
@@ -2554,6 +2635,14 @@ el('c-saved').addEventListener('click',function(){
   logAct('act  saved routes');buildSavedPanel()});
 
 el('c-machine').addEventListener('click',function(){
+  /* take 149 · in Water the chip cycles craft, not machines (A165) */
+  if(mode==='water'){
+    var wi=(WORDER.indexOf(machine)+1)%WORDER.length;
+    machine=WORDER[wi];waterCraft=machine;
+    setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''));
+    show('Craft set to <b>'+MACHINE[machine].lbl.replace(/^\S+\s/,'')+
+      '</b>. Float times on the river cards use it.','');
+    return}
   machIdx=(machIdx+1)%ORDER.length;machine=ORDER[machIdx];_legalMemo={};
   setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''));
   applyMachine();
@@ -3326,6 +3415,14 @@ function buildIndex(){
     rows.push({t:lab,k:'junction',c:[NODES[k][0],NODES[k][1]],cls:'jx'})}
   PLACES.forEach(function(p){if(seen[p[0]])return;seen[p[0]]=1;
     rows.push({t:p[0],k:'place',c:[p[1],p[2]],cls:'place'})});
+  /* take 152 · A168 (first external tester): "rifle river" found a STREET
+     and three trails, never the river. Every mapped corridor is a search
+     row; the hit fits the whole river and says what it holds. */
+  ((PADDLE&&PADDLE.c)||[]).forEach(function(c){
+    if(seen[c.n])return;seen[c.n]=1;
+    var g0=c.g&&c.g[0],m=g0&&g0[(g0.length/2)|0];
+    if(!m)return;
+    rows.push({t:c.n,k:'river',c:m,cls:'river',riv:c.n})});
   if(ADDR&&ADDR.names){
     /* one entry per street, positioned on its first segment's midpoint */
     var first={};
@@ -3339,7 +3436,7 @@ function buildIndex(){
     r.z=r.l.replace(/[^a-z0-9]/g,'')});
   IDX=rows;return rows}
 
-var KRANK={address:0,place:1,trail:2,number:3,road:4,street:5,junction:6};
+var KRANK={address:0,place:1,river:1.5,trail:2,number:3,road:4,street:5,junction:6};
 function search(q){
   q=q.trim().toLowerCase();if(q.length<1)return [];
   var rows=buildIndex(),out=[];
@@ -3386,8 +3483,29 @@ function renderHits(list){
     if(d.dataset.i===undefined)return;
     d.addEventListener('click',function(){
       var r=list[+d.dataset.i];if(!r)return;
-      map.easeTo({center:r.c,zoom:r.k==='place'?13.2:14.6,duration:800});
       el('srch').className='';el('c-search').className='chip';
+      if(r.k==='river'){
+        /* take 152 · A168: a river hit fits the WHOLE river and hands you
+           the run flow — not a dropped pin at its midpoint. */
+        var c=null;for(var ci=0;ci<((PADDLE&&PADDLE.c)||[]).length;ci++)
+          if(PADDLE.c[ci].n===r.riv){c=PADDLE.c[ci];break}
+        if(c){var xs=[],ys=[];
+          c.g.forEach(function(gr){gr.forEach(function(pt){xs.push(pt[0]);ys.push(pt[1])})});
+          try{map.fitBounds([[Math.min.apply(null,xs),Math.min.apply(null,ys)],
+            [Math.max.apply(null,xs),Math.max.apply(null,ys)]],{padding:40,duration:900})}catch(e){}
+          var stops=c.f.filter(function(f){return f.k==='launch'||f.k==='access'});
+          var dams=c.f.filter(function(f){return f.k==='dam'});
+          logAct('act  river '+c.n);
+          show('<div class="tn">'+c.n+'</div>'+
+            '<b>'+c.mi+' mi</b> mapped · '+stops.length+' access point'+
+            (stops.length===1?'':'s')+
+            (dams.length?' · <b style="color:#C1121F">'+dams.length+' dam'+
+              (dams.length>1?'s':'')+' — portages</b>':'')+
+            '<br><span class="sub">Tap a stop on the river to plan a run — '+
+            'in Water mode a launch pin works too.</span>','');
+        }
+        return}
+      map.easeTo({center:r.c,zoom:r.k==='place'?13.2:14.6,duration:800});
       /* Every hit becomes a place card, so a searched address can be made home
          or routed to with the same two taps as a dropped pin. */
       dropPin(r.c.slice());
@@ -3629,13 +3747,16 @@ var MODES=[
      Ride" — launches and beaches belong to Water (the take-125 rule that Ride
      is today's map is overruled by the rider), and the wall of store/food
      badges at 3000 ft is noise on a riding map, so those demote to z13. */
-  {k:'ride',     h:'Ride',     s:'ORV, dirt bike, side-by-side, MTB — trails, riding areas, fuel', act:'ride',
+  /* take 146 · A167, Jacob: the mode is called Off-road; the key 'ride'
+     and the recording verb ("Ride it") stay — saved state and the activity
+     are not the mode's label. */
+  {k:'ride',     h:'Off-road', s:'ORV, dirt bike, side-by-side, MTB — trails, riding areas, fuel', act:'ride',
    kinds:['trailhead','camp','fuel','dayuse','view','info','water','toilet','shelter','store','food','mtb'],
    demote:['store','food','info'],
    groups:{areas:true,peaks:false,contour:false,relief:false,paddle:false,places:true,county:false,public:false},
    basemap:'Map', zoom:9},
   {k:'outdoors', h:'Outdoors', s:'Hike, camp, fish — on foot, with trail systems, hills and rivers', act:'foot', machine:'walk',
-   kinds:['trailhead','camp','shelter','water','toilet','view','launch','beach','dayuse','info','system','mtb','ski','lighthouse'],
+   kinds:['trailhead','camp','shelter','water','toilet','view','launch','beach','dayuse','info','system','mtb','ski','lighthouse','livery'],
    peaksFrom:9,
    /* relief OFF: the statewide z10 hillshade upscaled to 5 mi is grey
       blotches (Jacob, 24416). Named hills and paddling carry the mode. */
@@ -3651,8 +3772,8 @@ var MODES=[
    peaksFrom:9,
    groups:{areas:false,peaks:true,contour:true,relief:false,paddle:false,places:true,county:true,public:true},
    basemap:'Map', zoom:11},
-  {k:'water',    h:'Water',    s:'Beach, kayak, tube, boat — launches and rivers, no trail lines', act:'none',
-   kinds:['launch','beach','camp','dayuse','info','toilet','fuel','lighthouse','marina'],
+  {k:'water',    h:'Water',    s:'Beach, kayak, tube, boat — launches and rivers, no trail lines', act:'none', machine:'kayak',
+   kinds:['livery','launch','beach','camp','dayuse','info','toilet','fuel','lighthouse','marina'],
    boost:['launch','beach','lighthouse'],
    groups:{areas:false,peaks:false,contour:false,relief:false,paddle:true,places:true,county:false,public:false},
    basemap:'Hybrid', zoom:10}
@@ -3697,9 +3818,16 @@ function applyMode(k,opts){
     }catch(e){}});
   /* machine: Outdoors walks; leaving it gives the rider's machine back */
   try{
-    if(m.machine){if(machine!==m.machine){if(machine!=='walk')rideMachine=machine;
-        machine=m.machine;_legalMemo={}}}
-    else if(machine==='walk'){machine=rideMachine||'bike';_legalMemo={}}
+    /* take 149 · craft are remembered like the ride machine is: entering
+       Water hands you your last boat, leaving it hands your machine back */
+    var tgt=m.machine==='kayak'?waterCraft:m.machine;
+    if(tgt){if(machine!==tgt){
+        if(machine!=='walk'&&!(MACHINE[machine]&&MACHINE[machine].mph))rideMachine=machine;
+        if(MACHINE[machine]&&MACHINE[machine].mph)waterCraft=machine;
+        machine=tgt;_legalMemo={}}}
+    else if(machine==='walk'||(MACHINE[machine]&&MACHINE[machine].mph)){
+      if(MACHINE[machine]&&MACHINE[machine].mph)waterCraft=machine;
+      machine=rideMachine||'bike';_legalMemo={}}
     machIdx=Math.max(0,ORDER.indexOf(machine));
     setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''));
     applyMachine();
@@ -4939,6 +5067,16 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.__ph={index:PHOTOS,html:photoHTML};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};
+    /* takes 149–150 · these come LAST and defensively: a throw here must
+       never take __ride down with it (it did, under smoke — the batch's
+       first red). */
+    try{
+      window.__paddle={data:PADDLE,run:runCard,near:nearStop,hours:paddleHours,
+        craft:function(){return machine}};
+      window.__gauge=GAUGE;
+      window.__gauges=(typeof GAUGES!=='undefined')?GAUGES:null;
+      window.__search=function(q){return search(q)};
+    }catch(e){}
     /* the layout matrix must be able to put the HUD on screen at four device
        sizes; measuring it hidden would measure nothing (landmine 85) */
     window.hudShow=hudShow;window.hudSet=hudSet;window.hudPaint=hudPaint;
@@ -5040,8 +5178,22 @@ function stLoad(){
   stAdd('LOAD','search-index',idx&&idx.length>100,(idx?idx.length:0)+' entries');
 }
 
-function stRender(){
-  stAdd('RENDER','style-loaded',map.isStyleLoaded(),String(map.isStyleLoaded()));
+function stRender(cb){
+  /* take 148 · A161: isStyleLoaded() is legitimately false mid-tile-
+     transition — the t143 self-test read it once and reported XX while 292
+     features drew in the same run. Settle-then-measure, as a setTimeout
+     chain and NOT a promise: smoke's harness pumps timers, never
+     microtasks, so a .then here structurally cannot complete under it
+     (the batch's second red). Poll up to 5 s, report the settle time, and
+     only then read the RENDER section against a settled style. */
+  var t0=Date.now();
+  (function _settle(){
+    var okd=map.isStyleLoaded();
+    if(!okd&&Date.now()-t0<5000)return setTimeout(_settle,250);
+    stAdd('RENDER','style-loaded',okd,okd?('true after '+(Date.now()-t0)+' ms'):'false after 5 s');
+    _stRenderBody();cb&&cb()})();
+  return;
+  function _stRenderBody(){
   stAdd('RENDER','no-map-errors',!glErr,glErr||'none');
   var q=function(ids){try{return map.queryRenderedFeatures({layers:ids}).length}
     catch(e){return -1}};
@@ -5097,7 +5249,7 @@ function stRender(){
     var km=(b[2]-b[0])*111.32*Math.cos(CTR[1]*Math.PI/180);
     stInfo('RENDER','imagery','single mosaic · about '+(km*1000/px).toFixed(0)+
       ' m/px — no tiles in this bundle')}
-}
+}}
 
 function stLayout(){
   /* Every UI bug Jacob has reported was invisible to this self-test: a strip
@@ -5626,7 +5778,11 @@ function stLabels(cb){
 /* opts.gps=false skips the 20s live-fix phase (used by the headless harness) */
 function selfTest(opts,done){
   opts=opts||{};ST=[];
-  stEnv();stLoad();stRender();stLayout();stData();stRouting();stSafety();stRide();stHaptics();
+  stEnv();stLoad();
+  /* take 148 · the chain awaits the settled RENDER section (A161); nothing
+     downstream changed. */
+  stRender(function(){
+  stLayout();stData();stRouting();stSafety();stRide();stHaptics();
   var finish=function(){var rep=stReport();
     try{window.__selfTestReport=rep}catch(e){}
     if(done)done(rep);return rep};
@@ -5635,7 +5791,7 @@ function selfTest(opts,done){
     if(opts.gps===false)return finish();
     show('<b>Self-test running…</b><br>Waiting up to 20s for a GPS fix. '+
       'Step outside for a real one, or wait it out.','');
-    stGps(function(){finish()})})});
+    stGps(function(){finish()})})})});
 }
 try{window.__selfTest=selfTest}catch(e){}
 el('c-loop').addEventListener('click',function(){
@@ -5840,7 +5996,10 @@ map.on('click',function(e){
     var pr=pf[0].properties,pp=pf[0].geometry.coordinates,
         pc='<span class="tn">'+pp[1].toFixed(5)+'  '+pp[0].toFixed(5)+'</span>';
     logAct('tap  place '+(pr.n||pr.k));
-    return show('<b>'+(pr.named?pr.n:pr.h)+'</b>'+
+    /* take 149 · the Water-mode run bridge (A163) */
+    var wrun=(mode==='water'&&(pr.k==='launch'||pr.k==='livery'||pr.k==='marina'))
+      ?nearStop(pp):null;
+    show('<b>'+(pr.named?pr.n:pr.h)+'</b>'+
       (pr.named?'<div class="sub">'+pr.h+(pr.mi?' \u00b7 '+pr.mi+' mi of trail':'')+'</div>':
                 '<div class="sub">Unnamed in the source \u2014 shown by what it is</div>')+
       (pr.named?photoHTML(pr.k,pr.n,pp):'')+
@@ -5857,8 +6016,31 @@ map.on('click',function(e){
           (DCOL[r.d]||'#8B857A')+'">\u25cf</span> '+r.n+(DLAB[r.d]?' \u00b7 '+DLAB[r.d]:'')}).join('<br>')+'</div>';
         if(rec.web)x+='<div class="sub"><a href="'+rec.web+'" target="_blank" style="color:#D98E32">Website \u2197</a></div>';
         return x})()+
+      (wrun?'<div class="k">ON THE '+wrun.riv.toUpperCase().replace('RIVER','').trim()+' RIVER</div>'+
+        '<div class="sub">'+
+        (RUNFROM&&RUNFROM.riv===wrun.riv&&Math.abs(RUNFROM.mi-wrun.stop.mi)>0.05
+          ?'<button class="chip" id="wr-to">'+ic('route')+'<span>Run from '+
+            (RUNFROM.n||PADKIND[RUNFROM.k]||'there')+' to here</span></button> '+
+            '<button class="chip" id="wr-cancel">'+ic('close')+'<span>Cancel</span></button>'
+          :'<button class="chip" id="wr-from">'+ic('route')+'<span>Plan a run from here</span></button>')+
+        '</div>':'')+
       '<div class="k">WHERE</div>'+pc+
       '<div class="sub">'+placeDist(pf[0].geometry.coordinates)+'</div>','');
+    if(wrun){
+      var w1=el('wr-from');
+      if(w1)w1.addEventListener('click',function(){
+        RUNFROM={mi:wrun.stop.mi,n:pr.n||wrun.stop.n,k:wrun.stop.k,riv:wrun.riv};
+        logAct('act  run from '+(pr.n||pr.k)+' (pin bridge)');
+        show('<b>'+(pr.n||'Here')+'</b> is the first end.<br>'+
+          'Now tap the other end of the run — a launch pin or a stop on the '+
+          wrun.riv+'.','')});
+      var w2=el('wr-to');
+      if(w2)w2.addEventListener('click',function(){
+        runCard(RUNFROM,{mi:wrun.stop.mi,n:pr.n||wrun.stop.n,k:wrun.stop.k},wrun.riv)});
+      var w3=el('wr-cancel');
+      if(w3)w3.addEventListener('click',function(){runClear();show('Run cancelled.','')});
+    }
+    return;
   }
   var f=map.queryRenderedFeatures([[e.point.x-9,e.point.y-9],[e.point.x+9,e.point.y+9]],
     {layers:HIT.concat(HIT_SHOW)});

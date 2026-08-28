@@ -14,6 +14,20 @@ ROOT = os.path.dirname(HERE)
 
 SOURCES = [
     {
+        # take 150 · A164: the one source with TWO phases — the site
+        # inventory at build, and LIVE values fetched in-app on a user tap
+        # (PROTOCOL §8 in-app rules, second entry on the runtime allowlist).
+        "host": "waterservices.usgs.gov",
+        "name": "USGS Water Services (NWIS)",
+        "what": "Gauge site inventory (1,332 MI surface-water sites) at "
+                "build; live flow/stage/water-temp on a river-card tap",
+        "licence": "Public domain (US Government work)",
+        "tool": "gauges.py + the app's conditions button",
+        "phase": "provision + in-app (user tap only, never load-bearing)",
+        "refresh": "inventory each build; values are always live or absent — "
+                   "a level from build time is worse than none (A164)",
+    },
+    {
         "host": "download.geofabrik.de",
         "name": "Geofabrik OpenStreetMap extract",
         "what": "Michigan .osm.pbf — the same OSM ways ingest.py asks Overpass "

@@ -395,8 +395,8 @@ if (zoomed.trails === 0) {
   if (modes.missing) {
     ok(false, "mode bridge missing");
   } else {
-    ok(modes.ride.chip === "Ride" && modes.ride.trail50 && modes.ride.areas && !modes.ride.peaks,
-       "Ride: ORV lines and riding areas on, hills off");
+    ok(modes.ride.chip === "Off-road" && modes.ride.trail50 && modes.ride.areas && !modes.ride.peaks,
+       "Off-road: ORV lines and riding areas on, hills off");
     /* take 134: `foot` is a NETWORK layer now (routable), not a show-only class */
     ok(modes.outdoors.chip === "Outdoors" && !modes.outdoors.trail50 && modes.outdoors.foot === true
        && modes.outdoors.peaks && modes.outdoors.paddle,
@@ -592,7 +592,7 @@ if (zoomed.trails === 0) {
     return { open, labels, after, closed, chip };
   });
   if (pick.missing) { ok(false, "mode bridge missing"); } else {
-    ok(pick.open && pick.labels.length === 4 && pick.labels.join() === "Ride,Outdoors,Hunt,Water",
+    ok(pick.open && pick.labels.length === 4 && pick.labels.join() === "Off-road,Outdoors,Hunt,Water",
        `the mode chip opens a picker with four rows (${pick.labels.join(" · ")})`);
     ok(pick.after === "water" && pick.closed && pick.chip === "Water",
        "choosing Water selects it directly and closes the picker");
@@ -837,6 +837,99 @@ if (zoomed.trails === 0) {
     ok(hdl.served === 500, "the resolver serves a saved HD tile straight after the save");
     ok(/MB/.test(hdl.label) && hdl.label0 === "HD",
        `the chip tells the truth before and after delete ("${hdl.label}" -> "${hdl.label0}")`);
+  }
+
+  /* Takes 147–150 · the tester batch (A163–A166): liveries in Water, boats
+     as Water's machine, the run flow reachable and craft-paced, gauges in
+     the bundle with live values behind a seam. Every target comes from the
+     bundle's own data (landmine 197). */
+  {
+    let liv = [];
+    try { liv = JSON.parse(readFileSync("www/bundle/poi.json", "utf8")).p
+      .filter((r) => r.k === "livery"); } catch (e) { }
+    ok(liv.length > 0, `the bundle carries canoe/kayak liveries (${liv.length}; e.g. ${liv[0] ? liv[0].n : "-"})`);
+    const wb = await page.evaluate(async (liv0) => {
+      const m = window.map, M = window.__mode, P = window.__paddle,
+            G = window.__gauge, GS = window.__gauges,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      if (!M || !P || !G) return { missing: true };
+      const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+      M.apply("water", { silent: true }); await s(250);
+      const craft0 = P.craft();
+      const hK = P.hours(10);
+      document.getElementById("c-machine").click(); await s(150);
+      const craft1 = P.craft();
+      const hAfter = P.hours(10);
+      // a river with two NAMED stops, from the bundle
+      const c = (P.data.c || []).find((r) =>
+        (r.f || []).filter((f) => f.n && (f.k === "launch" || f.k === "access")).length >= 2);
+      let run = null, bridge = null, gnear = null;
+      if (c) {
+        const st = c.f.filter((f) => f.n && (f.k === "launch" || f.k === "access"));
+        const a = st[0], b = st[st.length - 1];
+        P.run(b, a, c.n);           // deliberately reversed — the card must flip
+        await s(200);
+        run = document.getElementById("panel").innerText;
+        bridge = P.near(a.p);
+        gnear = GS ? G.near(a.p, 12) : null;
+      }
+      let livDrawn = -1;
+      if (liv0) {
+        m.jumpTo({ center: liv0.p, zoom: 12.5 });
+        for (let i = 0; i < 16; i++) { await s(300);
+          try { livDrawn = m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major"] })
+            .filter((f) => f.properties.k === "livery").length; } catch (e) { }
+          if (livDrawn > 0) break; }
+      }
+      const canned = { value: { timeSeries: [
+        { variable: { variableCode: [{ value: "00060" }] },
+          values: [{ value: [{ value: "1240", dateTime: "2026-08-28T12:00:00Z" }] }] },
+        { variable: { variableCode: [{ value: "00010" }] },
+          values: [{ value: [{ value: "10.0", dateTime: "2026-08-28T12:00:00Z" }] }] }] } };
+      const fmt = G.fmt(canned);
+      M.apply(was, { silent: true });
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+      return { craft0, craft1, hK, hAfter, riv: c && c.n, run, livDrawn,
+               bridge: bridge && bridge.riv, gcount: GS ? GS.g.length : 0,
+               gnear: gnear && gnear.g.id, fmt };
+    }, liv[0] || null);
+    if (wb.missing) ok(false, "water-batch hooks missing");
+    else {
+      ok(wb.craft0 === "kayak" && wb.craft1 === "canoe",
+         `Water hands you a kayak and the chip cycles craft (${wb.craft0} -> ${wb.craft1})`);
+      ok(wb.hK !== wb.hAfter,
+         `float pace follows the craft (10 mi: ${wb.hK} as a kayak, ${wb.hAfter} as a canoe)`);
+      ok(!!wb.run && /Put in/.test(wb.run) && /Take out/.test(wb.run) &&
+         /of paddling/.test(wb.run) && /other order/.test(wb.run),
+         `the run card plans ${wb.riv}: put-in, take-out, time, and it flips a reversed tap order`);
+      ok(/canoe at/.test(wb.run || ""),
+         "the run card names the craft and its calibrated pace");
+      ok(wb.bridge === wb.riv, "a launch point projects to its river's run flow (the pin bridge)");
+      ok(wb.livDrawn > 0, `a livery pin draws in Water (${wb.livDrawn} at ${liv[0] ? liv[0].n : "-"})`);
+      ok(wb.gcount > 100 && !!wb.gnear,
+         `the bundle carries the USGS gauge inventory (${wb.gcount} sites; nearest to the run: ${wb.gnear})`);
+      ok(wb.fmt.rows.length === 2 && /1,240 cfs/.test(wb.fmt.rows[0]) && /50\u00b0F|50°F/.test(wb.fmt.rows[1]),
+         `gauge values format honestly (flow shown, 10\u00b0C -> 50\u00b0F)`);
+    }
+    /* takes 151–152 · the Rifle River report: DNR access sites on the
+       corridors, and rivers findable by name. */
+    const rr = await page.evaluate(() => {
+      const P = window.__paddle, S = window.__search;
+      if (!P || !S) return { missing: true };
+      const c = (P.data.c || []).find((x) => x.n === "Rifle River");
+      const named = c ? c.f.filter((f) => f.n && (f.k === "launch" || f.k === "access")) : [];
+      const hits = S("rifle river");
+      const riv = hits.find((h) => h.k === "river");
+      return { named: named.map((f) => f.n), riv: riv && riv.t,
+               rank: hits.findIndex((h) => h.k === "river") };
+    });
+    if (rr.missing) ok(false, "search / paddle hooks missing");
+    else {
+      ok(rr.named.length >= 6,
+         `the Rifle carries the DNR accesses OSM never had (${rr.named.length} named: ${rr.named.slice(0, 4).join(", ")}…)`);
+      ok(rr.riv === "Rifle River" && rr.rank >= 0 && rr.rank <= 4,
+         `"rifle river" finds the RIVER, ranked with the best hits (row ${rr.rank + 1})`);
+    }
   }
 
   /* take 138: the guide rewrite left two stray </div> and the tab bar fell
@@ -1239,7 +1332,7 @@ if (zoomed.trails === 0) {
   /* take 133: the guide teaches the state and the three modes, and its key
      is versioned so a rewritten guide shows once even on a phone that
      dismissed an old one (A147). */
-  ok(/Ride/.test(guide.text) && /Outdoors/.test(guide.text) && /Hunt/.test(guide.text) && /Water/.test(guide.text)
+  ok(/Off-road/.test(guide.text) && /Outdoors/.test(guide.text) && /Hunt/.test(guide.text) && /Water/.test(guide.text)
      && /Michigan/.test(guide.text) && !/Rose City/.test(guide.text),
      "it teaches Ride / Outdoors / Water and the whole state, not the old test box");
   const gk = await page.evaluate(() => { try { return Object.keys(localStorage).filter((k) => /apex\.guide/.test(k)).join(","); } catch (e) { return ""; } });

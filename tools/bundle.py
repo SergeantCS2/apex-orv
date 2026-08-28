@@ -46,6 +46,7 @@ ARTIFACTS = [
     ("areas_payload.json",   "areas.json",       "areas",    False),
     ("photos_index.json",    "photos.json",      "photos",   False),
     ("publicland_payload.json","publicland.json",  "publicland",False),
+    ("gauges_payload.json",  "gauges.json",      "gauges",   False),
 ]
 
 # How many things are actually IN a payload. A layer with no features in it is

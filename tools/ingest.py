@@ -31,7 +31,10 @@ S_, W_, N_, E_ = R.overpass_bbox
 # areas in this region would be clutter, not information.
 POI_TAGS = {
     "amenity": ["fuel", "parking", "restaurant", "cafe", "toilets",
-                "drinking_water", "shelter"],
+                "drinking_water", "shelter",
+                # take 147 · A166: canoe/kayak liveries are put-in
+                # infrastructure, not shopping (first external tester)
+                "boat_rental"],
     "tourism": ["camp_site", "picnic_site", "viewpoint", "information"],
     "shop":    ["convenience", "supermarket", "general"],
 }

@@ -52,6 +52,10 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### Michigan DNR ORV Scramble Areas
 
 - **Host** `services3.arcgis.com`
+- **Also provides (take 151, A169)** `DNR_State_Sponsored_Developed_
+  Boating_Access_Sites_Public_View` — 1,325 in-state boat ramps, fetched
+  by `bas.py`, merged into launches and corridor accesses. State-sponsored
+  only; county/township ramps are in neither this layer nor OSM.
 - **Provides** Designated open-riding area polygons (Silver Lake, St. Helen, Holly Oaks, The Mounds, Bull Gap Hill Climb…) — the DNR publishes these on ArcGIS Online, not in its trails MapServer
 - **Licence** Public domain (State of Michigan open data)
 - **Fetched by** `areas.py`
@@ -90,6 +94,18 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
   flow (take 145, A160) — user tap only, never at boot or idle
 - **Refresh** when NAIP re-flies, every 2-3 years
 - **Note** Landmine 22 — Esri, Google, Bing and Mapbox imagery are licensed and may NOT be redistributed offline. This one may.
+
+### USGS Water Services (NWIS)
+
+- **Host** `waterservices.usgs.gov`
+- **Provides** Gauge site inventory at build (241 MI surface-water sites,
+  22 KB) and LIVE instantaneous values (flow 00060, stage 00065, water
+  temp 00010) fetched **in-app** on a user tap (take 150, A164)
+- **Licence** Public domain (US Government work)
+- **Fetched by** `gauges.py` (inventory) and the river card's conditions
+  button — §8 in-app rules: tap only, never at boot or idle, never
+  load-bearing; stale values are never shipped (ruled out in AGENDA)
+- **Refresh** inventory each build; values are always live or absent
 
 ### US Census cartographic boundary files
 

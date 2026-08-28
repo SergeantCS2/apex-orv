@@ -71,7 +71,9 @@ def check_stamps():
 # basemap.nationalmap.gov: the §8 take-145 in-app provisioning allowlist —
 # user-tap-only HD saves (A160), declared in PROVISION.md, never load-bearing.
 ALLOW = re.compile(r"openstreetmap\.org|maplibre\.org|github\.com/maplibre"
-                   r"|basemap\.nationalmap\.gov")
+                   r"|basemap\.nationalmap\.gov"
+                   # take 150 · A164: live gauge values, user tap only (§8)
+                   r"|waterservices\.usgs\.gov")
 
 
 def check_offline():

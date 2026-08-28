@@ -45,6 +45,10 @@ KINDS = [
     # boat gets fuel and a slip. Both destinations, not corridor treatment.
     ("lighthouse","man_made", ["lighthouse"],                       False),
     ("marina",    "leisure",  ["marina"],                           False),
+    # take 147 · A166 (first external tester): a livery is put-in
+    # infrastructure, not shopping — and it outranks camp so a
+    # rental-campground pins as the thing a paddler is looking for.
+    ("livery",    "amenity",  ["boat_rental"],                      False),
     ("camp",      "tourism",  ["camp_site"],                        False),
     ("beach",     "natural",  ["beach"],                            True),
     ("dayuse",    "tourism",  ["picnic_site"],                      False),
@@ -266,6 +270,28 @@ def main():
             out.append(rec)
             ski_added += 1
         print(f"poi: ski hills — {ski_added} pinned, {ski_runs} runs on their cards")
+
+    # take 151 · A169: DNR boating access sites become launch pins where OSM
+    # has none. Same 120 m same-ramp rule as the corridor merge. State-
+    # sponsored sites only — county ramps (the Rifle's High Banks) are in
+    # neither source, and that limit is written where it bites (bas.py).
+    if os.path.exists("bas_payload.json"):
+        _bas = json.load(open("bas_payload.json"))["b"]
+        _ex = [r for r in out if r["k"] == "launch"]
+        import math as _m
+        def _mt(a, b):
+            return _m.hypot((b[0]-a[0])*111320*_m.cos(_m.radians(a[1])),
+                            (b[1]-a[1])*111320)
+        bas_added = 0
+        for b in _bas:
+            if not (W <= b["p"][0] <= E and S <= b["p"][1] <= N):
+                continue
+            if any(_mt(r["p"], b["p"]) < 120 for r in _ex):
+                continue
+            rec = {"k": "launch", "n": b["n"], "p": b["p"]}
+            out.append(rec); _ex.append(rec); bas_added += 1
+        print(f"poi: launches — {bas_added} DNR boating access sites added "
+              f"({len(_bas)-bas_added} already held or outside)")
 
     th_before = sum(1 for r in out if r["k"] == "trailhead")
     out = [r for r in out if r["k"] != "trailhead" or _near_trail(r["p"][0], r["p"][1])]

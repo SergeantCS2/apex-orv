@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 145.* Ranked by blocking-ness, not by interest.
+*Current as of take 152.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2619,4 +2619,102 @@ NOTHING automatic, and one simple visible control. Design of record:
 - **Ruled out:** raising the in-APK base past z12 (A159 numbers stand).
 - A158 (WebP on the SHIPPED bundle) proceeds independently to shrink the
   APK itself.
+
+### Field report — t143 self-test on the Fold (PASS 50 · FAIL 2), and the FIRST EXTERNAL TESTER's notes (via Jacob)
+
+## A161 — self-test style-loaded reads a flickering flag · OPEN
+XX style-loaded false while 292 features drew, roads passed, 0 map
+errors. isStyleLoaded() is legitimately false mid-tile-transition; the
+check reads it once. Fix: settle-then-measure (poll a few seconds) like
+every other honest check.
+- **Ruled out:** treating this as a style bug — the same run proves the
+  style painting.
+
+## A162 — one 1,783 ms frame on the first fps run · WATCH
+avg 29 poisoned by a single giant frame (1/70 over budget, 596 features);
+the rerun scored 120 fps / worst 16 ms. First-paint decode or JIT burst.
+Watch across future self-tests; profile only if the field ever feels it.
+- **Ruled out:** acting on one frame from one run — a stall that never
+  recurs is noise, and the self-test already reran itself to prove it.
+
+## A163 — Paddle planning: Water mode routes on WATER · OPEN (design next)
+Tester: planned launch-to-launch and got walked down major roads. The
+plan system is the land graph in every mode; Water should route down the
+river using the corridor lines we already ship (76 corridors, ordered
+downstream, portages marked, launch access scored). Put-in / take-out,
+distance by river, estimated float time (livery-style estimates like
+Hinchman Acres' Au Sable times as calibration).
+- **Ruled out:** noding the rivers into the land graph — water is a
+  different network with different legality; corridors stay their own
+  system.
+
+## A164 — Live gauge data on rivers (USGS waterdata) · OPEN (design next)
+Tester's link: USGS-04137500 (Au Sable at Mio) — flow, stage, temp are
+public and current. Fits §8's in-app provisioning rules exactly: user-
+invoked or clearly-stated streaming, host declared, never load-bearing.
+- **Ruled out:** shipping stale gauge readings in the bundle — a
+  water level from build time is worse than none.
+
+## A165 — Water mode's "machine" should be a boat · OPEN
+Kayak / canoe / raft as the activity in Water, switching with the mode
+(tester: "we kinda do this already but it could use improvement").
+Feeds A163's float-time estimates (a raft is not a kayak).
+- **Ruled out:** a separate boat button beside the machine button — one
+  activity control, mode-aware, as today's foot/machine switch is.
+
+## A166 — Canoe/kayak liveries appear in Ride, vanish in Water · OPEN
+Backwards, per the tester. Find which kind swallows rental POIs (store?
+marina?) and put liveries in Water's kind list — they are put-in
+infrastructure, not shopping.
+- **Ruled out:** showing them in both — Ride's pin budget is already
+  spent on riding.
+
+## A167 — Rename the Ride mode label to "Off-road" · take 146
+Jacob's direct call. Label and guide text only; the internal key 'ride'
+and the "Ride it" recording verb stay — renaming keys breaks saved
+state, and "go for a ride" is the activity, not the mode.
+- **Ruled out:** renaming the k:'ride' key — persistence and harness
+  hooks hang off it for zero rider-visible gain.
+
+### Field report — t145/t146 session two (Rifle River, via Jacob)
+
+## A168 — Rivers findable by name · SHIPPED take 152
+"rifle river" returned a STREET and three trails, never the river. Every
+mapped corridor is a search row now, ranked with the best hits; the hit
+fits the whole river and opens a summary (miles, accesses, dams) that
+points at the run flow.
+- **Ruled out:** dropping a pin at the river's midpoint — a 60-mile line
+  is not a point, and the run flow is the destination.
+
+## A169 — Missing river accesses · SHIPPED take 151 (with an honest limit)
+The Rifle's mapped 60.8 mi held TWO named OSM accesses; Jacob has stood
+on ramps we did not show. Root cause: OSM coverage, not the algorithm
+(verified — the only OSM "High Banks" launch is on the MANISTEE). Fix:
+the DNR's Michigan Boating Access Sites layer (1,325 sites, same host
+PROVISION already declared) merges into launch pins (+280 statewide) and
+corridor candidates, 120 m same-ramp dedupe, OSM's fuller names winning.
+- **Honest limit, written where it bites:** state-sponsored sites only.
+  County/township ramps — the Rifle's High Banks among them — are in
+  neither OSM nor this layer. Those need OSM contribution or a county
+  source not yet found.
+- **Ruled out:** hand-placing High Banks from a Google pin — one
+  coordinate typed from a screenshot is landmine-190 bait, and the next
+  missing ramp would need the same favour.
+
+### Takes 147–152 — shipped (the tester batch, one seal — Jacob's call)
+Every mode plans something. 147: 36 liveries from real boat_rental ingest,
+in Water and Outdoors. 148: self-test settles the style flag (setTimeout
+chain — smoke pumps timers, not microtasks). 149: kayak/canoe/raft as
+Water's machine with craft memory; run flow reachable from launch pins;
+run card names the craft and its livery-calibrated pace. 150: 241 USGS
+gauges shipped, live values on a tap under §8. 151: 1,325 DNR boating
+access sites into launches (+280) and corridors — the Rifle from 2 named
+accesses to 6, nameless OSM twins adopting DNR names. 152: rivers are
+search rows; a river hit fits the river.
+- **Ruled out:** shipping any of the live-network features as automatic —
+  every network touch is a tap (Jacob's law, twice stated).
+- Verified: smoke 5 modes, render 195/0, self-test 42/0 non-render under
+  stubs. Three explicit-map artifacts bit in one batch (manifest keys,
+  IN_BUNDLE, the split loader) — each caught by a drill, each now carries
+  gauges.
 
