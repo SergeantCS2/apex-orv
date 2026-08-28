@@ -439,7 +439,8 @@ var POIKIND={
      fuel and slip. Destination treatment, never corridor (Jacob, take 118). */
   lighthouse:{c:'#B23A48', h:'Lighthouse', r:0, d:1, g:'eye'},
   marina:   {c:'#2E7FA8', h:'Marina',      r:2, d:1, g:'boat'},
-  mtb:      {c:'#1F7A6B', h:'MTB trail system', r:1, d:1, g:'tree'},
+  ski:      {c:'#3D6CB3', h:'Ski & snowboard hill', r:1, d:1, g:'ski'},
+  mtb:      {c:'#1F7A6B', h:'MTB trail system', r:1, d:1, g:'bike'},
   store:    {c:'#6B4FA0', h:'Store',       r:3, g:'bag'},
   food:     {c:'#6B4FA0', h:'Food',        r:4, g:'cup'},
   view:     {c:'#3D6B35', h:'Viewpoint',   r:4, d:1, g:'eye'},
@@ -455,6 +456,17 @@ function makeBadges(){
   var G={
     tree:function(x){x.moveTo(13,6);x.lineTo(8,15);x.lineTo(18,15);x.closePath();
       x.moveTo(13,15);x.lineTo(13,19)},
+    /* take 141 · a bicycle: two wheels, a frame, a saddle — Jacob asked the
+       MTB systems to read as bikes, not trees. Ski resorts flip to MTB in
+       summer, so the glyph carries the summer meaning too. */
+    bike:function(x){x.moveTo(11,17);x.arc(8,17,3,0,Math.PI*2);x.moveTo(21,17);x.arc(18,17,3,0,Math.PI*2);
+      x.moveTo(8,17);x.lineTo(12,10);x.lineTo(18,17);x.moveTo(12,10);x.lineTo(16,10);
+      x.moveTo(12,10);x.lineTo(13,17);x.moveTo(16,10);x.lineTo(18,17);x.moveTo(11,9);x.lineTo(14,9)},
+    /* take 142 · a skier: head, leaning body, a pole, two diagonal skis. */
+    ski:function(x){x.moveTo(16.6,6.5);x.arc(15,6.5,1.6,0,Math.PI*2);
+      x.moveTo(14,8.5);x.lineTo(11.5,13);x.moveTo(13,10.5);x.lineTo(16.5,12.5);x.lineTo(18,17);
+      x.moveTo(11.5,13);x.lineTo(9.5,16.2);x.moveTo(11.5,13);x.lineTo(12.5,16.2);
+      x.moveTo(6,18.6);x.lineTo(16,15.4);x.moveTo(7.2,20.4);x.lineTo(17.2,17.2)},
     tent:function(x){x.moveTo(6,18);x.lineTo(13,7);x.lineTo(20,18);x.closePath();
       x.moveTo(13,18);x.lineTo(13,12)},
     boat:function(x){x.moveTo(6,15);x.lineTo(20,15);x.lineTo(17,19);x.lineTo(9,19);
@@ -1158,12 +1170,14 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       attribution:'USGS'}
      :{type:'image',url:SATURL,
       coordinates:[[SATBOX[0],SATBOX[3]],[SATBOX[2],SATBOX[3]],[SATBOX[2],SATBOX[1]],[SATBOX[0],SATBOX[1]]]},
-    /* take 140 · a statewide z11 BASE as its own source: a raster source
-       overzooms only from its own maxzoom, so z11 tiles stretch under
-       z12–15 everywhere outside a patch instead of going blank. Layer
-       order: mosaic, base, patches. */
+    /* take 140 · a statewide BASE as its own source: a raster source
+       overzooms only from its own maxzoom, so base tiles stretch under
+       z13–15 everywhere outside a patch instead of going blank. Take 143:
+       the base is a z11..TILES.base pyramid (z12 by default — field report
+       24493), each level native at its own band. Layer order: mosaic,
+       base, patches. */
     satbase:(SPARSE&&TILES.zmin<=11)?{type:'raster',tiles:['apexsat://{z}/{x}/{y}'],tileSize:256,
-      minzoom:11,maxzoom:11,attribution:'USGS'}
+      minzoom:11,maxzoom:(TILES.base||11),attribution:'USGS'}
       :{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     satpatch:SPARSE?{type:'raster',tiles:['apexsat://{z}/{x}/{y}'],tileSize:256,
       minzoom:Math.max(12,TILES.zmin),maxzoom:TILES.zmax,attribution:'USGS'}
@@ -2887,12 +2901,22 @@ var MODES=[
    demote:['store','food','info'],
    groups:{areas:true,peaks:false,contour:false,relief:false,paddle:false,places:true,county:false,public:false},
    basemap:'Map', zoom:9},
-  {k:'outdoors', h:'Outdoors', s:'Hike, camp, hunt, fish — on foot, with hills, counties and rivers', act:'foot', machine:'walk',
-   kinds:['trailhead','camp','shelter','water','toilet','view','launch','beach','dayuse','info','system','mtb','lighthouse'],
+  {k:'outdoors', h:'Outdoors', s:'Hike, camp, fish — on foot, with trail systems, hills and rivers', act:'foot', machine:'walk',
+   kinds:['trailhead','camp','shelter','water','toilet','view','launch','beach','dayuse','info','system','mtb','ski','lighthouse'],
    peaksFrom:9,
    /* relief OFF: the statewide z10 hillshade upscaled to 5 mi is grey
       blotches (Jacob, 24416). Named hills and paddling carry the mode. */
-   groups:{areas:false,peaks:true,contour:true,relief:false,paddle:true,places:true,county:true,public:true},
+   groups:{areas:false,peaks:true,contour:true,relief:false,paddle:true,places:true,county:false,public:false},
+   basemap:'Map', zoom:11},
+  /* take 141, Jacob: "split Hunt from the separate modes — there's going to
+     be a lot of squares for public land." Hunt is the land: state forest and
+     game areas, county lines (a hunter thinks in counties), hills from
+     regional zoom, and the typed waypoints (stand / camera / sign / water /
+     gate) live here. On foot. */
+  {k:'hunt',     h:'Hunt',     s:'Public land, game areas, counties, stands and cameras — on foot', act:'foot', machine:'walk',
+   kinds:['trailhead','camp','water','toilet','info','system','shelter'],
+   peaksFrom:9,
+   groups:{areas:false,peaks:true,contour:true,relief:false,paddle:false,places:true,county:true,public:true},
    basemap:'Map', zoom:11},
   {k:'water',    h:'Water',    s:'Beach, kayak, tube, boat — launches and rivers, no trail lines', act:'none',
    kinds:['launch','beach','camp','dayuse','info','toilet','fuel','lighthouse','marina'],
@@ -4024,7 +4048,7 @@ function placeCard(at,kind,title){
   acts.push('<button class="chip" id="pc-go">⤢ Centre</button>');
   if(kind==='drop'){
     acts.push('<button class="chip" id="pc-wpt">☆ Save as waypoint</button>');
-    if(mode==='outdoors')acts.push(Object.keys(WPTYPES).map(function(k){
+    if(mode==='hunt')acts.push(Object.keys(WPTYPES).map(function(k){
       return '<button class="chip" data-wpt="'+k+'">'+WPTYPES[k].h+'</button>'}).join(''));
     acts.push('<button class="chip" id="pc-drop">✕ Remove pin</button>')}
   show(rows.join('<br>')+'<div style="margin-top:9px">'+acts.join(' ')+'</div>','');
@@ -5043,6 +5067,19 @@ map.on('click',function(e){
       (pr.named?'<div class="sub">'+pr.h+(pr.mi?' \u00b7 '+pr.mi+' mi of trail':'')+'</div>':
                 '<div class="sub">Unnamed in the source \u2014 shown by what it is</div>')+
       (pr.named?photoHTML(pr.k,pr.n,pp):'')+
+      /* take 142 · a ski hill's card lists its runs with their tagged
+         difficulty — untagged stays grey, never guessed — and links the
+         hill's own website. Read from the RECORD via properties.i: nested
+         arrays do not survive MapLibre's property serialisation. */
+      (function(){if(pr.k!=='ski')return '';
+        var rec=((POIS&&POIS.p)||[])[pr.i]||{},x='';
+        var DCOL={green:'#2F7D4F',blue:'#2E6FA8',black:'#141414',expert:'#141414',park:'#7A5B3A'};
+        var DLAB={green:'Beginner',blue:'Intermediate',black:'Advanced',expert:'Expert',park:'Terrain park'};
+        if(rec.runs&&rec.runs.length)x+='<div class="k">RUNS \u00b7 '+rec.runs.length+'</div>'+
+          '<div class="sub">'+rec.runs.map(function(r){return '<span style="color:'+
+          (DCOL[r.d]||'#8B857A')+'">\u25cf</span> '+r.n+(DLAB[r.d]?' \u00b7 '+DLAB[r.d]:'')}).join('<br>')+'</div>';
+        if(rec.web)x+='<div class="sub"><a href="'+rec.web+'" target="_blank" style="color:#D98E32">Website \u2197</a></div>';
+        return x})()+
       '<div class="k">WHERE</div>'+pc+
       '<div class="sub">'+placeDist(pf[0].geometry.coordinates)+'</div>','');
   }

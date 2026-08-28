@@ -58,10 +58,11 @@ PAUSE = 0.35
 # accumulates across builds, so the next build resumes where this one
 # stopped. Photos land progressively; the build never waits on them.
 BUDGET_S = int(os.environ.get("APEX_PHOTO_BUDGET_S", "1500"))
-KINDS = {"camp", "system", "mtb", "beach", "lighthouse", "marina", "launch"}
+KINDS = {"camp", "system", "mtb", "beach", "lighthouse", "marina", "launch",
+         "ski"}   # take 142: ski hills join the photo pass (Mt Holly, Pine Knob have articles)
 # how far a Commons photo may sit from the pin and still be "of" it
 NEAR = {"area": 700, "camp": 500, "beach": 400, "launch": 250, "marina": 300,
-        "lighthouse": 350, "system": 600, "mtb": 600}
+        "lighthouse": 350, "system": 600, "mtb": 600, "ski": 700}
 COMMONS = "https://commons.wikimedia.org/w/api.php"
 STOP = {"state", "park", "campground", "camp", "trail", "trails", "pathway", "area",
         "orv", "recreation", "rec", "forest", "national", "the", "of", "and", "county",

@@ -423,7 +423,7 @@ if (zoomed.trails === 0) {
     const game = src.filter((f) => f.properties.t === "game").sort((a, b) => b.properties.ac - a.properties.ac)[0];
     const ring = game.geometry.coordinates.sort((a, b) => b[0].length - a[0].length)[0][0];
     const cx = ring.reduce((s, q) => s + q[0], 0) / ring.length, cy = ring.reduce((s, q) => s + q[1], 0) / ring.length;
-    M.apply("outdoors", { silent: true });
+    M.apply("hunt", { silent: true });
     m.jumpTo({ center: [cx, cy], zoom: 11 });
     let fill = 0, line = 0;
     for (let i = 0; i < 30; i++) { await sleep(300);
@@ -440,7 +440,7 @@ if (zoomed.trails === 0) {
   if (pub.missing) { ok(false, "mode bridge missing"); }
   else if (pub.absent) { ok(true, "no public-land artifact — skipped, not failed"); }
   else {
-    ok(pub.fill > 0 && pub.line > 0, `Outdoors draws public land at ${pub.name} (${pub.ac.toLocaleString()} ac): ${pub.fill} fill, ${pub.line} boundary features`);
+    ok(pub.fill > 0 && pub.line > 0, `Hunt draws public land at ${pub.name} (${pub.ac.toLocaleString()} ac): ${pub.fill} fill, ${pub.line} boundary features`);
     ok(pub.acres > 4e6 && pub.acres < 5.5e6, `${pub.n} tracts carry ${(pub.acres / 1e6).toFixed(2)}M acres — Michigan's state land is ~4.6M`);
     ok(pub.rideOff, "Ride keeps public land off by default");
   }
@@ -471,7 +471,7 @@ if (zoomed.trails === 0) {
     M.apply("ride", { silent: true }); await s(200);
     const rideTypes = await drop();
     try { document.getElementById("pc-drop").click(); } catch (e) { }
-    M.apply("outdoors", { silent: true }); await s(200);
+    M.apply("hunt", { silent: true }); await s(200);
     const outTypes = await drop();
     const stand = document.querySelector('[data-wpt="stand"]');
     if (stand) stand.click(); await s(400);
@@ -489,10 +489,62 @@ if (zoomed.trails === 0) {
   if (twp.missing) { ok(false, "mode bridge missing"); } else {
     ok(twp.rideTypes.length === 0, "Ride's pin card offers no hunting types");
     ok(twp.outTypes.join() === "stand,camera,sign,water,gate",
-       `Outdoors' pin card offers Stand / Camera / Sign / Water / Gate (${twp.outTypes.join(" · ")})`);
+       `Hunt's pin card offers Stand / Camera / Sign / Water / Gate (${twp.outTypes.join(" · ")})`);
     ok(twp.rec && twp.rec.t === "stand" && /^Stand · /.test(twp.rec.n),
        `choosing Stand saves a typed waypoint (${twp.rec && twp.rec.n})`);
     ok(twp.painted === true, "the typed waypoint is drawn on the map in its own colour");
+  }
+
+  /* Take 142 · ski & snowboard hills. The target hill comes from the BUNDLE,
+     not from a coordinate typed here (landmine 197): poi.json is read on the
+     Node side and the drill is handed the record. The card's runs and website
+     come off the record via properties.i, so the assertion goes through the
+     same door a finger does: tap the pin, read the card. Drill restores mode
+     and camera (harness law). */
+  {
+    let hill = null;
+    try {
+      const pj = JSON.parse(readFileSync("www/bundle/poi.json", "utf8"));
+      const all = (pj.p || []).filter((r) => r.k === "ski");
+      hill = all.find((r) => r.runs && r.runs.length && r.web) ||
+             all.find((r) => r.runs && r.runs.length) || all[0] || null;
+      ok(all.length > 0, `the bundle carries ski hills (${all.length}; drill uses ${hill ? hill.n : "none"})`);
+    } catch (e) { ok(false, "poi.json unreadable for the ski drill: " + e.message); }
+    if (hill) {
+      const ski = await page.evaluate(async (hill) => {
+        const m = window.map, s = (ms) => new Promise((r) => setTimeout(r, ms));
+        const M = window.__mode; if (!M) return { missing: true };
+        const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+        M.apply("outdoors", { silent: true }); await s(200);
+        m.jumpTo({ center: hill.p, zoom: 13.2 });
+        let drawn = 0;
+        for (let i = 0; i < 20; i++) { await s(300);
+          try { drawn = m.queryRenderedFeatures(
+            { layers: ["poi-dot", "poi-dot-major"] })
+            .filter((f) => f.properties.k === "ski").length; } catch (e) { }
+          if (drawn) break; }
+        const px = m.project(hill.p), cv = m.getCanvasContainer(),
+              r = cv.getBoundingClientRect();
+        cv.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true,
+          clientX: r.left + px.x, clientY: r.top + px.y }));
+        let text = "";
+        for (let i = 0; i < 16; i++) { await s(250);
+          text = document.body.innerText || "";
+          if (text.indexOf(hill.n) !== -1) break; }
+        M.apply(was, { silent: true });
+        m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+        return { drawn, named: text.indexOf(hill.n) !== -1,
+                 runs: text.indexOf("RUNS") !== -1,
+                 firstRun: hill.runs && hill.runs.length ? text.indexOf(hill.runs[0].n) !== -1 : null,
+                 web: text.indexOf("Website") !== -1 };
+      }, hill);
+      ok(ski.drawn > 0, `the ski pin draws in Outdoors at ${hill.n} (${ski.drawn} rendered)`);
+      ok(ski.named, `tapping it opens the hill's card`);
+      if (hill.runs && hill.runs.length)
+        ok(ski.runs && ski.firstRun,
+           `the card lists its runs (RUNS section, "${hill.runs[0].n}" shown)`);
+      if (hill.web) ok(ski.web, "the card links the hill's website");
+    }
   }
 
   /* Take 131 · photos on major pins. Measured: a pin the index names gets
@@ -540,8 +592,8 @@ if (zoomed.trails === 0) {
     return { open, labels, after, closed, chip };
   });
   if (pick.missing) { ok(false, "mode bridge missing"); } else {
-    ok(pick.open && pick.labels.length === 3 && pick.labels.join() === "Ride,Outdoors,Water",
-       `the mode chip opens a picker with three rows (${pick.labels.join(" · ")})`);
+    ok(pick.open && pick.labels.length === 4 && pick.labels.join() === "Ride,Outdoors,Hunt,Water",
+       `the mode chip opens a picker with four rows (${pick.labels.join(" · ")})`);
     ok(pick.after === "water" && pick.closed && pick.chip === "Water",
        "choosing Water selects it directly and closes the picker");
   }
@@ -552,7 +604,7 @@ if (zoomed.trails === 0) {
     const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const M = window.__mode; if (!M) return { missing: true };
     const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
-    M.apply("outdoors", { silent: true });
+    M.apply("hunt", { silent: true });
     m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: 8.6 }); await sleep(300);
     let lines = 0, labels = 0;
     for (let i = 0; i < 30; i++) { await sleep(300);
@@ -572,11 +624,11 @@ if (zoomed.trails === 0) {
     return { lines, labels, peakMin, systems, mtb, withMi, hasSystem: /"system"/.test(poiF), rideCounty, ridePeak };
   });
   if (od.missing) { ok(false, "mode bridge missing"); } else {
-    ok(od.lines > 0 && od.labels > 0, `Outdoors draws county lines and names at 8.6 (${od.lines} lines, ${od.labels} names)`);
-    ok(od.peakMin === 9, `Outdoors shows summits from z9 (minzoom ${od.peakMin})`);
+    ok(od.lines > 0 && od.labels > 0, `Hunt draws county lines and names at 8.6 (${od.lines} lines, ${od.labels} names)`);
+    ok(od.peakMin === 9, `Hunt shows summits from z9 (minzoom ${od.peakMin})`);
     ok(od.systems > 100 && od.mtb > 50 && od.withMi === od.systems + od.mtb,
        `trail-system pins in the payload: ${od.systems} hiking, ${od.mtb} MTB, every one with mileage`);
-    ok(od.hasSystem, "Outdoors' pin set includes trail systems");
+    ok(od.hasSystem, "Hunt's pin set includes trail systems");
     ok(od.rideCounty === false && od.ridePeak === 10.6, "Ride puts county lines away and summits back to z10.6");
   }
 
@@ -693,10 +745,10 @@ if (zoomed.trails === 0) {
     const vis = (() => { try { return m.getLayoutProperty("sat-base", "visibility"); } catch (e) { return null; } })();
     while (document.querySelector("#c-base span").textContent !== bm) { document.getElementById("c-base").click(); await s(150); }
     m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
-    return { loaded, vis, at: [lon.toFixed(2), lat.toFixed(2)] };
+    return { loaded, vis, bz: (S.tiles.base || 11), at: [lon.toFixed(2), lat.toFixed(2)] };
   });
   if (base.skip) ok(true, "no statewide imagery base in this bundle — skipped, not failed");
-  else ok(base.loaded && base.vis === "visible", `the statewide z11 base is loaded and visible at z13 outside every patch (${base.at})`);
+  else ok(base.loaded && base.vis === "visible", `the statewide base (to z${base.bz}) is loaded and visible at z13 outside every patch (${base.at})`);
 
   /* take 138: the guide rewrite left two stray </div> and the tab bar fell
      out of the layout grid on the Fold. Assert the bar sits inside a phone
@@ -1098,7 +1150,7 @@ if (zoomed.trails === 0) {
   /* take 133: the guide teaches the state and the three modes, and its key
      is versioned so a rewritten guide shows once even on a phone that
      dismissed an old one (A147). */
-  ok(/Ride/.test(guide.text) && /Outdoors/.test(guide.text) && /Water/.test(guide.text)
+  ok(/Ride/.test(guide.text) && /Outdoors/.test(guide.text) && /Hunt/.test(guide.text) && /Water/.test(guide.text)
      && /Michigan/.test(guide.text) && !/Rose City/.test(guide.text),
      "it teaches Ride / Outdoors / Water and the whole state, not the old test box");
   const gk = await page.evaluate(() => { try { return Object.keys(localStorage).filter((k) => /apex\.guide/.test(k)).join(","); } catch (e) { return ""; } });

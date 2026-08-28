@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 140.*
+*Current as of take 143.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -2613,3 +2613,17 @@ base64 in take 127 was blue at 50 % alpha; nothing decoded it until Jacob's
 Hybrid went blue. Generate such constants with a tool and assert the decoded
 value. Companion: a markup edit that searches for `  </div>` will match
 inside `    </div>`; count opens and closes after any edit to the DOM.
+
+**207. A detached process does not outlive the turn.** The statewide
+pipeline was launched `setsid nohup` and was healthy mid-graph when the
+turn ended; at the next turn it was simply gone — no exit line, no
+traceback, no OOM record — while kernel state (the swap file) survived.
+Confirmed twice in one session: the harness's seal chain from the previous
+chat died the same way, which is why take 141 existed proven-but-unsealed.
+The environment reaps background process groups between turns. Rule: a
+long step must either complete inside the turn that started it (start,
+then poll with sleeps in the SAME turn) or be resumable from disk when
+relaunched. The stage caches and stamps are what make relaunch cheap —
+they turned a dead pipeline into a resume, not a redo. Corollary: never
+narrate a background job as done until its exit line is in the log.
+

@@ -191,27 +191,34 @@ def patches(zmax=15, pad=0.03):
     # "fidelity is still very bad" — 11 m per screen pixel against a 234 m/px
     # mosaic. One whole-state box at BASE_Z (11: ~2,650 tiles, ~26 MB,
     # 54 m/px, 4x the mosaic) under the z12–15 riding-area patches; z12
-    # statewide would be 10,573 tiles / 104 MB (27 m/px) — Jacob's call.
-    BASE_Z = int(os.environ.get("APEX_IMAGERY_BASE_Z", "11"))
-    if BASE_Z >= 11:
-        bx0, by0 = t_xy(W, N, BASE_Z)
-        bx1, by1 = t_xy(E, S, BASE_Z)
-        boxes.append([BASE_Z, bx0, by0, bx1, by1])
+    # Take 143: Jacob made the z12 call from the field (24493 — Onondaga at
+    # 1 mi still "awful" on z11) and accepted the size for now ("work
+    # backwards"): 10,573 tiles / ~104 MB / 27 m/px. WebP re-encode
+    # measurement queued separately to claw the APK back toward 100 MB.
+    BASE_Z = int(os.environ.get("APEX_IMAGERY_BASE_Z", "12"))
+    # Take 143: the base is EVERY level 11..BASE_Z, not one. A raster source
+    # cannot underzoom, so a z12-only base would push z11-11.9 views back to
+    # the 234 m/px mosaic - a regression band in exactly the product the base
+    # exists for. z11 native at its band, z12 native above it, overzoom past.
+    for bz in range(11, BASE_Z + 1) if BASE_Z >= 11 else []:
+        bx0, by0 = t_xy(W, N, bz)
+        bx1, by1 = t_xy(E, S, bz)
+        boxes.append([bz, bx0, by0, bx1, by1])
         jobs = [(x, y) for x in range(bx0, bx1 + 1) for y in range(by0, by1 + 1)]
-        def one0(j):
+        def one0(j, _z=bz):
             x, y = j
-            return j, fetch(BASE_Z, x, y)
+            return j, fetch(_z, x, y)
         with ThreadPoolExecutor(max_workers=10) as ex:
             for (x, y), b in ex.map(one0, jobs):
                 if not b:
                     continue
-                seen.add((BASE_Z, x, y))
-                d = os.path.join(root, str(BASE_Z), str(x))
+                seen.add((bz, x, y))
+                d = os.path.join(root, str(bz), str(x))
                 os.makedirs(d, exist_ok=True)
                 open(os.path.join(d, f"{y}.jpg"), "wb").write(b)
                 total += 1
                 bytes_ += len(b)
-        print(f"  statewide base z{BASE_Z}: {len(jobs)} tiles", flush=True)
+        print(f"  statewide base z{bz}: {len(jobs)} tiles", flush=True)
     for ar in areas:
         xs = [pt[0] for ring in ar["g"] for pt in ring]
         ys = [pt[1] for ring in ar["g"] for pt in ring]
@@ -239,7 +246,8 @@ def patches(zmax=15, pad=0.03):
                     total += 1
                     bytes_ += len(b)
         print(f"  patch {ar['n']}: z12–z{zmax}")
-    json.dump({"zmin": min(BASE_Z, 12) if BASE_Z >= 11 else 12, "zmax": zmax,
+    json.dump({"zmin": 11 if BASE_Z >= 11 else 12, "zmax": zmax,
+               "base": BASE_Z if BASE_Z >= 11 else None,
                "tiles": total, "bytes": bytes_, "sparse": True, "boxes": boxes},
               open("imagery_tiles.json", "w"))
     print(f"tiles: {total} files, {bytes_ / 1048576:.1f} MB, sparse patches over "

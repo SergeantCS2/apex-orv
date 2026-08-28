@@ -1,4 +1,112 @@
-# HANDOFF — through Take 140 · V2
+# HANDOFF — through Take 143 · V2
+
+## Take 143 — 2026-08-28 — z12 statewide imagery base
+
+Field report 24493 (Onondaga at 1 mi, take-140 APK): Hybrid still reads
+pixelated — the z11 base is 54 m/px stretched ~5x at that view. Jacob
+made the z12 call and accepted the size for now ("work backwards and not
+worry… 114 MB isn't bad"): the statewide base moves to z12 — 10,573
+tiles, ~104 MB, 27 m/px, 2x sharper again — under the unchanged z12–15
+riding-area patches. One-line change: the APEX_IMAGERY_BASE_Z default in
+imagery.py, so CI builds it with no env plumbing. Elevation readout
+confirmed good in the same report (take 140's text stroke did its job).
+
+Size ledger, measured from Jacob's own t140 APK: 110.6 MB on the wire, of
+which the Android shell is <8 MB — the bundle IS the APK. Expected next
+APK ≈ 175–180 MB. The WebP re-encode measurement is queued as its own
+arc to work back toward Jacob's sub-100 MB ideal.
+
+Two catches on the way, both worth keeping:
+1. A z12-ONLY base regresses the z11-11.9 band to the 234 m/px mosaic —
+   a raster source cannot underzoom. The base is a PYRAMID now, z11 and
+   z12 both shipped, each native at its band, overzoom past 12. Measured:
+   14,058 tiles / 183 MB staged (z11 2,695 + z12 10,573 + patches).
+2. bundle.py's manifest builder is an explicit key list and silently
+   dropped the new "base" field — the app fell back to maxzoom 11 and the
+   render check said "to z11". The check caught the wiring gap; the field
+   rides in the manifest now. Expected APK ≈ 235 MB; the WebP arc is next
+   for size.
+
+SEAL: render 173/0 — the base check now reads "the statewide base (to
+z12) is loaded and visible at z13 outside every patch". Palette and smoke
+unchanged by this take (data-side + one source parameter); gate PASSED.
+apex-seed-t143.zip sealed (sha256 in chat).
+
+---
+
+## Take 142 — 2026-08-28 — ski and snowboard hills
+
+Jacob (24280): "add all ski resorts… pictures, descriptions, link to
+website and what ski runs are available." Mt Holly and Pine Knob are the
+archetypes. Plan of record: `landuse=winter_sports` polygons pin as a
+`ski` kind in Outdoors; `piste:type=downhill` and `snow_park` ways whose
+midpoint falls inside the polygon become the card's run list with
+`piste:difficulty`; the `website` tag becomes a link; the Wikipedia pass
+covers photo + description; summer-MTB hills share take 141's bike glyph
+in Ride. Nordic ruled out (a groomed loop is not a resort). Piste ways
+carry no highway tag, so graph.py's selector never admits them — no
+routing or legality surface.
+
+Ingest: the ski tags joined POI_EXTRA, which already feeds both the keep
+predicate and the tag-set stamp, so the stamp forced the re-ingest
+honestly ("aoi.json was built with a different tag set — rebuilding").
+
+Shipped: **36 hills pinned, 609 named runs on their cards, 17 with a
+Wikipedia photo** (19 without — honest absence, no placeholder). Mt.
+Holly's card reads Bugs Bunny · Grant's Trail · Rabbit Ridge in green
+before Grant's Gorge and Mozart in blue, website linked. The card reads
+runs and website off the RECORD via properties.i — nested arrays do not
+survive MapLibre's property serialisation. The render drill is
+region-aware (the hill comes from the bundle's poi.json, landmine 197)
+and proved itself by FAILING against the ski-less bundle first — a check
+is trusted only after it is watched failing (AGENTS rule 2).
+
+Photo pass surgery: photos.py main() rebuilds its index from scratch and
+deletes orphan files, so a cold-cache budget run would have shipped ~40
+photos and destroyed the other 568. Killed by PID (landmine 204 bit again
+on the way — a grep for photos.py matched this shell's own command
+line); the 36 ski lookups ran through photos.py's own lookup()/key()
+(landmine 98: no second copy) and merged into the shipped index,
+608 -> 625.
+
+SEAL: render 173/0 (168 + the five ski checks; drill self-selected Alpine
+Valley from the bundle), smoke 5 modes (this session, this data), palette
+18, gate PASSED. Found and recorded on the way: build_app.py is what
+syncs bundles/<region>/ into www/bundle/ — bundle.py staging alone leaves
+www stale. apex-seed-t142.zip sealed (sha256 in chat).
+
+---
+
+## Take 141 — 2026-08-28 — Hunt as its own mode; MTB pins are bikes
+
+Jacob: "split Hunt from the separate modes — there's going to be a lot of
+squares for public land." MODES gains `hunt` (on foot; public land + county
+lines + summits from z9 + the typed waypoints); Outdoors is the hiker's map
+again (trail systems, hills, rivers — public land and counties OFF). The
+typed waypoint row moved from Outdoors to Hunt. Guide teaches four modes.
+
+MTB systems draw a hand-drawn bicycle glyph (rendered at 3.4× and real
+size to check it reads — it does); ski resorts that flip to MTB in summer
+will share it.
+
+Render 168/0 with every Hunt assertion retargeted (public land at Allegan,
+county lines at 8.6, summits from z9, the pin card's five types). A stale
+render with the old harness produced six failures first — expected, and
+the reason harness edits ride in the same change as the feature.
+
+SEAL (this session): statewide rebuilt in a fresh sandbox from the t140
+seed (sha verified) — 573,316 edges, 25,448 places, 76 corridors, 323
+summits; bundle composition matches the sealed record. Smoke 5 modes,
+render 168/0 (two starved runs first — landmine 54 and 207), palette 18,
+gate PASSED. apex-seed-t141.zip sealed (sha256 in chat).
+
+Session note: the first pass at this take died UNSEALED at a chat limit —
+the sandbox reset ate the workspace, so the take was replayed from the
+transcript onto the sealed t140 tree and re-proven here. Legal under
+landmine 203: no seed t141 ever existed, so this is a first seal, not a
+reseal.
+
+---
 
 ## Take 140 — 2026-08-28 — the readout outline, and a statewide imagery base
 
@@ -27,6 +135,12 @@ has loaded and the layer is visible. 168/0. Imagery 55.9 MB / 3,513 tiles.
 **Jacob's call, with numbers:** z12 statewide is 10,573 tiles / 104 MB
 (27 m/px, 9× the mosaic); z13 is 400 MB. `APEX_IMAGERY_BASE_Z=12` in
 ci/bundle.sh is the one-line switch if he wants it.
+
+Gate PASSED, smoke 5 modes. apex-seed-t140.zip sealed (sha256 in chat).
+CI note: the z11 base is 2,695 USGS tiles fetched on the runner — the
+USGS tile service has not throttled CI before (the box era fetched
+5,000+), but if the imagery step stalls, that is landmine 205's shape
+again and the tiles move into the seed like the photos did.
 
 ---
 

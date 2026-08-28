@@ -207,6 +207,10 @@ def build(rid):
         meta = json.load(open(os.path.join(ROOT, "imagery_tiles.json")))
         man["imagery_tiles"] = {
             "zmin": meta["zmin"], "zmax": meta["zmax"], "count": count,
+            # take 143: the top of the statewide base pyramid — the app's
+            # satbase maxzoom. An explicit key list dropped this the first
+            # time; the render check caught it saying "to z11".
+            "base": meta.get("base"),
             "bytes": nbytes,
             # take 127: sparse patches ride ON TOP of the mosaic; the app must
             # know, and it must know where the tiles are so nothing else is

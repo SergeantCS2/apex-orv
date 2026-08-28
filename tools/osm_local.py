@@ -96,7 +96,15 @@ POI = poi_tags()
 # through aoi.json and is picked up by contour.py, which owns terrain (A76).
 # A139 (take 131): Great Lakes destinations — lighthouses and marinas
 POI_EXTRA = {"leisure": ["slipway", "marina"], "natural": ["beach", "peak"],
-             "man_made": ["lighthouse"]}
+             "man_made": ["lighthouse"],
+             # take 142 · ski/snowboard hills (Jacob, 24280 follow-up): the
+             # resort polygon carries the pin; downhill runs and terrain
+             # parks become the card's run list. Nordic deliberately out —
+             # a groomed loop is not a resort. These ways have no highway
+             # tag, so graph.py never sees them (verified: its selector
+             # requires one).
+             "landuse": ["winter_sports"],
+             "piste:type": ["downhill", "snow_park"]}
 
 
 def region(rid=None):

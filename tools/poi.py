@@ -92,6 +92,7 @@ def main():
     import aoi_stream
     els = aoi_stream.elements()   # generator — 542 MB statewide, never loaded
     seen, out = set(), []
+    _ski_areas, _pistes = [], []   # take 142 · collected here (single-pass generator)
     # A152 (take 122): a named car park is a TRAILHEAD only if a trail comes
     # to it. Statewide the old rule shipped 1,902 "trailheads" including ".",
     # "001", "1 hour/Handicapped" and "RMHA Pool Parking Lot" — every named
@@ -119,6 +120,13 @@ def main():
         if e.get("type") == "way" and tags.get("highway") in TRAILWAYS:
             for pt in e.get("geometry") or []:
                 _tadd(pt["lon"], pt["lat"])
+        # take 142 · ski & snowboard raw material — assembled after the loop,
+        # because the generator cannot be walked twice.
+        if e.get("type") == "way":
+            if tags.get("landuse") == "winter_sports" and (tags.get("name") or "").strip():
+                _ski_areas.append(e)
+            elif tags.get("piste:type") in ("downhill", "snow_park"):
+                _pistes.append(e)
         kind, unnamed_ok = classify(tags)
         if not kind:
             continue
@@ -193,6 +201,71 @@ def main():
             added += 1
         print(f"poi: trail systems — {added} pinned ({skipped} skipped as statewide "
               f"corridors or under half a mile)")
+
+    # Ski & snowboard hills (take 142, Jacob 24280): the winter_sports polygon
+    # pins at a point inside itself; named downhill runs and terrain parks
+    # whose midpoint falls inside become the card's run list with their tagged
+    # difficulty — untagged difficulty stays untagged (grey), never invented.
+    # The website tag becomes the card's link. Nordic is deliberately out.
+    # Relations are not assembled here: Michigan's hills are closed ways; if a
+    # named hill is ever missing, look here first.
+    if _ski_areas:
+        from shapely.geometry import Polygon, Point
+        DIFF = {"novice": "green", "easy": "green", "intermediate": "blue",
+                "advanced": "black", "expert": "expert", "freeride": "expert"}
+        ORDER = {"green": 0, "blue": 1, "black": 2, "expert": 3, "park": 4}
+        ski_added = ski_runs = 0
+        for e in _ski_areas:
+            ring = [(q["lon"], q["lat"]) for q in e.get("geometry") or []]
+            if len(ring) < 4:
+                continue
+            try:
+                poly = Polygon(ring)
+                if not poly.is_valid:
+                    poly = poly.buffer(0)
+            except Exception:
+                continue
+            t = e.get("tags", {})
+            nm = t["name"].strip()
+            key = ("ski", nm.lower())
+            if key in seen or poly.is_empty:
+                continue
+            seen.add(key)
+            c = poly.representative_point()
+            if not (W <= c.x <= E and S <= c.y <= N):
+                continue
+            runs, seenr = [], set()
+            for w in _pistes:
+                g = w.get("geometry") or []
+                if not g:
+                    continue
+                m = g[len(g) // 2]
+                if not poly.contains(Point(m["lon"], m["lat"])):
+                    continue
+                wt = w.get("tags", {})
+                rn = (wt.get("name") or "").strip()
+                if wt.get("piste:type") == "snow_park":
+                    rd, rn = "park", (rn or "Terrain park")
+                else:
+                    rd = DIFF.get(wt.get("piste:difficulty"))
+                    if not rn:
+                        continue
+                if rn.lower() in seenr:
+                    continue
+                seenr.add(rn.lower())
+                runs.append({"n": rn, "d": rd})
+            runs.sort(key=lambda r: (ORDER.get(r["d"], 5), r["n"]))
+            rec = {"k": "ski", "n": nm,
+                   "p": [round(c.x, 5), round(c.y, 5)]}
+            if runs:
+                rec["runs"] = runs[:60]
+                ski_runs += len(rec["runs"])
+            web = (t.get("website") or t.get("contact:website") or "").strip()
+            if web:
+                rec["web"] = web
+            out.append(rec)
+            ski_added += 1
+        print(f"poi: ski hills — {ski_added} pinned, {ski_runs} runs on their cards")
 
     th_before = sum(1 for r in out if r["k"] == "trailhead")
     out = [r for r in out if r["k"] != "trailhead" or _near_trail(r["p"][0], r["p"][1])]

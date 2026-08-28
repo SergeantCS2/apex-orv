@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 140.* Ranked by blocking-ness, not by interest.
+*Current as of take 143.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2525,3 +2525,59 @@ bar back). 139: address index v2 delta-int (52 → 28 MB), addressAt on a
 midpoint grid — dispatch card 2 ms in headless.
 - **Ruled out:** 1e-4° precision for the index (2 MB for lost fidelity).
 - **Ruled out:** dropping unnumbered segments — there are none.
+
+### Takes 140–141 — shipped
+140: statewide z11 imagery base under the riding-area patches (2,695 tiles,
+~38 MB) — Hybrid 4× sharper outside the eight areas; readout and scale get
+a real `-webkit-text-stroke` (four ±1 px shadows separate into dots at the
+Fold's dpr). 141: Hunt is its own mode — public land, game areas, county
+lines, summits from z9 and the typed waypoints; Outdoors back to the
+hiker's map; MTB systems draw a bicycle glyph.
+- **Ruled out:** z13 statewide imagery (400 MB). Field verdict 24493: z11
+  still reads pixelated at 1 mi — the z12 base (+104 MB) is queued work.
+- **Ruled out:** hunting layers living inside Outdoors — the public-land
+  squares crowd the hiker's map (Jacob, 24280).
+- 141 process note: first pass died proven-but-unsealed at a chat limit
+  (landmine 207); replayed from the transcript onto the sealed t140 tree.
+  First seal, so landmine 203 is satisfied.
+
+## A156 — Ski & snowboard hills · SHIPPED take 142
+Resort pins in Outdoors from `landuse=winter_sports`; run list with
+difficulty from `piste:type` ways inside the polygon; website link; photo
+and description from the Wikipedia pass; bike glyph in Ride for the
+summer-MTB hills. Nordic out. (Jacob, 24280.)
+
+### Take 142 — shipped
+36 ski/snowboard hills from `landuse=winter_sports` (ski kind, Outdoors),
+609 named runs with tagged difficulty on the cards, website links, 17
+Wikipedia photos; skier glyph verified at 3.4× and real size.
+- **Ruled out:** nordic pistes — a groomed loop is not a resort.
+- **Ruled out:** guessing untagged difficulty — untagged renders grey.
+- **Ruled out:** piste ways in the graph — no highway tag, the selector
+  never admits them (verified, not assumed).
+
+## A157 — Hybrid fidelity: z11+z12 statewide base pyramid · SHIPPED take 143
+Field report 24493: z11 base still pixelated at 1 mi. Base to z12 (10,573
+tiles / ~104 MB / 27 m/px); patches unchanged. Size accepted for now;
+WebP re-encode measurement queued separately (Jacob: "work backwards").
+
+### Take 143 — shipped
+Statewide base is a z11+z12 pyramid (14,058 tiles / 183 MB with patches):
+27 m/px under Jacob's 1-mi view, no regression band anywhere. Manifest
+carries "base"; app satbase maxzoom follows it; render check parametrized.
+- **Ruled out:** z12-only base — a raster source cannot underzoom, so
+  z11-11.9 views would fall back to the mosaic. Worse than t140 in that
+  band; the pyramid costs 38 MB more and regresses nothing.
+- **Ruled out:** z13 statewide (~400 MB) — unchanged from take 140.
+- Queued: WebP re-encode measurement (A158) to work the ~235 MB APK back
+  toward the sub-100 MB ideal ("optimize backwards").
+
+## A158 — Imagery size: WebP re-encode measurement · OPEN
+The bundle is the APK and imagery is now its biggest slab (183 MB JPEG).
+Measure: WebP q~70 on a representative tile sample — size delta, visual
+delta on the Fold, decode support in the WebView (API 24+ is fine).
+Decide re-encode vs keep-JPEG from numbers, not vibes.
+- **Ruled out:** dropping the z11 base level to buy back 38 MB — that
+  reopens the exact regression band take 143 closed. Size comes from the
+  codec or nowhere; the pyramid stays whole.
+
