@@ -506,7 +506,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 143</span>
+    <span id="title"><b>APEX</b> ORV · Take 145</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -521,6 +521,9 @@
          off-road app puts it — not buried in a horizontally scrolling strip
          where you have to find it (take 62). -->
     <button id="c-base" class="basebtn">__IC_map__<span>Map</span></button>
+    <!-- take 145 · A160: the HD chip Jacob sketched — top right, off by
+         default, carries its own progress text while a save runs. -->
+    <button id="c-hd" class="basebtn">__IC_layers__<span>HD</span></button>
     <!-- Activity filter, and the legend. Eight colours accumulated with nothing
          telling a rider what any of them mean; this says so and filters at the
          same time (take 67). -->
@@ -569,6 +572,7 @@
       <button class="chip" data-tab="tools" id="c-howto">__IC_info__<span>How to use</span></button>
       <button class="chip" data-tab="tools" id="c-compass">__IC_locate__<span>Compass</span></button>
       <button class="chip" data-tab="tools" id="c-markme">__IC_pin__<span>Mark this spot</span></button>
+      <button class="chip" data-tab="tools" id="c-hdmanage">__IC_layers__<span>Saved HD imagery</span></button>
       <button class="chip" data-tab="tools" id="c-diag">__IC_shield__<span>Diagnostics</span></button>
       <button class="chip" data-tab="map" id="c-layers">__IC_layers__<span>Layers</span></button>
       <button class="chip" data-tab="plan" id="c-machine">__IC_vehicle__<span>Dirt bike 24&quot;</span></button>
@@ -1783,13 +1787,98 @@ function inPatch(z,x,y){var b=(TILES&&TILES.boxes)||[];
   for(var i=0;i<b.length;i++){var q=b[i];
     if(q[0]===z&&x>=q[1]&&x<=q[3]&&y>=q[2]&&y<=q[4])return true}
   return false}
-if(SPARSE)maplibregl.addProtocol('apexsat',function(params){
+/* take 144 · the saved-HD tile store (A160). IndexedDB because it needs no
+   native plugin, survives app restarts, and the render harness can drive
+   it. The read path ships first and alone — proven before any UI exists.
+   Writers (the area downloader, the streaming cache) arrive in later
+   takes and own the LRU; this module only reads, writes, counts, clears. */
+var HD=(function(){
+  var DBN='apex-hd',ST='tiles',db=null;
+  function open(){return db?Promise.resolve(db):new Promise(function(res,rej){
+    var q=indexedDB.open(DBN,1);
+    q.onupgradeneeded=function(){q.result.createObjectStore(ST)};
+    q.onsuccess=function(){db=q.result;res(db)};
+    q.onerror=function(){rej(q.error)}})}
+  function tx(mode,fn){return open().then(function(d){return new Promise(function(res,rej){
+    var t=d.transaction(ST,mode),q=fn(t.objectStore(ST));
+    t.oncomplete=function(){res(q?q.result:undefined)};
+    t.onerror=function(){rej(t.error)}})})}
+  return {
+    get:function(z,x,y){return tx('readonly',function(s){return s.get(z+'/'+x+'/'+y)})
+      .then(function(v){return v?v.b:null})},
+    put:function(z,x,y,buf){return tx('readwrite',function(s){
+      return s.put({b:buf,s:buf.byteLength,t:Date.now()},z+'/'+x+'/'+y)})},
+    del:function(z,x,y){return tx('readwrite',function(s){return s.delete(z+'/'+x+'/'+y)})},
+    stats:function(){return tx('readonly',function(s){return s.getAll()})
+      .then(function(all){all=all||[];var b=0;for(var i=0;i<all.length;i++)b+=(all[i].s||0);
+        return {tiles:all.length,bytes:b}})},
+    clear:function(){return tx('readwrite',function(s){return s.clear()})}};
+})();
+/* take 144 · the resolver's order of address: inside a declared box the
+   BUNDLE answers, as it always has; outside every box the SAVED HD STORE
+   answers before blank does — that is the entire trick that lets a rider's
+   saved z13–15 draw on top of the overzoomed base with zero source or
+   layer changes. Streaming will slot between store and blank in its own
+   take. */
+function _satResolve(params){
   var m=/apexsat:\/\/(\d+)\/(\d+)\/(\d+)/.exec(params.url||'');
   var blank=function(){return {data:BLANK_PNG.buffer.slice(0)}};
-  if(!m||!inPatch(+m[1],+m[2],+m[3]))return Promise.resolve(blank());
-  return fetch('bundle/imagery/'+m[1]+'/'+m[2]+'/'+m[3]+'.jpg')
-    .then(function(r){return r.ok?r.arrayBuffer().then(function(b){return {data:b}}):blank()})
-    .catch(blank)});
+  if(!m)return Promise.resolve(blank());
+  var z=+m[1],x=+m[2],y=+m[3];
+  if(inPatch(z,x,y))
+    return fetch('bundle/imagery/'+z+'/'+x+'/'+y+'.jpg')
+      .then(function(r){return r.ok?r.arrayBuffer().then(function(b){return {data:b}}):blank()})
+      .catch(blank);
+  return HD.get(z,x,y).then(function(b){return b?{data:b}:blank()}).catch(blank);
+}
+if(SPARSE)maplibregl.addProtocol('apexsat',_satResolve);
+/* take 145 · "Save HD for this area" (A160). Jacob's rules are law here:
+   NOTHING moves without a tap, the sheet quotes tiles and megabytes before
+   the save button exists, and the chip carries progress exactly as he
+   sketched ("HD 42%"). A stopped or killed save costs nothing — landed
+   tiles stay in the store and the same save run again skips them, so
+   resume is free. fetchTile is a deliberate seam: the harness replaces it
+   and proves the whole loop with no network. EST is measured, not guessed:
+   17.3 MB over 790 shipped z13–15 patch tiles ≈ 22 KB each. */
+var HDDL=(function(){
+  var USGS='https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}';
+  var running=false,stopReq=false;
+  function txy(lon,lat,z){var n=Math.pow(2,z),r=lat*Math.PI/180;
+    return [Math.floor((lon+180)/360*n),
+            Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n)]}
+  function plan(b){
+    var out=[];
+    for(var z=13;z<=15;z++){
+      var a=txy(b[0],b[3],z),c=txy(b[2],b[1],z);
+      for(var x=a[0];x<=c[0];x++)for(var y=a[1];y<=c[1];y++)
+        if(!inPatch(z,x,y))out.push([z,x,y]);
+    }
+    return out}
+  function fetchTile(z,x,y){
+    return fetch(USGS.replace('{z}',z).replace('{y}',y).replace('{x}',x))
+      .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer()})}
+  function save(b,onp){
+    if(running)return Promise.resolve(null);
+    running=true;stopReq=false;
+    var tiles=plan(b),i=0,done=0,skipped=0,bytes=0;
+    function fin(err){running=false;
+      return {error:err,done:done,skipped:skipped,bytes:bytes,
+              total:tiles.length,stopped:stopReq}}
+    function next(){
+      if(stopReq||i>=tiles.length)return fin(null);
+      var t=tiles[i++];
+      return HD.get(t[0],t[1],t[2]).then(function(have){
+        if(have){skipped++;return}
+        return M.fetchTile(t[0],t[1],t[2]).then(function(buf){
+          return HD.put(t[0],t[1],t[2],buf).then(function(){
+            done++;bytes+=buf.byteLength})})})
+        .then(function(){if(onp)onp(i,tiles.length);return next()})
+        .catch(function(e){return fin(String(e))})}
+    return Promise.resolve().then(next)}
+  var M={plan:plan,save:save,fetchTile:fetchTile,EST:22*1024,
+    stop:function(){stopReq=true},busy:function(){return running}};
+  return M;
+})();
 var SAT_OK=!!TILES||!!(SAT&&SATB&&(SATB[2]-SATB[0])>1e-6&&(SATB[3]-SATB[1])>1e-6);
 var SATBOX=SAT_OK?SATB:(BUNDLE.bbox||[0,0,1,1]);
 var SATURL=SAT_OK?SAT:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -4344,6 +4433,45 @@ function buildLyrPanel(){
    immediately — its basemap checks encode behaviour worth keeping (take 90).
    The panel is a separate chip. */
 el('c-base').addEventListener('click',function(){setBasemap(bmi+1)});
+/* take 145 · the HD sheet. Everything the rider needs to decide is quoted
+   BEFORE the save button appears: tile count, megabytes, what is already
+   on the phone. Over 500 MB the button refuses to exist — "zoom in" is
+   the only path, so nobody saves a Great-Lakes-sized mistake. */
+function hdChipTxt(t){var e=el('c-hd');if(e)e.querySelector('span').textContent=t}
+function hdChip(){HD.stats().then(function(st){
+  if(!HDDL.busy())hdChipTxt(st.tiles?('HD · '+(st.bytes/1048576).toFixed(0)+' MB'):'HD');
+  var e=el('c-hd');if(e)e.className='basebtn'+(st.tiles?' on':'')}).catch(function(){})}
+function refreshSat(){try{var sc=(map.style.sourceCaches||{})['satpatch'];
+  if(sc){sc.clearTiles();map.triggerRepaint()}}catch(e){}}
+function startHDSave(b){
+  hdChipTxt('HD 0%');
+  HDDL.save(b,function(d,t){hdChipTxt('HD '+Math.round(d/Math.max(1,t)*100)+'%')})
+    .then(function(r){hdChip();refreshSat();
+      if(r&&r.error)show('<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
+        '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');})}
+function hdCard(){
+  var v=map.getBounds(),b=[v.getWest(),v.getSouth(),v.getEast(),v.getNorth()];
+  HD.stats().then(function(st){
+    var n=HDDL.plan(b).length,mb=n*HDDL.EST/1048576,big=mb>500;
+    var h='<b>HD imagery</b>'+
+      '<div class="sub">Sharper satellite for places you choose. Nothing downloads on its own.</div>'+
+      '<div class="k">THIS VIEW</div><div class="sub">'+n.toLocaleString()+' tiles · about '+
+        (mb<1?'under 1':Math.round(mb))+' MB'+(big?' — zoom in to a smaller area to save':'')+'</div>'+
+      (HDDL.busy()?'<button class="chip" id="hd-stop">__IC_alert__<span>Stop downloading</span></button>':
+        (big||!n?'':'<button class="chip" id="hd-save">__IC_layers__<span>Save HD for this view</span></button>'))+
+      '<div class="k">SAVED ON THIS PHONE</div><div class="sub">'+st.tiles.toLocaleString()+
+        ' tiles · '+(st.bytes/1048576).toFixed(1)+' MB</div>'+
+      (st.tiles?'<button class="chip" id="hd-del">__IC_alert__<span>Delete all saved HD</span></button>':'');
+    show(h);
+    var a=el('hd-save');if(a)a.addEventListener('click',function(){startHDSave(b);hdCard()});
+    var o=el('hd-stop');if(o)o.addEventListener('click',function(){HDDL.stop()});
+    var d=el('hd-del');if(d)d.addEventListener('click',function(){
+      HD.clear().then(function(){refreshSat();hdChip();hdCard()})});
+  })}
+el('c-hd').addEventListener('click',hdCard);
+el('c-hdmanage').addEventListener('click',hdCard);
+if(!SPARSE){el('c-hd').style.display='none';var _hm=el('c-hdmanage');if(_hm)_hm.style.display='none'}
+else hdChip();
 /* take 130 · the mode chip opens a PICKER (Jacob: choose, don't cycle) */
 function buildModePanel(){
   var p=el('modepanel');
@@ -4802,7 +4930,12 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.__mode={apply:applyMode,get:function(){return mode},MODES:MODES};
     /* take 127: BUNDLE is not a window global (app.js is wrapped — the same
        lesson as areaCard at 121); the harness reads imagery facts here */
-    window.__sat={tiles:TILES,sparse:SPARSE,inPatch:inPatch,blank:Array.from(BLANK_PNG)};
+    window.__sat={tiles:TILES,sparse:SPARSE,inPatch:inPatch,blank:Array.from(BLANK_PNG),resolve:_satResolve};
+    window.__hd=HD;
+    /* take 145 · app.js is wrapped (the take-127 lesson): nothing reaches
+       window unless placed there. The drill drives the save loop through
+       these. */
+    window.HDDL=HDDL;window.__hdChip=hdChip;
     window.__ph={index:PHOTOS,html:photoHTML};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};

@@ -86,7 +86,8 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 - **Host** `basemap.nationalmap.gov`
 - **Provides** Satellite basemap. NAIP-derived
 - **Licence** Public domain (US Government work)
-- **Fetched by** `imagery.py`
+- **Fetched by** `imagery.py` (pipeline) and **in-app** by the HD save
+  flow (take 145, A160) — user tap only, never at boot or idle
 - **Refresh** when NAIP re-flies, every 2-3 years
 - **Note** Landmine 22 — Esri, Google, Bing and Mapbox imagery are licensed and may NOT be redistributed offline. This one may.
 

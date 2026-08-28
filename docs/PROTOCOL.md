@@ -1,6 +1,6 @@
 # PROTOCOL
 
-*Revised 2026-08-19, take 143.*
+*Revised 2026-08-19, take 145.*
 
 The working rules for this project. The gate enforces the ones it can.
 
@@ -161,8 +161,17 @@ network call. Not a font, not a glyph range, not a tile, not a licence check.
 
 Three controls, because this failure is invisible on wifi:
 
-1. **Runtime assets carry no remote origins.** The gate greps `www/`. A CDN
-   reference passes every bench test and dies at Mack Lake.
+1. **Runtime assets carry no remote origins** — except the in-app
+   provisioning allowlist. *Revised at take 145*: A160 moved provisioning
+   into the app (HD saves), so the blunt form of this rule became wrong the
+   same way its take-10 form was. An allowed origin must meet all four
+   conditions: declared in `docs/PROVISION.md` with an **in-app** role;
+   reachable only from a user tap, never at boot or idle; never
+   load-bearing for anything the region manifest claims (the airplane-mode
+   invariant above is untouched — saved HD is claimed only after saving);
+   and named in the gate's allowlist next to a citation of this clause.
+   Everything else in `www/` still refuses: a CDN reference passes every
+   bench test and dies at Mack Lake.
 2. **The app wraps `fetch` and `XMLHttpRequest`** and shows a NET badge. Belt and
    braces.
 3. **Every provisioning host is declared** in `docs/PROVISION.md` with its purpose,

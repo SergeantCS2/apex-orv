@@ -1,4 +1,67 @@
-# HANDOFF — through Take 143 · V2
+# HANDOFF — through Take 145 · V2
+
+## Take 145 — 2026-08-28 — the HD chip and "Save HD for this view"
+
+The visible half of A160, built to Jacob's sketch: an HD chip in the
+top-right stack (hidden entirely for non-sparse regions), a sheet that
+quotes tiles and megabytes BEFORE a save button exists, progress in the
+chip's own label ("HD 42%"), a Stop button, saved totals and a delete
+under Tools too. Over 500 MB the save button refuses to exist — "zoom in"
+is the only path. Nothing moves without a tap, ever.
+
+The downloader plans z13–15 over the visible bounds, skips the bundle's
+own boxes and everything already stored, and fetches sequentially from
+the same USGS endpoint the pipeline uses. A stopped or killed save costs
+nothing: landed tiles persist and the same save resumes for free.
+fetchTile is a deliberate seam so the render drill proves the entire
+loop — plan, save, progress, store growth, resolver serving the result —
+with the network stubbed out. EST is measured, not guessed (22 KB/tile
+from the 790 shipped patch tiles).
+
+Process note, honestly: the UI landed before this entry did — §6 says
+record first and this take slipped the order by one edit. Caught here.
+
+Wrapped-app.js bit once more (take 127's lesson): HDDL and hdChip never
+reached window until placed there explicitly — the drill said "hooks
+missing" and was right.
+
+The gate then refused twice, both correctly, and the first refusal was
+governance: the USGS URL in app.js broke §8's "no remote origins" as
+written. A160 moves provisioning INTO the app, so §8 itself was revised
+(its second revision; the first was take 10) with a four-condition
+in-app provisioning allowlist — PROVISION.md declares the host's in-app
+role, the gate's allowlist cites the clause. Second refusal: MapStub was
+missing getBounds() and triggerRepaint(); the stub-completeness check
+did its job. A prematurely written seal paragraph claimed "Gate PASSED"
+before the verdict — replaced by this one, written after.
+
+SEAL: render 184/0 (178 + six save-loop checks). Gate PASSED on the
+rerun. apex-seed-t145.zip sealed (sha256 in chat). This one is worth
+building: the HD button is field-visible.
+
+---
+
+## Take 144 — 2026-08-28 — HD imagery arc opens: the saved store + resolver
+
+A160 (Jacob's call after field report 24542): sharp-past-z12 comes from a
+manual HD system — stream with signal, save areas by choice, NOTHING
+automatic. This take ships the foundation alone and proves it before any
+UI exists: an IndexedDB tile store (no plugin, survives restarts, the
+harness can drive it) and the apexsat:// resolver learning a second
+place to look — inside the bundle's boxes the bundle answers as always;
+outside them the SAVED STORE answers before blank does. Writers (the
+downloader take, the streaming cache take) arrive next and own LRU; the
+read path ships first because everything else stands on it.
+
+Drill: resolver called directly (exposed as __sat.resolve) — blank
+outside every box, seeded store tile served after __hd.put, bundle still
+winning inside its boxes, stats counting what clear removes.
+
+SEAL: render 178/0 (173 + the five store checks). Gate PASSED.
+apex-seed-t144.zip sealed (sha256 in chat). Field-invisible by design —
+Jacob can skip building this take; 145 puts the chip on it.
+
+---
 
 ## Take 143 — 2026-08-28 — z12 statewide imagery base
 

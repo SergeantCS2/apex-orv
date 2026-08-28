@@ -68,7 +68,10 @@ def check_stamps():
 
 # ── 3. Offline integrity ────────────────────────────────────────────────────
 # PROTOCOL §8. One CDN reference passes every test on wifi and dies in the woods.
-ALLOW = re.compile(r"openstreetmap\.org|maplibre\.org|github\.com/maplibre")
+# basemap.nationalmap.gov: the §8 take-145 in-app provisioning allowlist —
+# user-tap-only HD saves (A160), declared in PROVISION.md, never load-bearing.
+ALLOW = re.compile(r"openstreetmap\.org|maplibre\.org|github\.com/maplibre"
+                   r"|basemap\.nationalmap\.gov")
 
 
 def check_offline():

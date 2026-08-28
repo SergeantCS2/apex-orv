@@ -194,6 +194,10 @@ class MapStub {
   fire(t, ev) { for (const cb of [...(this._on[t] || [])]) cb(ev || {}); }
   easeTo(o) { record.eased.push(o); this.fire("moveend"); }
   fitBounds() { record.fitted++; }
+  /* take 145 · hdCard reads the view, refreshSat pokes the painter */
+  getBounds() { return { getWest: () => -84.30, getSouth: () => 44.50,
+    getEast: () => -84.20, getNorth: () => 44.60 }; }
+  triggerRepaint() { record.repaints = (record.repaints || 0) + 1; }
   getSource(n) { return { setData: (d) => { (record.setData[n] ||= []).push(d); } }; }
   addControl() {}
   getCanvasContainer() {

@@ -1,16 +1,21 @@
-**Take 143 — Hybrid sharpness: the statewide base is a z11+z12 pyramid.**
+**Take 145 — the HD button you sketched.**
 
-- The pixelation from your Onondaga screenshot: at 1 mi you were seeing
-  54 m/px stretched 5×. The statewide base now carries **z12 everywhere**
-  (27 m/px — twice as sharp again) with z11 beneath it, each level native
-  at its own band, so nothing regresses at any zoom. Riding-area patches
-  (z13–15) unchanged on top.
-- **Size, stated plainly: this APK will be ~235 MB** (imagery is now
-  183 MB of it). You accepted growth for now; the WebP measurement
-  (A158) is queued to work it back toward 100 MB.
+- **New HD chip, top right** under the basemap button. Tap it: the sheet
+  tells you what THIS VIEW would cost ("1,240 tiles · about 27 MB")
+  before any save button exists. Tap **Save HD for this view** and the
+  chip itself counts up ("HD 42%") exactly like you drew it. Stop any
+  time — saved tiles are kept, and running the same save later continues
+  where it left off.
+- **Nothing downloads on its own. Ever.** The chip sits dark until you
+  act; saved totals and a delete-all live in the sheet and under Tools →
+  Saved HD imagery. Views over 500 MB refuse to offer a save — zoom in.
+- Saved HD draws on top of the built-in base wherever you've saved it:
+  z13–15 sharpness in places YOU pick, from the same USGS source the app
+  ships with.
 
 ### Check on the phone
-1. Hybrid at the same Onondaga spot at 1 mi — fields and tree lines
-   should resolve where blocks were.
-2. Zoom out through 2–4 mi: no band where it suddenly goes blurry.
-3. Inside a riding area (Bull Gap): patches still razor-sharp.
+1. Hybrid over Flat Rock at ~1 mi, tap HD → quote appears; save (~15–30
+   MB); watch the chip count; when done, that view sharpens for real.
+2. Airplane mode after: the saved area stays sharp — it's on the phone.
+3. Tools → Saved HD imagery: totals match; Delete all returns the chip
+   to "HD".

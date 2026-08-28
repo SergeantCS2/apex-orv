@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 143.* Ranked by blocking-ness, not by interest.
+*Current as of take 145.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2580,4 +2580,43 @@ Decide re-encode vs keep-JPEG from numbers, not vibes.
 - **Ruled out:** dropping the z11 base level to buy back 38 MB — that
   reopens the exact regression band take 143 closed. Size comes from the
   codec or nowhere; the pyramid stays whole.
+
+## A159 — Field report 24542 (t143 APK, Flat Rock at ~1 mi) · DECIDED
+"Better but hard to tell — still extremely pixelated despite 230 MB."
+Verified from Jacob's own APK: all 10,573 z12 tiles aboard, manifest
+base:12, and tile 12/1100/1519 (his exact spot) is crisp at its native
+28 m/px — the blur is arithmetic, not delivery. At 1 mi on the Fold the
+screen wants ~5 m/px; z12 leaves a ~5x stretch (t143 halved t140's ~10x).
+Sharp-at-1-mi needs z14–15: statewide that is 2.2–8.6 GB — no APK can
+carry it. Raising the base further is a dead end; the fix is structural.
+Options on the table for Jacob: (a) on-demand offline imagery downloads
+per area/county (the onX model — z13–15 pulled from USGS to device
+storage for places he picks, ~50–150 MB per county); (b) online streaming
+Hybrid with cache-as-you-go, offline falls back to the z12 base;
+(c) hold at z12 and take the WebP size win (A158) only.
+- **Ruled out:** raising the statewide in-APK base past z12 — z13 is
+  ~550 MB, z14 ~2.2 GB, z15 8.6 GB (take 75's measurement stands).
+
+## A160 — HD imagery: manual streaming + area saves · IN PROGRESS (144 store+resolver · 145 chip+saves · streaming next)
+Jacob picked a hybrid of streaming and downloads with two hard rules:
+NOTHING automatic, and one simple visible control. Design of record:
+- One **HD chip** top-right by the basemap control. OFF by default.
+  First tap opens a two-choice sheet in plain words.
+- **Stream HD while connected**: z13–15 live from USGS with signal,
+  cache-as-you-go into a bounded LRU (~250 MB); no signal, no cache →
+  built-in z12 base. Chip states its truth: "HD · streaming" /
+  "HD · offline base".
+- **Save HD for this area**: the visible area / riding area / county,
+  size quoted BEFORE fetch ("~85 MB"), progress in the chip exactly as
+  Jacob sketched ("HD 42%…"), pausable, deletable under Tools.
+- Implementation: extend the apexsat:// resolver — bundle → saved store →
+  (streaming on + online) fetch+cache → blank. Pipeline and CI untouched;
+  same free USGS endpoint the pipeline uses. Est. 3–4 takes.
+- Size ledger that motivated it (from Jacob's t143 APK, 240 MB): z12 base
+  127.7 + z11 38.0 + patches 17.3 = imagery 183; photos only 9.8 (ski
+  added ~2). The pyramid law: each level costs 4x for 2x sharpness.
+- **Ruled out:** automatic/background downloads of any kind (Jacob).
+- **Ruled out:** raising the in-APK base past z12 (A159 numbers stand).
+- A158 (WebP on the SHIPPED bundle) proceeds independently to shrink the
+  APK itself.
 

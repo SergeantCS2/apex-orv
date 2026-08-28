@@ -750,6 +750,95 @@ if (zoomed.trails === 0) {
   if (base.skip) ok(true, "no statewide imagery base in this bundle — skipped, not failed");
   else ok(base.loaded && base.vis === "visible", `the statewide base (to z${base.bz}) is loaded and visible at z13 outside every patch (${base.at})`);
 
+  /* Take 144 · the saved-HD store behind the apexsat resolver (A160). The
+     resolver is called directly — the same function MapLibre calls — with
+     tiles chosen from the bundle's OWN box list (landmine 197): one z13
+     tile outside every box, one tile inside the statewide base box. Blank
+     before saving, the seeded bytes after, the bundle still winning inside
+     its boxes, and stats counting exactly what clear removes. */
+  const hd = await page.evaluate(async () => {
+    const S = window.__sat, H = window.__hd;
+    if (!S || !S.resolve || !H) return { missing: true };
+    const blankLen = S.blank.length;
+    const boxes = S.tiles.boxes || [];
+    const at = (z) => boxes.filter((b) => b[0] === z);
+    // a z13 tile outside every z13 box: walk east from the first box's edge
+    const b13 = at(13)[0] || [13, 4000, 3000, 4001, 3001];
+    let ox = b13[3] + 7, oy = b13[2];
+    const inAny = (z, x, y) => S.inPatch(z, x, y);
+    let guard = 0;
+    while (inAny(13, ox, oy) && guard++ < 200) ox += 13;
+    // a tile the bundle certainly has: centre of the statewide base box
+    const bb = at(12)[0] || at(11)[0];
+    const ix = (bb[1] + bb[3]) >> 1, iy = (bb[2] + bb[4]) >> 1, iz = bb[0];
+    const r = (u) => S.resolve({ url: u }).then((o) => o.data.byteLength);
+    await H.clear();
+    const empty = await r(`apexsat://13/${ox}/${oy}`);
+    const seed = new Uint8Array(999); for (let i = 0; i < 999; i++) seed[i] = i & 255;
+    await H.put(13, ox, oy, seed.buffer);
+    const served = await r(`apexsat://13/${ox}/${oy}`);
+    const bundleTile = await r(`apexsat://${iz}/${ix}/${iy}`);
+    const st1 = await H.stats();
+    await H.clear();
+    const st0 = await H.stats();
+    const after = await r(`apexsat://13/${ox}/${oy}`);
+    return { blankLen, empty, served, bundleTile, st1, st0, after,
+             at: `13/${ox}/${oy}`, bt: `${iz}/${ix}/${iy}` };
+  });
+  if (hd.missing) ok(false, "HD store or resolver hook missing");
+  else {
+    ok(hd.empty === hd.blankLen, `an unsaved tile outside every box answers blank (${hd.at}: ${hd.empty} bytes)`);
+    ok(hd.served === 999, `after __hd.put the store answers before blank does (${hd.served} bytes served)`);
+    ok(hd.bundleTile !== hd.blankLen && hd.bundleTile !== 999, `the bundle still wins inside its boxes (${hd.bt}: ${hd.bundleTile} bytes)`);
+    ok(hd.st1.tiles === 1 && hd.st1.bytes === 999 && hd.st0.tiles === 0,
+       `stats count what clear removes (${hd.st1.tiles} tile / ${hd.st1.bytes} B, then ${hd.st0.tiles})`);
+    ok(hd.after === hd.blankLen, "a cleared store answers blank again — the store never lies about what it holds");
+  }
+
+  /* Take 145 · the HD chip and the save loop (A160). The fetcher seam is
+     replaced with a stub, the bbox comes from the bundle's own box list
+     (landmine 197), and the loop is proven whole: plan, save, progress,
+     store growth, the resolver serving what landed, the chip telling the
+     truth, and Jacob's first rule — nothing downloads on its own. */
+  const hdl = await page.evaluate(async () => {
+    const S = window.__sat, H = window.__hd, D = window.HDDL;
+    if (!S || !H || !D) return { missing: true };
+    const chip = document.getElementById("c-hd");
+    const st0 = await H.stats();
+    const boxes = (S.tiles.boxes || []).filter((b) => b[0] === 13);
+    const b13 = boxes[0] || [13, 4000, 3000, 4001, 3001];
+    let ox = b13[3] + 9, oy = b13[2], guard = 0;
+    while (S.inPatch(13, ox, oy) && guard++ < 200) ox += 11;
+    const n = 8192, inv = (x, y) => [x / n * 360 - 180,
+      Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI];
+    const a = inv(ox + 0.05, oy + 0.05), c = inv(ox + 0.95, oy + 0.95);
+    const bbox = [a[0], c[1], c[0], a[1]];
+    const planned = D.plan(bbox).length;
+    D.fetchTile = () => Promise.resolve(new ArrayBuffer(500));
+    let last = 0;
+    const r = await D.save(bbox, (d, t) => { last = d / t; });
+    const st1 = await H.stats();
+    const served = await S.resolve({ url: `apexsat://13/${ox}/${oy}` })
+      .then((o) => o.data.byteLength);
+    window.__hdChip(); await new Promise((z) => setTimeout(z, 300));
+    const label = chip ? chip.querySelector("span").textContent : "";
+    await H.clear(); window.__hdChip(); await new Promise((z) => setTimeout(z, 300));
+    const label0 = chip ? chip.querySelector("span").textContent : "";
+    return { chip: !!chip, st0: st0.tiles, planned, r, st1, served, last, label, label0 };
+  });
+  if (hdl.missing) ok(false, "HD chip / downloader hooks missing");
+  else {
+    ok(hdl.chip && hdl.st0 === 0, "the HD chip exists and nothing has downloaded on its own");
+    ok(hdl.planned === 21, `one z13 tile of view plans its z14+z15 children too (${hdl.planned} = 1+4+16)`);
+    ok(hdl.r && !hdl.r.error && hdl.r.done === 21 && hdl.last === 1,
+       `the save loop lands every planned tile with progress reaching 100% (${hdl.r && hdl.r.done} done)`);
+    ok(hdl.st1.tiles === 21 && hdl.st1.bytes === 21 * 500,
+       `the store holds exactly what the save reported (${hdl.st1.tiles} tiles / ${hdl.st1.bytes} B)`);
+    ok(hdl.served === 500, "the resolver serves a saved HD tile straight after the save");
+    ok(/MB/.test(hdl.label) && hdl.label0 === "HD",
+       `the chip tells the truth before and after delete ("${hdl.label}" -> "${hdl.label0}")`);
+  }
+
   /* take 138: the guide rewrite left two stray </div> and the tab bar fell
      out of the layout grid on the Fold. Assert the bar sits inside a phone
      viewport, below the map, above the bottom edge. */
