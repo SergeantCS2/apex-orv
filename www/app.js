@@ -2065,6 +2065,11 @@ function setChip(id,icon,label,on){
   b.className=base+(on?' on':'')+(b.id==='c-act'?' actbtn':'')}
 
 try{paintIcons()}catch(e){}
+/* take 158 · reveal UNCONDITIONALLY, thrown or not: raw tokens are ugly, an
+   invisible-but-tappable app is dangerous. The backstop covers the case
+   where this line is never reached at all. */
+try{var _sh=document.getElementById('shell');
+  if(_sh&&_sh.className.indexOf('ready')<0)_sh.className+=' ready'}catch(e){}
 
 function mk(cls,txt){var d=document.createElement('div');d.className='pin '+cls;
   d.textContent=txt;return d}
@@ -4333,6 +4338,8 @@ map.on('load',function(){SPL.style();
   setTimeout(function(){SPL.lift()},2600)});
 map.on('idle',function(){SPL.ready()});
 setTimeout(function(){SPL.lift()},20000);
+setTimeout(function(){try{var s2=document.getElementById('shell');
+  if(s2&&s2.className.indexOf('ready')<0)s2.className+=' ready'}catch(e){}},8000);
 map.on('load',drawCoverage);
 /* The map must reflect the current machine from the first frame, not only after
    someone taps the chip — a rider who never touches it is exactly the one who

@@ -1,18 +1,17 @@
-**Take 157 — you can see when the map is still loading.**
+**Take 158 — the half-built look is gone for good.**
 
-Switching to Satellite or Hybrid used to leave the map looking half-drawn
-with no explanation while imagery arrived. Now a thin red line runs across
-the very top while it settles, and disappears the moment it's done.
+Take 157 put a loading screen over the messy start-up. This one removes
+the mess underneath it: the app's buttons stay invisible until their
+icons are actually drawn, so `__IC_map__` style placeholder text can no
+longer appear on screen at all — with or without the loading screen in
+front of it.
 
-- Same red as the loading screen's bar, so a red bar always means the same
-  thing: something is still coming.
-- It only appears if the switch actually takes a moment — flipping to a
-  basemap that's already in memory won't flash anything at you.
-- It never covers the map and never eats a tap, and it can't stick: if
-  something stalls it clears itself after 15 seconds.
+Everything from the last two builds rides along: the cold-start loading
+screen with your logo and the red A-to-X progress bar, and the thin red
+line across the top while a basemap change settles.
 
 ### Check on the phone
-1. Cycle Map → Satellite → Hybrid somewhere you haven't saved HD: the
-   line appears, then goes as the imagery lands.
-2. Cycle straight back: no flash for the ones already loaded.
-3. You can still pan, tap pins and open cards while it's showing.
+1. Force-stop and reopen: logo, bar, then a finished map — no
+   placeholder text at any point.
+2. Cycle Map → Satellite → Hybrid: red line while it loads, gone after.
+3. Everything else exactly where you left it.

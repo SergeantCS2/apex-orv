@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 157.* Ranked by blocking-ness, not by interest.
+*Current as of take 158.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2630,7 +2630,7 @@ every other honest check.
 - **Ruled out:** treating this as a style bug — the same run proves the
   style painting.
 
-## A162 — one 1,783 ms frame on the first fps run · WATCH
+## A162 — one 1,783 ms frame on the first fps run · CLOSED (noise)
 avg 29 poisoned by a single giant frame (1/70 over budget, 596 features);
 the rerun scored 120 fps / worst 16 ms. First-paint decode or JIT burst.
 Watch across future self-tests; profile only if the field ever feels it.
@@ -2804,7 +2804,7 @@ boot milestones, lifts into the guide/permission prompt.
   it. The splash covers boot; the tokens being runtime-substituted at all
   is filed as its own item (A172).
 
-## A172 — Icon tokens are substituted at RUNTIME · OPEN
+## A172 — Icon tokens are substituted at RUNTIME · SHIPPED take 158
 __IC_*__ ships literal in index.html and app.js swaps it at boot, which
 is why a cold start reads broken. Build-time substitution would remove
 the failure mode entirely rather than covering it.
@@ -2823,4 +2823,33 @@ flicker, 15 s ceiling so it cannot stick.
   two chips counting different things would read as noise.
 - **Ruled out:** blocking taps while it shows. Imagery loading is not a
   reason to take the map away.
+
+### Take 158 — shipped
+The shell holds at opacity 0 until paintIcons() has run, so raw __IC_
+tokens can never be on screen — the splash covers the boot, and behind it
+there is now nothing ugly to cover.
+- **Ruled out:** build-time token substitution — it needs a second copy
+  of ic()'s SVG wrapper in Python (landmine 98) and drifts silently when
+  the wrapper changes.
+- **Ruled out:** revealing only on paintIcons success. Invisible and
+  tappable is worse than ugly and honest, so the reveal is unconditional
+  with an 8 s backstop on top.
+
+## A174 — Pin cluster tuning · OPEN (Jacob, after t157 field test)
+"The pin clusters will need additional tuning, but good enough for now."
+Knobs, all measured rather than guessed when the report arrives: cluster
+radius (38 px today — 46 was too greedy at ×150, 38 gives ×65), the
+z11.4 ceiling where stacks give way to pins, and the 12-kind clusterable
+set. What is NOT yet known is WHICH way it reads wrong on the Fold —
+too eager, too shy, wrong break zoom — so nothing moves until Jacob says
+which.
+- **Ruled out:** tuning it blind on my own taste. The numbers already
+  pass; the thing being tuned is how it FEELS at arm's length, and that
+  is his measurement, not mine.
+
+## A175 — Splash timing · CLOSED (field-confirmed take 158)
+Lifting on the first idle frame is correct: "when it goes away,
+everything is mostly loaded" (Jacob, 24586). No change.
+- **Ruled out:** holding for full tile-settle — it would lengthen every
+  cold start to fix a problem the field says does not exist.
 

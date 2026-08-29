@@ -1,4 +1,43 @@
-# HANDOFF — through Take 157 · V2
+# HANDOFF — through Take 158 · V2
+
+## Take 158 — 2026-08-29 — the raw tokens stop existing (A172)
+
+Take 156 COVERED the broken boot; this removes it. paintIcons() runs at
+the top of the app body — but the app body is inside start(), and start()
+only runs once the whole bundle has fetched, which is why Jacob watched
+__IC_map__ sit there for seconds (24582). The shell is now transparent
+until its icons are real, and paintIcons reveals it.
+
+Ruled out, and worth writing down: substituting the tokens at BUILD time.
+It works, but it needs a Python copy of ic()'s SVG wrapper — a second
+copy of a rule that already exists in one place (landmine 98), free to
+drift the moment the wrapper changes. Hiding the shell needs no copy of
+anything.
+
+The reveal is unconditional — it runs whether paintIcons succeeded or
+threw — plus an 8 s backstop. An app that shows raw tokens is ugly; an
+app that is invisible and still tappable is dangerous, and that trade is
+not close.
+
+FIELD (t157 on the Fold, self-test 24586): **PASS 47 · FAIL 0** — the
+first fully clean sweep this project has recorded. It closes four items
+in the field rather than the harness: offline-clean reads "0 unexpected
+remote requests" with the in-app allowlist doing its job (A153/A164);
+style-loaded is "true after 0 ms" (A161); snap routes 327341 -> 285341
+now the drill borrows a land machine; and fps is avg 119, worst 21 ms,
+0/70 frames over budget — the 1,783 ms first-paint stall of A162 has not
+recurred in two clean runs, so A162 closes as noise.
+
+Jacob's splash verdict: "works great — when it goes away, everything is
+mostly loaded". That settles the open question from the take-156 seal:
+lifting on the first idle frame is the right moment, and holding for
+tile-settle is NOT needed. Pin clusters: "will need additional tuning,
+but good enough for now" — filed as A174, not guessed at.
+
+SEAL: render 212/0 (210 + two shell checks), smoke green, gate PASSED.
+apex-seed-t158.zip sealed (sha256 in chat).
+
+---
 
 ## Take 157 — 2026-08-29 — the basemap busy line (A173)
 

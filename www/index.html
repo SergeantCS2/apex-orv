@@ -187,6 +187,13 @@
   /* take 157 · A173 · the basemap busy line. Same red as the splash bar so
      "red bar = loading" means exactly one thing in this app. Pointer
      transparent: imagery loading is never a reason to eat a tap. */
+  /* take 158 · A172 · the shell waits until its icons are real. The tokens
+     are substituted by paintIcons() at the top of the app body, and that
+     body runs inside start() — i.e. AFTER the bundle has fetched. Rather
+     than copy ic()'s wrapper into the build system to substitute earlier,
+     the chrome simply does not show until it is finished. */
+  #shell{opacity:0}
+  #shell.ready{opacity:1;transition:opacity .18s ease}
   #busy{position:fixed;left:0;right:0;top:0;height:3px;z-index:9998;
     overflow:hidden;pointer-events:none;opacity:0;transition:opacity .18s ease}
   #busy.on{opacity:1}
@@ -550,7 +557,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 157</span>
+    <span id="title"><b>APEX</b> ORV · Take 158</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>

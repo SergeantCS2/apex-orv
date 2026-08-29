@@ -1075,6 +1075,27 @@ if (zoomed.trails === 0) {
     }
   }
 
+  /* Take 158 · A172 · the shell must be REVEALED and its tokens gone. The
+     dangerous failure is the opposite of the ugly one: a shell left at
+     opacity 0 is invisible and still tappable. */
+  const shl = await page.evaluate(() => {
+    const sh = document.getElementById("shell");
+    if (!sh) return { missing: true };
+    const cs = getComputedStyle(sh);
+    return { ready: sh.className.indexOf("ready") >= 0,
+             opacity: cs.opacity,
+             tokens: (sh.innerText.match(/__IC_/g) || []).length,
+             btnTokens: [...sh.querySelectorAll("button")]
+               .filter((b) => b.innerHTML.indexOf("__IC_") >= 0).length };
+  });
+  if (shl.missing) ok(false, "no #shell to check");
+  else {
+    ok(shl.ready && shl.opacity === "1",
+       `the shell is revealed once its icons are painted (opacity ${shl.opacity})`);
+    ok(shl.tokens === 0 && shl.btnTokens === 0,
+       `and no button is left holding a raw token (${shl.btnTokens} of them)`);
+  }
+
   /* take 138: the guide rewrite left two stray </div> and the tab bar fell
      out of the layout grid on the Fold. Assert the bar sits inside a phone
      viewport, below the map, above the bottom edge. */
