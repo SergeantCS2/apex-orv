@@ -85,7 +85,19 @@ var remoteHits=0,netB=el('b-net');
 function isRemote(r){try{var u=new URL(r,location.href);
  if(['data:','blob:','file:'].indexOf(u.protocol)>=0)return false;
  return u.origin!==location.origin}catch(e){return false}}
-function watch(r){if(!isRemote(r))return;remoteHits++;
+/* take 153 · §8's in-app provisioning allowlist, mirrored from the gate:
+   a user-tapped HD save or gauge read is LEGAL network use and must not
+   paint the badge red or fail the self-test — but it is still counted and
+   named, because "offline" is proven, not promised. Anything else stays a
+   failure. */
+var INAPP_HOSTS=['basemap.nationalmap.gov','waterservices.usgs.gov'];
+var inappHits=0;
+function watch(r){if(!isRemote(r))return;
+ try{var h=new URL(r,location.href).hostname;
+   if(INAPP_HOSTS.indexOf(h)>=0){inappHits++;
+     netB.textContent='NET '+inappHits+' IN-APP';netB.className='badge good';return}
+ }catch(e){}
+ remoteHits++;
  netB.textContent='NET '+remoteHits+' REMOTE';netB.className='badge bad'}
 var nf=window.fetch&&window.fetch.bind(window);
 if(nf)window.fetch=function(i,o){watch(typeof i==='string'?i:(i&&i.url)||'');return nf(i,o)};
@@ -3939,16 +3951,19 @@ function hdCard(){
       '<div class="sub">Sharper satellite for places you choose. Nothing downloads on its own.</div>'+
       '<div class="k">THIS VIEW</div><div class="sub">'+n.toLocaleString()+' tiles · about '+
         (mb<1?'under 1':Math.round(mb))+' MB'+(big?' — zoom in to a smaller area to save':'')+'</div>'+
-      (HDDL.busy()?'<button class="chip" id="hd-stop">__IC_alert__<span>Stop downloading</span></button>':
-        (big||!n?'':'<button class="chip" id="hd-save">__IC_layers__<span>Save HD for this view</span></button>'))+
+      (HDDL.busy()?'<button class="chip" id="hd-stop">'+ic('alert')+'<span>Stop downloading</span></button>':
+        (big||!n?'':'<button class="chip" id="hd-save">'+ic('layers')+'<span>Save HD for this view</span></button>'))+
       '<div class="k">SAVED ON THIS PHONE</div><div class="sub">'+st.tiles.toLocaleString()+
         ' tiles · '+(st.bytes/1048576).toFixed(1)+' MB</div>'+
-      (st.tiles?'<button class="chip" id="hd-del">__IC_alert__<span>Delete all saved HD</span></button>':'');
+      (st.tiles?'<button class="chip" id="hd-del">'+ic('alert')+'<span>Delete all saved HD</span></button>':'');
     show(h);
     var a=el('hd-save');if(a)a.addEventListener('click',function(){startHDSave(b);hdCard()});
     var o=el('hd-stop');if(o)o.addEventListener('click',function(){HDDL.stop()});
     var d=el('hd-del');if(d)d.addEventListener('click',function(){
-      HD.clear().then(function(){refreshSat();hdChip();hdCard()})});
+      /* take 153 · deleting mid-download raced the writer: landed tiles
+         kept arriving after the clear. Stop first, then clear. */
+      HDDL.stop();
+      setTimeout(function(){HD.clear().then(function(){refreshSat();hdChip();hdCard()})},350)});
   })}
 el('c-hd').addEventListener('click',hdCard);
 el('c-hdmanage').addEventListener('click',hdCard);
@@ -4512,7 +4527,8 @@ function stLoad(){
   stAdd('LOAD','bundle-honest',_hon,
     BUNDLE.state+(BUNDLE.absent&&BUNDLE.absent.length?
       ' — names absent: '+BUNDLE.absent.join(','):' — nothing absent'));
-  stAdd('LOAD','offline-clean',remoteHits===0,remoteHits+' remote requests');
+  stAdd('LOAD','offline-clean',remoteHits===0,remoteHits+' unexpected remote requests'+
+    (inappHits?' \u00b7 '+inappHits+' in-app (HD / gauges \u2014 user taps, \u00a78 allowlist)':''));
   /* Saved routes are on-device state, not a network surface — PROTOCOL §8 draws
      the line at requests leaving the phone. Report what storage holds so a
      rider can see it is local and finite (take 79). */
@@ -4804,9 +4820,17 @@ function stData(){
 }
 
 function stRouting(){
+  /* take 153 · t152 self-test on the Fold: snap read -1 -> -1 because the
+     current machine was a KAYAK (Jacob was in Water mode) — legal on zero
+     land classes, exactly as designed. The routing drill borrows a land
+     machine and says which, then puts the boat back. */
+  var _was=machine;
+  if(MACHINE[machine]&&MACHINE[machine].mph){machine=rideMachine||'bike';_legalMemo={}}
   var a=anchorOf('site'),b=anchorOf('town');
   var na=nearestNode(a),nb=nearestNode(b);
-  stAdd('ROUTE','snap',na>=0&&nb>=0,'nodes '+na+' -> '+nb);
+  stAdd('ROUTE','snap',na>=0&&nb>=0,'nodes '+na+' -> '+nb+
+    (_was!==machine?' (as '+MACHINE[machine].lbl.replace(/^\S+\s/,'')+' \u2014 a '+
+      MACHINE[_was].lbl.replace(/^\S+\s/,'').toLowerCase()+' is legal on no land class)':''));
   if(na<0||nb<0)return;
   var got=0,detail=[];
   PROFILES.forEach(function(pf){
@@ -4853,8 +4877,8 @@ function stRouting(){
   }catch(e){stAdd('ROUTE','loop',false,'threw: '+(e&&e.message||e))}
   }catch(e){stAdd('ROUTE','machine-filter',false,'threw: '+e.message)}
   machine=before;
+  if(_was!==machine){machine=_was;_legalMemo={}}
 }
-
 function stSafety(){
   /* The drill calls startRecording, which since take 41 also starts ride
      telemetry and a 20 s interval. A self-test that leaves a live ride running

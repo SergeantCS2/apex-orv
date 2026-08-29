@@ -187,6 +187,10 @@
     border-radius:50%;background:var(--bone);opacity:.85;margin-right:7px;vertical-align:1px}
   .actbtn{top:136px}
   .modebtn{top:186px}
+  /* take 153 · Jacob 24565: the HD chip sat on the LEFT stack with no
+     per-id offset and overlapped the basemap chip. Top right, parallel
+     to the elevation readout, where he asked for it. */
+  #c-hd{left:auto;right:11px;top:60px}
   #lyrpanel{position:absolute;left:11px;top:186px;z-index:6;max-width:min(248px,76vw);
     background:rgba(24,22,18,.96);border:1px solid rgba(255,255,255,.22);
     border-radius:10px;padding:6px;box-shadow:0 6px 22px rgba(0,0,0,.45);
@@ -506,7 +510,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 152</span>
+    <span id="title"><b>APEX</b> ORV · Take 153</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>

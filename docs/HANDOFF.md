@@ -1,4 +1,38 @@
-# HANDOFF — through Take 152 · V2 (147–152 sealed as one batch)
+# HANDOFF — through Take 153 · V2
+
+## Take 153 — 2026-08-29 — v2 field report one (Jacob, t152 on the Fold)
+
+Five fixes from one report and one self-test:
+1. The HD chip had no per-id position — it sat ON the basemap chip in the
+   left stack. Top right now, parallel to the elevation readout (Jacob's
+   spec, twice: the sketch and the correction).
+2. The hdCard's three buttons showed literal __IC_layers__/__IC_alert__ —
+   the token pass substitutes STATIC markup only; runtime HTML must use
+   ic(). The gauge and run buttons already did; only my HD sheet forgot.
+3. Deleting saved HD mid-download raced the writer (his LAST ACTIONS:
+   hd-del, then hd-stop, tiles still landing). Delete stops first.
+4. offline-clean read "XX 478 remote requests" — every one of them his
+   own legal HD save. The fetch wrapper now mirrors §8's in-app
+   allowlist: user-tap traffic to the two declared hosts is counted and
+   NAMED ("478 in-app · user taps") with the badge staying green; anything
+   else stays a red badge and a failure. Offline remains proven, not
+   promised — the count never hides.
+5. snap read -1: the self-test routed as his KAYAK. The drill borrows a
+   land machine, says which and why, and puts the boat back.
+
+A170 opened: overlapping pins in dense areas (his Hess Lake shot) — real
+distinct places, two prominence tiers both drawing. His ×N stack idea is
+the design candidate; recorded for a design pass, not built blind.
+
+SEAL: smoke 2 fast modes, render 195/0, gate PASSED. The gate refused
+once first and was right: a combined "Takes 151–152" heading parses as
+neither take, so the batch's own record was incomplete — split into two
+entries. ci/RELEASE.md was written BEFORE this seal, closing the t152
+miss where the notes still carried take 146 (landmine 96's shape, caught
+by Jacob's own reading of the Releases tab). apex-seed-t153.zip sealed
+(sha256 in chat).
+
+---
 
 ## Takes 147–150 — 2026-08-28/29 — the tester batch (Jacob: "do not seal
 ## until all of these are hit... every mode should plan something")
@@ -54,15 +88,23 @@ here is a silent empty inventory. A drill first shipped with a
 tautological check (`? true : true`) — caught and made falsifiable
 before it ever ran.
 
-## Takes 151–152 — 2026-08-29 — the Rifle River report (A168, A169)
+## Take 151 — 2026-08-29 — DNR boating access sites (A169)
 
-Mid-batch field report two: "rifle river" found a street, and Jacob has
-dropped at ramps the app never showed. 151: DNR Boating Access Sites
-(1,325; the layer verified to exist before anything was promised —
-landmine 190) merge into launches (+280) and corridor candidates; the
-Rifle goes from 2 named accesses to the DNR's seven; the state-sponsored-
-only limit is written in bas.py where it bites. 152: corridors are search
-rows; a river hit fits the whole river and opens its summary.
+Mid-batch field report two, half one: Jacob has dropped at ramps the app
+never showed. DNR Boating Access Sites (1,325; the layer verified to
+exist before anything was promised — landmine 190) merge into launches
+(+280) and corridor candidates; the Rifle goes from 2 named accesses to
+the DNR's seven, with nameless OSM twins adopting the DNR's names
+(Moffatt Bridge exists because of that rule). The state-sponsored-only
+limit — county and township ramps are in neither source — is written in
+bas.py where it bites.
+
+## Take 152 — 2026-08-29 — rivers findable by name (A168)
+
+Half two: "rifle river" found a STREET and three trails, never the river.
+Corridors are search rows now, ranked with the best hits; a river hit
+fits the whole river on screen and opens its summary (miles, accesses,
+dams), pointing at the run flow.
 
 Smoke's two batch reds, closed with causes: the exposure block died at my
 GAUGES line and took __ride down (exposures now come last, defensively —

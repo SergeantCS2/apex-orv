@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 152.* Ranked by blocking-ness, not by interest.
+*Current as of take 153.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2717,4 +2717,18 @@ search rows; a river hit fits the river.
   stubs. Three explicit-map artifacts bit in one batch (manifest keys,
   IN_BUNDLE, the split loader) — each caught by a drill, each now carries
   gauges.
+
+## A170 — Pin stacking in dense areas · DESIGN NEXT (Jacob's ×N idea)
+Hess Lake (24571): five real launches + a marina overlap; the two
+prominence tiers draw over each other and read as "a small pin inside a
+big one". They ARE distinct places. Candidate: same-kind stack badge — a
+single pin with ×N where several of one kind collide at the CURRENT zoom,
+separating as you zoom in; tap lists the members. Needs a design pass:
+MapLibre's built-in clustering merges across kinds and fights the
+per-mode filters, so the honest version is per-kind and zoom-aware.
+- **Ruled out:** data-side collapse (an A151-style merge) — zoom-blind, it
+  would hide genuinely distinct neighbours exactly when you zoom in to
+  separate them.
+- **Ruled out:** letting it be — Jacob flagged it, and a pin hiding
+  another pin is a map lying by occlusion.
 
