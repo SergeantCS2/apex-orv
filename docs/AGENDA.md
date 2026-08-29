@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 158.* Ranked by blocking-ness, not by interest.
+*Current as of take 159.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2572,7 +2572,7 @@ carries "base"; app satbase maxzoom follows it; render check parametrized.
 - Queued: WebP re-encode measurement (A158) to work the ~235 MB APK back
   toward the sub-100 MB ideal ("optimize backwards").
 
-## A158 — Imagery size: WebP re-encode measurement · OPEN
+## A158 — Imagery size · SHIPPED take 159 (chroma, not WebP)
 The bundle is the APK and imagery is now its biggest slab (183 MB JPEG).
 Measure: WebP q~70 on a representative tile sample — size delta, visual
 delta on the Fold, decode support in the WebView (API 24+ is fine).

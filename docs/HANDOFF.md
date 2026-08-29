@@ -1,4 +1,48 @@
-# HANDOFF — through Take 158 · V2
+# HANDOFF — through Take 159 · V2
+
+## Take 159 — 2026-08-29 — imagery gets smaller, and WebP loses (A158)
+
+A158 asked for a WebP measurement and got one. The answer is no, and the
+reason is the interesting part.
+
+Measured over a stratified sample of the shipped tiles (SSIM against the
+tiles themselves, since they ARE the source):
+
+    base z11+z12, 165.7 MB, always viewed overzoomed
+      jpeg q85 4:2:0   31.7% smaller   SSIM 0.9913
+      jpeg q78 4:2:0   39.5% smaller   SSIM 0.9808
+      webp q85         45.2% smaller   SSIM 0.9769
+    patches z14+z15, viewed at native sharpness
+      jpeg q85 4:4:4    2.9% smaller   SSIM 1.0000  <- the tell
+
+That last line identifies the source: USGS serves JPEG q85 with NO chroma
+subsampling, which is why re-encoding at exactly those settings
+reproduces it perfectly. So the win was never a new codec — it was the
+chroma nobody had halved. q85 4:2:0 keeps the luminance the eye actually
+reads and throws away half the colour resolution, which on aerial imagery
+is invisible.
+
+WebP REJECTED: at matched fidelity it bought about six points more, not
+the 30% its reputation promises, because it re-encodes an existing JPEG
+into a different transform and fights the artifacts already there. Six
+points does not pay for a new format across the resolver, the saved-HD
+store, the manifest and the gate.
+
+Cannot compound: img_cache holds pristine bytes and every write starts
+from those. And shrink() returns the ORIGINAL whenever its output is not
+actually smaller, so a tile can never grow.
+
+Measured on disk after the rewrite: 183.0 MB -> 127.2 MB, a 55.8 MB cut
+(30.5%) on the largest thing in the app; the manifest carries the honest
+new figure (133,391,356 bytes). Expected APK around 185 MB, from 240.
+
+SEAL: render 212/0 on the smaller tiles, smoke green, gate PASSED. The
+gate refused once first and was right — BUILD said 159 while the ledgers
+still said 158. One cycle was also lost to landmine 207: a gate launched
+near a turn boundary died with an empty log, which is exactly the failure
+mode that landmine describes. apex-seed-t159.zip sealed (sha256 in chat).
+
+---
 
 ## Take 158 — 2026-08-29 — the raw tokens stop existing (A172)
 
