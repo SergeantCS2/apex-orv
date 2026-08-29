@@ -382,12 +382,19 @@ if (zoomed.trails === 0) {
     for (const k of ["ride", "outdoors", "water"]) {
       M.apply(k, { silent: true }); await sleep(350);
       let poiF = null; try { poiF = JSON.stringify(m.getFilter("poi-dot-major")); } catch (e) { }
+      const kinds = ((M.MODES || []).find((x) => x.k === k) || {}).kinds || [];
       out[k] = { chip: document.querySelector("#c-mode span").textContent,
                  trail50: vis("trail50"), show: vis("show-line"), foot: vis("foot"),
                  showF: (() => { try { return JSON.stringify(m.getFilter("show-line")); } catch (e) { return null; } })(),
                  peaks: vis("peak-dot"), paddle: vis("pad-line"), areas: vis("area-fill"),
                  basemap: document.querySelector("#c-base span").textContent,
-                 launchIn: /"launch"/.test(poiF || ""), fuelIn: /"fuel"/.test(poiF || "") };
+                 /* take 154: this used to grep the serialized poi-dot-major
+                    FILTER for the word. That filter now also carries the
+                    clusterable-kinds list (the double-draw guard), so the
+                    text probe went ambiguous. The mode's own kinds list is
+                    the authoritative answer and always was. */
+                 launchIn: (kinds.indexOf("launch") >= 0),
+                 fuelIn: (kinds.indexOf("fuel") >= 0) };
     }
     M.apply(was, { silent: true }); await sleep(200);
     return out;
@@ -929,6 +936,142 @@ if (zoomed.trails === 0) {
          `the Rifle carries the DNR accesses OSM never had (${rr.named.length} named: ${rr.named.slice(0, 4).join(", ")}…)`);
       ok(rr.riv === "Rifle River" && rr.rank >= 0 && rr.rank <= 4,
          `"rifle river" finds the RIVER, ranked with the best hits (row ${rr.rank + 1})`);
+    }
+    /* Take 154 · A170 pin clusters. The check that matters is the TRAP: a
+       badge must count only what the current mode shows of the clusterable
+       kinds — never the services Jacob excluded, never a hidden kind. */
+    const cl = await page.evaluate(async () => {
+      const m = window.map, M = window.__mode, C = window.__clust,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      if (!C || !M) return { missing: true };
+      const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+      const MODES = M.MODES || [];
+      const modeOf = (k) => MODES.find((x) => x.k === k);
+      M.apply("water", { silent: true }); await s(300);
+      const water = C.count();
+      const waterKinds = new Set(C.feats(modeOf("water")).map((f) => f.properties.k));
+      M.apply("ride", { silent: true }); await s(300);
+      const ride = C.count();
+      // draw a real cluster: sit over the launch-dense southeast at low zoom
+      M.apply("water", { silent: true }); await s(300);
+      m.jumpTo({ center: [-83.5, 42.6], zoom: 8.4 });
+      let clusters = 0, biggest = 0, kinds = new Set(), sample = null;
+      C.recluster();
+      for (let i = 0; i < 22; i++) { await s(320);
+        try {
+          const f = m.queryRenderedFeatures({ layers: ["poi-cluster"] });
+          clusters = f.length;
+          f.forEach((x) => { kinds.add(x.properties.k);
+            if (+x.properties.n > biggest) {
+              biggest = +x.properties.n; sample = x.properties.k; } });
+        } catch (e) { }
+        if (clusters) break; }
+      // take 155 · Jacob asked plainly: "when fully zoomed out I should see
+      // the pin clusters, will I?" The map's own floor is minZoom 5.2, and
+      // the z8.4 pass above does not answer for it. This does.
+      m.jumpTo({ center: [-85.5, 44.8], zoom: 5.2 });
+      C.recluster();
+      let wide = 0, wideBig = 0, wideKinds = new Set();
+      for (let i = 0; i < 18; i++) { await s(320);
+        try { const f = m.queryRenderedFeatures({ layers: ["poi-cluster"] });
+          wide = f.length;
+          f.forEach((x) => { wideKinds.add(x.properties.k);
+            if (+x.properties.n > wideBig) wideBig = +x.properties.n; });
+        } catch (e) { }
+        if (wide) break; }
+      // above the ceiling, clusters are gone and the plain pins are back
+      m.jumpTo({ center: [-83.5, 42.6], zoom: 12.6 }); 
+      let above = -1, pins = 0;
+      for (let i = 0; i < 16; i++) { await s(320);
+        try {
+          above = m.queryRenderedFeatures({ layers: ["poi-cluster"] }).length;
+          pins = m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major", "poi-clust-one"] }).length;
+        } catch (e) { }
+        if (pins) break; }
+      M.apply(was, { silent: true });
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+      return { water, ride, waterKinds: [...waterKinds], clusters,
+               badgeKinds: [...kinds], biggest, sample, above, pins,
+               wide, wideBig, wideKinds: [...wideKinds],
+               maxz: C.maxz, kinds: C.kinds, radius: C.radius,
+               minz: m.getMinZoom() };
+    });
+    if (cl.missing) ok(false, "cluster hooks missing");
+    else {
+      ok(cl.kinds.length > 0 && !cl.kinds.some((k) => ["fuel", "food", "store"].includes(k)),
+         `services never cluster (${cl.kinds.length} clusterable kinds, no fuel/food/store)`);
+      ok(cl.water !== cl.ride && cl.water > 0 && cl.ride > 0,
+         `the clustered source follows the mode — the count cannot include hidden pins (Water ${cl.water}, Off-road ${cl.ride})`);
+      ok(!cl.waterKinds.some((k) => ["fuel", "food", "store"].includes(k)),
+         `Water's clustered kinds are destinations only (${cl.waterKinds.join(", ")})`);
+      ok(cl.clusters > 0 && cl.biggest > 1,
+         `piles draw as clusters at z8.4 (${cl.clusters} badges, biggest ×${cl.biggest} ${cl.sample})`);
+      ok(cl.badgeKinds.length > 0 && cl.badgeKinds.every((k) => cl.kinds.includes(k)),
+         `every stack is ONE kind and wears its badge — Jacob's "similar pins" rule (${cl.badgeKinds.join(", ")})`);
+      ok(cl.wide > 0 && cl.wideBig > 1,
+         `fully zoomed out (z${cl.minz}, the map's floor) the stacks still draw — ${cl.wide} badges, biggest ×${cl.wideBig}, kinds: ${cl.wideKinds.join(", ")}`);
+      ok(cl.above === 0 && cl.pins > 0,
+         `above z${cl.maxz} the clusters are gone and the pins are back (${cl.pins} drawn)`);
+    }
+  }
+
+  /* Take 156 · A171 · the boot splash. Two things matter and they pull in
+     opposite directions: it must cover the ugly boot, and it must GET OUT
+     OF THE WAY. By the time every check above has run the map is long
+     since idle, so a splash still present here would be a trap. */
+  {
+    const sp = await page.evaluate(() => {
+      const S = window.__splash;
+      const el = document.getElementById("splash");
+      const idx = document.documentElement.innerHTML;
+      return { hook: !!S, pct: S ? S.pct() : -1, gone: S ? S.gone() : false,
+               stillInDom: !!el,
+               logoInlined: /id="splash"[\s\S]{0,400}data:image\/png;base64/.test(idx) ||
+                            !!document.querySelector("#splash img[src^='data:image']"),
+               tokensInShell: (document.body.innerText.match(/__IC_/g) || []).length };
+    });
+    ok(sp.hook, "the splash controller is wired to the boot");
+    ok(sp.pct === 100, `progress reaches 100% on a real boot (${sp.pct}%)`);
+    ok(sp.gone && !sp.stillInDom,
+       "and the splash lifts itself — it covers the boot, it does not trap the rider");
+    ok(sp.tokensInShell === 0,
+       `no raw __IC_ tokens are on screen once loaded (${sp.tokensInShell})`);
+  }
+
+  /* Take 157 · A173 · the basemap busy line. The failure worth catching is
+     a STUCK indicator: one that arms on a switch and never disarms says
+     "still loading" forever, which is worse than no indicator at all. */
+  {
+    const bz = await page.evaluate(async () => {
+      const B = window.__busy, m = window.map,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      if (!B) return { missing: true };
+      const el = document.getElementById("busy");
+      B.begin();
+      const armedNow = B.armed();
+      // let the map settle exactly as it would after a real switch
+      for (let i = 0; i < 24; i++) { await s(300); if (!B.armed()) break; }
+      await s(300);
+      return { el: !!el, armedNow, armedAfter: B.armed(),
+               classAfter: el ? el.className : null,
+               blocksTaps: el ? getComputedStyle(el).pointerEvents : null };
+    });
+    if (bz.missing) ok(false, "the basemap busy hook is missing");
+    else {
+      /* "ships hidden" is a property of the MARKUP, not of the live page —
+         by the time this drill runs, earlier drills have cycled the basemap
+         several times, so reading the class here measured history, not the
+         shipped state (my first version failed for exactly that reason). */
+      let shipped = "";
+      try { shipped = readFileSync("www/index.html", "utf8"); } catch (e) { }
+      const m0 = /<div id="busy"[^>]*>/.exec(shipped);
+      ok(bz.el && !!m0 && !/class=/.test(m0[0]),
+         `the busy line ships hidden, not showing (${m0 ? m0[0] : "absent"})`);
+      ok(bz.armedNow === true, "a basemap change arms it");
+      ok(bz.armedAfter === false && bz.classAfter === "",
+         "and the map settling disarms it — it cannot stick on");
+      ok(bz.blocksTaps === "none",
+         "it never eats a tap while it shows (pointer-events: none)");
     }
   }
 

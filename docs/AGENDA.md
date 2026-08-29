@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 153.* Ranked by blocking-ness, not by interest.
+*Current as of take 157.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2718,7 +2718,7 @@ search rows; a river hit fits the river.
   IN_BUNDLE, the split loader) — each caught by a drill, each now carries
   gauges.
 
-## A170 — Pin stacking in dense areas · DESIGN NEXT (Jacob's ×N idea)
+## A170 — Pin stacking in dense areas · SHIPPED take 154
 Hess Lake (24571): five real launches + a marina overlap; the two
 prominence tiers draw over each other and read as "a small pin inside a
 big one". They ARE distinct places. Candidate: same-kind stack badge — a
@@ -2731,4 +2731,96 @@ per-mode filters, so the honest version is per-kind and zoom-aware.
   separate them.
 - **Ruled out:** letting it be — Jacob flagged it, and a pin hiding
   another pin is a map lying by occlusion.
+
+### A170 design of record (Jacob 24507/24509 — the reference app's
+### numbered clusters at low zoom, plain pins when you zoom in)
+
+Feasible, contained, and the trap is ONE thing: MapLibre clusters at the
+SOURCE, and this app selects pins by LAYER FILTER (`modeFilter` sets
+poi-dot / poi-dot-major). Stock `cluster:true` on the `poi` source would
+therefore count all 25,798 places — including the 17,544 fuel/food/store
+pins Jacob explicitly excludes and every kind the current mode hides. The
+badge would read a number no rider could ever reach. That is the failure
+this project exists to refuse, so:
+
+- **A SECOND source, `poiclust`**, carrying only CLUSTERABLE kinds ∩ the
+  current mode's kinds, its data re-set on every mode switch (the
+  features are already in memory; setData is cheap). The source IS the
+  filter, so the count cannot lie.
+- **Clusterable = destinations only** (8,254 statewide): launch, camp,
+  trailhead, system, mtb, ski, livery, beach, marina, lighthouse,
+  dayuse, view, shelter. **Never** fuel, food, store — Jacob's rule.
+- `clusterProperties` carries per-kind counts, so a HOMOGENEOUS cluster
+  draws its own glyph with ×N (his idea) and a mixed one draws a plain
+  numbered circle (the reference app's behaviour).
+- Clusters live below the zoom where pins already separate; above
+  `clusterMaxZoom` the map is exactly what it is today. The existing poi
+  layers must exclude clusterable kinds below that zoom or both draw.
+- Tap a cluster: zoom to its bounds; at max zoom, list its members.
+- **Ruled out:** clustering the single existing `poi` source — the count
+  would include filtered-out and never-cluster pins (see above).
+- **Ruled out:** one clustered source per kind — 13 sources and 13 badge
+  layers to avoid one `clusterProperties` expression.
+- **Cost:** one take to build (source, badges, mode wiring, tap, drills),
+  likely a second to tune radius and thresholds against a field report.
+  Memory is a non-issue: ~8k points indexed beside a 573k-edge graph.
+
+### Take 154 — shipped
+Same-kind pin stacks below z11.4: one badge, one kind, ×N, tap to open.
+12 clusterable destination kinds (POIKIND d:1); services never stack;
+the pool is the mode's own kinds so a count can only include reachable
+pins. Radius 38 px (Jacob's agreed starting point — it took the biggest
+statewide pile from ×150 to ×65).
+- **Ruled out:** MapLibre/supercluster clustering — it merges by
+  proximity alone and cannot partition by property, so 20 of its first
+  23 piles were MIXED. Jacob's rule is "similar and major pins", so the
+  bucketing is per-kind in JS: bin by kind + grid cell, stack only where
+  2+ of one kind share a cell. Fewer layers than the supercluster
+  version, not more.
+- **Ruled out:** one clustered source per kind — 13 sources, 39 layers.
+- **Ruled out:** clustering `shelter` — POIKIND flags it d:0, i.e. not a
+  destination, and it was never a low-zoom pin before this take.
+- **Ruled out:** letting the badges evict labels. They draw over
+  everything (allow-overlap) but no longer BLOCK (ignore-placement);
+  verified against t153's baseline of exactly 1 label at that camera.
+
+### Take 155 — shipped
+Jacob asked whether stacks appear when FULLY zoomed out; the take-154
+drill only proved z8.4. The harness now asserts at the map's own floor
+(minZoom 5.2). Documentation caught up: A170 marked shipped, landmines
+208 and 209 recorded.
+- **Ruled out:** answering the question from the code rather than from a
+  measurement — the whole project's rule.
+
+## A171 — Boot loading screen · SHIPPED take 156
+Cold start shows raw __IC_ tokens on a tan background until app.js runs
+(Jacob 24582). Static splash painted on first paint, real progress from
+boot milestones, lifts into the guide/permission prompt.
+- **Ruled out:** the 10-second fixed timer Jacob offered as a shortcut —
+  it either wastes a fast phone's time or lifts before a slow one is
+  ready, and a progress bar that does not track progress is an instrument
+  that lies. The milestones are already countable.
+- **Ruled out:** hiding the raw-token problem forever instead of fixing
+  it. The splash covers boot; the tokens being runtime-substituted at all
+  is filed as its own item (A172).
+
+## A172 — Icon tokens are substituted at RUNTIME · OPEN
+__IC_*__ ships literal in index.html and app.js swaps it at boot, which
+is why a cold start reads broken. Build-time substitution would remove
+the failure mode entirely rather than covering it.
+- **Ruled out:** doing it inside take 156 — the splash is the fix Jacob
+  asked for and mixing a build-system change into it would put two risks
+  in one take.
+
+## A173 — Basemap-switch busy line · SHIPPED take 157
+A 3 px red line at the top edge while a basemap change settles; armed on
+switch, hidden on map idle, 200 ms grace so instant switches do not
+flicker, 15 s ceiling so it cannot stick.
+- **Ruled out:** reusing the take-156 splash for basemap changes — it
+  would cover the map the rider just asked to look at.
+- **Ruled out:** a spinner in the basemap chip alone — the chip is
+  already carrying the basemap NAME, and the HD chip owns progress text;
+  two chips counting different things would read as noise.
+- **Ruled out:** blocking taps while it shows. Imagery loading is not a
+  reason to take the map away.
 

@@ -76,6 +76,30 @@ ALLOW = re.compile(r"openstreetmap\.org|maplibre\.org|github\.com/maplibre"
                    r"|waterservices\.usgs\.gov")
 
 
+def check_splash():
+    """take 156 · A171. The splash only works if it is in the STATIC markup,
+    ahead of the app shell, with its logo already inlined — a splash that
+    needs app.js to appear cannot cover app.js loading."""
+    idx = os.path.join(ROOT, "www", "index.html")
+    if not os.path.exists(idx):
+        return notes.append("no www/index.html to scan for the splash")
+    h = read("www", "index.html")
+    if 'id="splash"' not in h:
+        return fails.append("no boot splash in www/index.html (A171)")
+    i, j = h.index('id="splash"'), h.index('id="shell"')
+    if i > j:
+        return fails.append("the splash is not ahead of the app shell — it "
+                            "would paint after the thing it exists to cover")
+    if "__SPLASH_LOGO__" in h or "data:image/png;base64" not in h[i:j]:
+        fails.append("the splash logo is not inlined — a second request "
+                     "races the first paint (A171)")
+    if "__IC_" in h[i:j]:
+        fails.append("the splash markup carries an __IC_ token, the exact "
+                     "thing it exists to hide")
+    else:
+        notes.append("splash: static, ahead of the shell, logo inlined")
+
+
 def check_offline():
     www = os.path.join(ROOT, "www")
     if not os.path.isdir(www):
@@ -1622,7 +1646,7 @@ def check_ledger_order():
     notes.append(f"landmine file order: {len(nums)} entries, strictly ascending")
 
 
-for fn in (check_handoff, check_stamps, check_offline,
+for fn in (check_handoff, check_stamps, check_offline, check_splash,
            check_style, check_palette, check_machine_legality,
            check_ledgers, check_osm_fallback, check_drawn,
            check_region_clean, check_no_duplicate_defs, check_ledger_order,

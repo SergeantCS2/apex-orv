@@ -1,4 +1,159 @@
-# HANDOFF — through Take 153 · V2
+# HANDOFF — through Take 157 · V2
+
+## Take 157 — 2026-08-29 — the basemap busy line (A173)
+
+The other half of Jacob's ask: "when the map changes to relief / auto
+hides after it fully loads." Switching to Satellite or Hybrid pulls
+imagery that may be a saved HD store, a bundled tile, or nothing at all,
+and until it lands the map looks half-drawn with no explanation.
+
+Deliberately NOT the take-156 splash. A full-screen cover on every
+basemap tap would hide the very thing the rider just asked to see. This
+is a 3 px red line across the top — the same red as the splash bar, so
+"red bar = something is loading" means one thing in this app — shown only
+if the tiles have not settled within 200 ms (an instant switch must not
+flicker), and hidden the moment the map goes idle. Ceiling of 15 s so it
+can never stick, and it is pointer-transparent so it never eats a tap.
+
+The gate caught what a single smoke run did not: all four smoke modes
+died with `ReferenceError: clearTimeout is not defined`. The sandbox
+modelled setTimeout, setInterval and clearInterval — but never
+clearTimeout, because until now no app code had cancelled a timer. The
+fix went in the HARNESS, not the app: a browser has clearTimeout, so the
+stub must model it, and bending the product to fit a gap in its own test
+rig is how a test rig starts lying. Ids are stable counters because
+flushTimeouts SPLICES the queue and index-based ids would go stale
+mid-flush.
+
+SEAL: render 210/0 (206 + four busy-line checks), smoke 5 modes, gate
+PASSED. A drill of mine failed honestly first — it read the live element
+to assert "ships hidden", but by the time it runs earlier drills have
+cycled the basemap, so it was measuring history; "ships hidden" is a
+property of the MARKUP and is read from www/index.html now.
+apex-seed-t157.zip sealed (sha256 in chat).
+
+---
+
+## Take 156 — 2026-08-29 — the loading screen (A171)
+
+Jacob's screenshot 24582 is the diagnosis: on a cold start the shipped
+index.html paints its chrome with the icon TOKENS still raw —
+__IC_map__, __IC_layers__, __IC_vehicle__ — on the bare tan map
+background, because those tokens are substituted by app.js at RUNTIME and
+app.js is still parsing a 46 MB graph. It fixes itself; it looks broken
+until it does.
+
+Design of record (Jacob's spec, built as specified):
+- A splash in index.html's STATIC markup, first child of body, styled by
+  the inline stylesheet already in <head> — so it paints on the browser's
+  FIRST paint, before app.js is even parsed. It carries no __IC_ token by
+  construction.
+- Logo background #323232 and the red #E2182A, both read from
+  logo-master.png rather than guessed. The bar spans the APEX wordmark
+  exactly: the letters run 12.6% to 89.0% of the artwork's width
+  (measured), so the bar is 76.37% wide, offset 12.6% — A to X, as asked.
+- REAL progress, not a 10-second lie. The boot already has countable
+  milestones: every bundle artifact the loader fetches, the style, and
+  the first idle frame. Jacob offered the fake timer as a simplification;
+  it is rejected on the project's own terms — a bar that says 60% while
+  the phone is done, or 100% while it is not, is a lying instrument, and
+  this app does not ship those.
+- The splash lifts on the FIRST of: first idle after style load; map
+  load plus a beat; a hard 20 s ceiling. A rider is never trapped behind
+  it, and a fatal load error lifts it immediately so the error is the
+  thing on screen.
+
+Basemap-switch busy state (Jacob also asked) is take 157 — a lighter
+indicator, not this full-screen splash.
+
+The bug worth keeping: the app body runs INSIDE start(), so the no-op
+fallback written as `var SPLASH` hoisted a LOCAL binding and shadowed the
+loader's real controller for the whole app body — every lift call hit the
+no-op and the splash sat there forever. Renamed to SPL, which reads the
+outer one. The harness caught it on the first run; a human would have
+caught it on the first cold start, after shipping.
+
+SEAL: render 206/0 (202 + four splash checks), smoke green, gate PASSED —
+including a new gate check that the splash is static, ahead of the shell,
+and its logo inlined, because a splash that needs app.js to appear cannot
+cover app.js loading. The gate also refused the first attempt over stale
+doc stamps: BUILD said 156, the ledgers still said 155.
+apex-seed-t156.zip sealed (sha256 in chat).
+
+---
+
+## Take 155 — 2026-08-29 — the zoom floor, and the paperwork 154 owed
+
+Jacob, reading the take-154 seal: "when fully zoomed out I should see the
+pin clusters, will I?" The honest answer was that I did not know — the
+drill measured z8.4 and the map's floor is minZoom 5.2. It measures the
+floor now, naming the badge count, the biggest stack and the kinds.
+
+Documentation audit of my own take-154 changes, which had gaps:
+- AGENDA still called A170 "DESIGN NEXT" after shipping it. Marked
+  SHIPPED with the four ruled-outs the design actually produced.
+- LANDMINES gained 208 (two renderers starve each other to all-zeros;
+  the naive `ps | grep` guard matches its own command line, so count
+  comm=node instead) and 209 (allow-overlap draws, ignore-placement is
+  what stops a symbol BLOCKING labels).
+- No code changed except the harness. The sealed t154 app is byte-for-
+  byte what ships here plus the take stamp.
+
+SEAL: render 202/0 — the new assertion reads "fully zoomed out (z5.2,
+the map's floor) the stacks still draw — 94 badges, biggest ×65, kinds:
+launch, beach, camp, marina, dayuse, livery". Smoke green, gate PASSED.
+apex-seed-t155.zip sealed (sha256 in chat).
+
+---
+
+## Take 154 — 2026-08-29 — pin clusters at low zoom (A170)
+
+Jacob's reference shots (24507/24509): numbered clusters zoomed out,
+plain pins zoomed in, and his rule — destinations only, never fuel/food/
+store. Built to A170's recorded design.
+
+The architectural trap, named before building: MapLibre clusters at the
+SOURCE and this app selects pins by LAYER FILTER, so cluster:true on the
+existing `poi` source would count all 25,798 places including the 17,544
+Jacob excludes and every kind the mode hides. Instead a SECOND source,
+`poiclust`, carries clusterable kinds INTERSECTED with the mode's kinds,
+re-set on every mode switch — the source is the filter, so the count
+cannot lie. clusterProperties carries per-kind counts so a homogeneous
+cluster draws its own glyph with xN (Jacob's idea) and a mixed one draws
+a plain numbered circle (the reference app's behaviour). Below the
+cluster ceiling the existing layers drop clusterable kinds so nothing
+draws twice; above it the map is exactly what it was.
+
+TUNED (Jacob: "only for similar and major pins"). The first build used
+MapLibre's supercluster and produced 20 MIXED piles of 23 — proximity is
+all supercluster knows, and it cannot partition by property. Rebuilt to
+bucket per KIND in JS: project the mode's destinations, bin by kind +
+grid cell, emit a stack only where 2+ of the SAME kind share a cell.
+Every cluster is one kind by construction, no per-kind sources needed,
+and the layer count went DOWN (the mixed circle and its count layer are
+gone). Radius 38 per Jacob's agreement: the ×150 pile became ×65.
+
+"Major" is the app's own flag, not a fresh opinion: POIKIND marks
+destinations d:1 and that flag already gated the low-zoom layer. shelter
+is d:0, so it left the clusterable list — drawing it at z8 filled the
+state with badges.
+
+Two regressions the harness caught, both mine, both real:
+1. Cluster text used allow-overlap, which draws anyway but still BLOCKS
+   others — the xN labels were evicting town and trail names at low zoom.
+   ignore-placement on the badges fixed it; verified against the t153
+   baseline (1 label at that camera) rather than against zero.
+2. The singleton layer dropped poi-dot-major's prominence tiering, so
+   every destination drew at z8. Tiering restored, plus d:1.
+
+Process note, ugly and worth writing down: three renders were launched
+while an earlier one still ran, and two Chromes on 4 GB starve each other
+to all-zeros. Every "everything failed" log in this take was that, not
+the code. The guard that finally worked counts comm=node — the obvious
+`ps | grep node tools/render` matches its OWN command line (landmine 204,
+hit for the third time this project).
+
+---
 
 ## Take 153 — 2026-08-29 — v2 field report one (Jacob, t152 on the Fold)
 

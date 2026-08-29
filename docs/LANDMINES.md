@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 153.*
+*Current as of take 157.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -2627,3 +2627,25 @@ relaunched. The stage caches and stamps are what make relaunch cheap —
 they turned a dead pipeline into a resume, not a redo. Corollary: never
 narrate a background job as done until its exit line is in the log.
 
+**208. Two renderers on one 4 GB box starve each other to all-zeros.** A
+second `node tools/render.mjs` launched while the first still ran put two
+Chromes on the same memory: both survived, both drew nothing, and the log
+read "trail layers rendered 0 · road layers 0 · label layers 0 · places
+drawn 0 of 25,798" — the signature of a broken app, produced by a healthy
+one. Hit THREE times in take 154 alone, each time costing a fix attempt
+aimed at the wrong thing. Rule: before launching a render, count real
+node processes and refuse if any exist. The obvious guard is itself a
+trap — `ps aux | grep "[n]ode tools/render"` matches the CALLING SHELL's
+own command line (landmine 204's mechanism), so it never reports zero.
+Use `ps -eo comm | awk '$1=="node"' | wc -l`, which cannot match a
+command string.
+
+**209. `allow-overlap` draws a symbol; `ignore-placement` is what stops it
+BLOCKING others.** Take 154's cluster badges used icon/text-allow-overlap
+so they would always draw — and they did, while silently evicting every
+town and trail name at low zoom, because a symbol with allow-overlap
+still occupies collision space unless ignore-placement is also set. The
+render harness's label check caught it; the baseline it was measured
+against (t153 drew exactly 1 label at that camera) is what made "1" a
+pass and "0" a regression rather than both looking like noise. Any new
+symbol layer added above the labels needs this pair considered together.

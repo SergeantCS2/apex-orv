@@ -79,6 +79,7 @@ def parts():
     app = s[s.rindex("<script>") + 8:s.rindex("</script>")]
     for d in DECLS:
         app = app.replace(d, "")
+    head = head.replace("__SPLASH_LOGO__", splash_logo())
     return head, app.strip()
 
 
@@ -92,11 +93,38 @@ LOADER = """/* Boot from the region bundle. PROTOCOL §8: provisioning may use t
 (function(){
 var WATER,GR,TR,SHADE,SAT,SATB,GLYPHS,BUNDLE={state:'unknown',absent:[]};
 
-function j(u){return fetch(u).then(function(r){
-  if(!r.ok)throw new Error(u+' '+r.status);return r.json()})}
-function blob(u){return fetch(u).then(function(r){
+/* take 156 · A171 · the splash's progress is REAL: it counts the artifacts
+   this boot actually fetches, then the style, then the first drawn frame.
+   Jacob offered a fixed 10-second timer as a shortcut; a bar that reads 60%
+   on a finished phone, or 100% on an unfinished one, is an instrument that
+   lies, and the milestones were already countable. Monotonic by
+   construction — it can never tick backwards as more fetches launch. */
+var SPLASH=(function(){
+  var el,fill,say,started=0,done=0,pct=0,lifted=false;
+  function grab(){
+    if(!el)el=document.getElementById('splash');
+    if(!fill)fill=document.getElementById('sp-fill');
+    if(!say)say=document.getElementById('sp-say')}
+  function set(p,msg){grab();
+    p=Math.max(pct,Math.min(100,p));pct=p;
+    if(fill)fill.style.width=p.toFixed(0)+'%';
+    if(msg&&say)say.textContent=msg}
+  function lift(){grab();if(lifted)return;lifted=true;set(100);
+    if(!el)return;el.className='gone';
+    setTimeout(function(){try{el.parentNode.removeChild(el)}catch(e){}},420)}
+  return {start:function(){started++},
+    /* denominator floors at 12 so the very first fetch cannot read 100% */
+    step:function(){done++;set(done/Math.max(started,12)*70,'Loading Michigan')},
+    style:function(){set(86,'Drawing the map')},
+    ready:function(){set(100,'Ready');lift()},
+    lift:lift,pct:function(){return pct},gone:function(){return lifted}}})();
+
+function j(u){SPLASH.start();return fetch(u).then(function(r){
+  if(!r.ok)throw new Error(u+' '+r.status);return r.json()})
+  .then(function(v){SPLASH.step();return v})}
+function blob(u){SPLASH.start();return fetch(u).then(function(r){
   if(!r.ok)throw new Error(u+' '+r.status);return r.blob()})
-  .then(function(b){return URL.createObjectURL(b)})}
+  .then(function(b){SPLASH.step();return URL.createObjectURL(b)})}
 
 function fatal(msg,detail){
   document.body.innerHTML='<div style="padding:26px;font:400 14px/1.6 Barlow,'+
@@ -180,6 +208,38 @@ if(BUNDLE.state==='partial'){
 }
 })();
 """
+
+
+SPLASH_CACHE = {}
+
+
+def splash_logo():
+    """take 156 · the splash logo as a data URI, cropped to the artwork's own
+    bounding box so the progress bar beneath it spans exactly the APEX
+    wordmark. Inlined rather than fetched: a second request would race the
+    first paint, which is the one thing this element exists to win."""
+    if SPLASH_CACHE:
+        return SPLASH_CACHE["d"]
+    import base64, io
+    from PIL import Image
+    src = os.path.join(ROOT, "assets", "logo-master.png")
+    im = Image.open(src).convert("RGB")
+    px = im.load()
+    W, H = im.size
+    xs, ys = [], []
+    for y in range(0, H, 2):
+        for x in range(0, W, 2):
+            r, g, b = px[x, y]
+            if abs(r - 50) + abs(g - 50) + abs(b - 50) > 60:
+                xs.append(x); ys.append(y)
+    im = im.crop((min(xs), min(ys), max(xs) + 1, max(ys) + 1))
+    w, h = im.size
+    im = im.resize((300, round(h * 300 / w)), Image.LANCZOS)
+    buf = io.BytesIO(); im.save(buf, "PNG", optimize=True)
+    d = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    SPLASH_CACHE["d"] = d
+    print(f"  splash logo inlined ({len(d)//1024} KB data URI)")
+    return d
 
 
 def split():

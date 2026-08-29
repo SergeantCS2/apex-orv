@@ -1,21 +1,18 @@
-**Take 153 — your field report, closed out.**
+**Take 157 — you can see when the map is still loading.**
 
-- **HD chip moved to the top right**, level with the elevation readout —
-  where you asked for it, off the left stack it was overlapping.
-- The Save / Stop / Delete buttons **show real icons** instead of
-  __IC_…__ text.
-- **Deleting saved HD mid-download** now stops the download first — no
-  more tiles landing after a delete.
-- The self-test understands your HD saves: the "478 remote requests"
-  failure is gone — user-tapped USGS traffic is counted and named
-  ("in-app · user taps") with the NET badge staying green. Anything
-  unexpected still fails loudly.
-- The routing self-check no longer tries to drive a kayak down a
-  two-track: it borrows a land machine, says so, and puts your boat back.
+Switching to Satellite or Hybrid used to leave the map looking half-drawn
+with no explanation while imagery arrived. Now a thin red line runs across
+the very top while it settles, and disappears the moment it's done.
+
+- Same red as the loading screen's bar, so a red bar always means the same
+  thing: something is still coming.
+- It only appears if the switch actually takes a moment — flipping to a
+  basemap that's already in memory won't flash anything at you.
+- It never covers the map and never eats a tap, and it can't stick: if
+  something stalls it clears itself after 15 seconds.
 
 ### Check on the phone
-1. HD chip top right, next to nothing, overlapping nothing.
-2. HD sheet: real icons on all three buttons.
-3. Run a small HD save, then Delete all — the count stops moving.
-4. Self-test in Water mode: offline-clean passes and names your taps;
-   snap routes as a land machine and says why.
+1. Cycle Map → Satellite → Hybrid somewhere you haven't saved HD: the
+   line appears, then goes as the imagery lands.
+2. Cycle straight back: no flash for the ones already loaded.
+3. You can still pan, tap pins and open cards while it's showing.

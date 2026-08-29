@@ -161,7 +161,7 @@ async function fetchStub(u) {
 
 /* timers under manual control */
 const rafQ = []; let now = 0;
-const timeouts = []; const intervals = new Map(); let iid = 1;
+const timeouts = []; const intervals = new Map(); let iid = 1; let tid = 1;
 /* Respect the delay. Flushing every pending timer regardless fired a 25s
    give-up timer during a four-frame idle loop and released the GPS receiver
    before the test could use it — the harness inventing a failure again. */
@@ -350,7 +350,15 @@ const sandbox = {
   })(),
   performance: { now: () => now },
   requestAnimationFrame: (f) => rafQ.push(f),
-  setTimeout: (f, d) => { timeouts.push({ fn: f, d: d || 0 }); return timeouts.length; },
+  /* take 157 · the sandbox modelled setTimeout but never clearTimeout, so
+     any app code that cancels a timer died with a ReferenceError — the busy
+     line's did. The gap was the harness's, not the app's: a browser has
+     clearTimeout, so the stub must too. Ids are stable because
+     flushTimeouts SPLICES the queue, which would invalidate index-based
+     ones. */
+  setTimeout: (f, d) => { const id = tid++; timeouts.push({ fn: f, d: d || 0, id }); return id; },
+  clearTimeout: (id) => { const i = timeouts.findIndex((t) => t.id === id);
+    if (i >= 0) timeouts.splice(i, 1); },
   setInterval: (f) => { intervals.set(iid, f); return iid++; },
   clearInterval: (id) => intervals.delete(id),
   fetch: fetchStub,

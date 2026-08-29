@@ -8,11 +8,38 @@
 (function(){
 var WATER,GR,TR,SHADE,SAT,SATB,GLYPHS,BUNDLE={state:'unknown',absent:[]};
 
-function j(u){return fetch(u).then(function(r){
-  if(!r.ok)throw new Error(u+' '+r.status);return r.json()})}
-function blob(u){return fetch(u).then(function(r){
+/* take 156 · A171 · the splash's progress is REAL: it counts the artifacts
+   this boot actually fetches, then the style, then the first drawn frame.
+   Jacob offered a fixed 10-second timer as a shortcut; a bar that reads 60%
+   on a finished phone, or 100% on an unfinished one, is an instrument that
+   lies, and the milestones were already countable. Monotonic by
+   construction — it can never tick backwards as more fetches launch. */
+var SPLASH=(function(){
+  var el,fill,say,started=0,done=0,pct=0,lifted=false;
+  function grab(){
+    if(!el)el=document.getElementById('splash');
+    if(!fill)fill=document.getElementById('sp-fill');
+    if(!say)say=document.getElementById('sp-say')}
+  function set(p,msg){grab();
+    p=Math.max(pct,Math.min(100,p));pct=p;
+    if(fill)fill.style.width=p.toFixed(0)+'%';
+    if(msg&&say)say.textContent=msg}
+  function lift(){grab();if(lifted)return;lifted=true;set(100);
+    if(!el)return;el.className='gone';
+    setTimeout(function(){try{el.parentNode.removeChild(el)}catch(e){}},420)}
+  return {start:function(){started++},
+    /* denominator floors at 12 so the very first fetch cannot read 100% */
+    step:function(){done++;set(done/Math.max(started,12)*70,'Loading Michigan')},
+    style:function(){set(86,'Drawing the map')},
+    ready:function(){set(100,'Ready');lift()},
+    lift:lift,pct:function(){return pct},gone:function(){return lifted}}})();
+
+function j(u){SPLASH.start();return fetch(u).then(function(r){
+  if(!r.ok)throw new Error(u+' '+r.status);return r.json()})
+  .then(function(v){SPLASH.step();return v})}
+function blob(u){SPLASH.start();return fetch(u).then(function(r){
   if(!r.ok)throw new Error(u+' '+r.status);return r.blob()})
-  .then(function(b){return URL.createObjectURL(b)})}
+  .then(function(b){SPLASH.step();return URL.createObjectURL(b)})}
 
 function fatal(msg,detail){
   document.body.innerHTML='<div style="padding:26px;font:400 14px/1.6 Barlow,'+
@@ -80,6 +107,15 @@ j('bundle/manifest.json').then(function(man){
 
 function start(){
 var el=function(i){return document.getElementById(i)};
+/* take 156 · the loader defines SPLASH and runs first, but THIS code lives
+   inside start(), so `var SPLASH` here would hoist a LOCAL binding and
+   shadow the real controller for the whole app body — which it did: every
+   lift call went to the no-op and the splash sat there forever. A distinct
+   name reads the outer one, and the no-op only stands in for the
+   single-file build, which has no loader at all. */
+var SPL=(typeof SPLASH!=='undefined'&&SPLASH)?SPLASH:{start:function(){},
+  step:function(){},style:function(){},ready:function(){},lift:function(){},
+  pct:function(){return 100},gone:function(){return true}};
 var remoteHits=0,netB=el('b-net');
 
 function isRemote(r){try{var u=new URL(r,location.href);
@@ -544,6 +580,24 @@ function makeBadges(){
     g.fillStyle='#FFFFFF';g.fill();
     g.lineWidth=1.8;g.strokeStyle='#1C1A16';g.stroke();
     try{map.addImage('mi-diamond',g.getImageData(0,0,30*S2,30*S2),{pixelRatio:S2})}catch(e){}}}
+/* take 154 · A170. DESTINATIONS cluster; services never do — Jacob's rule
+   from the reference app (24507): "Gas stations and food & others
+   shouldn't be included". 8,254 of 25,798 places are clusterable. */
+var CLUSTERKINDS=['launch','camp','trailhead','system','mtb','ski','livery',
+  'beach','marina','lighthouse','dayuse','view'];
+/* "Major" is not a fresh opinion: POIKIND already flags destinations d:1,
+   and that flag is what gated the low-zoom layer before this take. shelter
+   is d:0 and was dropped from the list above for exactly that reason —
+   drawing it at z8 filled the state with badges and cost every town label
+   its collision (the harness's label check caught it twice). */
+var CLUSTER_MAXZ=11.4;   /* above this, pins are exactly what they were */
+var CLUSTER_R=38;   /* px: how close two of the SAME kind must sit to stack */
+/* Jacob, twice: "only for similar and major pins" — a lot of beaches, or a
+   lot of launches, in one spot. supercluster merges by PROXIMITY ALONE and
+   cannot partition by property, so its piles came out mixed (20 of 23 in
+   the first build). Bucketing here instead makes every cluster one kind by
+   construction, needs no per-kind source, and costs one pass over the
+   mode's own destinations on moveend. */
 var poif=((POIS&&POIS.p)||[]).map(function(r,i){
   var k=POIKIND[r.k]||{c:'#4A443B',h:r.k,r:7};
   return {type:'Feature',
@@ -1375,6 +1429,15 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     wlbl:{type:'geojson',data:{type:'FeatureCollection',features:wlab}},
     refs:{type:'geojson',data:{type:'FeatureCollection',features:refstrokes}},
     poi:{type:'geojson',data:{type:'FeatureCollection',features:poif}},
+    /* take 154 · A170: clustering is a SOURCE property and mode selection is
+       a LAYER filter, so a clustered `poi` would count pins the mode hides
+       and the 17,544 services Jacob excludes. This source carries only what
+       the current mode actually shows of the clusterable kinds — its data is
+       re-set on every mode switch (clusterData below), so the number on the
+       badge is a number a rider can reach. clusterProperties keeps the
+       composition: kn = how many of the dominant kind, so a homogeneous
+       pile can wear its own glyph and an honest xN. */
+    poiclust:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     cont:{type:'geojson',data:{type:'FeatureCollection',features:contf}},
     wpts:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     peaks:{type:'geojson',data:{type:'FeatureCollection',features:peakf}},
@@ -1719,6 +1782,48 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     /* Only the INDEX contour carries a number. Labelling every 40 ft line puts
        sixteen numbers on one hillside; labelling every 200 ft is what a paper
        quad does and is readable. */
+    /* take 154 · a HOMOGENEOUS cluster wears its kind's badge with xN;
+       a mixed one is a plain numbered circle, which is what the reference
+       app does and what a mixed pile honestly is. */
+    {id:'poi-cluster',type:'symbol',source:'poiclust',maxzoom:CLUSTER_MAXZ,
+      filter:['>',['get','n'],1],
+      layout:{'icon-image':['concat','bdg-',['get','k']],
+        'icon-size':['interpolate',['linear'],['zoom'],6,0.62,11.4,1.02],
+        'icon-allow-overlap':true,'icon-padding':2,
+        /* take 154 · allow-overlap makes a label draw anyway; it does NOT
+           stop it BLOCKING others. Without ignore-placement the always-on
+           xN text evicted every town and trail name at low zoom — caught by
+           the render harness's label check, which is what it is for. */
+        'icon-ignore-placement':true,
+        'text-field':['concat','\u00d7',['to-string',['get','n']]],
+        'text-font':['APEX'],'text-size':11,'text-offset':[0,1.25],
+        'text-anchor':'top','text-allow-overlap':true,
+        'text-ignore-placement':true},
+      paint:{'text-color':'#1C1A16','text-halo-color':'#FFFFFF',
+        'text-halo-width':2}},
+    /* A destination with no neighbour is not a cluster — supercluster emits
+       it as a plain point. Below the ceiling poiclust OWNS the clusterable
+       kinds, so the lone ones need their own badge or they vanish. */
+    {id:'poi-clust-one',type:'symbol',source:'poiclust',maxzoom:CLUSTER_MAXZ,
+      /* take 154 · poi-dot-major gated low zoom by prominence; a lone
+         destination here must be gated the SAME way or the state fills with
+         badges and the town names lose every collision. */
+      filter:['all',['==',['get','n'],1],['==',['get','d'],1],
+        ['step',['zoom'],['<=',['get','pri'],0],
+          10.5,['<=',['get','pri'],1], 11.4,true]],
+      layout:{'icon-image':['concat','bdg-',['get','k']],
+        'icon-size':['interpolate',['linear'],['zoom'],9.2,0.60,11.4,1.04],
+        'icon-allow-overlap':true,'icon-padding':2,
+        /* take 154 · below the ceiling these badges draw over everything
+           anyway; letting them also EVICT town and trail names costs the
+           map its orientation. Non-blocking, like the stack badges. */
+        'icon-ignore-placement':true,
+        'text-field':['step',['zoom'],'',11,['get','n_']],
+        'text-font':['APEX'],'text-size':11,'text-max-width':9,
+        'text-offset':[0,1.5],'text-anchor':'top','text-padding':3,
+        'text-optional':true,'symbol-sort-key':['get','r']},
+      paint:{'text-color':['get','c'],'text-halo-color':'#FFFFFF',
+        'text-halo-width':1.9}},
     {id:'cont-label',type:'symbol',source:'cont',minzoom:13.2,
       layout:{visibility:'none','symbol-placement':'line',
         'text-field':['get','lb'],'text-font':['APEX'],
@@ -3153,11 +3258,76 @@ function modeOf(k){return MODES.filter(function(m){return m.k===k})[0]||MODES[0]
      kinds  — whitelist for the mode
      boost  — kinds that ARE the mode (Water's launches): pass at every zoom
      demote — kinds that are noise for the mode (Ride's stores): wait for z13 */
+/* take 154 · A170 */
+function clusterFeatures(m){
+  var ks=(m&&m.kinds)||[];
+  return poif.filter(function(f){
+    return CLUSTERKINDS.indexOf(f.properties.k)>=0&&ks.indexOf(f.properties.k)>=0})}
+var CLUSTN=0;   /* what the clustered source currently holds — a clustered
+                   GeoJSONSource does not hand its data back, so the writer
+                   records it (the harness reads this, not source internals) */
+function clusterData(m){
+  CLUSTPOOL=clusterFeatures(m);CLUSTN=CLUSTPOOL.length;recluster()}
+/* One pass over the mode's destinations: project to screen, bucket by
+   KIND + grid cell, and emit a stack only where two or more of the SAME
+   kind land in one cell. Everything else stays the pin it always was.
+   Runs on moveend, never during a gesture, and not at all above the
+   ceiling — where the map is exactly what it was before take 154. */
+var CLUSTPOOL=[],CLUSTLAST='';
+function recluster(){
+  var src;try{src=map.getSource('poiclust')}catch(e){return}
+  if(!src)return;
+  var z=map.getZoom();
+  if(z>=CLUSTER_MAXZ){
+    if(CLUSTLAST!=='off'){CLUSTLAST='off';
+      src.setData({type:'FeatureCollection',features:[]})}
+    return}
+  var cell=CLUSTER_R*2,bins={},out=[];
+  for(var i=0;i<CLUSTPOOL.length;i++){
+    var f=CLUSTPOOL[i],pt;
+    try{pt=map.project(f.geometry.coordinates)}catch(e){continue}
+    var key=f.properties.k+'|'+Math.floor(pt.x/cell)+'|'+Math.floor(pt.y/cell);
+    (bins[key]||(bins[key]=[])).push(f)}
+  for(var key2 in bins){
+    var g=bins[key2];
+    if(g.length===1){var o=g[0];
+      out.push({type:'Feature',properties:{n:1,k:o.properties.k,c:o.properties.c,
+        r:o.properties.r,n_:o.properties.n,named:o.properties.named,
+        i:o.properties.i,pri:o.properties.pri,d:o.properties.d},
+        geometry:o.geometry});continue}
+    var sx=0,sy=0;
+    for(var j=0;j<g.length;j++){sx+=g[j].geometry.coordinates[0];
+      sy+=g[j].geometry.coordinates[1]}
+    out.push({type:'Feature',
+      properties:{n:g.length,k:g[0].properties.k,h:g[0].properties.h,
+        c:g[0].properties.c,r:g[0].properties.r},
+      geometry:{type:'Point',coordinates:[sx/g.length,sy/g.length]}})}
+  var stamp=z.toFixed(2)+'|'+out.length;
+  if(stamp===CLUSTLAST)return;
+  CLUSTLAST=stamp;
+  src.setData({type:'FeatureCollection',features:out})}
+/* Tapping a pile opens it: zoom to where supercluster splits it, or at the
+   ceiling just show what is in there rather than zooming forever. */
+function clusterTap(f){
+  var p=f.geometry.coordinates,n=f.properties.n,k=f.properties.k;
+  var lbl=(POIKIND[k]||{}).h||k;
+  logAct('tap  cluster '+n+' '+k);
+  show('<b>'+n+' '+lbl.toLowerCase()+(n>1?'s':'')+' here</b>'+
+    '<div class="sub">They are all the same kind, which is why they stack. '+
+    'Zooming in splits them apart.</div>','');
+  map.easeTo({center:p,zoom:Math.min(CLUSTER_MAXZ+0.6,map.getZoom()+1.8),
+    duration:700})}
+
 function modeFilter(base,m,id){
   var inK=['in',['get','k'],['literal',m.kinds]];
   var wrap=function(br){
     var f=['all',inK,(m.boost&&id==='poi-dot-major')
       ?['any',['in',['get','k'],['literal',m.boost]],br]:br];
+    /* take 154 · below the cluster ceiling poiclust owns the clusterable
+       kinds; without this both sources draw them and every destination
+       doubles. */
+    if(id==='poi-dot-major')f.push(['step',['zoom'],
+      ['!',['in',['get','k'],['literal',CLUSTERKINDS]]],CLUSTER_MAXZ,true]);
     return f};
   if(Array.isArray(base)&&base[0]==='step'){
     var out=['step',base[1],wrap(base[2])];
@@ -3198,6 +3368,10 @@ function applyMode(k,opts){
     setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''));
     applyMachine();
   }catch(e){}
+  /* take 154 · A170: re-cut the clustered source to THIS mode's clusterable
+     kinds. The count on a badge is therefore a count of pins the rider can
+     actually reach in the mode they are in. */
+  clusterData(m);
   /* layer groups */
   LYRGROUPS.forEach(function(g){if(g.k in m.groups)lyrSet(g,m.groups[g.k])});
   /* summits from further out where the mode is about the land (onX 24276
@@ -3224,6 +3398,7 @@ function setBasemap(i){
     return}
   bmi=i%BASEMAPS.length;
   var m=BASEMAPS[bmi],sat=(m!=='Map');
+  BUSY.begin();
   map.setLayoutProperty('sat','visibility',sat?'visible':'none');
   try{map.setLayoutProperty('sat-patch','visibility',sat?'visible':'none');
       map.setLayoutProperty('sat-base','visibility',sat?'visible':'none')}catch(e){}
@@ -4130,6 +4305,34 @@ function drawCoverage(){
       cp.push({type:'Feature',properties:{n:co.n},geometry:{type:'Point',coordinates:[sx/big.length,sy/big.length]}})}});
   try{map.getSource('county').setData({type:'FeatureCollection',features:cl});
       map.getSource('countylbl').setData({type:'FeatureCollection',features:cp})}catch(e){}}
+/* take 156 · A171 · the splash comes off when the map is genuinely usable:
+   the first IDLE frame after the style is in. Two backstops so a rider is
+   never trapped behind it — a beat after load, and a hard ceiling. A fatal
+   load error needs no handler here: fatal() replaces document.body, which
+   takes the splash with it. */
+/* take 157 · A173 · armed by a basemap change, disarmed by the map going
+   idle. The 200 ms grace is the difference between an honest indicator and
+   a flicker: a switch to a basemap already in memory settles faster than
+   the eye, and flashing a loading bar at it would be noise pretending to
+   be information. */
+var BUSY=(function(){
+  var el,armed=false,timer=null,ceil=null;
+  function grab(){if(!el)el=document.getElementById('busy');return el}
+  function hide(){armed=false;clearTimeout(timer);clearTimeout(ceil);
+    if(grab())el.className=''}
+  function show(){if(grab())el.className='on'}
+  return {begin:function(){
+      clearTimeout(timer);clearTimeout(ceil);armed=true;
+      timer=setTimeout(function(){if(armed)show()},200);
+      ceil=setTimeout(function(){hide()},15000);
+      try{map.once('idle',function(){if(armed)setTimeout(hide,120)})}catch(e){hide()}},
+    hide:hide,
+    on:function(){return !!(grab()&&el.className==='on')},
+    armed:function(){return armed}}})();
+map.on('load',function(){SPL.style();
+  setTimeout(function(){SPL.lift()},2600)});
+map.on('idle',function(){SPL.ready()});
+setTimeout(function(){SPL.lift()},20000);
 map.on('load',drawCoverage);
 /* The map must reflect the current machine from the first frame, not only after
    someone taps the chip — a rider who never touches it is exactly the one who
@@ -4445,6 +4648,11 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       window.__gauge=GAUGE;
       window.__gauges=(typeof GAUGES!=='undefined')?GAUGES:null;
       window.__search=function(q){return search(q)};
+      window.__splash=SPL;window.__busy=BUSY;
+      window.__clust={kinds:CLUSTERKINDS,maxz:CLUSTER_MAXZ,
+        feats:function(m){return clusterFeatures(m)},
+        count:function(){return CLUSTN},radius:CLUSTER_R,
+        recluster:function(){CLUSTLAST='';recluster()}};
     }catch(e){}
     /* the layout matrix must be able to put the HUD on screen at four device
        sizes; measuring it hidden would measure nothing (landmine 85) */
@@ -5256,6 +5464,8 @@ map.on('load',collapseAttrib);map.on('idle',collapseAttrib);
 map.on('idle',function(){if(!healthOK)renderHealth()});
 map.on('move',refreshReadout);map.on('load',refreshReadout);
 map.on('moveend',railFoldIfAway);
+/* take 154 · re-bucket after the map settles, never during a gesture */
+map.on('moveend',recluster);
 ['dragstart','zoomstart','rotatestart'].forEach(function(ev){
   map.on(ev,function(e){if(e&&e.originalEvent)_userDrove=true})});
 map.on('load',function(){makeBadges();setBasemap(0);wpDraw();showTab('map');
@@ -5329,6 +5539,13 @@ var HIT=['route72','trail50','moto24','mccct','fstrail','fsroad','closed','fsclo
 var HIT_SHOW=['show-line'];
 map.on('click',function(e){
   if(lp.fired){lp.fired=false;return}   /* the long press already acted */
+  /* take 154 · a cluster is checked FIRST: it is drawn over everything at
+     that zoom, so a tap that lands on one meant it. */
+  try{var cf=map.queryRenderedFeatures(
+      [[e.point.x-14,e.point.y-14],[e.point.x+14,e.point.y+14]],
+      {layers:['poi-cluster']});
+    if(cf.length&&+cf[0].properties.n>1)
+      return clusterTap(cf[0])}catch(_e){}
   if(arm){var ll=[e.lngLat.lng,e.lngLat.lat];
     if(arm==='home'){HOME=ll;homeSave();homeMark()}else{ME=ll;mM.setLngLat(ll);syncSafety()}
     arm=null;syncArm();clearRoute();
