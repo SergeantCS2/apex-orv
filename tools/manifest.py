@@ -176,6 +176,17 @@ SOURCES = [
         "phase": "build",
         "refresh": "on version bump",
     },
+    {
+        "host": "github.com",
+        "name": "bundletool (google/bundletool releases)",
+        "what": "Google's app-bundle tool: validates the Play AAB and derives "
+                "the universal APK android_check audits. Pinned by version and "
+                "sha256 in ci/apk.sh; runs on the CI runner only (take 154).",
+        "licence": "Apache 2.0",
+        "tool": "ci/apk.sh",
+        "phase": "build",
+        "refresh": "on version bump (BT_VER in ci/apk.sh)",
+    },
 ]
 
 # measured, not estimated — see imagery.py and the take 10 handoff

@@ -324,6 +324,12 @@ def check_ledgers():
 
     h = read("docs", "HANDOFF.md") or ""
     takes = [int(x) for x in re.findall(r"^## Take (\d+) ", h, re.M)]
+    # A batch sealed as one carries a range heading ("## Takes 151-152 -").
+    # check_handoff already honoured it; this check did not, so the first take
+    # after a batch reported the batch's own takes as gaps.
+    cur = take() or 0
+    for a, b in re.findall(r"^## Takes (\d+)\s*[-\u2013]\s*(\d+)", h, re.M):
+        takes.extend(n for n in range(int(a), min(int(b), cur) + 1) if n not in takes)
     if not takes:
         return fails.append("HANDOFF.md has no take entries")
     d = dups(takes)
@@ -1646,6 +1652,84 @@ def check_ledger_order():
     notes.append(f"landmine file order: {len(nums)} entries, strictly ascending")
 
 
+
+# ── Play hardening (play kit) ──────────────────────────────────────────
+# The artifact check lives in tools/android_check.py and runs in the apk job,
+# where a built APK exists. This check makes sure it is WIRED — the check
+# that is not called is the check that skipped (landmine 53) — and that the
+# source-side patches android.py promises are still in the file. When a built
+# APK is on disk (local proof builds), it runs the artifact check too.
+def check_play():
+    import subprocess, shutil
+    sh = read("ci", "apk.sh") or ""
+    if "tools/android_check.py" not in sh:
+        fails.append("ci/apk.sh does not run tools/android_check.py — the Play "
+                     "hardening check is not wired (play kit)")
+    a = read("tools", "android.py") or ""
+    for need in ("webContentsDebuggingEnabled\": false", "usesCleartextTraffic=\"false\"",
+                 "versionCode {t}", "TARGET_SDK = 36", "MIN_SDK = 26"):
+        if need not in a:
+            fails.append(f"tools/android.py lost the Play patch: {need}")
+    pkg = read("package.json") or ""
+    if '"@capacitor/android": "^8' not in pkg:
+        fails.append("package.json is not on @capacitor/android ^8 — targetSdk 36 "
+                     "is tied to the Capacitor major (A170)")
+    cfg = read("capacitor.config.json") or ""
+    if '"webContentsDebuggingEnabled": false' not in cfg:
+        fails.append("capacitor.config.json lacks explicit webContentsDebuggingEnabled:false")
+    wf = read("ci", "build.yml") or ""
+    m = re.search(r"node-version:\s*'?(\d+)", wf)
+    if not m or int(m.group(1)) < 22:
+        fails.append("ci/build.yml apk job pins Node < 22 — Capacitor 8 refuses it "
+                     "(play kit). The workflow is hand-pasted: re-paste it.")
+    for sec in ("PLAY_UPLOAD_KEYSTORE_B64", "PLAY_UPLOAD_STORE_PASS",
+                "PLAY_UPLOAD_KEY_ALIAS", "PLAY_UPLOAD_KEY_PASS"):
+        if f"{sec}: ${{{{ secrets.{sec} }}}}" not in wf:
+            fails.append(f"ci/build.yml does not pass secrets.{sec} to ci/apk.sh (play kit)")
+    if "steps.pkg.outputs.aab" not in wf:
+        fails.append("ci/build.yml never publishes the AAB (play kit)")
+    if re.search(r"-----BEGIN|PLAY_UPLOAD_KEYSTORE_B64\s*[:=]\s*['\"]?[A-Za-z0-9+/]{40}", sh):
+        fails.append("ci/apk.sh appears to CONTAIN key material — credentials never live in the tree")
+    bs = read("ci", "bundle.sh") or ""
+    if "tools/play_assets.py" not in bs:
+        fails.append("ci/bundle.sh does not generate the privacy page — Pages "
+                     "publishes the bundle job's www/, so the policy URL Play "
+                     "requires would 404 (play kit)")
+    app = read("www", "app.js") or ""
+    if "timeout:12000},function(pos,err)" in app:
+        fails.append("www/app.js watchPosition still carries timeout:12000 — under "
+                     "Capacitor 8 that errors a slow first fix (play kit)")
+    r = subprocess.run([sys.executable, os.path.join(HERE, "android_check.py"),
+                        "--selftest"], capture_output=True, text=True)
+    if r.returncode:
+        fails.append("android_check.py selftest failed: " + (r.stdout + r.stderr).strip()[-200:])
+    apk = os.path.join(ROOT, "android", "app", "build", "outputs", "apk",
+                       "release", "app-release.apk")
+    if os.path.exists(apk) and (os.environ.get("ANDROID_HOME")
+                                or os.environ.get("ANDROID_SDK_ROOT")):
+        r = subprocess.run([sys.executable, os.path.join(HERE, "android_check.py"),
+                            apk], capture_output=True, text=True)
+        if r.returncode:
+            fails.append("built APK fails android_check: " + r.stdout.strip()[-300:])
+        else:
+            notes.append("built APK passes android_check (versionCode=take, targetSdk 36)")
+    if not any("Play" in f or "android_check" in f or "capacitor" in f.lower() for f in fails):
+        notes.append("play hardening wired: apk.sh -> android_check.py; android.py patches present")
+
+
+# ── Ledger entries file in numeric order ────────────────────────────────────
+# Take 115's audit: 191 entries, zero gaps, zero duplicates — and two entries
+# (68, 119) filed out of position, which the set-completeness check could never
+# see. An out-of-order ledger cites fine and READS wrong. Order is asserted now.
+def check_ledger_order():
+    lm = read("docs", "LANDMINES.md") or ""
+    nums = [int(x) for x in re.findall(r"^\*\*(\d+)[.,]", lm, re.M)]
+    if nums != sorted(nums):
+        bad = [(a, b) for a, b in zip(nums, nums[1:]) if b < a][:4]
+        return fails.append(f"LANDMINES.md entries out of numeric order near {bad}")
+    notes.append(f"landmine file order: {len(nums)} entries, strictly ascending")
+
+
 for fn in (check_handoff, check_stamps, check_offline, check_splash,
            check_style, check_palette, check_machine_legality,
            check_ledgers, check_osm_fallback, check_drawn,
@@ -1662,7 +1746,7 @@ for fn in (check_handoff, check_stamps, check_offline, check_splash,
            check_regions, check_bundles, check_empty_artifacts,
            check_input_integrity, check_region_polygon,
            check_tools,
-           check_manifest):
+           check_manifest, check_play):
     try:
         fn()
     except Exception as e:

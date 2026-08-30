@@ -56,15 +56,15 @@ def npm_configs():
   "version": "1.0.0",
   "description": "Offline ORV trail navigation for Michigan riding areas",
   "dependencies": {
-    "@capacitor/android": "^7.0.0",
-    "@capacitor/core": "^7.0.0",
-    "@capacitor/geolocation": "^7.0.0",
-    "@capacitor/haptics": "^7.0.0",
-    "@capacitor/share": "^7.0.0",
-    "@capacitor/device": "^7.0.0"
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/geolocation": "^8.0.0",
+    "@capacitor/haptics": "^8.0.0",
+    "@capacitor/share": "^8.0.0",
+    "@capacitor/device": "^8.0.0"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.0.0",
+    "@capacitor/cli": "^8.0.0",
     "puppeteer": "^25.0.0"
   }
 }
@@ -74,7 +74,7 @@ def npm_configs():
   "appName": "%s",
   "webDir": "www",
   "server": { "androidScheme": "https" },
-  "android": { "allowMixedContent": false }
+  "android": { "allowMixedContent": false, "webContentsDebuggingEnabled": false }
 }
 """ % (APP_ID, APP_NAME)
     # Never clobber a package.json that already has what we need: this template
@@ -184,6 +184,75 @@ def patch_mainactivity():
     print("  MainActivity: keep-screen-on added")
 
 
+def take_number():
+    b = open(os.path.join(ROOT, "BUILD")).read()
+    m = re.search(r"OFFROAD_TAKE=(\d+)", b)
+    if not m:
+        sys.exit("BUILD has no OFFROAD_TAKE — versionCode cannot be derived")
+    return int(m.group(1))
+
+
+MIN_SDK = 26      # README: "Android 8+". Cap 8's floor is 24; we promise 26.
+TARGET_SDK = 36   # Play, new apps, from 2026-08-31 (A170). Cap 8's default.
+
+
+def patch_variables():
+    """variables.gradle is written by `cap add` once. Cap 8 writes 24/36/36;
+    we raise the floor to the README's promise and REFUSE a target below
+    Play's requirement rather than silently shipping one (A170)."""
+    p = os.path.join(ROOT, "android", "variables.gradle")
+    s = open(p).read()
+    orig = s
+    s = re.sub(r"minSdkVersion\s*=\s*\d+", f"minSdkVersion = {MIN_SDK}", s)
+    open(p, "w").write(s) if s != orig else None
+    got = {k: int(re.search(rf"{k}\s*=\s*(\d+)", s).group(1))
+           for k in ("minSdkVersion", "compileSdkVersion", "targetSdkVersion")}
+    print(f"  variables.gradle: {got}")
+    if got["targetSdkVersion"] < TARGET_SDK or got["compileSdkVersion"] < TARGET_SDK:
+        sys.exit(f"targetSdk/compileSdk below {TARGET_SDK} — this Capacitor "
+                 f"major cannot ship to Play; upgrade @capacitor/android")
+    if got["minSdkVersion"] != MIN_SDK:
+        sys.exit(f"minSdk {got['minSdkVersion']} != {MIN_SDK}")
+
+
+def patch_version():
+    """versionCode = take, versionName = 2.<take>. Every build, from BUILD."""
+    bg = os.path.join(ROOT, "android", "app", "build.gradle")
+    s = open(bg).read()
+    t = take_number()
+    s2 = re.sub(r"versionCode\s+\d+", f"versionCode {t}", s, 1)
+    s2 = re.sub(r'versionName\s+"[^"]*"', f'versionName "2.{t}"', s2, 1)
+    if s2 != s:
+        open(bg, "w").write(s2)
+    print(f"  build.gradle: versionCode {t}, versionName 2.{t}")
+
+
+def harden_manifest():
+    """Play hardening flags on <application>. allowBackup stays TRUE on
+    purpose: waypoints and rides live in WebView storage and a rider moving
+    phones wants them back; the restore path is a field item (A170)."""
+    mf = os.path.join(ROOT, "android", "app", "src", "main", "AndroidManifest.xml")
+    s = open(mf).read()
+    orig = s
+    if "android:usesCleartextTraffic" not in s:
+        s = s.replace("<application\n",
+                      '<application\n        android:usesCleartextTraffic="false"\n', 1)
+    s = re.sub(r'android:usesCleartextTraffic="true"',
+               'android:usesCleartextTraffic="false"', s)
+    s = re.sub(r'android:allowBackup="false"', 'android:allowBackup="true"', s)
+    if 'android:debuggable="true"' in s:
+        sys.exit("manifest sets debuggable=true — never in a release shell")
+    if s != orig:
+        open(mf, "w").write(s)
+    # Every component must say exported= explicitly (API 31+ install rule).
+    comps = re.findall(r"<(activity|service|receiver|provider)\b([^>]*)>", s, re.S)
+    missing = [k for k, attrs in comps if "android:exported=" not in attrs]
+    if missing:
+        sys.exit(f"manifest components without android:exported: {missing}")
+    print(f"  manifest: cleartext=false, allowBackup=true, "
+          f"{len(comps)} components all declare exported")
+
+
 def keystore():
     if os.path.exists(KS):
         print("  keystore: present")
@@ -205,19 +274,35 @@ def keystore():
 def patch_signing():
     bg = os.path.join(ROOT, "android", "app", "build.gradle")
     s = open(bg).read()
-    if "APEX-SIGNING" in s:
-        print("  build.gradle: signing current")
+    if "APEX-SIGNING v2" in s:
+        print("  build.gradle: signing current (v2)")
         return
+    if "APEX-SIGNING" in s:
+        # An OLDER version of this block is present (an android/ that outlived
+        # a take). The marker matched, the patch was skipped, and the take-155
+        # upload-key path built dev-key bundles that only android_check
+        # caught (landmine 208). Strip it and rewrite.
+        s = re.sub(r"\n\s*// APEX-SIGNING.*?signingConfigs \{.*?\n    \}\n", "\n", s,
+                   count=1, flags=re.S)
+        s = s.replace("\n            signingConfig signingConfigs.release", "", 1)
+        print("  build.gradle: replaced an older APEX-SIGNING block")
     s = s.replace("android {", """android {
-    // APEX-SIGNING — committed keystore, tradeoff recorded in tools/android.py
+    // APEX-SIGNING v2 — two keys, one appId (take 155, A21/A170).
+    //   default        : the COMMITTED keystore; sideload takes install over
+    //                    each other (tradeoff in tools/android.py).
+    //   -Pupload=1     : the PRIVATE Play upload key from env, decoded by
+    //                    ci/apk.sh from Actions secrets to a temp path. The
+    //                    key never lives in this tree.
     signingConfigs {
         release {
-            storeFile file("../../signing/apex.keystore")
-            storePassword "%s"
-            keyAlias "apex"
-            keyPassword "%s"
+            def up = project.hasProperty("upload") && System.getenv("PLAY_UPLOAD_KS")
+            storeFile file(up ? System.getenv("PLAY_UPLOAD_KS") : "../../signing/apex.keystore")
+            storePassword up ? System.getenv("PLAY_UPLOAD_STORE_PASS") : "%s"
+            keyAlias up ? System.getenv("PLAY_UPLOAD_KEY_ALIAS") : "apex"
+            keyPassword up ? System.getenv("PLAY_UPLOAD_KEY_PASS") : "%s"
         }
     }""" % (KS_PASS, KS_PASS), 1)
+
     s = re.sub(r"(buildTypes\s*\{\s*release\s*\{)",
                r"\1\n            signingConfig signingConfigs.release", s, 1)
     open(bg, "w").write(s)
@@ -230,7 +315,10 @@ if __name__ == "__main__":
     scaffold()
     print("── patches")
     patch_strings()
+    patch_variables()
+    patch_version()
     patch_manifest()
+    harden_manifest()
     patch_mainactivity()
     keystore()
     patch_signing()

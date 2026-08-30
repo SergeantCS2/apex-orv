@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 160.*
+*Current as of take 161.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -157,6 +157,8 @@ Start here. Do not read top to bottom.
 | A tool call dies (-1, no output) right after a pkill/pgrep | 204 |
 | CI sits on one step with no output until the job timeout | 205 |
 | A layer or control vanishes on the phone but not in headless | 206 |
+| An idempotent patch says "current" but holds the OLD version | 211 |
+| The Play bundle is dev-key signed although the secrets are set | 211 |
 
 ---
 
@@ -2672,3 +2674,15 @@ Corollary for landmine 207: some earlier "died at the turn boundary"
 diagnoses in this project were probably this instead. 207 is real — it
 was observed with a healthy disk — but it is the second thing to check,
 not the first.
+
+**211. An idempotency marker that the OLD patch also carries never upgrades.**
+android.py guarded its signing patch with `if "APEX-SIGNING" in build.gradle:
+return`. The Play kit rewrote that block (two keys, `-Pupload=1`) under the
+same marker; on an `android/` that outlived a take the guard saw the old
+comment, printed "signing current", and the upload-key run produced a
+DEV-KEY-signed bundle. Only reading the signer back off the artifact caught
+it. Rule: version the marker (`APEX-SIGNING v2`) and REPLACE an older block
+when one is found — any patch that changes what it writes must change what it
+checks for. Companion found the same hour: bundletool's derived universal APK
+is signed by bundletool's own key, so a signer read from it says nothing about
+the bundle; read the signer from the artifact Play actually receives.

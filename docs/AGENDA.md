@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 160.* Ranked by blocking-ness, not by interest.
+*Current as of take 161.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -237,7 +237,11 @@ ROADMAP 9.2. Two regions build from one definition with no code changes.
 - **Ruled out:** treating `node --check` + Python mirrors as sufficient. They
   passed for eight takes while Phase 4 was dead on first use.
 
-## A21 — Signing and update continuity · DECIDED, take 20
+## A21 — Signing and update continuity · DECIDED take 20 · REVISITED take 161 (Play)
+
+- **The 'revisit before public distribution' clause is met.** Sideload keeps the committed key; the Play AAB is signed by a private upload key held only on the Fold and in Actions secrets, with Play App Signing holding the app key.
+  - **Ruled out:** re-keying the sideload APK too — it orphans every installed take for no Play benefit.
+  - **Ruled out:** re-signing the bundle after Gradle — a second signingConfig behind a property is the boring mechanism.
 
 - **Decision:** `signing/apex.keystore` is committed; CI signs releases with it,
   so every take installs over the previous one.
@@ -2868,3 +2872,25 @@ scrollable tray of the members.
   existing layers carry mode filters, prominence tiers and boosts; the
   collision pass hides by feature index and leaves all of that alone.
 
+## A177 — Google Play arc · IN PROGRESS (applied by play kit v1)
+Decisions of record, made against the LIVE Play pages (landmine 190):
+- **appId `com.sergeantslabs.apex`** (Jacob). Consequence: the Play build and
+  a sideloaded take cannot coexist on one phone — different keys, same id.
+  - **Ruled out:** a separate Play appId for side-by-side installs — a variant
+    split in android.py for a convenience the 14-day test does not need.
+- **No Play Asset Delivery.** Play's size page lists the base module at 500 MB;
+  200 MB is only a mobile-data dialog. The bundle is ~240 MB.
+  - **Ruled out:** PAD now — an added mechanism, with one open question
+    (does Capacitor's asset server read split-APK assets?), buying nothing
+    under 500 MB. It stays the escape hatch if the bundle grows.
+- **Capacitor 8 for targetSdk 36**; **versionCode = take**.
+  - **Ruled out:** pinning targetSdk 36 on Capacitor 7 — the vendor says it
+    breaks; an unsupported shell under a nav app is not worth three lines.
+  - **Ruled out:** the CI run number as versionCode — never wired, and a
+    workflow re-paste can reset it.
+- **The Play work is a kit, not a take.** The app is developed elsewhere; a
+  patch that any newer seed absorbs is the only thing that survives a
+  parallel take numbering (landmine 203).
+- Remaining before upload: privacy policy URL live on Pages, data safety
+  form, content rating, listing assets, then internal → closed testing with
+  12 testers opted in 14 continuous days.

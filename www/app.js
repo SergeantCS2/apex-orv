@@ -3937,7 +3937,10 @@ function gpsStart(onFix,onFail){
        background. The self-test caught it on its first real run. Accept both
        shapes — a plugin's return type is not something to assume (landmine 56). */
     var w;
-    try{ w=C.watchPosition({enableHighAccuracy:true,timeout:12000},function(pos,err){
+    /* Capacitor 8 applies `timeout` to watchPosition on Android too;
+       12 s errored a slow first fix under canopy. Ask for a fix each
+       second via `interval` and never time the watch out. */
+    try{ w=C.watchPosition({enableHighAccuracy:true,interval:1000},function(pos,err){
       if(err||!pos)return onFail&&onFail(err);
       onFix([pos.coords.longitude,pos.coords.latitude],pos.coords.accuracy,
             pos.coords.speed,pos.coords.heading);

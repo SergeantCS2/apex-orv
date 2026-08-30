@@ -3,5 +3,5 @@
   "appName": "APEX ORV",
   "webDir": "www",
   "server": { "androidScheme": "https" },
-  "android": { "allowMixedContent": false }
+  "android": { "allowMixedContent": false, "webContentsDebuggingEnabled": false }
 }

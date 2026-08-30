@@ -1,4 +1,68 @@
-# HANDOFF — through Take 160 · V2
+# HANDOFF — through Take 161 · V2
+
+## Take 161 — Google Play release engineering (play kit v1)
+
+Applied as a PATCH, not authored here: the app is built in another chat and
+its take numbers move independently, so the Play work is a kit any newer seed
+absorbs (`play-kit/apply.py`). Everything below is re-derivable by re-running
+it; nothing about map data, styles or the pipeline is touched.
+
+**Capacitor 8 / targetSdk 36.** Play requires target 36 for new apps from
+2026-08-31 and Capacitor ties targetSdk to its major (custom targets are
+unsupported), so 8 is the vehicle, not a preference. minSdk stays 26 (the
+README's Android 8 promise) above Cap 8's floor of 24. Cap 8 applies
+`timeout` to watchPosition on Android — the app's 12 s would have errored a
+slow first fix under canopy, so the watch uses `interval` and never times out.
+
+**versionCode = OFFROAD_TAKE**, versionName `2.<take>`. Capacitor's template
+ships `versionCode 1` and nothing here ever set it, so every take to date was
+version 1. Takes are monotonic and never reused (PROTOCOL §2): the ledger is
+the version scheme, with no run-number arithmetic a workflow re-paste can
+regress. Play's ceiling is 2,100,000,000.
+
+**Hardening, asserted on the ARTIFACT.** `tools/android_check.py` reads the
+built APK with aapt2 — as Play does — and refuses: targetSdk < 36,
+versionCode != take, `debuggable`, cleartext traffic, a component without an
+explicit `android:exported`, or a wrong package. Its component audit carries a
+negative-control selftest. Source-side, capacitor.config gains an explicit
+`webContentsDebuggingEnabled: false`; allowBackup stays **true** deliberately
+(waypoints and rides live in WebView storage and a rider changing phones wants
+them back — the restore path is an open field item).
+
+**Two keys, one appId.** The sideload APK keeps the committed keystore so
+field takes still install over each other; the Play AAB is signed by a private
+upload key that lives only on the Fold and in Actions secrets, reached by
+`bundleRelease -Pupload=1`. No secrets set → the AAB still builds, is named
+`…-DEVKEY-DO-NOT-UPLOAD.aab`, and the job says so; sideload testing never
+blocks on Play. android_check reads the signer back **from the bundle** and
+refuses a Play-named artifact carrying the dev key.
+
+**The bundle is proved before it is trusted.** bundletool (pinned by version
+and sha256) validates the AAB and derives the universal APK the audit reads.
+The Capacitor shell carries zero native libraries, so 16 KB page alignment is
+moot — `zipalign -c -P 16` asserts it rather than assuming it.
+
+**CI emits everything Play asks for**: APK, AAB, and `play-assets-<take>.zip`
+(512 icon, 1024×500 feature graphic, privacy policy page, listing copy, data
+safety answers, release notes) from `tools/play_assets.py`.
+
+Found while sealing against t160, and folded back into the kit: the privacy
+policy was generated in the apk job, but Pages deploys the BUNDLE job's www/
+artifact — so the URL the Play console requires would have 404'd in
+production while existing locally. `ci/bundle.sh` generates it now and the
+gate refuses a tree where it does not.
+
+SEAL (t161): kit applied to t160 clean — 28 edits, every anchor found, gate
+PASSED first run. Real Gradle build against SDK 36: APK signed with the
+committed key AND AAB signed with a throwaway upload key in one run,
+versionCode 161 / versionName 2.161 on both, bundletool validate ok,
+universal APK audited, 16 KB alignment verified, play assets generated.
+The shell only — the 127 MB map bundle is built in CI, so the final size is
+CI's to report.
+
+Landmine 211 and AGENDA A177 record what this cost to learn. The workflow
+file is hand-pasted (landmines 46/84): re-paste `ci/build.yml` once after
+seeding, diffed job by job (landmine 202).
 
 ## Take 160 — 2026-08-29 — overlapping pins stack at ANY zoom (A176)
 

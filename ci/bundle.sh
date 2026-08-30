@@ -39,6 +39,11 @@ node tools/render.mjs
 # exists. A check that skips is not a check (landmine 53).
 node tools/verify_palette.mjs
 
+# The Play privacy policy is served from Pages, and Pages deploys
+# THIS job's www/ artifact — so it is generated here, not in the
+# apk job. Play requires the URL to resolve before review.
+python3 tools/play_assets.py
+
 python3 tools/gate.py
 
 # ── Built what the seed declared? (take 118, landmine 199) ─────────────────
