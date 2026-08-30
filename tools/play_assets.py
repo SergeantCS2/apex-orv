@@ -225,6 +225,65 @@ a POI card, and Water mode's run planner.
 """
 
 
+def page(title, md, t):
+    """Markdown -> a plain readable page. Deliberately a small subset: the
+    guide is written to be read on a phone in a parking lot, not typeset."""
+    out, in_ul, in_ol = [], False, False
+    for ln in md.splitlines():
+        if ln.startswith("*Generated into") or ln.startswith("The guide's job"):
+            continue                      # notes to the developer, not testers
+        esc = (ln.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+        esc = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", esc)
+        esc = re.sub(r"`(.+?)`", r"<code>\1</code>", esc)
+        esc = re.sub(r"(?<![*\w])\*([^*]+)\*(?!\*)", r"<i>\1</i>", esc)
+        st = esc.strip()
+        is_ul, is_ol = st.startswith("- "), bool(re.match(r"\d+\. ", st))
+        if in_ul and not is_ul:
+            out.append("</ul>"); in_ul = False
+        if in_ol and not is_ol:
+            out.append("</ol>"); in_ol = False
+        if is_ul:
+            if not in_ul:
+                out.append("<ul>"); in_ul = True
+            out.append(f"<li>{st[2:]}</li>")
+        elif is_ol:
+            if not in_ol:
+                out.append("<ol>"); in_ol = True
+            out.append(f"<li>{re.sub(r'^\d+\. ', '', st)}</li>")
+        elif st.startswith("## "):
+            out.append(f"<h2>{st[3:]}</h2>")
+        elif st.startswith("# "):
+            out.append(f"<h1>{st[2:]}</h1>")
+        elif st == "---":
+            out.append("<hr>")
+        elif st:
+            out.append(f"<p>{st}</p>")
+    if in_ul:
+        out.append("</ul>")
+    if in_ol:
+        out.append("</ol>")
+    body = "\n".join(out)
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title}</title>
+<style>
+ body{{background:#0b0f0d;color:#e8ece9;font:16px/1.65 system-ui,sans-serif;
+      margin:0 auto;padding:28px 20px 80px;max-width:46rem}}
+ h1{{font-size:1.5rem;line-height:1.25}}
+ h2{{font-size:1.08rem;margin-top:2.2rem;color:#9fd3b4;
+     border-top:1px solid #1d2622;padding-top:1.1rem}}
+ li{{margin:.45rem 0}} b{{color:#fff}} hr{{border:0;border-top:1px solid #1d2622;margin:2rem 0}}
+ code{{background:#151b18;padding:2px 5px;border-radius:4px;font-size:.9em}}
+ .foot{{color:#8b968f;font-size:.85rem;margin-top:3rem}}
+</style></head><body>
+{body}
+<p class="foot">{APP_NAME} · build {t} · this page is generated from the
+repository that built the app you are testing.</p>
+</body></html>
+"""
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     t = take()
@@ -234,15 +293,34 @@ def main():
     open(os.path.join(OUT, "data-safety.md"), "w").write(
         DATA_SAFETY.format(app=APP_NAME, take=t))
     open(os.path.join(OUT, "listing.md"), "w").write(listing(t))
+    # The tester guide ships as a page beside the policy: the URL goes in the
+    # track's feedback field, so a tester always reads the guide matching the
+    # build they were handed (landmine 98).
+    md = os.path.join(ROOT, "docs", "TESTING.md")
+    if os.path.exists(md):
+        open(os.path.join(OUT, "testing.html"), "w").write(
+            page("APEX ORV — Tester Guide", open(md).read(), t))
     rel = os.path.join(ROOT, "ci", "RELEASE.md")
     if os.path.exists(rel):
-        notes = re.sub(r"[*#`]", "", open(rel).read()).strip()[:480]
-        open(os.path.join(OUT, "release-notes.txt"), "w").write(notes + "\n")
+        # Play's cap is 500 characters per language. A hard slice cut a note
+        # mid-word ("exactly a"), which would have shipped to testers verbatim.
+        raw = re.sub(r"[*#`]", "", open(rel).read()).strip()
+        if len(raw) > 500:
+            cut = raw[:500]
+            for sep in ("\n\n", ". ", "\n"):
+                i = cut.rfind(sep)
+                if i > 200:
+                    cut = cut[:i + (1 if sep == ". " else 0)]
+                    break
+            raw = cut.rstrip()
+        open(os.path.join(OUT, "release-notes.txt"), "w").write(raw + "\n")
     # the policy must be reachable at the URL the console is given
     www = os.path.join(ROOT, "www")
     if os.path.isdir(www):
-        shutil.copyfile(os.path.join(OUT, "privacy.html"),
-                        os.path.join(www, "privacy.html"))
+        for f in ("privacy.html", "testing.html"):
+            p = os.path.join(OUT, f)
+            if os.path.exists(p):
+                shutil.copyfile(p, os.path.join(www, f))
     files = sorted(os.listdir(OUT))
     print(f"play assets — build {t}: {', '.join(files)}")
     if CONTACT.startswith("SUPPORT-EMAIL"):

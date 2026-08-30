@@ -1,5 +1,30 @@
-# HANDOFF — through Take 164 · V2
+# HANDOFF — through Take 165 · V2
 
+## Take 165 — 2026-08-30 — the tester guide, restored to the lineage
+
+Take 163's rename branched from t161, so two things sealed in t162 never
+reached this line: `docs/TESTING.md` and the `play_assets.py` that renders it
+to `play/testing.html` and copies it into `www/` for Pages. The release notes
+in Jacob's hand point at `/testing.html`; without this the URL 404s at the
+moment twelve riders tap it. Also restored: release notes cut on a paragraph
+or sentence boundary rather than a hard 480-character slice, which had cut a
+note mid-word ("exactly a").
+
+The guide is corrected for A180. It previously told testers to uninstall the
+sideloaded build because Android would refuse to install over it — true when
+both carried one application id, false now. The store build and the sideload
+have DIFFERENT ids: they sit side by side, and waypoints, rides and saved HD
+imagery do not carry across, because WebView storage is scoped per app. The
+guide says so, and tells a tester how to know which icon they opened.
+
+Measured, not estimated, from the take-164 bundle Jacob built: download size
+184.1–184.2 MB (bundletool get-size total). Under Play's 200 MB threshold, so
+no mobile-data confirmation dialog. The bundle itself is 181 MB against a
+500 MB base-module limit — Play Asset Delivery stays unnecessary (A170).
+
+SEAL: gate PASSED; generated page verified structurally, not eyeballed.
+
+---
 ## Take 164 — 2026-08-30 — the scrubber survives a clean runner
 
 CI failed at build_app: `Cannot find package 'acorn'`. Take 162 installed
