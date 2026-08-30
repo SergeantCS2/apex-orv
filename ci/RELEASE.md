@@ -1,20 +1,20 @@
-**Take 163 — release build, final app identity.**
+**Take 164 — release build (fixes the failed CI run).**
 
-The app's package name is now `com.apexoffroad.app`. This is set before
-the first store upload because the store fixes it permanently and it
-appears in the store listing's address.
+The previous build failed on the build server: a tool it needed was
+installed only on the development machine and not committed. It's now
+part of the repository, so a clean checkout builds the same way this one
+does.
 
-**Read this before installing the store version:** Android treats a
-package name as the app's identity, so the store build is a separate app
-from the one you've been sideloading. It will install *alongside* it, not
-over it, and saved waypoints, recorded rides and saved HD imagery do not
-carry across. Note anything you want to keep first.
+Otherwise identical to take 163: package name `com.apexoffroad.app`,
+release web assets carrying no development notes, and everything from the
+recent builds — loading screen, basemap loading line, stacked pins at
+every zoom, and satellite imagery about 56 MB smaller.
 
-Otherwise identical to the last build: loading screen, basemap loading
-line, stacked pins at every zoom, smaller satellite imagery.
+**Before installing the store version:** it is a separate app from the
+one you've been sideloading, so it installs alongside rather than over
+it, and saved waypoints, rides and HD imagery do not carry across.
 
 ### Check before submitting
-1. Install and open: loading screen, then a finished map.
-2. Tools -> Self-test: expect a clean pass.
-3. Confirm the old sideloaded build is still there separately — that's
-   expected, and it's your fallback until the store version is proven.
+1. The build completes on GitHub Actions — that's the fix.
+2. Install and open: loading screen, then a finished map.
+3. Tools -> Self-test: expect a clean pass.

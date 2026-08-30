@@ -176,3 +176,15 @@ region claims to have renders, and the NET badge stays green.
 
 Nothing in the field may wait on a network call — not a font, not a
 glyph range, not a tile, not a licence check.
+
+### acorn (vendored, not fetched)
+
+- **File** `tools/vendor/acorn.mjs` — one generated ESM build, unmodified
+- **Provides** the JavaScript parser tools/scrub.mjs uses to remove
+  comments from the release artifact without mistaking a regex literal
+  for a division (take 164, A181)
+- **Licence** MIT, text retained at the head of the vendored file
+- **Fetched by** nobody at build time — it is committed, because the data
+  pipeline runs before `npm ci` and must not depend on it
+- **Refresh** only if the parser needs updating; it is a pinned copy
+

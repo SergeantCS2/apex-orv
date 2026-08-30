@@ -1,4 +1,34 @@
-# HANDOFF — through Take 163 · V2
+# HANDOFF — through Take 164 · V2
+
+## Take 164 — 2026-08-30 — the scrubber survives a clean runner
+
+CI failed at build_app: `Cannot find package 'acorn'`. Take 162 installed
+the parser with --no-save, which put it in this workspace and nowhere
+else. That is the project's oldest recurring failure — verified locally,
+broken on a clean machine — and this is the third time it has happened.
+
+Adding acorn to package.json would NOT have fixed it. ci/bundle.sh runs
+`npm ci` AFTER the pipeline, so no package dependency exists at the
+moment build_app strips the artifact. The ordering is deliberate and
+documented there, so the dependency had to go, not the ordering.
+
+acorn is vendored at tools/vendor/acorn.mjs — one generated ESM file,
+unmodified, MIT licence text prepended, declared in PROVISION.md. The
+pipeline now needs no npm at all for the scrub, which is the right shape:
+a data pipeline should not depend on the test harness's package tree.
+
+Proved rather than assumed: node_modules/acorn was physically MOVED AWAY
+and the build re-run. It scrubbed 121 KB and 16 KB exactly as before. A
+green run with the package still present would have proved nothing.
+
+Good news from the same CI log, confirmed on a clean runner: the imagery
+shrink works there too — 183.0 MB fetched, 127.2 MB shipped — and the
+whole bundle is 118.86 MB, down from about 193 MB before take 159.
+
+SEAL: render 216/0, smoke green, gate PASSED. apex-seed-t164.zip sealed
+(sha256 in chat). This is the build for the first Play submission.
+
+---
 
 ## Take 163 — 2026-08-30 — the application id, decided before it locks
 

@@ -13,10 +13,16 @@
    still parses. (This very comment first closed itself early by containing
    the sequence it was describing.)
 
+   The parser is vendored at tools/vendor/acorn.mjs, not installed: the
+   pipeline runs before npm ci, so a package dependency is not there yet.
+   The first version of this used a package and passed locally while
+   failing on a clean runner — the exact failure this project has now hit
+   three times.
+
    Usage: node tools/scrub.mjs www/app.js www/index.html
 */
 import { readFileSync, writeFileSync } from "fs";
-import * as acorn from "acorn";
+import * as acorn from "./vendor/acorn.mjs";
 
 function stripJs(src) {
   const comments = [];

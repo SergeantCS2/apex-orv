@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 163.* Ranked by blocking-ness, not by interest.
+*Current as of take 164.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2925,4 +2925,17 @@ makes it permanent. Restores the id the project chose at take 73.
 - **Consequence, accepted:** the store build installs alongside a
   sideloaded one rather than updating it, and per-app WebView storage
   means saved waypoints, rides and HD tiles do not migrate.
+
+## A181 — Scrubber must work on a clean runner · SHIPPED take 164
+CI could not find the acorn package: take 162 installed it with
+--no-save. acorn is vendored at tools/vendor/acorn.mjs instead.
+- **Ruled out:** adding acorn to package.json. `npm ci` runs AFTER the
+  pipeline in ci/bundle.sh, so a package dependency does not exist when
+  build_app runs; the fix would have looked right and failed identically.
+- **Ruled out:** moving `npm ci` above the pipeline. That would make the
+  pipeline's own render step run in CI as well as the one after it,
+  doubling the slowest job to fix a packaging problem.
+- **Ruled out:** a regex-based stripper to avoid the dependency. A
+  pattern matcher cannot tell a regex literal from a division followed by
+  a comment, and getting it wrong corrupts code that still parses.
 
