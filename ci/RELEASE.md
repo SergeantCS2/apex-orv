@@ -1,20 +1,21 @@
-**Take 164 — release build (fixes the failed CI run).**
+**Take 166 — advertising ID declaration.**
 
-The previous build failed on the build server: a tool it needed was
-installed only on the development machine and not committed. It's now
-part of the repository, so a clean checkout builds the same way this one
-does.
+Google blocked the submission pending an advertising ID declaration. The
+answer is no — this app has no advertising, no analytics, and no ad
+identifier — and it's answered on the Play Console form, not here.
 
-Otherwise identical to take 163: package name `com.apexoffroad.app`,
-release web assets carrying no development notes, and everything from the
-recent builds — loading screen, basemap loading line, stacked pins at
-every zoom, and satellite imagery about 56 MB smaller.
+What changed in the build: the release check now inspects the finished
+package and fails if an advertising ID permission ever appears in it. The
+declaration you give Google is a promise about the final merged app, and
+a dependency added later could quietly break that promise. Now it can't
+do so silently.
 
-**Before installing the store version:** it is a separate app from the
-one you've been sideloading, so it installs alongside rather than over
-it, and saved waypoints, rides and HD imagery do not carry across.
+No change to the app itself.
 
-### Check before submitting
-1. The build completes on GitHub Actions — that's the fix.
-2. Install and open: loading screen, then a finished map.
-3. Tools -> Self-test: expect a clean pass.
+### On the two warnings
+Both are about R8 code optimization, and both are declined for this
+release. The Java code is about 7.6 MB of a ~185 MB app that is almost
+entirely map data, so a good pass saves under 2% — and our test suite
+runs the web layer in a browser, so it cannot detect an optimization rule
+that breaks a native plugin. Only a device install can. Worth doing later
+with proper device verification; not worth the risk on a first release.

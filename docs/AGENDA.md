@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 165.* Ranked by blocking-ness, not by interest.
+*Current as of take 166.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2938,4 +2938,27 @@ CI could not find the acorn package: take 162 installed it with
 - **Ruled out:** a regex-based stripper to avoid the dependency. A
   pattern matcher cannot tell a regex literal from a division followed by
   a comment, and getting it wrong corrupts code that still parses.
+
+## A182 — Advertising ID declaration · SHIPPED take 166 (console + assertion)
+Play blocked submission pending the declaration. The app uses no
+advertising ID; the answer is given on the console form. android_check.py
+now asserts the BUILT manifest carries no AD_ID permission so the
+declaration cannot silently become false.
+- **Ruled out:** answering the form and leaving it unverified. The answer
+  is about the merged manifest, which a future dependency can change.
+- **Ruled out:** adding `tools:node="remove"` for AD_ID pre-emptively. It
+  would HIDE a dependency that wanted the permission; the check surfaces
+  it instead, which is the decision Jacob should get to make.
+
+## A183 — R8 / app optimization · DECLINED for the first release
+Play warns "App optimization: Low" and notes no deobfuscation file. Both
+are R8, and both are warnings, not blockers.
+- **Ruled out:** enabling R8 for the first release. classes.dex is ~7.6 MB of a ~185 MB
+  package — a good pass saves under 2% of an app that is 95% map data —
+  and the harness runs the web layer in a browser, so it cannot detect an
+  R8 rule that strips a Capacitor plugin. Only a device install can, and
+  that is not a risk worth taking on a first submission for 2%.
+- **Revisit when:** the app is in front of testers and a device-verified
+  R8 pass can be proven before it ships, or if package size becomes the
+  binding constraint (it is imagery, not code).
 

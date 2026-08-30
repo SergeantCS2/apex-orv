@@ -1,4 +1,42 @@
-# HANDOFF — through Take 165 · V2
+# HANDOFF — through Take 166 · V2
+
+## Take 166 — 2026-08-30 — the advertising-ID declaration, made verifiable
+
+First Play submission returned one blocker and two warnings.
+
+BLOCKER, and it needs no code: "Incomplete advertising ID declaration".
+Play requires every app targeting Android 13+ to say whether it uses an
+advertising ID. This one does not — the built manifest declares exactly
+four permissions (fine and coarse location, wake lock, vibrate), there is
+no Play Services ads dependency, and the privacy policy already states
+there is no advertising. The answer is No, and it is answered on the
+console form, not in the repository.
+
+What IS code: that answer is a promise about the MERGED manifest, and a
+dependency added later could introduce AD_ID without anyone noticing. A
+false declaration is a policy violation, not a bug — so android_check.py
+now asserts the built artifact carries no advertising-ID permission, and
+says plainly that the contradiction must be resolved rather than shipped.
+
+WARNINGS, both declined for the first release and recorded as A183: no
+deobfuscation file, and "App optimization: Low". Both are R8. Measured
+before deciding: classes.dex is about 7.6 MB of a roughly 185 MB
+package, so a good R8 pass saves on the order of 3 MB — under 2% — of an
+app that is 95% map data. Against that, this project's harness runs the
+WEB layer in a browser and cannot see the native bridge at all, so it
+structurally cannot catch an R8 rule that strips a Capacitor plugin;
+only a device install can. Taking an unverifiable risk for 2% on a first
+submission is a bad trade. The deobfuscation warning is moot while
+nothing is obfuscated.
+
+SEAL: render 216/0, smoke green, gate PASSED. The gate refused once over
+A183's ruled-out line, which I had written as "Ruled out for now:" — the
+check matches the exact phrase, and a hedged ruled-out is not the same
+commitment as a ruled-out. apex-seed-t166.zip sealed (sha256 in chat).
+
+The blocker itself is cleared on the Play console, not by this seed:
+App content -> Advertising ID -> No. The build carries no advertising
+permission and now proves it on every run.
 
 ## Take 165 — 2026-08-30 — the tester guide, restored to the lineage
 

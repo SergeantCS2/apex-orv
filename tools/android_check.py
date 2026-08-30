@@ -144,6 +144,23 @@ def check(apk, play=False):
         fails.append("components without android:exported: " + ", ".join(missing))
 
     perms = re.findall(r"uses-permission: name='([^']+)'", badging)
+
+    # take 166 · A182. Play requires every app targeting Android 13+ to
+    # declare whether it uses an advertising ID, and this one answers no.
+    # That answer is a promise about the MERGED manifest, not about our
+    # source: a dependency added later can introduce AD_ID silently, and a
+    # false declaration is a policy violation rather than a bug. Asserted
+    # here, against the built artifact, so the declaration cannot quietly
+    # stop being true.
+    ADVERT = ("com.google.android.gms.permission.AD_ID",
+              "com.huawei.android.launcher.permission.OAID")
+    for p_ in perms:
+        if p_ in ADVERT:
+            fails.append(f"{p_} is in the built manifest, but the Play "
+                         "listing declares no advertising ID (A182) — either "
+                         "remove the dependency that added it or change the "
+                         "declaration; do not ship the contradiction")
+
     print(f"android_check — {os.path.basename(apk)}")
     print(f"  package {pkg}  versionCode {vc}  versionName {vn}  "
           f"minSdk {msdk}  targetSdk {tsdk}")
