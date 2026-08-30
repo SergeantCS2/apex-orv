@@ -28,7 +28,7 @@ before any public distribution (AGENDA A21).
 import json, os, re, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-APP_ID = "com.sergeantslabs.apex"
+APP_ID = "com.apexoffroad.app"
 APP_NAME = "APEX ORV"
 KS = os.path.join(ROOT, "signing", "apex.keystore")
 KS_PASS = "apexoffroad"        # committed on purpose — see module docstring

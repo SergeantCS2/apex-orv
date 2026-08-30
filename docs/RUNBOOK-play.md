@@ -48,7 +48,7 @@ Applying twice is safe — the second run reports `changed 0`.
    is there — the `seed` job and `apex-seed*.zip` in `push.paths` are
    load-bearing and have been dropped by a paste before (landmine 202).
 4. **Play Console**: create the app, accept Play App Signing, keep the
-   applicationId `com.sergeantslabs.apex` — permanent from the first upload.
+   applicationId `com.apexoffroad.app` — permanent from the first upload.
 5. **Enable GitHub Pages** (Settings → Pages → Source: GitHub Actions) so the
    privacy policy is live at `https://<user>.github.io/<repo>/privacy.html`.
    That URL goes in the console; Play requires a working one.

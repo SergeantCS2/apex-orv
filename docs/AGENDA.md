@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 162.* Ranked by blocking-ness, not by interest.
+*Current as of take 163.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2906,7 +2906,7 @@ the artifact. Source annotations are untouched.
   Jacobsville Lighthouse, Jacobson Marina and Sergeant Marina are real
   places in the map data.
 
-## A180 — Application ID is permanent at first Play upload · DECISION NEEDED
+## A180 — Application ID · DECIDED take 163: com.apexoffroad.app
 capacitor.config.json declares com.sergeantslabs.apex. Play fixes the
 applicationId forever at the first upload, and it is visible in the store
 URL. If the name is to be neutral it must change BEFORE that upload, and
@@ -2914,4 +2914,15 @@ a change means Play-installed and sideloaded builds can no longer update
 each other.
 - **Ruled out:** changing it unilaterally. It is the app's identity and
   the last reversible moment is now.
+
+### Take 163 — shipped
+applicationId is `com.apexoffroad.app`, set before the first Play upload
+makes it permanent. Restores the id the project chose at take 73.
+- **Ruled out:** keeping the vendor-flavoured id. It carries a personal
+  name into a public store URL and the store URL cannot be changed later.
+- **Ruled out:** deferring the decision past submission. There is no
+  after; Play fixes applicationId at first upload.
+- **Consequence, accepted:** the store build installs alongside a
+  sideloaded one rather than updating it, and per-app WebView storage
+  means saved waypoints, rides and HD tiles do not migrate.
 

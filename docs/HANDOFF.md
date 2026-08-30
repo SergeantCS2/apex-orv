@@ -1,4 +1,31 @@
-# HANDOFF — through Take 162 · V2
+# HANDOFF — through Take 163 · V2
+
+## Take 163 — 2026-08-30 — the application id, decided before it locks
+
+A180 answered: the id is `com.apexoffroad.app`. It is changed in the four
+places that are functional — capacitor.config.json, android.py,
+play_assets.py, and android_check.py, which asserts the package name of
+the BUILT artifact and would have failed loudly on a half-done rename —
+and in RUNBOOK-play.md, which documents it.
+
+This restores the name the project chose originally: the record at take
+73 reads "Named. APEX Off-road. appId com.apexoffroad.app", and the
+vendor-flavoured id arrived later. Play fixes applicationId permanently
+at the first upload, so this was the last reversible moment.
+
+Consequence that matters more than the rename, and it is not reversible
+either: an application id IS the app's identity on Android. The store
+build will not update a sideloaded one — they install side by side — and
+because WebView storage is scoped per app, **saved waypoints, recorded
+rides and saved HD imagery on the sideloaded build do not carry across**.
+Anything worth keeping should be noted before the first store install.
+
+SEAL: render 216/0, smoke green, gate PASSED. android_check.py asserts
+the package name of the built artifact, so a half-finished rename would
+have failed in CI rather than reaching the store.
+apex-seed-t163.zip sealed (sha256 in chat).
+
+---
 
 ## Take 162 — 2026-08-30 — the release artifact carries no commentary
 

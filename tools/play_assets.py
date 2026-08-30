@@ -22,7 +22,7 @@ import json, os, re, shutil, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "play")
 APP_NAME = "APEX ORV"
-APP_ID = "com.sergeantslabs.apex"
+APP_ID = "com.apexoffroad.app"
 CONTACT = "sergeantetsy@gmail.com"   # Play requires a public support address.
 
 

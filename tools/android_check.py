@@ -124,7 +124,7 @@ def check(apk, play=False):
         fails.append(f"targetSdkVersion {tsdk} < {TARGET_SDK} (Play, new apps)")
     if msdk != MIN_SDK:
         fails.append(f"minSdkVersion {msdk} != {MIN_SDK} (README promise)")
-    if pkg != "com.sergeantslabs.apex":
+    if pkg != "com.apexoffroad.app":
         fails.append(f"package {pkg} — appId is permanent on Play (A170)")
 
     # xmltree: attribute lines look like  A: android:debuggable(0x0101000f)=true

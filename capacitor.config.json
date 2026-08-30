@@ -1,5 +1,5 @@
 {
-  "appId": "com.sergeantslabs.apex",
+  "appId": "com.apexoffroad.app",
   "appName": "APEX ORV",
   "webDir": "www",
   "server": { "androidScheme": "https" },
