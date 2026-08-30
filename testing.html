@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>APEX ORV — Tester Guide</title>
+<style>
+ body{background:#0b0f0d;color:#e8ece9;font:16px/1.65 system-ui,sans-serif;
+      margin:0 auto;padding:28px 20px 80px;max-width:46rem}
+ h1{font-size:1.5rem;line-height:1.25}
+ h2{font-size:1.08rem;margin-top:2.2rem;color:#9fd3b4;
+     border-top:1px solid #1d2622;padding-top:1.1rem}
+ li{margin:.45rem 0} b{color:#fff} hr{border:0;border-top:1px solid #1d2622;margin:2rem 0}
+ code{background:#151b18;padding:2px 5px;border-radius:4px;font-size:.9em}
+ .foot{color:#8b968f;font-size:.85rem;margin-top:3rem}
+</style></head><body>
+<h1>APEX ORV — tester guide</h1>
+<p>policy, so the guide a tester reads is the one this build actually shipped</p>
+<p>(landmine 98: a document kept apart from the thing it describes drifts).*</p>
+<p>anyone but the developer's own phone. Sections are ordered by how badly a</p>
+<p>failure would hurt, not by how the app is laid out.</p>
+<hr>
+<h2>Before you start</h2>
+<ul>
+<li><b>Install from Play, not from GitHub.</b> If you already sideloaded APEX, <b>uninstall it first</b> — the Play build is signed with a different key and Android will refuse to install over it.</li>
+<li><b>The download is large</b> (most of it is satellite imagery for the whole state). Get it on wifi.</li>
+<li><b>First launch needs no signal</b>, but do it once at home so you can see it working before you rely on it.</li>
+<li><b>You are not testing whether it looks nice.</b> You are testing whether it lies. Anything the app tells you that turns out to be wrong on the ground is the most valuable thing you can report.</li>
+</ul>
+<h2>How to report</h2>
+<p>Report <b>what you did, what you expected, what happened, and where you were</b>. A screenshot beats a description. If you can, open <b>Tools → Diagnostics → Self-test</b> and include the summary line — it names the build.</p>
+<p>Say which phone you have. Almost all development happened on one device, so a bug that only appears on yours is exactly the bug worth finding.</p>
+<hr>
+<h2>1. The first sixty seconds</h2>
+<ul>
+<li>Launch it. <b>The splash should hold until the map is there</b> — if you see raw text like <code>__IC_map__</code>, or an empty screen you can still tap, that is a bug and it is a bad one.</li>
+<li>Does it ask for location once, plainly? <b>Deny it</b> on purpose the first time. Everything except the position dot and ride recording should still work. Then grant it and confirm the dot appears.</li>
+<li>Watch the <b>NET badge</b> in the title bar. It should read green with nothing unexpected. If it ever climbs while you are just panning the map, report it immediately — the app promises it downloads nothing on its own.</li>
+<li>Kill the app and reopen it. Does it come back where you left it?</li>
+</ul>
+<h2>2. Airplane mode is the real test</h2>
+<p>This is the whole point of the app, so test it deliberately:</p>
+<ul>
+<li><b>Turn airplane mode on</b> and leave it on for an entire session.</li>
+<li>Pan and zoom across both peninsulas. Every layer should draw.</li>
+<li>Search for a trail, a town, an address, a river. All of it is supposed to work with no signal.</li>
+<li>Plan a route, run it, retrace it.</li>
+<li>Anything that greys out, hangs, spins forever, or says "no connection" in airplane mode is a bug — with two exceptions that are <i>supposed</i> to need signal: <b>saving HD imagery</b> and <b>live river conditions</b>.</li>
+</ul>
+<h2>3. GPS, under real conditions</h2>
+<p>The riskiest area in this build. The location code changed and has not been ridden hard.</p>
+<ul>
+<li><b>Cold start under tree cover.</b> Park under canopy, open the app fresh, and time how long until the dot appears. It should keep trying — if it gives up, stops updating, or shows an error and never recovers, that is the single most important bug you can report.</li>
+<li>Ride a few miles and watch the dot. Does it keep up, or lag and jump?</li>
+<li>Does it survive <b>screen off → screen on</b> mid-ride? Does it survive a phone call?</li>
+<li><b>Foldables</b>: fold and unfold mid-ride. The map should not reset, lose your route, or forget your position.</li>
+<li>Battery: note roughly what an hour of navigation costs you.</li>
+</ul>
+<h2>4. Routing — check it against the ground</h2>
+<ul>
+<li>Plan a route with <b>Return home</b> and follow it. Every turn instruction should match a turn that exists.</li>
+<li>Change the machine (<b>Dirt bike 24" / Quad 50" / Side-by-side 72"</b>) and re-plan the same trip. Narrow trails should fade out for the wider machine. <b>If the app routes a 72" machine down something a 72" machine cannot legally or physically use, report it with the location — that is a safety bug.</b></li>
+<li>Try each route profile: Most trail, Fastest, Easiest, Pavement soonest, Shortest, Least climbing. Do the results differ in the way the names promise?</li>
+<li><b>Loop</b>: ask for a loop of a given distance from where you are. Does it come back to you? Is the mileage close to what you asked for?</li>
+<li><b>Wrong turn</b>: go off route on purpose and press it. Does it recover sensibly?</li>
+<li><b>Retrace</b>: does it walk you back the way you actually came?</li>
+<li>Compare the app's mileage to your odometer over a known stretch and tell us both numbers.</li>
+</ul>
+<h2>5. The four modes</h2>
+<p>Cycle the mode chip and confirm the whole map follows — layers, pins, routing, the machine button.</p>
+<ul>
+<li><b>Off-road</b> — trails by legal width, riding areas, fuel. Do the riding areas (Bull Gap, Silver Lake Dunes, Mack Lake) look like open ground rather than a single line through them?</li>
+<li><b>Outdoors</b> — hiking and MTB systems with mileage, ski and snowboard hills. Tap a hill: runs by name and difficulty, website, photo. <b>Is anything mislabelled?</b> Difficulty is supposed to come from the source or stay grey, never be guessed.</li>
+<li><b>Hunt</b> — state land boundaries, game area names, county lines. Long-press to drop a waypoint: stand, camera, sign, water, gate. Do they survive closing the app? Do they survive a phone restart?</li>
+<li><b>Water</b> — launches, liveries, beaches, marinas, lighthouses. <b>Plan a river run</b>: tap a put-in and a take-out and check the distance, the dams, the float time for your boat. Tap them in the wrong order on purpose — the card should flip them, because a river only runs one way.</li>
+</ul>
+<h2>6. Pins, when they pile up</h2>
+<p>Changed in this build and barely tested outside one screenshot.</p>
+<ul>
+<li>Zoom into a town where places cluster — a main street with several businesses.</li>
+<li>Overlapping pins should collapse into one pin with <b>×2, ×3</b> beside it, <b>at any zoom</b>.</li>
+<li>Tap the badge: you should get the whole stack as a scrollable list, and tapping a row opens that place.</li>
+<li><b>Watch for flicker.</b> If pins visibly appear and disappear repeatedly while the map sits still, report it — that failure mode exists and we want to know if it escaped.</li>
+<li>Do pins you care about ever vanish entirely when you zoom?</li>
+</ul>
+<h2>7. Imagery — is it still sharp enough?</h2>
+<p>The satellite imagery was re-compressed in a recent build and is about a third smaller. Nobody has looked at it in the field yet.</p>
+<ul>
+<li>Switch the base to <b>Hybrid</b> and look at ground you know well at about a one-mile zoom. Is it legible? Any blocky patches, colour banding, or smeared areas?</li>
+<li>The statewide base is deliberately soft up close — that is expected. <b>Blockiness and colour smearing are not.</b></li>
+<li><b>HD chip</b> (top right): pick an area, check the sheet quotes tiles and megabytes <i>before</i> the save button appears, run the save, watch the progress. Press <b>Stop</b> partway — it should keep what it already got. Start the same save later; it should resume rather than start over.</li>
+<li>Put the phone in airplane mode and go back to that area. <b>Saved HD must still draw.</b></li>
+<li><b>Tools → Saved HD imagery</b>: does deleting a save actually free the space?</li>
+</ul>
+<h2>8. Search</h2>
+<ul>
+<li>Trails by name and by number — <code>H57-17</code> and <code>h5717</code> should both find it.</li>
+<li>A street address near you. A town. A ski hill. A boat launch. A river by name.</li>
+<li><b>Does the top result make sense</b>, or do you have to scroll to find the obvious answer?</li>
+<li>Anything you search for that <i>should</i> exist in Michigan and does not come up is worth reporting.</li>
+</ul>
+<h2>9. The safety features — test them cold, not on the bad day</h2>
+<ul>
+<li><b>Dispatch card</b>: does it show your coordinates <i>and</i> a nearest address? Read it aloud and check it against your maps app. <b>If the address is wrong, report it with the coordinates</b> — this is the feature meant to work when you are hurt.</li>
+<li><b>Compass</b>, <b>Mark this spot</b>, <b>breadcrumb trail</b>, <b>truck pin</b>: do they do what they say?</li>
+<li><b>Tools → Diagnostics → Self-test</b>: run it and report anything that fails. It should also report zero remote requests — if it does not, we want to know.</li>
+</ul>
+<h2>10. The things that make an app feel broken</h2>
+<ul>
+<li>Rotate the phone. Fold and unfold it. Change the system font size to large. Turn on dark mode. Anything clipped, overlapping, or unreachable?</li>
+<li>Leave it open for an hour. Does it slow down or get hot?</li>
+<li>Interrupt it: incoming call, low battery warning, another app on top. Does it come back?</li>
+<li>Does the back button ever trap you in a panel you cannot leave?</li>
+<li>Anything that stutters while panning.</li>
+</ul>
+<h2>11. Read the map like a rider</h2>
+<p>Data errors matter as much as crashes:</p>
+<ul>
+<li>A trail drawn where there is no trail, or missing where there is one.</li>
+<li>A trail marked open that is signed closed, or the reverse.</li>
+<li>A boat launch, campground or gas station that is not there any more.</li>
+<li>A dam <b>not</b> marked on a river you paddle. Report this one first.</li>
+<li>Names spelled wrong, or a trail number that does not match the sign.</li>
+</ul>
+<p><b>The map is not permission.</b> Signs on the ground always win. An ORV licence and trail permit are required on the designated system. Check seasons and closures with the DNR or the Forest Service before you ride or hunt.</p>
+<hr>
+<h2>What we most want to hear about</h2>
+<ol>
+<li>GPS that stops updating, or never gets a fix under cover.</li>
+<li>Any route that sends a machine somewhere it may not legally or physically go.</li>
+<li>A dispatch address that is wrong.</li>
+<li>A dam missing from a river run.</li>
+<li>Anything at all that happens in airplane mode but not on wifi.</li>
+<li>Crashes — with what you were doing when it happened.</li>
+</ol>
+<p>Thanks for riding it. Things you find now are things nobody finds three miles in.</p>
+<p class="foot">APEX ORV · build 162 · this page is generated from the
+repository that built the app you are testing.</p>
+</body></html>
