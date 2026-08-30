@@ -1,4 +1,53 @@
-# HANDOFF — through Take 159 · V2
+# HANDOFF — through Take 160 · V2
+
+## Take 160 — 2026-08-29 — overlapping pins stack at ANY zoom (A176)
+
+Jacob, 24596, at 1000 ft: pins still sit on top of each other — three by
+Bosko's Coffee, two on Cass Lake Road — "the whole reason we implemented
+this feature". He is right, and take 154 does not cover it: that
+clustering stops at z11.4 and everything above it draws exactly as it
+always did. Statewide grouping and on-screen collision are two different
+problems and only the first was solved.
+
+Design of record:
+- Above the cluster ceiling a COLLISION pass runs on moveend. It reads
+  the pins MapLibre actually rendered (queryRenderedFeatures, so it sees
+  what the eye sees, after every mode and prominence filter), groups any
+  whose screen positions fall within a pin's width of each other, keeps
+  the highest-ranked member visible and hides the rest, and draws a xN
+  badge on the survivor.
+- Every kind participates up here, food and fuel included. The take-154
+  rule ("services never cluster") was about mass grouping at statewide
+  zoom; two coffee shops drawn on top of each other are unreadable
+  whatever kind they are, and Jacob's screenshot IS food pins.
+- Tapping the badge opens a card listing the whole stack, scrollable,
+  each row opening that place — his ask, verbatim.
+- The existing poi layers keep doing the rendering. Hiding is a filter
+  exclusion on the feature index, so mode filters, prominence tiers and
+  boosts all keep working untouched; nothing about pin drawing is
+  reimplemented.
+
+The bug the drill caught, and it would have flickered in Jacob's hand:
+the pass reads RENDERED pins, so once it hid the overlapping members it
+could no longer see them — next pass finds no overlap, un-hides
+everything, finds the overlap again, forever. Pins hidden by the previous
+pass are added back from the record by index before grouping, so every
+pass starts from the same full set. The check that caught it asserted the
+suppression COUNT, not just that a badge appeared; a badge appears in
+both the working and the oscillating case.
+
+Infrastructure, found the hard way and recorded as landmine 210: three
+gate runs died with EMPTY logs and I blamed landmine 207 twice before
+running one in the foreground, which printed ENOSPC on the first line.
+The disk was at 100% — a dozen ~133 MB Chrome profiles abandoned by
+killed renders, plus stale seed staging and the 4 GB swap file. Cleared
+2.2 GB. Some earlier "turn boundary" diagnoses in this project were
+probably this.
+
+SEAL: render 216/0 (212 + four collision checks), smoke green, gate
+PASSED. apex-seed-t160.zip sealed (sha256 in chat).
+
+---
 
 ## Take 159 — 2026-08-29 — imagery gets smaller, and WebP loses (A158)
 

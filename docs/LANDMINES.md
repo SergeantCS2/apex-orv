@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 159.*
+*Current as of take 160.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -2649,3 +2649,26 @@ render harness's label check caught it; the baseline it was measured
 against (t153 drew exactly 1 label at that camera) is what made "1" a
 pass and "0" a regression rather than both looking like noise. Any new
 symbol layer added above the labels needs this pair considered together.
+
+**210. A silent detached-process death is DISK before it is anything
+else.** Three gate runs in take 160 produced a zero-byte log and no
+process, and each time landmine 207 (turn boundaries) looked like the
+answer. It was not. Running the gate in the FOREGROUND printed the truth
+immediately: `ENOSPC ... mkdtemp /tmp/puppeteer_dev_chrome_profile-*` —
+the filesystem was at 100%, zero bytes available. Every render killed
+mid-run leaves a ~133 MB Chrome profile behind, and a dozen of those
+plus stale seed staging and a 4 GB swap file had eaten the disk. A
+process that cannot create a temp dir dies before it writes a single
+line, which is indistinguishable from being reaped.
+
+Rule: when a background job produces an EMPTY log, run it in the
+foreground before diagnosing anything else — the error is usually
+already on stderr and takes one call to see. And clear the debris:
+
+    rm -rf /tmp/puppeteer_dev_chrome_profile-* /tmp/apex-fatal-*
+    df -h /            # before blaming the environment
+
+Corollary for landmine 207: some earlier "died at the turn boundary"
+diagnoses in this project were probably this instead. 207 is real — it
+was observed with a healthy disk — but it is the second thing to check,
+not the first.

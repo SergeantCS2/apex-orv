@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 159.* Ranked by blocking-ness, not by interest.
+*Current as of take 160.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2852,4 +2852,19 @@ Lifting on the first idle frame is correct: "when it goes away,
 everything is mostly loaded" (Jacob, 24586). No change.
 - **Ruled out:** holding for full tile-settle — it would lengthen every
   cold start to fix a problem the field says does not exist.
+
+## A176 — Overlapping pins at high zoom · SHIPPED take 160
+Take 154 stacks only below z11.4; at 1000 ft pins still overlap (Jacob,
+24596). Collision pass above the ceiling: group rendered pins within a
+pin-width, hide all but the top-ranked, badge it xN, tap opens a
+scrollable tray of the members.
+- **Ruled out:** extending take 154's grid bucketing upward — its 76 px
+  cell merges pins that are merely NEAR each other, and up here the only
+  thing worth merging is pins that actually overlap.
+- **Ruled out:** excluding food and fuel as take 154 does. That rule
+  exists to stop mass grouping at statewide zoom; overlapping is
+  overlapping, and the report is literally about coffee shops.
+- **Ruled out:** reimplementing pin rendering in the stack source. The
+  existing layers carry mode filters, prominence tiers and boosts; the
+  collision pass hides by feature index and leaves all of that alone.
 

@@ -1438,6 +1438,9 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
        composition: kn = how many of the dominant kind, so a homogeneous
        pile can wear its own glyph and an honest xN. */
     poiclust:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
+    /* take 160 · A176 · one badge per pile of pins that physically overlap
+       at the CURRENT zoom, above the cluster ceiling where take 154 stops */
+    poistack:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     cont:{type:'geojson',data:{type:'FeatureCollection',features:contf}},
     wpts:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     peaks:{type:'geojson',data:{type:'FeatureCollection',features:peakf}},
@@ -1824,6 +1827,13 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-optional':true,'symbol-sort-key':['get','r']},
       paint:{'text-color':['get','c'],'text-halo-color':'#FFFFFF',
         'text-halo-width':1.9}},
+    {id:'poi-stack',type:'symbol',source:'poistack',minzoom:CLUSTER_MAXZ,
+      layout:{'text-field':['concat','\u00d7',['to-string',['get','n']]],
+        'text-font':['APEX'],'text-size':11,'text-allow-overlap':true,
+        'text-ignore-placement':true,'text-offset':[1.05,-1.05],
+        'text-anchor':'left'},
+      paint:{'text-color':'#FFFFFF','text-halo-color':'#1C1A16',
+        'text-halo-width':2.4}},
     {id:'cont-label',type:'symbol',source:'cont',minzoom:13.2,
       layout:{visibility:'none','symbol-placement':'line',
         'text-field':['get','lb'],'text-font':['APEX'],
@@ -3254,7 +3264,7 @@ var MODES=[
    groups:{areas:false,peaks:false,contour:false,relief:false,paddle:true,places:true,county:false,public:false},
    basemap:'Hybrid', zoom:10}
 ];
-var mode='ride', POI_BASE={};
+var mode='ride', POI_BASE={}, POI_MODEF={}, STACKED={};
 function modeOf(k){return MODES.filter(function(m){return m.k===k})[0]||MODES[0]}
 /* A zoom `step` is legal ONLY at the top of a filter (the same rule that
    rejected the whole style at take 121, landmine 52). The base destination
@@ -3355,7 +3365,12 @@ function applyMode(k,opts){
   ['poi-dot','poi-dot-major'].forEach(function(id){
     try{
       if(!POI_BASE[id])POI_BASE[id]=map.getFilter(id)||true;
-      map.setFilter(id,modeFilter(POI_BASE[id],m,id))
+      /* take 160 · A176 · remembered so the collision pass can re-apply the
+         SAME filter with a hidden-index exclusion, instead of rebuilding
+         (and quietly diverging from) the mode logic. */
+      POI_MODEF[id]=modeFilter(POI_BASE[id],m,id);
+      map.setFilter(id,POI_MODEF[id]);
+      STACKED={};
     }catch(e){}});
   /* machine: Outdoors walks; leaving it gives the rider's machine back */
   try{
@@ -4656,6 +4671,9 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       window.__gauges=(typeof GAUGES!=='undefined')?GAUGES:null;
       window.__search=function(q){return search(q)};
       window.__splash=SPL;window.__busy=BUSY;
+      window.__stack={run:restack,px:STACKPX,
+        hidden:function(){return Object.keys(STACKED).length},
+        card:stackCard};
       window.__clust={kinds:CLUSTERKINDS,maxz:CLUSTER_MAXZ,
         feats:function(m){return clusterFeatures(m)},
         count:function(){return CLUSTN},radius:CLUSTER_R,
@@ -5473,6 +5491,113 @@ map.on('move',refreshReadout);map.on('load',refreshReadout);
 map.on('moveend',railFoldIfAway);
 /* take 154 · re-bucket after the map settles, never during a gesture */
 map.on('moveend',recluster);
+
+/* take 160 · A176 · collision above the cluster ceiling. It reads the pins
+   MapLibre ACTUALLY RENDERED rather than the source data, so it sees what
+   the rider sees — after the mode filter, the prominence tier, the boost
+   and the label collision. Groups anything within a pin's width, keeps the
+   best-ranked member, hides the others by feature index, and badges the
+   survivor xN. Every kind takes part up here: two coffee shops drawn on
+   top of each other are unreadable whatever kind they are (Jacob, 24596). */
+var STACKPX=26;   /* a pin is ~26 px across; closer than that is overlap */
+function restack(){
+  var src;try{src=map.getSource('poistack')}catch(e){return}
+  if(!src)return;
+  if(map.getZoom()<CLUSTER_MAXZ){
+    if(Object.keys(STACKED).length){STACKED={};applyStackFilters()}
+    src.setData({type:'FeatureCollection',features:[]});return}
+  var fs=[];
+  try{fs=map.queryRenderedFeatures({layers:['poi-dot','poi-dot-major']})}
+  catch(e){return}
+  var seen={},pts=[];
+  for(var i=0;i<fs.length;i++){
+    var f=fs[i],id=f.properties.i;
+    if(id===undefined||seen[id])continue;      /* one entry per place */
+    seen[id]=1;
+    var p;try{p=map.project(f.geometry.coordinates)}catch(e){continue}
+    pts.push({id:id,x:p.x,y:p.y,r:+f.properties.r||9,
+      c:f.geometry.coordinates,k:f.properties.k})}
+  /* The pins hidden by the LAST pass are not rendered any more, so a query
+     alone cannot see them — and a pass blind to what it hid would find no
+     overlap, un-hide everything, find the overlap again, and flicker
+     forever. They are added back from the record, by index, so every pass
+     starts from the same full set. */
+  for(var hid in STACKED){
+    if(seen[hid])continue;
+    var rec=((POIS&&POIS.p)||[])[+hid];
+    if(!rec||!rec.p)continue;
+    seen[hid]=1;
+    var hp;try{hp=map.project(rec.p)}catch(e){continue}
+    if(hp.x<-60||hp.y<-60||hp.x>map.getCanvas().clientWidth+60||
+       hp.y>map.getCanvas().clientHeight+60)continue;
+    pts.push({id:+hid,x:hp.x,y:hp.y,r:(POIKIND[rec.k]||{}).r||9,
+      c:rec.p,k:rec.k})}
+  var bins={},cell=STACKPX;
+  pts.forEach(function(p){
+    var key=Math.round(p.x/cell)+'|'+Math.round(p.y/cell);
+    (bins[key]||(bins[key]=[])).push(p)});
+  var hide={},out=[];
+  for(var key2 in bins){
+    var g=bins[key2];
+    if(g.length<2)continue;
+    /* the survivor is the most prominent — lowest rank wins, the same
+       order the map already uses to decide what sits on top */
+    g.sort(function(a,b){return a.r-b.r});
+    for(var j=1;j<g.length;j++)hide[g[j].id]=1;
+    out.push({type:'Feature',
+      properties:{n:g.length,k:g[0].k,
+        ids:g.map(function(q){return q.id}).join(',')},
+      geometry:{type:'Point',coordinates:g[0].c}})}
+  var changed=Object.keys(hide).length!==Object.keys(STACKED).length;
+  if(!changed)for(var h in hide)if(!STACKED[h]){changed=true;break}
+  STACKED=hide;
+  if(changed)applyStackFilters();
+  src.setData({type:'FeatureCollection',features:out})}
+
+/* take 160 · A176 · the tray Jacob asked for: "when you click it, the tray
+   shows both pins that you can scroll through". Each row opens that place's
+   own card, so nothing about a place is reachable only through the stack. */
+function stackCard(f){
+  var ids=String(f.properties.ids||'').split(',').filter(function(x){return x!==''});
+  var recs=ids.map(function(i){return {i:+i,r:((POIS&&POIS.p)||[])[+i]}})
+    .filter(function(o){return o.r});
+  if(!recs.length)return;
+  logAct('tap  stack '+recs.length);
+  var rows=recs.map(function(o,n){
+    var kd=POIKIND[o.r.k]||{},nm=o.r.n||kd.h||o.r.k;
+    return '<button class="chip" data-si="'+n+'" style="width:100%;'+
+      'justify-content:flex-start;text-align:left">'+
+      '<span style="color:'+(kd.c||'#8B857A')+'">\u25cf</span>'+
+      '<span>'+nm+(o.r.n&&kd.h?' <span class="sub">'+kd.h+'</span>':'')+
+      '</span></button>'}).join('');
+  show('<b>'+recs.length+' places here</b>'+
+    '<div class="sub">They are stacked at this zoom. Tap one, or zoom in '+
+    'to separate them.</div><div class="sub" style="max-height:46vh;'+
+    'overflow:auto">'+rows+'</div>','');
+  var host=el('panel')||document;
+  Array.prototype.forEach.call(host.querySelectorAll('[data-si]'),function(b){
+    b.addEventListener('click',function(){
+      var o=recs[+b.dataset.si];if(!o)return;
+      /* open THAT place by flying to it and letting the normal pin card do
+         the work — one card implementation, not two (landmine 98) */
+      map.easeTo({center:o.r.p,zoom:Math.max(map.getZoom(),15.6),duration:600});
+      setTimeout(function(){
+        var pt=map.project(o.r.p);
+        map.getCanvasContainer().dispatchEvent(new MouseEvent('click',
+          {bubbles:true,cancelable:true,
+           clientX:map.getCanvasContainer().getBoundingClientRect().left+pt.x,
+           clientY:map.getCanvasContainer().getBoundingClientRect().top+pt.y}))},700)})});
+}
+
+function applyStackFilters(){
+  var ids=Object.keys(STACKED).map(Number);
+  ['poi-dot','poi-dot-major'].forEach(function(id){
+    try{
+      var base=POI_MODEF[id]||POI_BASE[id]||true;
+      map.setFilter(id, ids.length
+        ? ['all',base,['!',['in',['get','i'],['literal',ids]]]]
+        : base)}catch(e){}})}
+map.on('moveend',restack);
 ['dragstart','zoomstart','rotatestart'].forEach(function(ev){
   map.on(ev,function(e){if(e&&e.originalEvent)_userDrove=true})});
 map.on('load',function(){makeBadges();setBasemap(0);wpDraw();showTab('map');
@@ -5546,6 +5671,12 @@ var HIT=['route72','trail50','moto24','mccct','fstrail','fsroad','closed','fsclo
 var HIT_SHOW=['show-line'];
 map.on('click',function(e){
   if(lp.fired){lp.fired=false;return}   /* the long press already acted */
+  /* take 160 · A176 · a stack badge is checked before the pins beneath it:
+     the tap that lands on a pile of three means the pile. */
+  try{var sf=map.queryRenderedFeatures(
+      [[e.point.x-16,e.point.y-16],[e.point.x+16,e.point.y+16]],
+      {layers:['poi-stack']});
+    if(sf.length&&+sf[0].properties.n>1)return stackCard(sf[0])}catch(_e){}
   /* take 154 · a cluster is checked FIRST: it is drawn over everything at
      that zoom, so a tap that lands on one meant it. */
   try{var cf=map.queryRenderedFeatures(

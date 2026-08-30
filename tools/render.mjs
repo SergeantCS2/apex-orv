@@ -1088,6 +1088,54 @@ if (zoomed.trails === 0) {
              btnTokens: [...sh.querySelectorAll("button")]
                .filter((b) => b.innerHTML.indexOf("__IC_") >= 0).length };
   });
+  /* Take 160 · A176 · overlapping pins at HIGH zoom — the case take 154's
+     ceiling never covered, and the one Jacob photographed at 1000 ft. */
+  {
+    const st = await page.evaluate(async () => {
+      const m = window.map, S = window.__stack, M = window.__mode,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      if (!S) return { missing: true };
+      const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+      // a dense town at a zoom where pins genuinely collide
+      M.apply("ride", { silent: true }); await s(200);
+      m.jumpTo({ center: [-83.35, 42.66], zoom: 13.4 });
+      let stacks = 0, biggest = 0, hidden = 0, ids = null, badge = null;
+      for (let i = 0; i < 22; i++) { await s(320);
+        S.run();
+        try {
+          const f = m.queryRenderedFeatures({ layers: ["poi-stack"] });
+          stacks = f.length;
+          f.forEach((x) => { if (+x.properties.n > biggest) {
+            biggest = +x.properties.n; ids = x.properties.ids; badge = x.properties.k; } });
+        } catch (e) { }
+        hidden = S.hidden();
+        if (stacks) break; }
+      // and the members really are suppressed from the pin layers
+      let drawnIds = new Set();
+      try { m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major"] })
+        .forEach((f) => drawnIds.add(String(f.properties.i))); } catch (e) { }
+      const members = (ids || "").split(",").filter(Boolean);
+      const stillDrawn = members.filter((x) => drawnIds.has(x)).length;
+      // below the ceiling the pass must stand down entirely
+      m.jumpTo({ center: [-83.35, 42.66], zoom: 10.4 }); await s(500);
+      S.run(); await s(400);
+      let low = -1;
+      try { low = m.queryRenderedFeatures({ layers: ["poi-stack"] }).length; } catch (e) { }
+      M.apply(was, { silent: true });
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+      return { stacks, biggest, hidden, members: members.length, stillDrawn, low, badge };
+    });
+    if (st.missing) ok(false, "the stack hook is missing");
+    else {
+      ok(st.stacks > 0 && st.biggest > 1,
+         `overlapping pins stack at z13.4 — the case z11.4 clustering never covered (${st.stacks} badges, biggest ×${st.biggest})`);
+      ok(st.members === st.biggest && st.stillDrawn === 1,
+         `a stack of ${st.members} leaves exactly ONE pin drawn, not ${st.stillDrawn}`);
+      ok(st.hidden > 0, `and the rest are hidden by index (${st.hidden} suppressed)`);
+      ok(st.low === 0,
+         "below the ceiling the collision pass stands down — take 154 owns that zoom");
+    }
+  }
   if (shl.missing) ok(false, "no #shell to check");
   else {
     ok(shl.ready && shl.opacity === "1",
