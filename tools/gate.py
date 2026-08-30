@@ -76,6 +76,22 @@ ALLOW = re.compile(r"openstreetmap\.org|maplibre\.org|github\.com/maplibre"
                    r"|waterservices\.usgs\.gov")
 
 
+def check_scrub():
+    """A release must not ship developer commentary. An .apk is a zip anyone
+    can open, so www/ is effectively public: internal notes, ticket numbers
+    and names have no business travelling with it. The repository keeps its
+    annotations; the build strips them from the artifact."""
+    for rel in ("app.js", "index.html"):
+        p = os.path.join(ROOT, "www", rel)
+        if not os.path.exists(p):
+            continue
+        t = read("www", rel)
+        if "/*" in t or "<!--" in t:
+            fails.append(f"www/{rel} still carries comments — run "
+                         "tools/scrub.mjs (it is wired into build_app split)")
+    notes.append("scrub: shipped assets carry no developer commentary")
+
+
 def check_splash():
     """take 156 · A171. The splash only works if it is in the STATIC markup,
     ahead of the app shell, with its logo already inlined — a splash that
@@ -1730,7 +1746,7 @@ def check_ledger_order():
     notes.append(f"landmine file order: {len(nums)} entries, strictly ascending")
 
 
-for fn in (check_handoff, check_stamps, check_offline, check_splash,
+for fn in (check_handoff, check_stamps, check_offline, check_splash, check_scrub,
            check_style, check_palette, check_machine_legality,
            check_ledgers, check_osm_fallback, check_drawn,
            check_region_clean, check_no_duplicate_defs, check_ledger_order,

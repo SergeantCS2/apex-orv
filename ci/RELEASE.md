@@ -1,19 +1,17 @@
-**Take 160 — overlapping pins stack now, at any zoom.**
+**Take 162 — release build.**
 
-The stacking added a few builds ago only worked when you were zoomed way
-out. Zoomed in — like your 1000 ft screenshot with three pins piled up by
-Bosko's — pins still sat on top of each other. Now they don't:
+Prepared for the first store submission. The app itself is unchanged from
+the last build you tested; what changed is what travels with it.
 
-- **Two or more pins overlapping become one pin with ×2, ×3** beside it,
-  at whatever zoom you're at.
-- **Tap it and you get the whole pile** in a scrollable list. Tap any row
-  and it opens that place's own card, exactly as if you'd tapped its pin.
-- Zoom in and they separate on their own, as you'd expect.
-- Up close this applies to every kind, food and fuel included — two
-  coffee shops drawn on top of each other are unreadable whichever kind
-  they are.
+- The web assets inside the package no longer carry development notes.
+  An installed app package is a zip anyone can open, so those files are
+  effectively public; they now contain code and nothing else.
+- Support contact set for the store listing.
+- Everything from the recent builds is here: the loading screen, the
+  basemap loading line, stacked pins with counts at every zoom, and the
+  smaller satellite imagery.
 
-### Check on the phone
-1. That same spot by Bosko's at 1000 ft: one pin with ×3, not a pile.
-2. Tap it: all three listed, scrollable; tap one, its card opens.
-3. Zoom right in: they separate and the badge disappears.
+### Check before submitting
+1. Install and open: loading screen, then a finished map.
+2. Tools -> Self-test: expect a clean pass.
+3. Spot-check Hybrid somewhere familiar and a couple of pin stacks.

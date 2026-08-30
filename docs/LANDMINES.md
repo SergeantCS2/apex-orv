@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 161.*
+*Current as of take 162.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -2663,8 +2663,13 @@ plus stale seed staging and a 4 GB swap file had eaten the disk. A
 process that cannot create a temp dir dies before it writes a single
 line, which is indistinguishable from being reaped.
 
-Rule: when a background job produces an EMPTY log, run it in the
-foreground before diagnosing anything else — the error is usually
+Refinement (take 162): gate.py BUFFERS its whole output and takes about
+ten minutes, so an empty log part-way through is simply an unfinished
+run. Give it the full window before calling it dead, then apply the rule
+below.
+
+Rule: when a background job produces an EMPTY log AFTER its full expected
+runtime, run it in the foreground before diagnosing anything else — the error is usually
 already on stderr and takes one call to see. And clear the debris:
 
     rm -rf /tmp/puppeteer_dev_chrome_profile-* /tmp/apex-fatal-*

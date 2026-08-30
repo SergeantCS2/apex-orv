@@ -311,6 +311,19 @@ def split():
         if os.path.exists(sp):
             os.remove(sp)
     print(f"split -> www/index.html, www/app.js, www/bundle/ ({len(copied)} files)")
+    # An .apk is a zip anyone can open, so the shipped web assets are public.
+    # The repository keeps its annotations; the release does not carry them.
+    # APEX_KEEP_COMMENTS=1 leaves them in for local debugging.
+    if not os.environ.get("APEX_KEEP_COMMENTS"):
+        import subprocess
+        try:
+            subprocess.run(["node", os.path.join(ROOT, "tools", "scrub.mjs"),
+                            os.path.join(ROOT, "www", "app.js"),
+                            os.path.join(ROOT, "www", "index.html")],
+                           check=True)
+        except Exception as e:
+            raise SystemExit(f"scrub failed ({e}) — a release must not ship "
+                             "developer commentary; fix it rather than skip it")
     for c in sorted(copied):
         print(f"    {c}")
     if "graph.json" not in copied:

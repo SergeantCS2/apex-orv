@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 161.* Ranked by blocking-ness, not by interest.
+*Current as of take 162.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2894,3 +2894,24 @@ Decisions of record, made against the LIVE Play pages (landmine 190):
 - Remaining before upload: privacy policy URL live on Pages, data safety
   form, content rating, listing assets, then internal → closed testing with
   12 testers opted in 14 continuous days.
+
+## A179 — Release artifacts carry no developer commentary · SHIPPED take 162
+tools/scrub.mjs strips comments from www/ at build time; gate re-checks
+the artifact. Source annotations are untouched.
+- **Ruled out:** stripping comments from src/. They are why this project
+  catches its own regressions; the artifact is what needs to be clean.
+- **Ruled out:** regex-based comment removal — a parser is the only way
+  to tell a comment from a regex literal or a division.
+- **Ruled out:** find-and-replace on personal names across the tree.
+  Jacobsville Lighthouse, Jacobson Marina and Sergeant Marina are real
+  places in the map data.
+
+## A180 — Application ID is permanent at first Play upload · DECISION NEEDED
+capacitor.config.json declares com.sergeantslabs.apex. Play fixes the
+applicationId forever at the first upload, and it is visible in the store
+URL. If the name is to be neutral it must change BEFORE that upload, and
+a change means Play-installed and sideloaded builds can no longer update
+each other.
+- **Ruled out:** changing it unilaterally. It is the app's identity and
+  the last reversible moment is now.
+

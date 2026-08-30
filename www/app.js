@@ -1,19 +1,8 @@
-/* Boot from the region bundle. PROTOCOL §8: provisioning may use the
-   network, the field may not -- these are same-origin reads of files already on
-   the device, which is why the NET guard stays green.
-
-   The manifest drives it. A region missing an optional layer still rides
-   (landmine 34); a region missing a required one is refused rather than shown
-   with holes, because a map you cannot trust is worse than no map. */
+ 
 (function(){
 var WATER,GR,TR,SHADE,SAT,SATB,GLYPHS,BUNDLE={state:'unknown',absent:[]};
 
-/* take 156 · A171 · the splash's progress is REAL: it counts the artifacts
-   this boot actually fetches, then the style, then the first drawn frame.
-   Jacob offered a fixed 10-second timer as a shortcut; a bar that reads 60%
-   on a finished phone, or 100% on an unfinished one, is an instrument that
-   lies, and the milestones were already countable. Monotonic by
-   construction — it can never tick backwards as more fetches launch. */
+ 
 var SPLASH=(function(){
   var el,fill,say,started=0,done=0,pct=0,lifted=false;
   function grab(){
@@ -28,7 +17,7 @@ var SPLASH=(function(){
     if(!el)return;el.className='gone';
     setTimeout(function(){try{el.parentNode.removeChild(el)}catch(e){}},420)}
   return {start:function(){started++},
-    /* denominator floors at 12 so the very first fetch cannot read 100% */
+     
     step:function(){done++;set(done/Math.max(started,12)*70,'Loading Michigan')},
     style:function(){set(86,'Drawing the map')},
     ready:function(){set(100,'Ready');lift()},
@@ -49,10 +38,7 @@ function fatal(msg,detail){
    '<b style="font-size:17px">'+msg+'</b><br><br>'+
    '<span style="color:#9A9184">'+detail+'</span></div>'}
 
-/* These names must match the `kind` column in tools/bundle.py ARTIFACTS.
-   They did not at take 12 — the loader wanted graph/terrain/glyphs while the
-   manifest emitted network/terrain/labels, so every region would have been
-   refused as incomplete. Caught by simulating a partial bundle, not by reading. */
+ 
 var REQ={network:1,terrain:1,labels:1};
 var OPT=['imagery','relief','hydro'];
 
@@ -79,21 +65,19 @@ j('bundle/manifest.json').then(function(man){
     have.context?j('bundle/'+have.context):Promise.resolve(null),
     have.address?j('bundle/'+have.address):Promise.resolve(null),
     have.other?j('bundle/'+have.other):Promise.resolve(null),
-    /* A110. Optional and absent-safe: an older bundle has no places artifact
-       and the app simply draws no pins, rather than refusing the region. */
+     
     have.places?j('bundle/'+have.places):Promise.resolve(null),
-    /* A87. Optional and absent-safe, exactly like places: an older bundle has
-       no contour artifact and the map simply has no contour lines. */
+     
     have.contour?j('bundle/'+have.contour):Promise.resolve(null),
-    /* A115. Optional and absent-safe like the rest. */
+     
     have.paddle?j('bundle/'+have.paddle):Promise.resolve(null),
     have.ground?j('bundle/'+have.ground):Promise.resolve(null),
-    /* A140 (take 119). DNR scramble areas — optional, absent-safe. */
+     
     have.areas?j('bundle/'+have.areas):Promise.resolve(null),
-    /* take 131 · photos for major pins — optional, absent-safe */
+     
     have.photos?j('bundle/'+have.photos):Promise.resolve(null),
     have.publicland?j('bundle/'+have.publicland):Promise.resolve(null),
-    /* take 150 · A164: gauge inventory — optional, absent-safe */
+     
     have.gauges?j('bundle/'+have.gauges):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
@@ -107,12 +91,7 @@ j('bundle/manifest.json').then(function(man){
 
 function start(){
 var el=function(i){return document.getElementById(i)};
-/* take 156 · the loader defines SPLASH and runs first, but THIS code lives
-   inside start(), so `var SPLASH` here would hoist a LOCAL binding and
-   shadow the real controller for the whole app body — which it did: every
-   lift call went to the no-op and the splash sat there forever. A distinct
-   name reads the outer one, and the no-op only stands in for the
-   single-file build, which has no loader at all. */
+ 
 var SPL=(typeof SPLASH!=='undefined'&&SPLASH)?SPLASH:{start:function(){},
   step:function(){},style:function(){},ready:function(){},lift:function(){},
   pct:function(){return 100},gone:function(){return true}};
@@ -121,11 +100,7 @@ var remoteHits=0,netB=el('b-net');
 function isRemote(r){try{var u=new URL(r,location.href);
  if(['data:','blob:','file:'].indexOf(u.protocol)>=0)return false;
  return u.origin!==location.origin}catch(e){return false}}
-/* take 153 · §8's in-app provisioning allowlist, mirrored from the gate:
-   a user-tapped HD save or gauge read is LEGAL network use and must not
-   paint the badge red or fail the self-test — but it is still counted and
-   named, because "offline" is proven, not promised. Anything else stays a
-   failure. */
+ 
 var INAPP_HOSTS=['basemap.nationalmap.gov','waterservices.usgs.gov'];
 var inappHits=0;
 function watch(r){if(!isRemote(r))return;
@@ -144,48 +119,11 @@ netB.textContent='NET CLEAN';netB.className='badge good';
 function decode(a){var p=[],x=0,y=0;for(var i=0;i<a.length;i+=2){x+=a[i];y+=a[i+1];
  p.push([x/1e5,y/1e5])}return p}
 
-/* ── graph ─────────────────────────────────────────────────────────────── */
-/* ══ MACHINE LEGALITY ═══════════════════════════════════════════════════════
-   Take 80. `MACHINE[m].ok` is a CLASS allow-list and it encodes the DNR's rules
-   correctly, because the DNR expresses width in the layer a feature comes from:
-   a 24" trail is class moto24, a 50" trail is trail50, and the allow-lists
-   follow. Nothing to fix there.
-
-   The Forest Service does not work that way. It publishes ONE class of trail
-   and puts the per-vehicle rules in the attributes. In this region 25 fstrail
-   edges (3.13 mi) carry `moto: open` with `atv` unset, and their MVUM symbol
-   reads "Trails open to motorcycles, Yearlong". A quad is allowed on class
-   fstrail, so the router would put one on a motorcycle trail — and the feature
-   card printed "Moto open" beside it, so the app was displaying the fact and
-   ignoring it at the same time.
-
-   Where the source states a per-vehicle rule, that rule governs. Where it does
-   not, the class rule stands. Both the router and the snapper go through here,
-   because a snap that lands on an illegal node reports "no route" when a legal
-   one exists, or worse, starts you on one (take 24).
-
-   sxs has no stored flag: the MVUM's `other_ohv_gt50inches` and
-   `highclearancevehicle` are fetched by ingest and dropped before the bundle.
-   It falls back to the class rule, which excludes fstrail entirely, so it is
-   conservative rather than wrong. Recorded as open — see A86. */
+ 
+ 
 var MACH_FLAG={bike:'moto',quad:'atv',sxs:null,walk:null};
 
-/* ══ SPECIAL RESTRICTIONS (A101) ════════════════════════════════════════════
-   The DNR publishes a free-text restriction on 180 features statewide. It is
-   real law: 67 of them read "Off road motorcycles are prohibited", which is
-   Jacob's machine.
-
-   ENUMERATED, not pattern-matched. There are exactly nine distinct strings in
-   the whole state — a table I can read and check by eye, against a regex on
-   legal prose that would silently mis-classify the tenth. When the DNR adds
-   one, it lands in `unknown` below and is SHOWN to the rider rather than
-   guessed at.
-
-   THE RULE: this table may only ever take access away, never grant it. A string
-   we do not recognise restricts nothing and is displayed verbatim, because
-   telling a rider what the sign says is honest and inventing a reading of it is
-   not. Zero features in the Bull Gap box carry one — this exists so the
-   machinery is here before A72 widens the region, not after. */
+ 
 var RESTRICT=[
   {m:'Off road motorcycles are prohibited',
    ban:['bike'], season:'May 1 – Nov 1',
@@ -213,13 +151,10 @@ function restrictOf(e){
   if(!t)return null;
   for(var i=0;i<RESTRICT.length;i++)
     if(t.indexOf(RESTRICT[i].m)>=0)return RESTRICT[i];
-  /* Unrecognised: show the source's own words. Never guess. */
+   
   return {m:null,ban:[],say:t,unknown:true}}
 
-/* Legality is pure in (machine, class, bundle) — memoised (take 117): the
-   statewide router was spending 30+ seconds per request re-parsing the same
-   restriction strings hundreds of thousands of times. The memo empties when
-   the machine changes. */
+ 
 var _legalMemo={};
 function machineLegal(e){
   var mk=machine+':'+e.bi+':'+e.c, hit=_legalMemo[mk];
@@ -227,37 +162,29 @@ function machineLegal(e){
   return (_legalMemo[mk]=_machineLegal(e))}
 function _machineLegal(e){
   if(MACHINE[machine].ok.indexOf(e.c)<0)return false;
-  /* A101: a published restriction may only ever take access away. An
-     unrecognised one bans nothing and is displayed instead (take 95). */
+   
   var _r=restrictOf(e);
   if(_r&&_r.ban&&_r.ban.indexOf(machine)>=0)return false;
   if(e.c==='closed'||e.c==='fsclosed')return false;
   var fl=MACH_FLAG[machine];
-  if(!fl)return true;                       /* no per-vehicle field for it */
+  if(!fl)return true;                        
   var v=B[e.bi>=0?e.bi:0];
-  if(e.bi<0||!v)return true;                /* no attributes: class rule stands */
+  if(e.bi<0||!v)return true;                 
   var mi=BK.indexOf('moto'),ai=BK.indexOf('atv');
   var has=(mi>=0&&v[mi])||(ai>=0&&v[ai]);
-  if(!has)return true;                      /* source states nothing per-vehicle */
+  if(!has)return true;                       
   var k=BK.indexOf(fl);
   if(k<0)return true;
   var val=v[k];
-  /* "open" is the only value the MVUM uses for permitted. Anything else —
-     absent, "closed", a seasonal string we do not parse — is not a licence to
-     ride, and this is not the place to be generous (invariant: nothing may
-     route a rider onto a trail they may not legally ride). */
+   
   return String(val||'').toLowerCase()==='open'}
 
 var NODES=decode(GR.n), CLS=GR.cls, NM=GR.nm, BK=GR.bk, B=GR.b;
-/* A60: `d` is "draw this one". Every edge stays in EDGES and in ADJ, so
-   routing, snapping, loops, retrace and every cost function see the whole
-   network exactly as before — route both, draw one. Older payloads have no
-   eighth field; treat their absence as "draw", so a stale bundle degrades to
-   the pre-A60 picture rather than to a blank map. */
+ 
 var EDGES=GR.e.map(function(e,i){return {a:e[0],b:e[1],L:e[2],c:CLS[e[3]],
   n:e[4]>=0?NM[e[4]]:null,id:e[5]>=0?NM[e[5]]:null,bi:e[6],i:i,
   d:e.length<8||e[7]!==0,
-  /* A75: the posted route number. Older payloads have no ninth field. */
+   
   rf:(e.length>8&&e[8]>=0)?NM[e[8]]:null}});
 function attrs(e){var o={};if(e.bi<0)return o;
   var v=B[e.bi];for(var k=0;k<BK.length;k++)if(v[k])o[BK[k]]=v[k];return o}
@@ -268,40 +195,21 @@ EDGES.forEach(function(e){ADJ[e.a].push(e);ADJ[e.b].push(e)});
 el('b-src').textContent='GRAPH '+EDGES.length;
 el('b-src').className='badge good';
 
-/* Machine legality. This is ROADMAP 7.4 driven by real MVUM and DNR width data,
-   not a guess: a 24" motorcycle trail is illegal for a quad, and a side-by-side
-   belongs on 72" routes and roads only. */
-/* Jacob rides a NARROW dirt bike, so in practice he is on the `bike` profile and
-   every width and per-vehicle rule below is permissive for him — the take-81
-   quad exclusion touches nothing he will ever ride. Recorded because it matters
-   for debugging: if a route looks wrong on his phone, machine legality is not
-   the first place to look. It becomes live for anyone else, and for A72. */
+ 
+ 
 var MACHINE={
   bike:{lbl:'🏍 Dirt bike 24"',ok:['route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track']},
   quad:{lbl:'🛻 Quad 50"',ok:['route72','trail50','mccct','fstrail','fsroad','paved','minor','track']},
   sxs:{lbl:'🚙 Side-by-side 72"',ok:['route72','fsroad','paved','minor']},
-  /* DESIGN-modes step 3 (take 128): a machine that walks. Legal on every
-     class a person may stand on; 3 mph regardless of class (`spd` overrides
-     the per-class SPEED table). The router already routes by machine, so a
-     walking profile is a table row, not new routing. Foot-only routes are
-     still show-only — a hiker is routed along two-track, forest road and
-     ORV trail, which is honest about what the graph holds. */
+   
   walk:{lbl:'🥾 On foot',ok:['foot','route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track'],spd:3},
-  /* take 149 · A165 (first external tester): Water's machine is a boat.
-     ok:[] is honest — a kayak is legal on no land class, and Water plans by
-     river runs, never the graph. mph±spread feeds paddleHours; the numbers
-     are the livery calibration the run card has always cited (Hinchman's
-     posted Au Sable times work out to 2.5–3 mph in a canoe). */
+   
   kayak:{lbl:'🛶 Kayak',ok:[],mph:3.0,spread:0.5},
   canoe:{lbl:'🛶 Canoe',ok:[],mph:2.5,spread:0.5},
   raft:{lbl:'🛟 Raft / tube',ok:[],mph:1.8,spread:0.4}
 };
 function spd(e){var m=MACHINE[machine];return (m&&m.spd)||SPEED[e.c]||14}
-/* machIdx, not `mi` — take 15: `mi=0` here silently overwrote the mi(a,b)
-   distance function (hoisted from the safety block below), so every Phase-4
-   distance call was invoking the number 0 from take 7 onward. The Python
-   verifiers mirror the maths and structurally cannot catch a wiring collision
-   like this; only executing the shipped file did. */
+ 
 var ORDER=['bike','quad','sxs','walk'],machIdx=0,machine='bike',rideMachine='bike';
 var WORDER=['kayak','canoe','raft'],waterCraft='kayak';
 var SPEED={route72:25,fsroad:22,trail50:16,fstrail:14,mccct:11,moto24:11,
@@ -311,31 +219,25 @@ var EFFORT={paved:1,route72:1.05,fsroad:1.1,minor:1.15,trail50:1.5,fstrail:1.7,
 var PAVED={paved:1,minor:1};
 var HARD=['paved','minor','route72','fsroad','track','trail50','fstrail','mccct','moto24'];
 
-/* ── render straight off the graph — one source of truth, conflation applied ── */
+ 
 var wf=[],wlab=[];
 Object.keys(WATER.l).forEach(function(c){var poly=(c==='water');
   var nms=(WATER.nm&&WATER.nm[c])||[];
   WATER.l[c].forEach(function(e,ix){var r=decode(e);
     wf.push({type:'Feature',properties:{c:c},
       geometry:poly?{type:'Polygon',coordinates:[r]}:{type:'LineString',coordinates:r}});
-    /* A77. 175 of these carry a name and the payload used to drop every one, so
-       the map drew Shaw Lake and the Au Sable as anonymous blue shapes. A lake
-       you can name is a landmark you can navigate by; a blue blob is scenery.
-       Lakes get a point at the centroid, rivers get the line itself — a river
-       label has to follow the water or it reads as belonging to something else.
-       Older payloads have no `nm`, so this simply produces nothing. */
+     
     var nm=nms[ix];
     if(!nm)return;
     if(poly){
-      /* area-weighted centroid, so a long crooked lake labels near its bulk
-         rather than at the average of its vertices */
+       
       var A=0,cx=0,cy=0;
       for(var k=0;k<r.length-1;k++){
         var f=r[k][0]*r[k+1][1]-r[k+1][0]*r[k][1];
         A+=f;cx+=(r[k][0]+r[k+1][0])*f;cy+=(r[k][1]+r[k+1][1])*f}
       var pt;
       if(Math.abs(A)>1e-12){pt=[cx/(3*A),cy/(3*A)]}
-      else{pt=r[(r.length/2)|0]}          /* degenerate ring: fall back to a vertex */
+      else{pt=r[(r.length/2)|0]}           
       wlab.push({type:'Feature',properties:{n:nm,c:c},
         geometry:{type:'Point',coordinates:pt}});
     }else{
@@ -343,10 +245,7 @@ Object.keys(WATER.l).forEach(function(c){var poly=(c==='water');
         geometry:{type:'LineString',coordinates:r}});
     }})});
 
-/* Map labels use what the sign says, not the database name. "The Meadows
-   Motorcycle Trail (TMM)" will not fit along a two-track at z14; "TMM · H58-1"
-   is both shorter and closer to what is nailed to the post. The inspect card
-   still shows the full name. */
+ 
 function labelFor(e){
   if(!e.n&&!e.id)return '';
   var n=e.n||'';
@@ -355,11 +254,7 @@ function labelFor(e){
   else if(n.length>24)n=n.replace(/\s+(Trail|Route|Road)$/i,'');
   if(e.id&&e.id!==n&&n)return n+' · '+e.id;
   return n||e.id}
-/* "M 33;M 72;F-32" is how OSM records a road carrying three designations.
-   Splitting happens HERE, where it is drawn, rather than at ingest — the raw
-   value is what the source said and is worth keeping intact upstream. Two is
-   the most that fits along a road at riding zoom; a third would be truncated
-   into nonsense, so it is dropped rather than clipped. */
+ 
 function refLabel(r){
   if(!r)return null;
   var parts=r.split(';').map(function(x){return x.trim()}).filter(Boolean);
@@ -369,19 +264,8 @@ var nf2=EDGES.filter(function(e){return e.d}).map(function(e){return {type:'Feat
   properties:{c:e.c,i:e.i,lb:labelFor(e),rf:refLabel(e.rf)},
   geometry:{type:'LineString',coordinates:decode(GR.g[e.i])}}});
 
-/* ══ LABEL STROKES ══════════════════════════════════════════════════════════
-   Line-placed labels need a line long enough to carry the text. The graph is
-   split into ROUTING edges — median 76 m, and 76% under the 230 px symbol
-   spacing — so each edge is its own feature and almost none can host a label.
-   The result: 2-3 names for up to 102 trail segments on screen. Every trail
-   edge has a label in the data; nearly none of them were being shown.
-
-   Chain consecutive edges that share a label into maximal strokes, and place
-   labels on those instead. Built once at load over 16k edges. */
-/* Metres along a stroke. A 740 ft trailhead cannot fit "M-33 Bull Gap
-   Trailhead" at 60 px symbol-spacing, so MapLibre placed nothing and Jacob had
-   to TAP the trailhead to learn its name (take 66). Short features get their own
-   layer with symbol-placement:line-center — exactly one label, centred. */
+ 
+ 
 function strokeLen(pts){
   var m=0;
   for(var i=1;i<pts.length;i++){
@@ -389,13 +273,8 @@ function strokeLen(pts){
     m+=Math.sqrt(dx*dx+dy*dy)}
   return Math.round(m)}
 
-/* `key` picks what a stroke is chained BY. Trail names use labelFor(); route
-   numbers use the posted ref. Parameterised rather than copied, because a
-   second walker is a second thing to keep in step and they would drift the way
-   the palette did (landmine 107). */
-/* A110. "0.8 mi NE of you" is the question a rider actually has about a pin.
-   Reuses mi() and compass(), both verified outside the code that produced them
-   at take 69 — a bearing nobody checked is how you send someone the wrong way. */
+ 
+ 
 function placeDist(p){
   if(!ME)return '';
   var d=mi(ME,p);
@@ -405,10 +284,7 @@ function chainStrokes(key){
   key=key||labelFor;
   var byKey={};
   EDGES.forEach(function(e){
-    /* Undrawn edges must be excluded HERE too. A label chain built from the
-       full set walks through geometry that is not on the map, and the name
-       lands on empty ground — the failure A60's note does not mention and the
-       reason this take touches two places, not one. */
+     
     if(!e.d)return;
     var lb=key(e); if(!lb)return;
     var k=e.c+'\u0000'+lb;
@@ -420,7 +296,7 @@ function chainStrokes(key){
     list.forEach(function(e){
       (adj[e.a]||(adj[e.a]=[])).push(e);(adj[e.b]||(adj[e.b]=[])).push(e)});
     function walk(from,e){
-      /* follow this label as far as it goes, never reusing an edge */
+       
       var pts=decode(GR.g[e.i]).slice(),cur=(e.a===from?e.b:e.a);
       used[e.i]=1;
       if(e.a!==from)pts.reverse();
@@ -434,7 +310,7 @@ function chainStrokes(key){
         pts=pts.concat(g.slice(1));
         cur=(nx.a===cur?nx.b:nx.a)}
       return pts}
-    /* start at dead ends first so strokes run end to end, then mop up loops */
+     
     var starts=[];
     Object.keys(adj).forEach(function(n){if(adj[n].length===1)starts.push(+n)});
     starts.forEach(function(n){
@@ -448,12 +324,7 @@ function chainStrokes(key){
         geometry:{type:'LineString',coordinates:co2}})}});
   });
   return feats}
-/* ══ SHOW-ONLY ROUTES ═══════════════════════════════════════════════════════
-   Trails that EXIST but a dirt bike may not legally ride: hiking, equestrian,
-   ski, snowmobile, non-motorised NFS, and OSM paths. Jacob rides to camp and
-   wants to know every route in the area — a footpath to a lake is worth seeing.
-   They are held out of the routing graph entirely by graph.py, so no cost
-   function, snap or loop can reach them; here they are only drawn. */
+ 
 var SHOWN={foot:'foot / hike',horse:'equestrian',snow:'ski',snowmob:'snowmobile',
   nfsmoto:'NFS trail — MVUM governs',cycle:'cycleway',race:'raceway',
   bike:'bike trail',mou:'permit / MOU',railtrail:'rail trail',path:'path (unnamed, not routed)'};
@@ -461,27 +332,9 @@ var showFeats=(SHOW&&SHOW.r?SHOW.r:[]).map(function(r){
   return {type:'Feature',properties:{c:r.c,n:r.n||'',u:r.u||SHOWN[r.c]||r.c},
     geometry:{type:'LineString',coordinates:r.g}}});
 
-/* ══ PLACES (A110) ══════════════════════════════════════════════════════════
-   Somewhere to ride TO. Kinds are ordered by how much a rider in trouble cares:
-   fuel and a trailhead are useful when the day is going wrong, a picnic table
-   is not. That order drives both the colour and which pin wins a collision.
-
-   No icons: the glyph pack is ASCII 32-126 (glyphs.py CHARS), so an emoji or a
-   sprite would render as a box. A coloured dot with a text label costs nothing,
-   scales on the GPU, and is legible at 2 px — landmine 30 in advance rather
-   than after. */
-/* ── CATEGORY BADGES (take 113 · T3, reference study) ─────────────────────
-   AllTrails' POI system, transcribed: a category-coloured circle with a white
-   glyph, label in the SAME colour with a white halo. The glyph names which
-   badge image to draw (makeBadges below); colours are the reference family —
-   deep green for nature, brown for camping, blue for water access — with fuel
-   and trailheads keeping their higher-urgency reds/oranges. */
-/* A143 (take 121) · TIERS. Jacob, planning a trip from the couch: "major pins
-   — trailheads, campgrounds, the dunes, launches — should be twice as big and
-   visible from ten miles out; the rest from about three." `d:1` marks a
-   DESTINATION (a reason to load the trailer); everything else is a service you
-   look for once you are already there. Two symbol layers, two minzooms, two
-   sizes — one table decides which. */
+ 
+ 
+ 
 var POIKIND={
   fuel:     {c:'#C1121F', h:'Fuel',        r:1, g:'fuel'},
   trailhead:{c:'#D2500C', h:'Trailhead',   r:1, d:1, g:'flag'},
@@ -489,13 +342,9 @@ var POIKIND={
   launch:   {c:'#2E7FA8', h:'Boat launch', r:2, d:1, g:'boat'},
   beach:    {c:'#C9A227', h:'Beach',       r:3, d:1, g:'sun'},
   dayuse:   {c:'#3D6B35', h:'Day use',     r:3, d:1, g:'tree'},
-  /* take 129 · transcribed from onX 24269: one pin per named trail SYSTEM,
-     not per segment — "Ogemaw Hills Pathway" is a destination. Hiking
-     systems and MTB systems are separate kinds so Ride can show MTB alone. */
+   
   system:   {c:'#2F7D4F', h:'Trail system', r:1, d:1, g:'tree'},
-  /* A139 (take 131) · Great Lakes destinations: the lighthouse is the
-     archetype — a place you drive to the coast for. Marinas are a boat's
-     fuel and slip. Destination treatment, never corridor (Jacob, take 118). */
+   
   lighthouse:{c:'#B23A48', h:'Lighthouse', r:0, d:1, g:'eye'},
   marina:   {c:'#2E7FA8', h:'Marina',      r:2, d:1, g:'boat'},
   ski:      {c:'#3D6CB3', h:'Ski & snowboard hill', r:1, d:1, g:'ski'},
@@ -511,18 +360,15 @@ var POIKIND={
 };
 
 function makeBadges(){
-  /* Tiny glyphs drawn by hand on a canvas: at 8 px inside a 26 px badge a
-     stroke sketch outlives any imported path. Registered once per kind. */
+   
   var G={
     tree:function(x){x.moveTo(13,6);x.lineTo(8,15);x.lineTo(18,15);x.closePath();
       x.moveTo(13,15);x.lineTo(13,19)},
-    /* take 141 · a bicycle: two wheels, a frame, a saddle — Jacob asked the
-       MTB systems to read as bikes, not trees. Ski resorts flip to MTB in
-       summer, so the glyph carries the summer meaning too. */
+     
     bike:function(x){x.moveTo(11,17);x.arc(8,17,3,0,Math.PI*2);x.moveTo(21,17);x.arc(18,17,3,0,Math.PI*2);
       x.moveTo(8,17);x.lineTo(12,10);x.lineTo(18,17);x.moveTo(12,10);x.lineTo(16,10);
       x.moveTo(12,10);x.lineTo(13,17);x.moveTo(16,10);x.lineTo(18,17);x.moveTo(11,9);x.lineTo(14,9)},
-    /* take 142 · a skier: head, leaning body, a pole, two diagonal skis. */
+     
     ski:function(x){x.moveTo(16.6,6.5);x.arc(15,6.5,1.6,0,Math.PI*2);
       x.moveTo(14,8.5);x.lineTo(11.5,13);x.moveTo(13,10.5);x.lineTo(16.5,12.5);x.lineTo(18,17);
       x.moveTo(11.5,13);x.lineTo(9.5,16.2);x.moveTo(11.5,13);x.lineTo(12.5,16.2);
@@ -552,8 +398,7 @@ function makeBadges(){
   var done={};
   function one(name,color,glyph){
     if(done[name]||!map.addImage)return;
-    /* headless stubs have elements without a 2d context — a badge is polish,
-       and polish must never be the reason the map refuses to load (take 113) */
+     
     if(!document.createElement('canvas').getContext)return;
     done[name]=1;
     var S=2,c=document.createElement('canvas');c.width=c.height=26*S;
@@ -569,9 +414,7 @@ function makeBadges(){
   one('bdg-pad-launch','#2E7FA8','boat');one('bdg-pad-access','#2E8B99','boat');
   one('bdg-pad-camp','#7A5B3A','tent');one('bdg-pad-parking','#4A5560','i');
   one('bdg-dam','#C1121F','dam');
-  /* The Michigan trunkline diamond — the black-on-white rotated square every
-     Michigander reads as "M-road" before the number registers. Both reference
-     apps draw it correctly; a Michigan-only app has no excuse not to. */
+   
   if(!done['mi-diamond']&&map.addImage&&document.createElement('canvas').getContext){done['mi-diamond']=1;
     var S2=2,cv=document.createElement('canvas');cv.width=cv.height=30*S2;
     var g=cv.getContext('2d');g.scale(S2,S2);g.translate(15,15);g.rotate(Math.PI/4);
@@ -580,72 +423,32 @@ function makeBadges(){
     g.fillStyle='#FFFFFF';g.fill();
     g.lineWidth=1.8;g.strokeStyle='#1C1A16';g.stroke();
     try{map.addImage('mi-diamond',g.getImageData(0,0,30*S2,30*S2),{pixelRatio:S2})}catch(e){}}}
-/* take 154 · A170. DESTINATIONS cluster; services never do — Jacob's rule
-   from the reference app (24507): "Gas stations and food & others
-   shouldn't be included". 8,254 of 25,798 places are clusterable. */
+ 
 var CLUSTERKINDS=['launch','camp','trailhead','system','mtb','ski','livery',
   'beach','marina','lighthouse','dayuse','view'];
-/* "Major" is not a fresh opinion: POIKIND already flags destinations d:1,
-   and that flag is what gated the low-zoom layer before this take. shelter
-   is d:0 and was dropped from the list above for exactly that reason —
-   drawing it at z8 filled the state with badges and cost every town label
-   its collision (the harness's label check caught it twice). */
-var CLUSTER_MAXZ=11.4;   /* above this, pins are exactly what they were */
-var CLUSTER_R=38;   /* px: how close two of the SAME kind must sit to stack */
-/* Jacob, twice: "only for similar and major pins" — a lot of beaches, or a
-   lot of launches, in one spot. supercluster merges by PROXIMITY ALONE and
-   cannot partition by property, so its piles came out mixed (20 of 23 in
-   the first build). Bucketing here instead makes every cluster one kind by
-   construction, needs no per-kind source, and costs one pass over the
-   mode's own destinations on moveend. */
+ 
+var CLUSTER_MAXZ=11.4;    
+var CLUSTER_R=38;    
+ 
 var poif=((POIS&&POIS.p)||[]).map(function(r,i){
   var k=POIKIND[r.k]||{c:'#4A443B',h:r.k,r:7};
   return {type:'Feature',
     properties:{i:i,k:r.k,h:k.h,c:k.c,r:k.r,d:k.d?1:0,pri:(r.pri==null?3:r.pri),
-      /* A beach has no name in OSM and is still a destination — it ships
-         unnamed and is labelled by KIND. Saying "Beach" is honest; inventing
-         "Island Lake Beach" from the day-use area 6 m away is not
-         (poi.py explains the exception). */
+       
       n:r.n||k.h,named:r.n?1:0,mi:r.mi||0},
     geometry:{type:'Point',coordinates:r.p}}});
 
-/* A87 · contour lines, a fifth product of the DEM ingest that already runs.
-   Delta-encoded exactly like water and graph geometry, so decode() reads it
-   with no new code. Index contours (every 200 ft) carry the elevation label;
-   the intermediates are drawn thinner and unlabelled, which is how every topo
-   map is read. */
-/* A76 · named summits. Four in this region, and three of them match the figures
-   on a commercial map to within three feet — Auger Hill, Mio Mountain, Wagon
-   Wheel Hill. The name is OSM's; the elevation is OUR DEM's, the same source as
-   every other height the app shows, so a summit label cannot disagree with the
-   readout under your wheels. Bull Gap is hill-climb country; named high ground
-   is the landmark people actually navigate by here. */
-/* ══ PADDLE CORRIDORS (A115/A112) ══════════════════════════════════════════
-   Six rivers, 390 miles, chosen by evidence rather than by anyone's list: every
-   named river in Michigan scored by how many boat and canoe access points people
-   have built on it, and those with three or more near this region kept.
-
-   A corridor is drawn as SEPARATE REACHES because that is what it is. The river
-   way stops at each impoundment and resumes below it, so the breaks land exactly
-   on the dams — and joining them would draw a river you cannot paddle.
-
-   THE PORTAGES ARE NOT DECORATION. Seven dams sit on the Au Sable. A map that
-   drew one continuous blue line from Grayling to Lake Huron without marking them
-   would be actively dangerous, and A112 makes that a ship-blocker, not a
-   nice-to-have. They are drawn on top of everything, in the closure colour, and
-   they are never hidden by anything else on this layer. */
-/* A140 · DNR scramble areas (take 119). Open-riding GROUND, not trail: Silver
-   Lake is 447 acres you may ride anywhere on, and the DNR draws it as a
-   polygon. Absent-safe like every optional layer. */
+ 
+ 
+ 
+ 
 var areaf=((AREAS&&AREAS.a)||[]).map(function(a){
   return {type:'Feature',properties:{n:a.n,ac:a.ac,o:a.o,c:a.c},
     geometry:{type:'Polygon',coordinates:a.g}}});
 var areapt=((AREAS&&AREAS.a)||[]).map(function(a){
   return {type:'Feature',properties:{n:a.n,ac:a.ac,o:a.o,lb:a.n+'\n'+a.ac+' ac'},
     geometry:{type:'Point',coordinates:a.c}}});
-/* Take 132 · DNR public land (transcribed from onX Hunt: the wash and
-   boundary a hunter reads first). 657 tracts dissolved from 136k parcels —
-   state forest, game areas, parks, access sites. Absent-safe. */
+ 
 var PUBT={forest:'State forest',game:'State game area',park:'State park / rec area',
   launch:'Public access site',trail:'State rail trail',other:'State land'};
 var pubf=((PUBS&&PUBS.a)||[]).map(function(a){
@@ -660,10 +463,7 @@ var padf=[],padpin=[];
   (c.g||[]).forEach(function(reach,i){
     padf.push({type:'Feature',properties:{n:c.n,reach:i},
       geometry:{type:'LineString',coordinates:reach}})});
-  /* The impoundment midpoints are NOT drawn. A portage marker a kilometre from
-     the dam it belongs to is two pins for one hazard, and the dam is the thing
-     you must not miss. The distances are in the payload and printed at build
-     time; they belong on the dam's card, not as a second pin. */
+   
   (c.f||[]).forEach(function(f){
     padpin.push({type:'Feature',
       properties:{k:f.k,n:f.n||null,mi:f.mi,riv:c.n,
@@ -671,54 +471,15 @@ var padf=[],padpin=[];
                    camp:'Campground',parking:'Parking'}[f.k]||f.k))},
       geometry:{type:'Point',coordinates:f.p}})})});
 
-/* ══ THE PADDLE CARD (A115) ═════════════════════════════════════════════════
-   A pin that only says its own name answers nothing. What a shuttle needs is
-   what is ABOVE and BELOW it, and whether there is a dam in between — because
-   you drop boats at one access and pick them up at another, and getting that
-   order wrong is the whole trip.
-
-   The mileage is the mapped centreline's, which under-measures (0.53x the local
-   outfitter above Mio, 0.78x near it). It is shown as "about" and the card says
-   so once, plainly, rather than the app pretending to a precision it does not
-   have. The ORDER, which is what the card is really for, is exact. */
+ 
 var PADKIND={dam:'Dam',launch:'Boat launch',access:'Canoe access',
              camp:'Campground',parking:'Parking'};
 
-/* ══ HOW LONG IT TAKES (A122) ══════════════════════════════════════════════
-   Take 102 shipped these distances with an apology: they came out about 0.55x
-   the local outfitter's published table, so the card said they ran short and
-   only the ORDER could be trusted.
-
-   The apology was wrong. Take 106 pulled the same river from USGS NHD — the
-   federal authoritative hydrography, an entirely independent survey — and it
-   agrees with OpenStreetMap to within 4%:
-
-       Burtons -> Wakeley     NHD  9.2   OSM  9.3   outfitter 16
-       Wakeley -> Camp Ten    NHD 26.2   OSM 26.3   outfitter 50
-       Camp Ten -> Comins     NHD 11.1   OSM 10.7   outfitter 15
-
-   Two independent surveys agreeing that closely are not both wrong by 45%. The
-   outfitter's MILEAGES run high — and Jacob, who has paddled these floats with
-   them, says their HOURS are about right. Both can be true, and together they
-   settle the pace:
-
-       Burtons->Mio   38.5 mi / 15 hrs   = 2.57 mph
-       Stephan->Mio   33.7 mi / 13 hrs   = 2.59 mph
-       Wakeley->Mio   29.2 mi / 11.5 hrs = 2.54 mph
-       McMasters->Mio 21.4 mi / 8.5 hrs  = 2.51 mph
-
-   2.5 mph is what a canoe does on a river with light current. Their own figures
-   imply 4.7, which nobody paddles. So the distances were right all along and the
-   card was apologising for the wrong number.
-
-   The estimate is shown as a RANGE and the assumption is stated, because pace is
-   the part we are guessing at — flow, wind, how much you stop. What we are not
-   guessing at is the distance. */
+ 
 var PADDLE_MPH=2.5, PADDLE_SPREAD=0.5;
 
 function paddleHours(miles){
-  /* take 149 · the craft sets the pace (A165); without one the historic
-     2.5±0.5 mph livery calibration stands */
+   
   var mc=MACHINE[machine]||{};
   var mph=mc.mph||PADDLE_MPH, spr=mc.mph?(mc.spread||PADDLE_SPREAD):PADDLE_SPREAD;
   var slow=miles/(mph-spr), fast=miles/(mph+spr);
@@ -729,22 +490,12 @@ function paddleHours(miles){
     return w+' hr'+(mn?' '+mn+' min':'')};
   return fmt(fast)+'\u2013'+fmt(slow)}
 
-/* ══ THE RUN (A121) ═════════════════════════════════════════════════════════
-   The card answers one hop. A shuttle needs the whole float: pick a put-in, pick
-   a take-out, and get what is between them — every dam you must portage, every
-   campground you could stop at, and which way round it goes.
-
-   You cannot paddle upstream, so tap order does not decide direction: the
-   upstream stop is the put-in whichever you picked first, and the card says so
-   rather than refusing a reasonable gesture. */
+ 
 var RUNFROM=null;
 
 function runClear(){RUNFROM=null}
 
-/* take 149 · the tester planned launch-to-launch and got walked down
-   Telegraph Road: the run flow lived only on the river's own paddle
-   features. A launch, livery or marina pin within ~300 m of a mapped
-   river projects to its nearest stop and carries the same run actions. */
+ 
 function nearStop(p){
   var best=null,bd=0.19;
   ((PADDLE&&PADDLE.c)||[]).forEach(function(c){(c.f||[]).forEach(function(f){
@@ -753,11 +504,7 @@ function nearStop(p){
     if(d<bd){bd=d;best={riv:c.n,stop:f}}})});
   return best}
 
-/* take 150 · A164: live river conditions from USGS, on a tap and only on a
-   tap (PROTOCOL §8 in-app rules; waterservices.usgs.gov is on the
-   allowlist, declared in PROVISION.md). The bundle ships the 241-site
-   INVENTORY; a level from build time is worse than none, so values are
-   always live or absent — never stale. fetchIV is a seam for the drill. */
+ 
 var GAUGE=(function(){
   var IV='https://waterservices.usgs.gov/nwis/iv/?format=json&sites={id}&parameterCd=00060,00065,00010&siteStatus=all';
   function near(p,maxMi){
@@ -784,41 +531,10 @@ var GAUGE=(function(){
   return {near:near,fetchIV:fetchIV,fmt:fmt};
 })();
 
-/* ══ COMPASS (A119) ═════════════════════════════════════════════════════════
-   The ride HUD has carried a compass ribbon since take 78, but only while a
-   ride is running. Standing at a junction with the engine off — which is when
-   you actually get out the map — the app had no heading at all and no bearing
-   to anything but the truck.
-
-   This is a rose you can read at a glance plus the bearings that matter: the
-   truck, home, and every waypoint you have saved. It is a TOOL, not a widget:
-   it opens from Tools, it says plainly when it has no heading rather than
-   drawing a needle pointing at nothing, and it updates as fixes arrive.
-
-   A phone lying flat has no heading until it moves. Android reports
-   `coords.heading` as null when stationary and the crumb-trail fallback needs
-   two fixes apart — so "no heading yet" is the normal state at a standstill and
-   is said in those words. */
+ 
 var CMP_ON=false, MAG=null, MAG_OK=null;
 
-/* ══ THE MAGNETOMETER (take 109) ════════════════════════════════════════════
-   Jacob, on the take-108 compass: "I don't think compass works". It was working
-   exactly as designed and the design was wrong. It read GPS course-over-ground,
-   which does not exist standing still — so a compass you open at a junction
-   with the engine off showed a rose with no needle and a sentence explaining
-   why. That is a correct answer to a question nobody asked.
-
-   The phone has a magnetometer and the Android WebView exposes it through
-   `deviceorientationabsolute` with no Capacitor plugin and no permission — the
-   plugin list on his Fold is Geolocation, Device, Haptics, Cookies, WebView,
-   Share, Http, and none of them are needed for this.
-
-   GPS heading still wins WHILE MOVING, because course-over-ground is what you
-   are actually doing and a magnetometer near an engine is not to be trusted.
-   Standing still the magnetometer takes over, which is the case that was broken.
-
-   If the sensor never reports, MAG_OK stays null and the compass says so rather
-   than pretending — the same rule as everything else here. */
+ 
 function magStart(){
   if(MAG_OK!==null)return;
   MAG_OK=false;
@@ -828,45 +544,27 @@ function magStart(){
     else if(e.absolute===true&&typeof e.alpha==='number')deg=(360-e.alpha)%360;
     else if(typeof e.alpha==='number')deg=(360-e.alpha)%360;
     if(deg===null||isNaN(deg))return;
-    /* Stored raw; converted where it is read, so the raw sensor value stays
-       available if this ever needs to show both. */
+     
     MAG_OK=true;MAG=(deg+360)%360;
     if(CMP_ON)cmpPaint()};
   try{window.addEventListener('deviceorientationabsolute',onEv,true)}catch(e){}
   try{window.addEventListener('deviceorientation',onEv,true)}catch(e){}
-  /* iOS needs a gesture-gated permission; Android does not. Asked for only if
-     the API exists, and never blocking. */
+   
   try{
     var D=window.DeviceOrientationEvent;
     if(D&&typeof D.requestPermission==='function')D.requestPermission().catch(function(){});
   }catch(e){}}
 
-/* Which heading to believe: moving, trust the GPS course; stopped, trust the
-   compass. Returns null only when neither has anything. */
-/* ── TWO NORTHS (A128, take 111) ──────────────────────────────────────────
-   Take 109 shipped a compass that reads GPS course while moving and the
-   magnetometer while stopped. Those are not the same north.
-
-   GPS course-over-ground is TRUE north. A magnetometer points at MAGNETIC
-   north, which in north-east Michigan sits about 7 degrees WEST of true. So the
-   same needle meant different things depending on whether the bike was rolling,
-   and worse: every bearing in the list — "Home WNW 300 deg · 109 deg left" — is
-   computed from coordinates and is therefore TRUE. Comparing a magnetic heading
-   against a true bearing put the turn figure out by 7 degrees.
-
-   Everything is converted to TRUE at the source, so one number means one thing.
-
-   The value is a constant, not a model: WMM changes slowly and this app covers
-   one region of one state. Stated, dated, and cheap to revise — an approximate
-   correction applied consistently beats an exact one applied to half the app. */
-var DECL_W = 7.0;      /* degrees west, NE Michigan, 2026 */
+ 
+ 
+var DECL_W = 7.0;       
 
 function magToTrue(deg){
   if(deg===null||deg===undefined)return null;
   return (deg-DECL_W+360)%360}
 
 function headingNow(){
-  var moving=HUD.spd!==null&&HUD.spd>1.2;   /* ~2.7 mph */
+  var moving=HUD.spd!==null&&HUD.spd>1.2;    
   if(moving&&HUD.hdg!==null)return {deg:HUD.hdg,src:'course'};
   if(MAG!==null)return {deg:magToTrue(MAG),src:'compass'};
   if(HUD.hdg!==null)return {deg:HUD.hdg,src:'course'};
@@ -900,11 +598,7 @@ function cmpRows(hdg){
   function row(label,at){
     if(!at||!ME)return;
     var b=bearing(ME,at),d=mi(ME,at);
-    /* A bearing to where you are standing is not a bearing. Marking this spot
-       and then opening the compass produced "N 0 deg · 0.00 mi · 49 deg left",
-       which is true, looks like an answer and is noise — the same shape as the
-       0.0 mi neighbour on the paddle card (landmine 164). Under ~100 ft you are
-       on it, and the row says that instead. */
+     
     if(d<0.02){out.push('<b>'+label+'</b> <span style="color:#9C9384">'+
       'you are here</span>');return}
     var rel=hdg===null?null:((b-hdg+540)%360-180);
@@ -985,10 +679,7 @@ function runCard(a,b,riv){
   if(cb)cb.addEventListener('click',function(){runClear();show('Run cleared.','')});
   RUNFROM=null}
 
-/* take 131 · a photo for a MAJOR pin, when Wikipedia has one matched by
-   name near the pin. Absent-safe: no entry, no markup — no placeholder.
-   Attribution ships with the file and is shown, because the licence says
-   so and because it is the honest thing to do with someone's picture. */
+ 
 function photoHTML(k,n,p){
   if(!PHOTOS||!n||!p)return '';
   var e=PHOTOS[k+'|'+n+'|'+(+p[0]).toFixed(4)+'|'+(+p[1]).toFixed(4)];
@@ -1047,7 +738,7 @@ function paddleCard(ft){
   }
   rows.push((PADKIND[pr.k]||pr.k)+' · about <b>'+mi.toFixed(1)+' mi</b> down the river');
 
-  /* what is upstream and downstream, and what is between */
+   
   function between(a,b){
     var d=[];
     for(var j=Math.min(a,b)+1;j<Math.max(a,b);j++)
@@ -1055,10 +746,7 @@ function paddleCard(ft){
     return d}
   function side(dir){
     var j=bi+dir;
-    /* Skip dams — they are reported separately as the thing between — and skip
-       anything at the SAME point. A dam usually has an access on each bank
-       projecting to the same river mile, so the first neighbour was "about
-       0.0 mi" in both directions, which answers nothing (take 103). */
+     
     while(j>=0&&j<stops.length&&
           (stops[j].k==='dam'||Math.abs(stops[j].mi-mi)<0.06))j+=dir;
     if(j<0||j>=stops.length)return null;
@@ -1077,8 +765,7 @@ function paddleCard(ft){
   rows.push('<span class="sub">River miles from OpenStreetMap, cross-checked '+
     'against the USGS survey — they agree within 4%.</span>');
 
-  /* Pick two and get the float between them. Only offered where it can mean
-     something: a stop we found on the river, with a mile to measure from. */
+   
   var acts='';
   if(here){
     acts=RUNFROM&&RUNFROM.riv===riv&&Math.abs(RUNFROM.mi-here.mi)>0.05
@@ -1086,7 +773,7 @@ function paddleCard(ft){
         (RUNFROM.n||PADKIND[RUNFROM.k]||'there')+' to here</span></button> '+
         '<button class="chip" id="pd-cancel">'+ic('close')+'<span>Cancel</span></button>'
       : '<button class="chip" id="pd-from">'+ic('route')+'<span>Plan a run from here</span></button>';}
-  /* take 150 · a gauge within 12 mi offers live conditions on a tap */
+   
   var _gp=(ft.geometry&&ft.geometry.coordinates)||null;
   var _gn=(_gp&&GAUGES)?GAUGE.near(_gp,12):null;
   show('<div class="tn">'+head+'</div>'+rows.join('<br>')+
@@ -1134,15 +821,9 @@ var contf=((CONT&&CONT.l)||[]).map(function(l){
     geometry:{type:'LineString',coordinates:decode(l.c)}}});
 
 var strokes=chainStrokes();
-/* A75. Route numbers chain by the posted ref, so "M 33" becomes one long line
-   instead of 157 routing edges none of which is long enough to carry a label.
-   Same walker, different key. */
+ 
 var refstrokes=chainStrokes(function(e){return refLabel(e.rf)});
-/* "M-33 Bull Gap Trailhead" is 23 characters and its feature is 740 ft — about
-   90 px at riding zoom. No line label of any size fits, so line-center drew
-   nothing and Jacob had to TAP the trailhead to find out what it was. A POINT
-   label at the middle of the stroke wraps onto two or three lines and fits
-   (take 66). */
+ 
 var shortPts={type:'FeatureCollection',features:strokes.filter(function(f){
     return f.properties.lb && f.properties.px<420 &&
            f.geometry.coordinates.length>1})
@@ -1151,69 +832,31 @@ var shortPts={type:'FeatureCollection',features:strokes.filter(function(f){
     return {type:'Feature',properties:{lb:f.properties.lb,c:f.properties.c},
             geometry:{type:'Point',coordinates:m}}})};
 
-/* ══ PALETTE ═══════════════════════════════════════════════════════════════
-   ONE table. The style paints from it and the activity picker reads from it, so
-   the legend cannot drift from the map — which it had. Take 61 set two-track to
-   #A9702F, take 64 dimmed the LAYER to #9C7343, take 67 wrote the swatch from
-   the take-61 value, and nothing connected the two: dE 12.9 apart, four times
-   the just-noticeable difference, and #A9702F appeared nowhere in the style at
-   all. A legend generated from a COPY of the palette is a hand-written legend
-   with extra steps (landmine 98).
-
-   Every value below was chosen by measurement against 1,048,576 real satellite
-   pixels sampled from this region's own z15 tiles, scored on FOUR axes at once
-   (take 77):
-     · separation from the sand basemap        — the app opens on Map
-     · separation from the darkest canopy      — the rider uses Hybrid
-     · separation from its siblings            — the hierarchy must read
-     · separation from every NON-RIDABLE class — landmine 88, and the one that
-       actually changed an answer: #B0722B scored best for two-track on
-       visibility and sits dE 12.5 from nfsmoto amber, a trail whose ridability
-       the MVUM governs. Rejected on legality, not on looks.
-
-   What the measurement REFUSED to give: a colour that makes `fsroad` legible.
-   The sand basemap is light (228,215,188) and canopy is dark (91,106,84), so
-   any single mid-tone loses to one of them — lighter candidates gained on
-   satellite exactly as fast as they lost on sand. fsroad is fixed with a
-   CASING, the same answer as designated trail and two-track, not with paint. */
-/* Take 137 · typed waypoints, transcribed from Jacob's onX Hunt screen
-   (24280): tree stand, trail camera, deer sign, water, gate. A type is a
-   colour and a prefix on the name; the record is the same waypoint record,
-   so nothing that reads waypoints has to change. Offered in Outdoors only —
-   a rider dropping a pin does not need a stand. */
+ 
+ 
 var WPTYPES={stand:{h:'Stand',c:'#2E7FA8'},camera:{h:'Camera',c:'#C9A227'},
   sign:{h:'Deer sign',c:'#F5EFE2'},water:{h:'Water',c:'#4FB3C9'},gate:{h:'Gate',c:'#7A5B3A'}};
 var PAL={
-  /* designated ORV line, by difficulty. green / blue / black is what every
-     trail map on earth uses, so it is learnable before it is explained. */
-  route72:'#0FAE57',                    /* easy   · was #2F7D4F, dE 26->49 vs canopy */
-  trail50:'#0B7FE8', fstrail:'#0B7FE8', /* mod    · was #2585D8, dE 62->74 */
-  mccct:'#1C1A16',  moto24:'#1C1A16',   /* hard   · unchanged; the halo carries it */
-  /* ridable dirt */
-  track:'#96562A',                      /* was #9C7343, dE 29->42; clears nfsmoto by 28 */
-  fsroad:'#8A7C66',                     /* unchanged — see the casing note above */
-  /* roads: background by design */
-  /* Take 113 · T3: on the light green ground, roads are WHITE with a hairline
-     casing — the AllTrails treatment — and white also reads correctly over the
-     dimmed hybrid imagery, so one value serves both styles. */
+   
+  route72:'#0FAE57',                     
+  trail50:'#0B7FE8', fstrail:'#0B7FE8',  
+  mccct:'#1C1A16',  moto24:'#1C1A16',    
+   
+  track:'#96562A',                       
+  fsroad:'#8A7C66',                      
+   
+   
   minor:'#FFFFFF', paved:'#FFFFFF',
-  /* closed to everything */
+   
   closed:'#C1121F', fsclosed:'#C1121F',
-  /* show-only: drawn so the map is honest about what exists, dashed because
-     dashed means "not yours to ride". */
+   
   foot:'#7CB342', horse:'#8E6BB5', snow:'#4FB3C9', snowmob:'#4FB3C9',
   nfsmoto:'#C98A2E',
-  showother:'#5E6B7A'  /* was #7C6F5A — dE 5.2 from fsroad, so an unmatched
-                          show-only route was almost indistinguishable from a
-                          forest road the rider MAY use. Now 25.5. */
+  showother:'#5E6B7A'   
 };
 
 function w(a,b,c){return ['interpolate',['linear'],['zoom'],10,a,14,b,17,c]}
-/* MapLibre forbids more than ONE zoom-based interpolate per expression, so
-   ['case', cond, w(...), w(...)] is invalid — and an invalid expression makes
-   MapLibre reject the ENTIRE style, which is why not a single layer drew from
-   take 9 to take 22. Keep the zoom curve on the outside and branch inside it
-   (landmine 52). */
+ 
 function wCase(cond,t,f){
   return ['interpolate',['linear'],['zoom'],
     10,['case',cond,t[0],f[0]],
@@ -1223,41 +866,15 @@ function lyr(id,cls,col,wd,dash){var o={id:id,type:'line',source:'net',
   filter:['==',['get','c'],cls],layout:{'line-cap':dash?'butt':'round','line-join':'round'},
   paint:{'line-color':col,'line-width':wd}};if(dash)o.paint['line-dasharray']=dash;return o}
 
-/* ══ LABELS ═════════════════════════════════════════════════════════════════
-   MOVED at take 15. This block accreted at take 9 hundreds of lines BELOW the
-   map constructor and the pins that use PLACES. `var` hoisting made every
-   reference `undefined` instead of an error, so style.glyphs and the places
-   source were silently dead from take 9 onward — verify9 proved the glyph PACK
-   perfect while nothing checked the WIRING — and take 14's anchorOf turned the
-   silence into a fatal crash. Found by the first actual execution of the
-   shipped file (tools/smoke.mjs). Definition order is load-bearing here.
-══
-   Landmine 4: MapLibre fetches glyph ranges from a `glyphs` URL and ships no
-   fallback, so a style with symbol layers and no glyphs renders silently blank.
-   A CDN is not allowed (PROTOCOL §8), so the SDF pack is generated in
-   tools/glyphs.py and inlined here.
-
-   ONE fontstack, served from a static data: URI. MapLibre substitutes
-   {fontstack}/{range} only if the placeholders are present; without them it
-   requests the URL as-is and gets the same pack every time. That avoids needing
-   a custom protocol handler for glyph requests, which would be one more thing
-   between the map and its text. data: is allowed by the offline guard. */
-/* MapLibre REQUIRES the glyphs url to be a template carrying {fontstack} and
-   {range} — a bare data: URI fails STYLE VALIDATION, which rejects the whole
-   style, which is why not one layer drew on the Fold (take 22 engine message:
-   'glyphs url must include a "{fontstack}" token'). Shipped broken since take 9.
-
-   A custom protocol keeps everything in memory, so this works identically in the
-   single-file build and in the APK, with no font files on disk and no network. */
+ 
+ 
 var GLYPH_BUF=(function(){var b=atob(GLYPHS.APEX),n=b.length,u=new Uint8Array(n);
   for(var i=0;i<n;i++)u[i]=b.charCodeAt(i);return u})();
 maplibregl.addProtocol('apexfont',function(){
   return Promise.resolve({data:GLYPH_BUF.buffer.slice(0)})});
 var GLYPH_URL='apexfont://{fontstack}/{range}.pbf';
 
-/* Anchors come from the region manifest, not from here. Take 14 made regions a
-   real concept; an app that knows the names of one riding area is a demo of that
-   area, not a tool. */
+ 
 var CTR=BUNDLE.centre||(BUNDLE.bbox?
   [(BUNDLE.bbox[0]+BUNDLE.bbox[2])/2,(BUNDLE.bbox[1]+BUNDLE.bbox[3])/2]:[0,0]);
 var PLACES=(BUNDLE.anchors&&BUNDLE.anchors.length?BUNDLE.anchors:
@@ -1266,33 +883,18 @@ var placeFC={type:'FeatureCollection',features:PLACES.map(function(p){
   return {type:'Feature',properties:{n:p[0],k:p[3]||'town'},
     geometry:{type:'Point',coordinates:[p[1],p[2]]}}})};
 
-/* Satellite is optional. With no imagery (partial region) or no georeference,
-   the source still needs valid geometry and the basemap chip must not offer
-   what cannot be shown. */
+ 
 var TILES=BUNDLE.tiles||null;
 var TILEURL='bundle/imagery/{z}/{x}/{y}.jpg';
-/* A153 (take 127) · SPARSE tiles. Statewide the pyramid ships only over the
-   riding areas, ON TOP of the mosaic that covers the state. Two rules keep
-   that honest: (1) a tile outside a declared box is never requested — the
-   box list comes with the bundle; (2) a tile that is requested and missing
-   comes back as a blank tile, not an error, because map.on('error') is what
-   decides RENDER FAIL and a rider zoomed on Manistee must not see it. Both
-   live in one protocol handler, like the glyph pack's. */
+ 
 var SPARSE=!!(TILES&&TILES.sparse);
-/* Take 138: the first "blank" tile was a half-transparent BLUE pixel
-   (0,0,255,127) typed from memory — Jacob's Hybrid turned blue from z12 up
-   everywhere outside a patch. This one is generated (PIL, RGBA 0,0,0,0) and
-   render asserts the decoded alpha is zero. */
+ 
 var BLANK_PNG=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=='),function(c){return c.charCodeAt(0)});
 function inPatch(z,x,y){var b=(TILES&&TILES.boxes)||[];
   for(var i=0;i<b.length;i++){var q=b[i];
     if(q[0]===z&&x>=q[1]&&x<=q[3]&&y>=q[2]&&y<=q[4])return true}
   return false}
-/* take 144 · the saved-HD tile store (A160). IndexedDB because it needs no
-   native plugin, survives app restarts, and the render harness can drive
-   it. The read path ships first and alone — proven before any UI exists.
-   Writers (the area downloader, the streaming cache) arrive in later
-   takes and own the LRU; this module only reads, writes, counts, clears. */
+ 
 var HD=(function(){
   var DBN='apex-hd',ST='tiles',db=null;
   function open(){return db?Promise.resolve(db):new Promise(function(res,rej){
@@ -1315,12 +917,7 @@ var HD=(function(){
         return {tiles:all.length,bytes:b}})},
     clear:function(){return tx('readwrite',function(s){return s.clear()})}};
 })();
-/* take 144 · the resolver's order of address: inside a declared box the
-   BUNDLE answers, as it always has; outside every box the SAVED HD STORE
-   answers before blank does — that is the entire trick that lets a rider's
-   saved z13–15 draw on top of the overzoomed base with zero source or
-   layer changes. Streaming will slot between store and blank in its own
-   take. */
+ 
 function _satResolve(params){
   var m=/apexsat:\/\/(\d+)\/(\d+)\/(\d+)/.exec(params.url||'');
   var blank=function(){return {data:BLANK_PNG.buffer.slice(0)}};
@@ -1333,14 +930,7 @@ function _satResolve(params){
   return HD.get(z,x,y).then(function(b){return b?{data:b}:blank()}).catch(blank);
 }
 if(SPARSE)maplibregl.addProtocol('apexsat',_satResolve);
-/* take 145 · "Save HD for this area" (A160). Jacob's rules are law here:
-   NOTHING moves without a tap, the sheet quotes tiles and megabytes before
-   the save button exists, and the chip carries progress exactly as he
-   sketched ("HD 42%"). A stopped or killed save costs nothing — landed
-   tiles stay in the store and the same save run again skips them, so
-   resume is free. fetchTile is a deliberate seam: the harness replaces it
-   and proves the whole loop with no network. EST is measured, not guessed:
-   17.3 MB over 790 shipped z13–15 patch tiles ≈ 22 KB each. */
+ 
 var HDDL=(function(){
   var USGS='https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}';
   var running=false,stopReq=false;
@@ -1383,8 +973,7 @@ var HDDL=(function(){
 var SAT_OK=!!TILES||!!(SAT&&SATB&&(SATB[2]-SATB[0])>1e-6&&(SATB[3]-SATB[1])>1e-6);
 var SATBOX=SAT_OK?SATB:(BUNDLE.bbox||[0,0,1,1]);
 var SATURL=SAT_OK?SAT:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-/* One ease to the rider's first fix — never repeated, never after the user
-   has taken the wheel (drag/zoom marks the map as theirs). */
+ 
 var _booted=false,_userDrove=false;
 function bootEase(at){
   if(_booted||_userDrove)return;_booted=true;
@@ -1392,24 +981,14 @@ function bootEase(at){
     essential:true})}catch(e){}}
 var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
   sources:{
-    /* Real tiles when the bundle has them: MapLibre fetches only what is on
-       screen, so z15 over the whole region costs 45 MB on disk but bounded
-       memory. The single 1500 px mosaic it replaces was 22.1 m/px — a
-       two-track is one metre wide, which is why the satellite layer was
-       unusable (take 42). The mosaic stays as the fallback for the
-       single-file build, which cannot carry 2,000 files. */
+     
     sat:(TILES&&!SPARSE)?{type:'raster',tiles:[TILEURL],tileSize:256,
       minzoom:TILES.zmin,maxzoom:TILES.zmax,
       bounds:[SATBOX[0],SATBOX[1],SATBOX[2],SATBOX[3]],
       attribution:'USGS'}
      :{type:'image',url:SATURL,
       coordinates:[[SATBOX[0],SATBOX[3]],[SATBOX[2],SATBOX[3]],[SATBOX[2],SATBOX[1]],[SATBOX[0],SATBOX[1]]]},
-    /* take 140 · a statewide BASE as its own source: a raster source
-       overzooms only from its own maxzoom, so base tiles stretch under
-       z13–15 everywhere outside a patch instead of going blank. Take 143:
-       the base is a z11..TILES.base pyramid (z12 by default — field report
-       24493), each level native at its own band. Layer order: mosaic,
-       base, patches. */
+     
     satbase:(SPARSE&&TILES.zmin<=11)?{type:'raster',tiles:['apexsat://{z}/{x}/{y}'],tileSize:256,
       minzoom:11,maxzoom:(TILES.base||11),attribution:'USGS'}
       :{type:'geojson',data:{type:'FeatureCollection',features:[]}},
@@ -1419,8 +998,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     hs:{type:'image',url:SHADE,
       coordinates:[[TR.b[0],TR.b[3]],[TR.b[2],TR.b[3]],[TR.b[2],TR.b[1]],[TR.b[0],TR.b[1]]]},
     ground:{type:'geojson',data:(function(){
-      /* forest / wetland / park polygons plus the NF boundary wash, extracted
-         from the same OSM file everything else comes from. Absent-safe. */
+       
       var f=(LAND&&LAND.f||[]).map(function(a){
         return {type:'Feature',properties:{k:a.k},
           geometry:{type:'Polygon',coordinates:a.g}}});
@@ -1429,17 +1007,9 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     wlbl:{type:'geojson',data:{type:'FeatureCollection',features:wlab}},
     refs:{type:'geojson',data:{type:'FeatureCollection',features:refstrokes}},
     poi:{type:'geojson',data:{type:'FeatureCollection',features:poif}},
-    /* take 154 · A170: clustering is a SOURCE property and mode selection is
-       a LAYER filter, so a clustered `poi` would count pins the mode hides
-       and the 17,544 services Jacob excludes. This source carries only what
-       the current mode actually shows of the clusterable kinds — its data is
-       re-set on every mode switch (clusterData below), so the number on the
-       badge is a number a rider can reach. clusterProperties keeps the
-       composition: kn = how many of the dominant kind, so a homogeneous
-       pile can wear its own glyph and an honest xN. */
+     
     poiclust:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
-    /* take 160 · A176 · one badge per pile of pins that physically overlap
-       at the CURRENT zoom, above the cluster ceiling where take 154 stops */
+     
     poistack:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     cont:{type:'geojson',data:{type:'FeatureCollection',features:contf}},
     wpts:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
@@ -1467,27 +1037,13 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     places:{type:'geojson',data:placeFC}
   },
   layers:[
-    /* ── THE GROUND (take 113 · T2, reference study) ────────────────────
-       AllTrails' light map: warm light-grey base, landcover doing the work.
-       The tan that drew a national forest as a desert dies here. */
+     
     {id:'bg',type:'background',paint:{'background-color':'#F2F3F0'}},
-    /* A142 (take 121) · the state shape is GROUND, not a wash. It sat above
-       every ground, water and network layer, so at 20-mile scale the whole
-       peninsula read as a flat tan sheet with the trails faintly bleeding
-       through it — Jacob's field verdict, and the screenshot is unarguable.
-       It draws on the background now: land where there is no landcover yet,
-       forest / park / water on top of it where there is. Opaque, because it
-       IS the ground; the fade to nothing by z9.6 stays, since landcover has
-       the view by then. The outline stays above the data, where a line
-       orients without hiding anything. */
+     
     {id:'state-fill',type:'fill',source:'state',maxzoom:9.6,
       paint:{'fill-color':'#EFE7D6','fill-opacity':1}},
-    /* USGS ImageryOnly, NAIP-derived, public domain. Landmine 22: Esri, Google,
-       Bing and Mapbox imagery are licensed and may not ship offline. */
-    /* Public-land wash first (the Huron NF boundary — AllTrails' deeper tone
-       over federal ground), then the specific covers on top of it. All of it
-       sits UNDER relief, water and the network: the ground is what the map is
-       read against, never what competes with it. */
+     
+     
     {id:'lc-public',type:'fill',source:'ground',
       filter:['==',['get','k'],'public'],
       paint:{'fill-color':'#E9F0DE','fill-opacity':0.85}},
@@ -1500,43 +1056,29 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     {id:'lc-park',type:'fill',source:'ground',
       filter:['==',['get','k'],'park'],
       paint:{'fill-color':'#C9E2B6','fill-opacity':0.9}},
-    /* A140 · riding areas wash in the legal-route green: the one ground on the
-       map you may ride anywhere on, so it carries the colour the network uses
-       for "yours". Under the network, above the landcover. */
-    /* Take 132 · public land: a wash by type under everything drawn, so a
-       hunter sees where the state line runs before the trails do. Game areas
-       a touch stronger than forest; parks in the park green. */
+     
+     
     {id:'pub-fill',type:'fill',source:'pubs',layout:{visibility:'none'},
       paint:{'fill-color':['match',['get','t'],'game','#5E9E4A','park','#7FB77E','launch','#4F8FB5','#8FBF7A'],
         'fill-opacity':['match',['get','t'],'game',0.30,'launch',0.35,0.20]}},
     {id:'area-fill',type:'fill',source:'areas',
       paint:{'fill-color':'#0FAE57','fill-opacity':0.22}},
-    /* The onX satellite trick is INVERSION: dim and desaturate the imagery so
-       the network becomes the brightest thing on screen. Dark ground, luminous
-       data (take 113, reference study). */
+     
     {id:'sat',type:'raster',source:'sat',layout:{visibility:'none'},
       paint:{'raster-opacity':1,'raster-fade-duration':0,
         'raster-saturation':-0.35,'raster-brightness-max':0.82,
         'raster-contrast':0.06}},
-    /* A153 · crisp tiles over the riding areas, above the mosaic. Toggled
-       with 'sat'. A geojson stand-in when the bundle has no patches keeps
-       the layer id stable for the toggle and the harness. */
+     
     (SPARSE&&TILES.zmin<=11)?{id:'sat-base',type:'raster',source:'satbase',layout:{visibility:'none'},
       paint:{'raster-opacity':1,'raster-fade-duration':150}}
       :{id:'sat-base',type:'circle',source:'satbase',layout:{visibility:'none'},paint:{'circle-radius':0}},
     SPARSE?{id:'sat-patch',type:'raster',source:'satpatch',layout:{visibility:'none'},
       paint:{'raster-opacity':1,'raster-fade-duration':150}}
       :{id:'sat-patch',type:'circle',source:'satpatch',layout:{visibility:'none'},paint:{'circle-radius':0}},
-    /* Relief under the map, multiplied into the sand rather than laid over it,
-       so trails stay the loudest thing on screen. */
+     
     {id:'hillshade',type:'raster',source:'hs',
       paint:{'raster-opacity':0.42,'raster-contrast':0.12,'raster-fade-duration':0}},
-    /* A87 · contours sit directly above the hillshade and BELOW water and the
-       network — terrain is the thing you read the map on top of, never the
-       thing competing with the trail you are riding. Off by default: this is a
-       reference layer, and the map should open the way it always has.
-       Brown, because contours have been brown since the USGS decided so, and a
-       rider who has seen a paper quad reads it without being told. */
+     
     {id:'cont-line',type:'line',source:'cont',minzoom:12.4,
       layout:{visibility:'none','line-join':'round'},
       filter:['==',['get','i'],0],
@@ -1547,10 +1089,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       filter:['==',['get','i'],1],
       paint:{'line-color':'#8A6A42','line-width':w(0.9,1.7,2.8),
         'line-opacity':0.8}},
-    /* Relation-assembled water (take 118): the Great Lakes and every
-       island-holding lake — the way-only reader can never see them, and take
-       117 shipped Michigan lakeless of its namesakes. Same paint, same seat,
-       one water. */
+     
     {id:'lc-water',type:'fill',source:'ground',
       filter:['==',['get','k'],'water'],
       paint:{'fill-color':'#A9D3E6'}},
@@ -1558,63 +1097,34 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       paint:{'fill-color':'#A9D3E6'}},
     {id:'wway',type:'line',source:'wtr',filter:['==',['get','c'],'waterway'],
       paint:{'line-color':'#A9D3E6','line-width':w(0.5,1.8,4)}},
-    /* A white casing under every trail. This is the single thing that makes a
-       coloured network readable over satellite imagery, and it was switched OFF
-       except in satellite mode — so on the default map the trails had no
-       separation from the roads at all. */
+     
     {id:'casing',type:'line',source:'net',
       layout:{'line-cap':'round','line-join':'round'},
       filter:['in',['get','c'],['literal',['route72','trail50','moto24','mccct','fstrail']]],
-      /* Wider than it was. Near-black singletrack on dark canopy is only
-         legible because of this halo — "dirtbike trails are hard to see". */
+       
       paint:{'line-color':'#FFFFFF','line-opacity':0.95,'line-width':w(3.2,7.2,15)}},
-    /* Two-track gets its OWN, narrower casing. Sharing the designated-trail
-       casing swamped it — a 1.6 px brown line under a 6 px white halo reads as a
-       cream line, which is how the two-track disappeared entirely (take 61). */
+     
     {id:'casing-track',type:'line',source:'net',
       layout:{'line-cap':'round','line-join':'round'},
       filter:['==',['get','c'],'track'],
       paint:{'line-color':'#FFFFFF','line-opacity':0.75,'line-width':w(1.7,3.8,8)}},
-    /* Forest road gets a casing too, and take 77 measured why it had to. Colour
-       alone cannot fix this one: the sand basemap is light and canopy is dark,
-       so every lighter candidate gained on satellite exactly as fast as it lost
-       on sand. At #8A7C66 it sits dE 15.8 from median ground with NOTHING under
-       it — the least legible drawn class on the map, and the only ridable one
-       with no halo.
-       Deliberately the faintest of the three casings, so the hierarchy take 61
-       established still reads: designated trail 0.95 / two-track 0.75 / forest
-       road 0.55, each narrower than the last. A road you drive a truck down
-       should be findable, not loud. */
+     
     {id:'casing-fsroad',type:'line',source:'net',
       layout:{'line-cap':'round','line-join':'round'},
       filter:['==',['get','c'],'fsroad'],
       paint:{'line-color':'#FFFFFF','line-opacity':0.55,'line-width':w(1.2,2.6,5.5)}},
-    /* PAVED and MINOR are roads and read as background. TRACK and FSROAD are
-       not: forest two-track and USFS road are 1,169 of the 2,246 miles here —
-       52% — and they are exactly what a dirt bike rides. Styled as grey dashes
-       they read as "not for you", which is why Jacob said the trails he rides
-       had no colour (take 58). They are ridable dirt: a warm tan, solid, thinner
-       than designated trail so the hierarchy still reads. */
-    /* Hairline casing UNDER the white fill — without it a white road on a
-       light ground is invisible, and the casing is what gives the reference
-       maps their quiet road hierarchy (take 113). */
+     
+     
     lyr('minor-case','minor','#C9C8C2',w(1.2,2.1,3.8)),
     lyr('paved-case','paved','#BFBEB8',w(1.9,3.4,6.6)),
     lyr('minor','minor',PAL.minor,w(0.4,0.9,2.2)),
     lyr('paved','paved',PAL.paved,w(0.9,2,4.8)),
-    /* fsroad and track were the same brown at take 58, and Jacob's own example
-       shows why that is wrong: "East Wagner Lake Road" is minor and "E. Wagner
-       Lake Rd" is fsroad — the SAME road, split in the source. A Forest Service
-       road is something you drive a truck down; a two-track is something you
-       ride. Muted grey-tan for the road, warm brown for the two-track, and only
-       the two-track gets a casing (take 61). */
+     
     lyr('fsroad','fsroad',PAL.fsroad,w(0.6,1.4,3.2)),
     lyr('track','track',PAL.track,w(0.7,1.8,3.9)),
-    /* take 134 · hiking routes are ROUTABLE now (walk machine); they draw
-       from the net source, dashed in the hiking green, above two-track */
+     
     lyr('foot','foot',PAL.foot,w(1.0,1.8,3.0),[2,2]),
-    /* Trails, by difficulty. Widest/easiest drawn first so the hard singletrack
-       sits on top where it matters. */
+     
     lyr('route72','route72',PAL.route72,w(1.7,4.1,9.5)),
     lyr('fstrail','fstrail',PAL.fstrail,w(1.4,3.4,8)),
     lyr('trail50','trail50',PAL.trail50,w(1.5,3.7,8.6)),
@@ -1622,17 +1132,10 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     lyr('moto24','moto24',PAL.moto24,w(1.5,3.7,8.6)),
     lyr('closed','closed',PAL.closed,w(1.2,3,7),[2,1.3]),
     lyr('fsclosed','fsclosed',PAL.fsclosed,w(1.2,3,7),[2,1.3]),
-    /* Both of these were written twice and never landed: my patches anchored on
-       'route-line', and the layer is called 'routeline'. The SOURCES were
-       created and fed data, so every check I wrote — which measured setData —
-       passed while nothing drew. Sources without layers are invisible data
-       (take 43, landmine 68). Order matters: alternates under the choice,
-       approach legs over it so the dashes stay readable. */
+     
     {id:'show-line',type:'line',source:'showonly',minzoom:11.5,
       layout:{'line-cap':'round'},
-      /* One grey for every non-ORV route told Jacob nothing — a hiking trail and a
-         snowmobile route looked identical, and both looked like "some line".
-         Colour by use; dashed still means "not yours to ride" (take 66). */
+       
       paint:{'line-color':['match',['get','c'],
           'foot',PAL.foot,'path',PAL.foot,'horse',PAL.horse,'snow',PAL.snow,
           'snowmob',PAL.snowmob,'nfsmoto',PAL.nfsmoto,PAL.showother],
@@ -1655,22 +1158,13 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     {id:'backline',type:'line',source:'back',
       layout:{'line-cap':'round','line-join':'round'},
       paint:{'line-color':'#FFD166','line-width':w(3,6,13),'line-opacity':.95}}    ,
-    /* Trail names ride along the line, the way a routed sign sits beside it.
-       Designated line gets its name and number; advisory OSM line gets neither,
-       so text itself carries provenance. */
-    /* The outline only — the fill moved to the bottom of the stack at take
-       121 (A142). Land filled, water left as page ground is what makes the
-       mitten read as the mitten; drawing that fill OVER the data made the
-       mitten read as a blank. */
+     
+     
     {id:'state-line',type:'line',source:'state',maxzoom:9.6,
       paint:{'line-color':'#8A8175',
         'line-width':['interpolate',['linear'],['zoom'],5,1.0,7,1.4,9.5,1.8],
         'line-opacity':['interpolate',['linear'],['zoom'],5,0.9,8.6,0.7,9.6,0]}},
-    /* take 129 · county lines and names (transcribed from onX 24276, which
-       draws them dashed with the name along the line). The 83 county rings
-       have been in the context payload since take 100, used only to answer
-       "what county am I in". Off in Ride and Water, on in Outdoors — a
-       hunter thinks in counties; a rider thinks in trail systems. */
+     
     {id:'county-line',type:'line',source:'county',minzoom:5.5,maxzoom:13,
       layout:{visibility:'none'},
       paint:{'line-color':'#6F6759','line-width':w(0.8,1.2,1.6),
@@ -1698,27 +1192,15 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       filter:['in',['get','c'],['literal',['route72','trail50','moto24','mccct','fstrail']]],
       layout:{'symbol-placement':'line','text-field':['get','lb'],
         'text-font':['APEX'],'text-size':w(9.5,11.5,14),
-        /* 32 degrees placed ZERO labels on this network: ORV trails bend far more than
-         that inside the width of a name, and MapLibre rejects the placement
-         outright. Measured sweep at z14.5 over 29 candidate strokes:
-         a32 s230 -> 0 · a60 s230 -> 3 · a60 s120 -> 4 · a85 s90 -> 5.
-         75/100 keeps most of the gain without text wrapping round hairpins. */
-        /* Swept at the REAL viewport (411x960), not the 900x1400 the harness used
-           to run — that overstated density threefold. Measured at z14.5:
-           75/100/pad2 -> 4 names · 85/60/pad1 -> 5 · with smaller text -> 6.
-           Past that it flattens, so more aggression buys nothing (take 57). */
+         
+         
         'text-max-angle':85,'symbol-spacing':60,'text-letter-spacing':0.02,
         'text-padding':1},
-      /* White on a dark halo rather than dark on light: it survives sand,
-         hillshade and satellite equally, which dark-on-light does not. */
+       
       paint:{'text-color':'#FFFFFF','text-halo-color':'rgba(20,18,15,0.92)',
         'text-halo-width':1.9,'text-halo-blur':0.2}},
-    /* AFTER lbl-trail. MapLibre gives earlier symbol layers priority in collision,
-       so this sat in front and a non-ridable path ("Mack's Sault") was named
-       while the trail loop a rider was standing on was not (take 57). Names you
-       may ride come first. */
-    /* Short named features — trailheads, connectors, spurs — get ONE centred
-       label. Without this a 740 ft trailhead is unlabelled at every zoom. */
+     
+     
     {id:'lbl-trail-short',type:'symbol',source:'shortpts',minzoom:13.4,
       layout:{'text-field':['get','lb'],'text-font':['APEX'],
         'text-size':w(9,10.5,12),'text-max-width':9,'text-line-height':1.15,
@@ -1736,27 +1218,9 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-font':['APEX'],'text-size':w(8.5,10,12),
         'text-max-angle':70,'symbol-spacing':180,'text-padding':2},
       paint:{'text-color':'#4A423A','text-halo-color':'#EFE6D2','text-halo-width':1.5}},
-    /* A110 · places. Circle plus label, no sprite sheet — see POIKIND. The
-       dot appears before the name so a pin is visible at a zoom where its
-       label will not fit, and `symbol-sort-key` puts fuel and trailheads ahead
-       of picnic tables when they compete for space. */
-    /* Badges, not dots (take 113 · T3): the id keeps 'poi-dot' because the
-       layers panel and checks address it, but it is now the category badge. */
-    /* A143 · destinations first and twice the size; A151 (take 123) · STABLE.
-       Take 121 handed 670 destination badges in one 10-mile view to the
-       collision solver, whose answer changed on every pan — Jacob: "pop in
-       and out like crazy" — and split badge from name into two layers that
-       collided separately, so a name could draw with no badge under it or a
-       badge with no name (A151b, screenshots 24315 vs 24323). Now:
-         · the DATA is thinned by a prominence rank (poi.py): rank 0 from
-           z9.2, rank 1 from z10.5, rank 2 from z11.4 — a filter on zoom is
-           deterministic, so a pin that is on stays on while you pan;
-         · overlap is allowed everywhere — there is nothing left to fight
-           over once the data is thinned;
-         · badge and name live in ONE layer with text-optional, so the badge
-           always draws and the name only when it fits. They cannot disagree.
-       The destination layer sits above the service layer: when a trailhead
-       and a gas station collide, the reason you drove out here wins. */
+     
+     
+     
     {id:'poi-dot',type:'symbol',source:'poi',minzoom:11.4,
       filter:['!=',['get','d'],1],
       layout:{'icon-image':['concat','bdg-',['get','k']],
@@ -1782,21 +1246,14 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-optional':true,'symbol-sort-key':['get','r']},
       paint:{'text-color':['get','c'],'text-halo-color':'#FFFFFF',
         'text-halo-width':1.9}},
-    /* Only the INDEX contour carries a number. Labelling every 40 ft line puts
-       sixteen numbers on one hillside; labelling every 200 ft is what a paper
-       quad does and is readable. */
-    /* take 154 · a HOMOGENEOUS cluster wears its kind's badge with xN;
-       a mixed one is a plain numbered circle, which is what the reference
-       app does and what a mixed pile honestly is. */
+     
+     
     {id:'poi-cluster',type:'symbol',source:'poiclust',maxzoom:CLUSTER_MAXZ,
       filter:['>',['get','n'],1],
       layout:{'icon-image':['concat','bdg-',['get','k']],
         'icon-size':['interpolate',['linear'],['zoom'],6,0.62,11.4,1.02],
         'icon-allow-overlap':true,'icon-padding':2,
-        /* take 154 · allow-overlap makes a label draw anyway; it does NOT
-           stop it BLOCKING others. Without ignore-placement the always-on
-           xN text evicted every town and trail name at low zoom — caught by
-           the render harness's label check, which is what it is for. */
+         
         'icon-ignore-placement':true,
         'text-field':['concat','\u00d7',['to-string',['get','n']]],
         'text-font':['APEX'],'text-size':11,'text-offset':[0,1.25],
@@ -1804,22 +1261,16 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-ignore-placement':true},
       paint:{'text-color':'#1C1A16','text-halo-color':'#FFFFFF',
         'text-halo-width':2}},
-    /* A destination with no neighbour is not a cluster — supercluster emits
-       it as a plain point. Below the ceiling poiclust OWNS the clusterable
-       kinds, so the lone ones need their own badge or they vanish. */
+     
     {id:'poi-clust-one',type:'symbol',source:'poiclust',maxzoom:CLUSTER_MAXZ,
-      /* take 154 · poi-dot-major gated low zoom by prominence; a lone
-         destination here must be gated the SAME way or the state fills with
-         badges and the town names lose every collision. */
+       
       filter:['all',['==',['get','n'],1],['==',['get','d'],1],
         ['step',['zoom'],['<=',['get','pri'],0],
           10.5,['<=',['get','pri'],1], 11.4,true]],
       layout:{'icon-image':['concat','bdg-',['get','k']],
         'icon-size':['interpolate',['linear'],['zoom'],9.2,0.60,11.4,1.04],
         'icon-allow-overlap':true,'icon-padding':2,
-        /* take 154 · below the ceiling these badges draw over everything
-           anyway; letting them also EVICT town and trail names costs the
-           map its orientation. Non-blocking, like the stack badges. */
+         
         'icon-ignore-placement':true,
         'text-field':['step',['zoom'],'',11,['get','n_']],
         'text-font':['APEX'],'text-size':11,'text-max-width':9,
@@ -1842,19 +1293,14 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       filter:['==',['get','i'],1],
       paint:{'text-color':'#7A5C36','text-halo-color':'#EFE6D2',
         'text-halo-width':1.6}},
-    /* A115 · the paddle corridor. Off by default — this is a different activity
-       from the one the app opens on, and a river drawn over the trail network
-       uninvited is clutter. Under the water layers so it reads as the river it
-       is, above the contours that describe the ground it cuts through. */
+     
     {id:'pad-case',type:'line',source:'paddle',minzoom:8,
       layout:{visibility:'none','line-join':'round','line-cap':'round'},
       paint:{'line-color':'#FFFFFF','line-width':w(3.2,5.5,9),'line-opacity':0.75}},
     {id:'pad-line',type:'line',source:'paddle',minzoom:8,
       layout:{visibility:'none','line-join':'round','line-cap':'round'},
       paint:{'line-color':'#1E6FA8','line-width':w(1.8,3.2,5.5)}},
-    /* A76 · summits. A triangle because that is what a summit is on every map a
-       rider has ever seen. Terrain, so it sits below the places you ride to and
-       below your own marks — but above the contours that describe it. */
+     
     {id:'peak-dot',type:'symbol',source:'peaks',minzoom:10.6,
       layout:{visibility:'none','text-field':'\u25B2','text-font':['APEX'],
         'text-size':w(8,10,12),'text-allow-overlap':true,'text-padding':0},
@@ -1864,8 +1310,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-size':w(8,9.5,11),'text-offset':[0,0.85],'text-anchor':'top',
         'text-max-width':10,'text-padding':4,'text-line-height':1.15},
       paint:{'text-color':'#3A352E','text-halo-color':'#FFFFFF','text-halo-width':1.9}},
-    /* Access, launches and camps ON the river, each carrying its river mile so
-       a shuttle can be planned from the map: which put-in is above which. */
+     
     {id:'pad-dot',type:'symbol',source:'padpin',minzoom:9.5,
       layout:{visibility:'none',
         'icon-image':['concat','bdg-pad-',['get','k']],
@@ -1877,10 +1322,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-max-width':9,'text-padding':4},
       filter:['!=',['get','k'],'dam'],
       paint:{'text-color':'#1C1A16','text-halo-color':'#FFFFFF','text-halo-width':1.9}},
-    /* THE HAZARD LAYER. Dams and the impoundments above them, in the closure
-       colour, on top of everything else this layer draws. Never filtered, never
-       thinned by zoom, never hidden behind a pin. A112: if paddle mode cannot
-       show these it does not ship. */
+     
     {id:'pad-dam',type:'circle',source:'padpin',minzoom:8,
       layout:{visibility:'none'},
       filter:['==',['get','k'],'dam'],
@@ -1894,8 +1336,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       paint:{'text-color':'#8E0F19','text-halo-color':'#FFFFFF','text-halo-width':2.2}},
     {id:'area-line',type:'line',source:'areas',
       paint:{'line-color':'#0B7A3E','line-width':w(1,1.6,2.6),'line-dasharray':[3,1.5]}},
-    /* One label per area at its centre, from state zoom down, so Silver Lake
-       and St. Helen read as destinations before their polygon has any size. */
+     
     {id:'pub-line',type:'line',source:'pubs',minzoom:8,layout:{visibility:'none'},
       paint:{'line-color':['match',['get','t'],'game','#2F6E24','park','#3D6B35','#4E7A3E'],
         'line-width':w(0.6,1.1,1.8),'line-opacity':0.8}},
@@ -1908,9 +1349,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-size':w(10,11.5,13),'text-anchor':'center','text-max-width':9,
         'text-allow-overlap':false,'text-padding':2},
       paint:{'text-color':'#0B7A3E','text-halo-color':'#FFFFFF','text-halo-width':2}},
-    /* A84 · your own marks. Drawn above the world's places: a POI is something
-       that is there, a waypoint is something YOU decided mattered, and when
-       they collide yours wins. */
+     
     {id:'wpt-dot',type:'circle',source:'wpts',minzoom:10.5,
       paint:{'circle-radius':w(3.4,5.2,7),
         'circle-color':['match',['get','t']].concat(Object.keys(WPTYPES).reduce(function(a,k){
@@ -1921,15 +1360,8 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-size':w(8,9.5,11),'text-offset':[0,1.05],'text-anchor':'top',
         'text-max-width':9,'text-padding':4},
       paint:{'text-color':'#2A2620','text-halo-color':'#FFFFFF','text-halo-width':1.9}},
-    /* A75 · posted route numbers. "Two east of M 33" is how a rider says where
-       they are, and the number is on every sign where the street name often is
-       not. Placed after trail names — the trail you are riding still wins — but
-       ahead of water, because a road number orients you and a pond does not.
-       Styled as a badge rather than a name: tighter letter spacing, a heavier
-       halo, and a colour of its own so a number reads as a number at a glance.
-       Real shields would need a sprite sheet the build does not have. */
-    /* M-routes wear the diamond, upright regardless of road bearing; every
-       other ref keeps the along-line badge. */
+     
+     
     {id:'lbl-shield',type:'symbol',source:'refs',minzoom:10.8,
       filter:['==',['index-of','M-',['get','lb']],0],
       layout:{'symbol-placement':'line','symbol-spacing':420,
@@ -1947,13 +1379,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-letter-spacing':0.02},
       paint:{'text-color':'#1C1A16','text-halo-color':'#FFFFFF',
         'text-halo-width':2.2,'text-halo-blur':0.2}},
-    /* A77 · water names. Placed AFTER every trail-name layer, because MapLibre
-       resolves symbol collisions in layer order and the trail you are riding
-       must always win against a pond. minzoom holds them back until the trail
-       labels have stopped competing for space (take 57 tuned that density and
-       this must not undo it — render.mjs counts trail names and would say so).
-       Italic-feeling letter spacing and the water blue, so they read as terrain
-       rather than as something you can ride. */
+     
     {id:'lbl-lake',type:'symbol',source:'wlbl',minzoom:11.6,
       filter:['==',['get','c'],'water'],
       layout:{'text-field':['get','n'],'text-font':['APEX'],
@@ -1976,43 +1402,18 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-max-angle':70,'symbol-spacing':300,'text-padding':2},
       paint:{'text-color':'#6E6B66','text-halo-color':'#F5F6F3','text-halo-width':1.4}},
   ]},
-  /* Open view (Jacob's spec, take 117): the app opens where the RIDER is,
-     zoomed a bit out, the moment a fix lands (once, and never fighting a user
-     who has already panned). Before any fix: home if one is set, otherwise the
-     middle of Michigan. */
+   
   center:(HOME||CTR),zoom:(HOME?11.4:8.6),maxZoom:17,minZoom:5.2,
-  /* Michigan, not just the download. Penning the map to the bundle bbox meant a
-     rider 135 mi away could not see where he was relative to the area, and a
-     blank screen outside the box read as "broken" instead of "not downloaded"
-     (take 27 field report). The coverage outline below carries that meaning. */
+   
   maxBounds:[[-91.5,41.0],[-81.0,49.2]],fadeDuration:0,
   attributionControl:{compact:true,
     customAttribution:'© OpenStreetMap · Michigan DNR · USDA Forest Service · USGS'}});
 
-/* ── pins ──────────────────────────────────────────────────────────────── */
-/* ══ ICONS (take 99) ════════════════════════════════════════════════════════
-   Thirty-eight emoji were doing the work of an icon set. 😖 for "Wrong turn"
-   renders as a different picture on every phone, 🏍 is a different bike on
-   Samsung than on Pixel, and none of them share a weight or a grid — which is
-   most of why the app read as unfinished next to a commercial one.
-
-   Drawn instead: one 24x24 grid, 1.75 stroke, round caps, `currentColor` so an
-   icon inherits whatever the control it sits in is doing. Inline SVG — no
-   sprite sheet, no font, no fetch, and nothing to go missing offline.
-
-   Deliberately NOT drawn: the machine (bike/quad/side-by-side). A recognisable
-   motorcycle at 24 px in stroke is beyond what I can draw well, and a bad one
-   is worse than none — the label already says "Dirt bike 24\"". It gets a
-   generic vehicle mark and the words carry the meaning. */
+ 
+ 
 var ICONS={
   mountain:'<path d="m8 3 4 8 5-5 5 15H2L8 3z" />',
-/* ── LUCIDE (take 113) ─────────────────────────────────────────────────────
-   Professionally drawn open-source icons (ISC licence, lucide.dev) replacing
-   every hand-drawn path. Jacob's field reports caught the hand-drawn set twice
-   (broken wheels take 109; "the svgs don't look that good"). Icon geometry is a
-   specialist craft; both reference apps use professional sets, so this one does
-   too. Values are inner-SVG markup, inlined at build time from lucide-static —
-   the app bundles nothing and calls nowhere. */
+ 
   layers:'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />',
   vehicle:'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" /> <circle cx="7" cy="17" r="2" /> <path d="M9 17h6" /> <circle cx="17" cy="17" r="2" />',
   home:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />',
@@ -2042,22 +1443,15 @@ var ICONS={
 function ic(n,sz){
   var d=ICONS[n];
   if(!d)return '';
-  /* Lucide entries are full inner markup (paths, circles, lines), not a single
-     d-string — so they are embedded, not wrapped in one <path>. Stroke width 2
-     is what the set is drawn for. */
+   
   return '<svg class="ic" width="'+(sz||15)+'" height="'+(sz||15)+'" viewBox="0 0 24 24" '+
     'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '+
     'stroke-linejoin="round" aria-hidden="true">'+d+'</svg>'}
 
-/* Twelve places rewrite a chip's label with textContent, which would wipe the
-   icon inside it. One helper, so a chip's icon survives every state change. */
-/* The markup carries __IC_name__ placeholders so the SVG is defined once, in
-   ICONS, rather than pasted into fifteen buttons. */
+ 
+ 
 function paintIcons(){
-  /* Replace each BUTTON'S OWN children, never a shared parent's innerHTML.
-     The first version rewrote #shell.innerHTML, which would have destroyed
-     every event listener in the app — a fresh DOM with the same markup and
-     nothing wired to it, and the map would still have drawn perfectly. */
+   
   Array.prototype.forEach.call(document.querySelectorAll('#shell button'),
     function(b){
       if(b.innerHTML.indexOf('__IC_')<0)return;
@@ -2068,39 +1462,31 @@ function setChip(id,icon,label,on){
   var b=el(id);
   if(!b)return;
   b.innerHTML=ic(icon)+'<span>'+label+'</span>';
-  /* The app already tests classes with indexOf on className everywhere else;
-     using classList here would have added an API to the harness stub for a
-     single call. Follow the convention the codebase has (take 99). */
+   
   var base=(' '+b.className+' ').indexOf(' basebtn ')>=0?'basebtn':'chip';
   b.className=base+(on?' on':'')+(b.id==='c-act'?' actbtn':'')}
 
 try{paintIcons()}catch(e){}
-/* take 158 · reveal UNCONDITIONALLY, thrown or not: raw tokens are ugly, an
-   invisible-but-tappable app is dangerous. The backstop covers the case
-   where this line is never reached at all. */
+ 
 try{var _sh=document.getElementById('shell');
   if(_sh&&_sh.className.indexOf('ready')<0)_sh.className+=' ready'}catch(e){}
 
 function mk(cls,txt){var d=document.createElement('div');d.className='pin '+cls;
   d.textContent=txt;return d}
-/* Start pins on real anchors from whichever region loaded. */
+ 
 function anchorOf(kind,skip){
   for(var i=0;i<PLACES.length;i++){var p=PLACES[i];
     if(p[3]===kind&&(!skip||p[0]!==skip))return [p[1],p[2]]}
   for(var i=0;i<PLACES.length;i++){var p=PLACES[i];
     if(!skip||p[0]!==skip)return [p[1],p[2]]}
   return CTR}
-/* HOME is UNSET until the user sets one (Jacob's spec, take 117): the old
-   default — first town anchor — was a phantom that Return Home dutifully
-   routed to. Once set it persists; the marker exists only while HOME does. */
+ 
 var HOMEKEY='apex.home.v1',HOME=null;
 try{var _h=JSON.parse(localStorage.getItem(HOMEKEY)||'null');
     if(_h&&_h.length===2)HOME=_h}catch(e){}
 function homeSave(){try{HOME?localStorage.setItem(HOMEKEY,JSON.stringify(HOME))
                         :localStorage.removeItem(HOMEKEY)}catch(e){}}
-/* ME starts at the region centre (Jacob's open-view spec, take 117): the old
-   'site'-anchor default put the statewide start pin at Silver Lake Dunes,
-   ninety miles from the map the rider was looking at. */
+ 
 var ME=CTR.slice();
 var hM=new maplibregl.Marker({element:mk('home','⌂')});
 function homeMark(){if(HOME){hM.setLngLat(HOME).addTo(map)}else{try{hM.remove()}catch(e){}}}
@@ -2121,7 +1507,7 @@ el('c-saved').addEventListener('click',function(){
   logAct('act  saved routes');buildSavedPanel()});
 
 el('c-machine').addEventListener('click',function(){
-  /* take 149 · in Water the chip cycles craft, not machines (A165) */
+   
   if(mode==='water'){
     var wi=(WORDER.indexOf(machine)+1)%WORDER.length;
     machine=WORDER[wi];waterCraft=machine;
@@ -2144,18 +1530,9 @@ el('c-fuel').addEventListener('click',function(){fi=(fi+1)%FUELS.length;
   setChip('c-fuel','fuel',FUELS[fi]?FUELS[fi]+' mi':'off');
   if(last)renderRoutes(last)});
 
-/* ── Dijkstra ──────────────────────────────────────────────────────────── */
-/* Snap to the nearest node that has at least one edge this machine may legally
-   use. Snapping to the geometrically nearest node strands a 72" side-by-side on
-   a 50" trailhead and reports "no route" when a legal one exists 200 m away. */
-/* A96 (take 119) · the spatial grid. Every "nearest X" below was a linear
-   scan — fine over the box's 20k edges, 300 ms in headless over the state's
-   474k (1.4M vertices decoded on EVERY tap), seconds on a phone. One grid of
-   0.02° cells (~1.6 km) indexes every node and every geometry vertex of every
-   edge, built on first use in one pass and kept. Lookups walk rings outward
-   and stop once the ring is farther than the best hit, so the answer is the
-   SAME as the linear scan's (the harness asserts that), just from a few
-   hundred candidates instead of half a million. */
+ 
+ 
+ 
 var GRID=null, GCS=0.02;
 function gkey(cx,cy){return cx*100000+cy}
 function gcell(ll){return [Math.floor((ll[0]+180)/GCS),Math.floor((ll[1]+90)/GCS)]}
@@ -2170,22 +1547,18 @@ function gridBuild(){
   GRID={nodes:nodes,edges:edges,ms:Date.now()-t0};
   try{window.__gridMs=GRID.ms}catch(e){}
   return GRID}
-/* visit cells ring by ring; fn(list) returns nothing; stops when done(r) */
+ 
 function gridRings(ll,idx,visit,maxR){
-  /* `idx`, not `map`: the gate's stub check reads any "map dot get" as a
-     MapLibre call and fails the build — including in a comment (take 120) */
+   
   var c=gcell(ll);
   var hit=function(dx,dy){var a=idx.get(gkey(c[0]+dx,c[1]+dy));if(a)visit(a)};
   for(var r=0;r<=maxR;r++){
     if(r===0)hit(0,0);
-    else{/* perimeter only — the square-and-skip version was O(r^2) per ring,
-            which is what made a probe 100 mi out in Lake Superior cost
-            440 ms (take 119) */
+    else{ 
       for(var dx=-r;dx<=r;dx++){hit(dx,-r);hit(dx,r)}
       for(var dy=-r+1;dy<=r-1;dy++){hit(-r,dy);hit(r,dy)}}
     if(visit.done(r))return}}
-/* the ring r is at least (r-0.5)*cell away in the smaller (EW) direction,
-   so once that exceeds the best distance no later ring can beat it */
+ 
 function ringMi(r){return Math.max(0,r-0.5)*GCS*0.714*69}
 
 function nearestNode(ll){
@@ -2197,16 +1570,14 @@ function nearestNode(ll){
       var dx=NODES[i][0]-ll[0],dy=NODES[i][1]-ll[1],d=dx*dx*0.51+dy*dy;
       if(d<best){best=d;bi=i}}};
   visit.done=function(r){return bi>=0&&ringMi(r+1)>Math.sqrt(best)*69};
-  gridRings(ll,G.nodes,visit,400);   /* 400 cells ≈ 640 km: past the state, then the linear fallback */
+  gridRings(ll,G.nodes,visit,400);    
   return bi>=0?bi:nearestNode_linear(ll)}
 function nearestNode_linear(ll){
   var best=1e18,bi=-1;
   for(var i=0;i<NODES.length;i++){
     var ad=ADJ[i],legal=false;
     for(var k=0;k<ad.length;k++){
-      /* the same predicate the router uses — a snap onto a node whose only
-         edges are illegal for this machine either reports "no route" when a
-         legal one exists, or starts the rider on one (take 24, take 80) */
+       
       if(machineLegal(ad[k])){legal=true;break}}
     if(!legal)continue;
     var dx=NODES[i][0]-ll[0],dy=NODES[i][1]-ll[1],d=dx*dx*0.51+dy*dy;
@@ -2233,23 +1604,16 @@ function route(from,to,cost){
         if(r<heap.length&&heap[r][0]<heap[s][0])s=r;
         if(s===i)break;var t=heap[s];heap[s]=heap[i];heap[i]=t;i=s}}
     return top}
-  /* Take 117, statewide: a profile whose weights dislike everything nearby
-     will happily search half of Michigan. 150k settled nodes is ~2 s and far
-     beyond any sane ride; past that the profile answers null and the other
-     profiles still speak. The cap is a ceiling on SEARCH, not on rides — a
-     150-mile route along trails settles far fewer than this. */
+   
   var _exp=0;
   while(heap.length){var cur=pop(),d=cur[0],u=cur[1];
     if(done[u])continue;done[u]=1;if(u===to)break;
-    /* Take 134: 150,000 was a box-era cap (20k nodes). With hiking routable
-       the state has 582k nodes, and Silver Lake -> Mio ran out of budget at
-       the first profile. The cap scales with the graph: a full traversal is
-       always allowed, and the grid keeps a local route cheap regardless. */
+     
     if(++_exp>ROUTE_CAP)return null;
     var ad=ADJ[u];
     for(var k=0;k<ad.length;k++){var e=ad[k];
-      if(e.c==='closed'||e.c==='fsclosed')continue;   /* never route through a closure */
-      if(!machineLegal(e))continue;                    /* class AND per-vehicle (take 80) */
+      if(e.c==='closed'||e.c==='fsclosed')continue;    
+      if(!machineLegal(e))continue;                     
       var v=e.a===u?e.b:e.a;if(done[v])continue;
       var nd=d+cost(e);
       if(nd<dist[v]){dist[v]=nd;prev[v]=u;pe[v]=e.i;push([nd,v])}}}
@@ -2257,18 +1621,13 @@ function route(from,to,cost){
   var path=[],u=to;while(u!==from&&prev[u]>=0){path.push(EDGES[pe[u]]);u=prev[u]}
   return path.reverse()}
 
-/* Designated ORV trail vs legal forest road vs pavement. All three are legal
-   for the selected machine — the router cannot produce anything else — but they
-   are very different rides. */
+ 
 var DESIG={route72:1,trail50:1,moto24:1,mccct:1,fstrail:1};
 var DIRT={fsroad:1,track:1};
 
 function summarise(path){
   var mi=0,hrs=0,off=0,adv=0,hardest=0,names={},up=0,dn=0,prof=[],run=0;
-  /* How much of this route is DESIGNATED ORV line, how much is legal forest
-     road, how much is pavement. Jacob: "routes should show if it's fully
-     approved, partly approved, or not" — crossing M-33 is inevitable and fine,
-     riding a road for ten miles is a different trip (take 58). */
+   
   var mDes=0,mDirt=0,mRoad=0;
   path.forEach(function(e){var L=e.L/1609.34;mi+=L;hrs+=L/spd(e);
     if(DESIG[e.c])mDes+=L; else if(DIRT[e.c])mDirt+=L; else mRoad+=L;
@@ -2280,13 +1639,13 @@ function summarise(path){
     var ep=edgeProfile(e.i),base=(NE&&NE[e.a])||0;
     for(var k=0;k<ep.length;k+=2)prof.push(base+ep[k]);
     run+=L});
-  /* climbing is time as well as effort -- roughly 1 min per 100 ft up */
+   
   hrs+=(up*3.28084/100)/60;
   return {mi:mi,hrs:hrs,off:off,adv:adv,hard:HARD[hardest],up:up,dn:dn,prof:prof,
           des:mDes,dirt:mDirt,road:mRoad,
           turns:Object.keys(names).length,path:path}}
 
-/* sunset, NOAA short form — enough to answer "am I getting home in the dark" */
+ 
 function sunset(lat,lon,date){
   var d=Math.floor((date-new Date(date.getFullYear(),0,0))/864e5);
   var g=(360/365.24)*(d+10)*Math.PI/180;
@@ -2301,11 +1660,7 @@ function sunset(lat,lon,date){
   return (mins+off)/60}
 
 var PROFILES=[
-  /* Most trail first, because it is what this app is FOR. Every other profile
-     optimises for speed or ease, and pavement wins both — Return Home was
-     handing back "no designated trail, 8.5 mi paved" to a man on a dirt bike
-     (take 58). Designated ORV line is cheap, forest road is fine, pavement is
-     expensive but never forbidden: crossing M-33 is inevitable. */
+   
   {k:'trail',h:'Most trail',f:function(e){
      return e.L*(DESIG[e.c]?0.55:DIRT[e.c]?1.3:8)}},
   {k:'fast',h:'Fastest',f:function(e){return e.L/spd(e)}},
@@ -2315,56 +1670,13 @@ var PROFILES=[
   {k:'flat',h:'Least climbing',f:function(e){return e.L*0.35+UP[e.i]*45}}
 ];
 
-/* ══ SAVED ROUTES ═══════════════════════════════════════════════════════════
-   A85, and the last thing take 25 named as missing from A28: "saving and naming
-   a planned route so it survives an app restart."
-
-   THE DESIGN DECISION: a saved route stores its INPUTS — the two points, the
-   machine, the profile — and is re-routed when you open it. It does NOT store
-   the line.
-
-   That is a safety property, not a storage preference. The bundle carries
-   twelve temporarily-closed segments and they are refreshed from the DNR on
-   every build. A route frozen as geometry in October and replayed in May would
-   happily draw you down something that closed in between, with every closure
-   check bypassed because the answer was already on disk. Re-routing from the
-   inputs runs the current legality filter, the current closures and the current
-   machine rules every time.
-
-   The cost is that a reopened route can differ from the one you saved. That is
-   the correct behaviour and the app says so when the bundle has changed under it.
-
-   localStorage is not a network call — it is same-origin state on the device,
-   which PROTOCOL §8 draws the line around explicitly. Nothing here is sent
-   anywhere. */
+ 
 var SVKEY='apex.routes.v1';
-/* ══ WAYPOINTS (A84) ════════════════════════════════════════════════════════
-   A dropped pin was ephemeral: one at a time, no name, gone the moment you
-   dropped another. "Mark the spot and get back to it" is the whole point of a
-   pin on a trail — the truck, the washout, the good hill, where you left the
-   gate open.
-
-   Unlike a saved ROUTE, a waypoint IS stored as geometry, and the difference is
-   worth stating. A route stores its inputs because closures move and a frozen
-   line would replay a legality decision made against stale data (landmine 113).
-   A point on the ground does not move and encodes no decision — it is an
-   observation, and freezing an observation is what saving it means. */
+ 
 var WPKEY='apex.waypoints.v1';
 
-/* ══ THE FIRST-RUN GUIDE (A129) ═════════════════════════════════════════════
-   Shown once, on first open, and never again on its own. Reachable afterwards
-   from Tools -> How to use.
-
-   The flag goes in the same localStorage the waypoints and saved routes use, so
-   it survives a force-stop and dies with the app's data — nothing is sent
-   anywhere and there is nothing to opt out of. If storage is unavailable the
-   guide simply shows every time rather than failing: an extra tap is a smaller
-   harm than a first-time rider getting no explanation at all. */
-/* A147 / A155 (take 133): the key is VERSIONED with the guide's content.
-   v1 was set on Jacob's phone at an early take and survived every install
-   since (same package, same localStorage), so the rewritten guide would
-   never have shown. v2 shows itself once — exactly when it became worth
-   reading — and then only under Tools. */
+ 
+ 
 var GUIDEKEY='apex.guide.v2';
 
 function guideSeen(){
@@ -2402,9 +1714,7 @@ function wpAdd(rec){
 function wpDel(n){return wpWrite(wpLoad().filter(function(x){return x.n!==n}))}
 
 function wpName(at){
-  /* One tap, no dialog — gloves, moving bike (take 79). Named from what is
-     actually there: the address if we have one, else the nearest trail, else
-     the coordinates, which are never a guess. */
+   
   var a=null;
   try{a=addressAt(at)||addressAt(at,true)}catch(e){}
   if(a&&a.line)return a.line.replace(/^Nearest address\s*/i,'').slice(0,42);
@@ -2414,9 +1724,7 @@ function wpName(at){
   return at[1].toFixed(4)+', '+at[0].toFixed(4)}
 
 function svAvailable(){
-  /* file:// in some browsers throws on ACCESS, not on use, so probe rather than
-     feature-detect (landmine 56 — a platform's return type, or its willingness
-     to answer at all, is not something to assume) */
+   
   try{var k='__apex_probe';localStorage.setItem(k,'1');localStorage.removeItem(k);
       return true}catch(e){return false}}
 
@@ -2431,8 +1739,7 @@ function svWrite(a){
 
 function svAdd(rec){
   var a=svLoad();
-  /* newest first, and a re-save under the same name replaces rather than
-     accumulating near-duplicates the rider then has to tell apart */
+   
   a=a.filter(function(x){return x.n!==rec.n});
   a.unshift(rec);
   if(a.length>40)a=a.slice(0,40);
@@ -2443,10 +1750,7 @@ function svDel(name){
   return svWrite(a)?a:null}
 
 function svCurrent(name){
-  /* What is on screen right now, as INPUTS.
-     A loop is not flagged on the option record — I assumed it was and it is
-     not (landmine 102). It is identifiable from the state that actually
-     exists: buildLoops sets na === nb and the chip handler records LOOP_MI. */
+   
   if(!last||last[sel]===undefined||!last[sel])return null;
   var o=last[sel],isLoop=(o.na===o.nb&&LOOP_MI>0);
   if(!RFROM)return null;
@@ -2458,9 +1762,7 @@ function svCurrent(name){
           lbl:DESTLBL||null,ts:Date.now()}}
 
 function svName(){
-  /* One tap, no dialog. A rider in gloves on a moving bike should not meet a
-     system prompt, so the name is generated from what the route IS and can be
-     renamed later from the panel. */
+   
   var o=last&&last[sel];
   if(!o)return 'Route';
   var d=new Date(),md=(d.getMonth()+1)+'/'+d.getDate();
@@ -2474,14 +1776,9 @@ function svOpen(rec){
     return show('<b>'+rec.n+'</b> was saved in a different region ('+rec.r+
       '). Routes are only meaningful against the map they were planned on.','fail');
   if(!rec.f)return show('<b>'+rec.n+'</b> has no start point saved.','fail');
-  /* Re-route, never replay. See the note on SVKEY: closures move between
-     builds and a frozen line would bypass every check that exists to catch
-     them. Say so when the data has changed underneath. */
+   
   var stale=(rec.b&&BUNDLE.hash&&rec.b!==BUNDLE.hash);
-  /* There is no syncMachine() — I called one that does not exist. The chip
-     handler sets machIdx, machine and the label inline, so do the same three
-     things here rather than inventing a helper (landmine 102: check the code,
-     not your memory of it). */
+   
   if(rec.m&&MACHINE[rec.m]){
     machine=rec.m;
     var _mi=ORDER.indexOf(rec.m);if(_mi>=0)machIdx=_mi;
@@ -2510,7 +1807,7 @@ function svOpen(rec){
   setTimeout(function(){svPrefer(rec.p);if(note)el('panel').innerHTML+=note},80)}
 
 function svPrefer(k){
-  /* reselect the profile the route was saved with, if it still exists */
+   
   if(!k||!last)return;
   for(var i=0;i<last.length;i++)if(last[i].k===k){
     sel=i;draw(last[i],true);
@@ -2580,10 +1877,7 @@ function buildSavedPanel(){
     svWrite(all);buildSavedPanel()})}
 
 var last=null,sel=null;
-/* Route from ME to any point. Return Home is just this with HOME as the
-   destination — take 33 pulled it out so a tapped pin can use the same five
-   profiles, the same legality filter and the same closure handling. One router,
-   many callers. */
+ 
 function routeToPoint(dest,label){
   logAct('route to '+(label||'?'));
   RFROM=ME.slice();RTO=dest.slice();
@@ -2597,17 +1891,14 @@ function routeToPoint(dest,label){
     if(a<0||b<0)return show('<b>Nothing legal nearby</b> for a '+
       MACHINE[machine].lbl.replace(/^\S+\s/,'')+'. Every line within reach is off limits for that machine.','fail');
     var sa=snapMiles(ME,a),sb=snapMiles(dest,b);
-    /* __routeDbg is a DELIBERATE bridge (take 117, kept at the 118 audit),
-       sibling to __restrict: snap ids, snap miles, per-profile outcome and
-       timing. It solved the statewide routing mystery once and costs bytes. */
+     
     var _dbg={a:a,b:b,sa:sa,sb:sb,tSnap:Math.round(_tSnap),got:[]};
     try{window.__routeDbg=_dbg}catch(e){}
     var _crow=mi(ME,dest);
     PROFILES.forEach(function(p){var _tp=performance.now();var pa=route(a,b,p.f);
       _dbg.got.push(p.k+':'+(pa?pa.length:'null')+':'+Math.round(performance.now()-_tp)+'ms');
       if(!pa)return;
-      /* cheap length first — a 100-mile answer to a 2-mile question is
-         discarded BEFORE the expensive summary, not after (take 117) */
+       
       var _len=0;for(var _q=0;_q<pa.length;_q++)_len+=pa[_q].L;
       _len/=1609.34;
       if(_len>Math.max(8, _crow*8+5)){
@@ -2620,37 +1911,16 @@ function routeToPoint(dest,label){
 
 var DESTLBL='home',RFROM=null,RTO=null;
 
-/* Loops and point-to-point routes are the same thing once they exist: a list of
-   options, each with a summary. One presenter, so cards, alternates, dashed
-   approach legs and the fuel/dark warnings work for both.
-
-   Take 40: the call sites for this were written before the function was, and
-   the definition silently never landed — `presentRoutes is not defined` at the
-   first tap. Landmine 38, and I did not re-grep after the edit. */
+ 
 function presentRoutes(out){
-  /* identical geometry across options is common on a sparse network — say so
-     rather than showing cards that are secretly the same route */
+   
   var seen={};out.forEach(function(o){var k=o.s.path.map(function(e){return e.i}).join(',');
     o.dup=seen[k]||false;seen[k]=true});
   last=out;sel=0;
   logAct('route '+out.length+' options, best '+out[0].s.mi.toFixed(1)+' mi');
   renderRoutes(out);draw(out[0],true)}
 
-/* ══ LOOPS ══════════════════════════════════════════════════════════════════
-   The third of "plan, ride, improvise" — you are at the truck with two hours of
-   light and want a ride that ENDS where it starts. Point-to-point routing
-   cannot express that: the shortest path from a node to itself is nothing.
-
-   Method: place three waypoints on a circle around the start and route through
-   them in turn, penalising edges already used so the return leg does not simply
-   retrace the outbound. Circumference C = 2*pi*r, so a target of T miles wants
-   r = T/(2*pi) — inflated, because trails do not run in circles and the real
-   line is always longer than the crow-flight radius.
-
-   Several bearings are tried; the ones that land nearest the target survive.
-   They then become ordinary route options, so the cards, the elevation
-   profiles, the fuel and dark warnings, the dashed approach legs and the
-   alternates all work with no new UI. */
+ 
 var LOOP_MI=15,LOOP_CHOICES=[6,10,15,20,30,40];
 
 function nodeToward(from,bearingDeg,miles){
@@ -2659,8 +1929,7 @@ function nodeToward(from,bearingDeg,miles){
   var dLon=(miles/(69.0*Math.cos(lat*Math.PI/180)))*Math.sin(b);
   return nearestNode([lon+dLon,lat+dLat])}
 
-/* cost that makes an already-ridden edge expensive but not forbidden — a
-   network this sparse sometimes has exactly one legal way through */
+ 
 function freshCost(base,used,factor){
   return function(e){return base(e)*(used[e.i]?factor:1)}}
 
@@ -2679,16 +1948,12 @@ function loopFrom(start,radiusMi,base,bearing0){
     leg.forEach(function(e){used[e.i]=(used[e.i]||0)+1});
     legs=legs.concat(leg)}
   if(!legs.length)return null;
-  /* how much of it is ridden twice — a loop that doubles back is an out-and-back */
+   
   var seen={},rep=0,tot=0;
   legs.forEach(function(e){var L=e.L/1609.34;tot+=L;if(seen[e.i])rep+=L;seen[e.i]=1});
   return {path:legs,repeat:tot?rep/tot:1,mi:tot}}
 
-/* One radius guess is never right: a first cut at T/(2*pi) came back 33-126%
-   long on this network, because trail does not run in circles and a
-   trail-hungry cost wanders further than a fast one. Distance is close to
-   proportional to radius, so scale and retry — four passes gets inside a few
-   percent, and the best attempt is kept even if none do. */
+ 
 function fitLoop(start,targetMi,base,bearing){
   var r=targetMi/(2*Math.PI), best=null;
   for(var i=0;i<4;i++){
@@ -2703,12 +1968,8 @@ function fitLoop(start,targetMi,base,bearing){
 
 function buildLoops(startNode,targetMi){
   var out=[];
-  /* six bearings, and two cost shapes: quickest, and trail-hungry */
-  /* Most trail FIRST, and costed from the same DESIG/DIRT tables the
-     point-to-point profiles use. The old weights named moto24 and trail50 by
-     hand and missed route72, mccct and fstrail entirely — so an MCCCT loop was
-     costed no better than a gravel road — and the loop shown first was the
-     fastest, which on a dirt bike means pavement (take 68). */
+   
+   
   var shapes=[
     {h:'Loop · most trail',k:'ltrail',f:function(e){
         return e.L*(DESIG[e.c]?0.55:DIRT[e.c]?1.3:8)}},
@@ -2719,7 +1980,7 @@ function buildLoops(startNode,targetMi){
     for(var b=0;b<360;b+=90){
       var f=fitLoop(startNode,targetMi,sh.f,b);
       if(!f)continue;
-      /* score: distance error dominates, then how much is ridden twice */
+       
       var score=f.err+f.L.repeat*0.9;
       if(!best||score<best.score){best={score:score,L:f.L}}}
     if(best)out.push({h:sh.h,k:sh.k,s:summarise(best.L.path),snap:0,
@@ -2743,7 +2004,7 @@ function renderRoutes(out){
       '<div class="big">'+s.mi.toFixed(1)+' <span class="sub">mi</span></div>'+
       '<div class="sub">'+(mins>=60?Math.floor(mins/60)+'h '+(mins%60)+'m':mins+' min')+
         ' · '+s.off.toFixed(1)+' mi off-pavement</div>'+
-      /* the composition, in the order a rider cares about */
+       
       (function(){
         var pd=s.mi>0?Math.round(100*s.des/s.mi):0;
         var tag=pd>=95?'<span class="tag legal">all designated trail</span>':
@@ -2767,15 +2028,8 @@ function renderRoutes(out){
         ' mi off-network (dashed) to reach the trail</div>':'')+
       '</div>'});
   html+='</div>';
-  /* Below the cards, not inside them: a button nested in a selectable card
-     needs stopPropagation on every path, and the thing a rider means by "save"
-     is the option currently chosen. */
-  /* Jacob, take 82 in the field: "I closed the interface for directions and I
-     still see the lines on the map for the last selected path." clearRoute()
-     has existed since take 33 and was never bound to anything a rider could
-     press — only to side effects of changing machine or moving a pin. Dismissing
-     a panel is not the same gesture as discarding a plan, so this is explicit
-     rather than automatic. */
+   
+   
   html+='<div class="sub" style="margin-top:7px">'+
     '<button class="chip" id="btn-save">\u2606 Save this route</button> '+
     '<button class="chip" id="btn-clear">\u2715 Clear route</button></div>';
@@ -2798,8 +2052,7 @@ function renderRoutes(out){
   Array.prototype.forEach.call(document.querySelectorAll('.rc'),function(c){
     c.addEventListener('click',function(){
       sel=+c.dataset.i;logAct('act  picked '+((last[sel]||{}).h||sel));
-      /* Toggle the class in place. Re-rendering the strip reset scrollLeft to 0
-         on every tap, which is why scrolling felt broken even once it worked. */
+       
       Array.prototype.forEach.call(document.querySelectorAll('.rc'),function(d){
         d.className='rc'+(+d.dataset.i===sel?' sel':'')});
       draw(last[sel],false);
@@ -2807,13 +2060,8 @@ function renderRoutes(out){
       catch(e){}})}) }
 
 
-/* Elevation profile per option. A 12 mile route with 900 ft of climbing is a
-   different ride from a 12 mile route with 200, and the number alone does not
-   land the way the shape does. */
-/* The elevation profile was a 128x26 hairline with no numbers — the shape of
-   the ride and nothing else. Filled now, full card width, and it says the low,
-   the high, and the climb, because "how much climbing" is a question with an
-   answer we already compute (take 68). */
+ 
+ 
 function spark(p,up,dn){
   if(!p||p.length<3)return '';
   var lo=Math.min.apply(null,p),hi=Math.max.apply(null,p),r=Math.max(1,hi-lo);
@@ -2837,15 +2085,10 @@ function label(c){return {route72:'ORV route 72"',trail50:'ORV trail 50"',
 function geomOf(o){return o.s.path.map(function(e){return {type:'Feature',properties:{},
   geometry:{type:'LineString',coordinates:decode(GR.g[e.i])}}})}
 
-/* fit=true only on the first draw. Re-framing on every card tap read as the map
-   "shifting over randomly" while comparing options that share most of their
-   corridor — and it hid the very change it was meant to show. */
+ 
 function draw(o,fit){
   var fs=geomOf(o);
-  /* The gap between a pin and the network. The cards have always SAID
-     "+0.5 mi off-network to the pins" while the line silently started at the
-     nearest node — so a route to a pin in the trees looked broken. Dashed,
-     because you are covering it off the designated network. */
+   
   var legs=[];
   function leg(from,to){
     if(!from||!to)return;
@@ -2856,9 +2099,7 @@ function draw(o,fit){
   if(o.nb>=0)leg([NODES[o.nb][0],NODES[o.nb][1]],RTO);
   try{map.getSource('approach').setData({type:'FeatureCollection',features:legs})}catch(e){}
   map.getSource('route').setData({type:'FeatureCollection',features:fs});
-  /* Every other option, dimmed underneath. Five routes over the same 3.7 mi
-     corridor look identical one at a time; against the alternatives the
-     difference is obvious at a glance — the pattern every first-party map uses. */
+   
   var others=[];
   (last||[]).forEach(function(x){if(x!==o)others=others.concat(geomOf(x))});
   map.getSource('alt').setData({type:'FeatureCollection',features:others});
@@ -2866,8 +2107,7 @@ function draw(o,fit){
   var b=new maplibregl.LngLatBounds();
   fs.concat(legs).forEach(function(f){
     f.geometry.coordinates.forEach(function(c){b.extend(c)})});
-  /* The chip strip floats over the bottom of the map, so 40 px of padding put
-     the end of the route underneath it. Clear the strip's real height. */
+   
   var strip=0;
   try{var r=el('rail-chips')||document.querySelector('.strip');
     if(r)strip=Math.round(r.getBoundingClientRect().height)}catch(e){}
@@ -2882,11 +2122,7 @@ function clearRoute(){map.getSource('route').setData({type:'FeatureCollection',f
 
 
 
-/* ══ SEARCH ═════════════════════════════════════════════════════════════════
-   Landmine 19: vector tiles only hold what is in the current viewport, so you
-   cannot search them for somewhere you are not already looking. The index is
-   separate and built at load from data already in the payload — 1,049 names and
-   3,706 junction descriptors that were sitting there unsearchable. */
+ 
 var IDX=null;
 function buildIndex(){
   if(IDX)return IDX;
@@ -2901,24 +2137,21 @@ function buildIndex(){
     rows.push({t:lab,k:'junction',c:[NODES[k][0],NODES[k][1]],cls:'jx'})}
   PLACES.forEach(function(p){if(seen[p[0]])return;seen[p[0]]=1;
     rows.push({t:p[0],k:'place',c:[p[1],p[2]],cls:'place'})});
-  /* take 152 · A168 (first external tester): "rifle river" found a STREET
-     and three trails, never the river. Every mapped corridor is a search
-     row; the hit fits the whole river and says what it holds. */
+   
   ((PADDLE&&PADDLE.c)||[]).forEach(function(c){
     if(seen[c.n])return;seen[c.n]=1;
     var g0=c.g&&c.g[0],m=g0&&g0[(g0.length/2)|0];
     if(!m)return;
     rows.push({t:c.n,k:'river',c:m,cls:'river',riv:c.n})});
   if(ADDR&&ADDR.names){
-    /* one entry per street, positioned on its first segment's midpoint */
+     
     var first={};
     ADDR.segs.forEach(function(g){if(first[g[0]]===undefined)first[g[0]]=g});
     ADDR.names.forEach(function(nm,i){
       if(seen[nm]||first[i]===undefined)return;seen[nm]=1;var g=first[i];
       rows.push({t:nm,k:'street',c:[(g[1]+g[3])/2,(g[2]+g[4])/2],cls:'addr'})})}
   rows.forEach(function(r){r.l=r.t.toLowerCase();
-    /* compressed: spaces and punctuation stripped, so "pinkstore" finds
-       "Pink Store" and "h5717" finds "H57-17" (take 73) */
+     
     r.z=r.l.replace(/[^a-z0-9]/g,'')});
   IDX=rows;return rows}
 
@@ -2926,27 +2159,25 @@ var KRANK={address:0,place:1,river:1.5,trail:2,number:3,road:4,street:5,junction
 function search(q){
   q=q.trim().toLowerCase();if(q.length<1)return [];
   var rows=buildIndex(),out=[];
-  /* a typed street address resolves to a point and leads the results */
+   
   var gc=geocode(q);
   if(gc)out.push([-1,-1,0,{t:gc.t,k:'address',c:gc.c,cls:'addr'}]);
   var qz=q.replace(/[^a-z0-9]/g,'');
   for(var i=0;i<rows.length;i++){var r=rows[i],p=r.l.indexOf(q);
     if(p>=0){
-      /* exact, then start-of-string, then start-of-word, then anywhere */
+       
       var s=r.l===q?0:p===0?1:(r.l[p-1]===' '||r.l[p-1]==='(')?2:3;
       out.push([s,(KRANK[r.k]||5),r.t.length,r]);continue}
-    /* "pinkstore" -> Pink Store: the query with spacing squeezed out */
+     
     if(qz.length>=3&&r.z.indexOf(qz)>=0)out.push([4,(KRANK[r.k]||5),r.t.length,r])}
-  /* one wrong or missing character — the gloved-thumb tier. Only when nothing
-     better matched, and only for queries long enough to mean something. */
+   
   if(!out.length&&qz.length>=4){
     for(var i2=0;i2<rows.length;i2++){var r2=rows[i2];
       if(near1(qz,r2.z))out.push([5,(KRANK[r2.k]||5),r2.t.length,r2])}}
   out.sort(function(a,b){return a[0]-b[0]||a[1]-b[1]||a[2]-b[2]});
   return out.slice(0,9).map(function(x){return x[3]})}
 
-/* Does needle occur in hay with at most one substitution, insertion or
-   deletion? Bounded prefix scan; 3,353 entries per keystroke is cheap. */
+ 
 function near1(needle,hay){
   var n=needle.length;
   for(var st=0;st<=Math.max(0,hay.length-n+1);st++){
@@ -2971,8 +2202,7 @@ function renderHits(list){
       var r=list[+d.dataset.i];if(!r)return;
       el('srch').className='';el('c-search').className='chip';
       if(r.k==='river'){
-        /* take 152 · A168: a river hit fits the WHOLE river and hands you
-           the run flow — not a dropped pin at its midpoint. */
+         
         var c=null;for(var ci=0;ci<((PADDLE&&PADDLE.c)||[]).length;ci++)
           if(PADDLE.c[ci].n===r.riv){c=PADDLE.c[ci];break}
         if(c){var xs=[],ys=[];
@@ -2992,8 +2222,7 @@ function renderHits(list){
         }
         return}
       map.easeTo({center:r.c,zoom:r.k==='place'?13.2:14.6,duration:800});
-      /* Every hit becomes a place card, so a searched address can be made home
-         or routed to with the same two taps as a dropped pin. */
+       
       dropPin(r.c.slice());
       placeCard(r.c,'drop',r.t)})})}
 
@@ -3009,10 +2238,7 @@ el('q').addEventListener('input',function(){
   if(!q){show(jumpChipsHTML(),'');wireJumpChips(el('panel'));return}
   renderHits(search(q))});
 
-/* ══ DIRECTIONS ═════════════════════════════════════════════════════════════
-   A blue line is not an instruction. Someone who is lost and tired needs words
-   they can read once and act on, and a turn list is also what you would relay
-   over a radio. Consecutive edges on the same way collapse into one step. */
+ 
 function turnWord(d){
   var a=((d+540)%360)-180,x=Math.abs(a);
   if(x<22)return ['Continue','↑'];
@@ -3048,14 +2274,10 @@ el('btn-steps').addEventListener('click',function(){
   var a=nearestNode(ME),steps=directions(last[sel].s.path,a);
   if(!steps.length)return show('No steps.','fail');
   var tot=0,html='<div id="steps">';
-  /* Each step said how long IT is, and nothing said where you are in the ride.
-     Mid-ride the question is "I have done about four miles — which step am I
-     on", so every step now carries the running total at its START. `tot` was
-     already accumulated for the header and thrown away (take 70). */
+   
   steps.forEach(function(s){
     var at=tot;tot+=s.mi;
-    /* "Turn left two-track" reads as if the trail is named two-track. It is not
-       named at all — say so rather than dressing a class up as a name. */
+     
     var named=s.name&&!/^(two-track|forest road|road|paved|trail)$/i.test(s.name);
     var nm=named?(s.name+(s.id&&s.id!==s.name?' \u00b7 '+s.id:''))
                 :('unnamed '+(s.name||'track')+(s.id?' \u00b7 '+s.id:''));
@@ -3070,34 +2292,10 @@ el('btn-steps').addEventListener('click',function(){
   show('<span class="tn">'+steps.length+' steps · '+tot.toFixed(1)+
     ' mi</span><span class="tag legal">'+last[sel].h+'</span>'+html,'')})
 
-/* ══ BASEMAP ════════════════════════════════════════════════════════════════
-   PROTOCOL §8 as revised at take 10: provisioning may use the network, the
-   field may not. Imagery is the size driver and it is measured, not guessed --
-   z16 is 159 MB for a riding area and 36.6 GB statewide, which is what settles
-   imagery as a per-region download you do at home the night before.
-
-   In satellite mode a pale casing goes under the trail lines. Dark ink on dark
-   jack pine is unreadable, and a trail you cannot see is not on the map. */
-/* Every route class, grouped the way a rider thinks about them. `sw` is the
-   swatch colour shown in the panel, so the legend cannot drift from the map:
-   both read this table. `dash` marks the ones routing will never use. */
-/* Every swatch reads PAL — the same object the style paints from — so the
-   picker and the map cannot disagree. It used to carry its own copy of the
-   colours and had already drifted by dE 12.9 on two-track (take 77).
-
-   `tier` rows are legend-only: they explain a colour without filtering, because
-   ORV/dirt-bike is ONE activity drawn in THREE colours and a single blue swatch
-   standing for green, blue and black explained none of them. Green/blue/black
-   is the universal trail-map grammar; it is learnable the moment it is stated
-   once, and until take 77 nothing in the app stated it. */
-/* Drawn, and deliberately NOT in the legend. Declared here rather than left as
-   a standing note in the gate, because a note that always lists three names
-   carries no signal — a fourth would join it silently (landmine 85's family).
-   With this list the gate can FAIL on anything drawn that is neither explained
-   nor exempt.
-   Grey means road. Nobody needs a swatch to be told that, and two more rows
-   costs panel height on a 360 px screen for information the map already gives.
-   Jacob, take 77, asked directly. */
+ 
+ 
+ 
+ 
 var LEGEND_EXEMPT=['minor','paved'];
 
 var ACTS=[
@@ -3115,25 +2313,10 @@ var ACTS=[
   {k:'horse',h:'Equestrian',        sw:PAL.horse,  cls:['horse'], dash:1},
   {k:'snow', h:'Snowmobile / ski',  sw:PAL.snow,   cls:['snow','snowmob'], dash:1},
   {k:'nfs',  h:'NFS trails',        sw:PAL.nfsmoto,cls:['nfsmoto'], dash:1},
-  /* A136 · Water mode's default: the map without trail lines at all */
+   
   {k:'none', h:'No trails',         sw:PAL.showother, cls:[]}
 ];
-/* ══ MACHINE LEGALITY ON THE MAP ════════════════════════════════════════════
-   A86. The router has refused illegal line since take 7, but the MAP said
-   nothing: a 24" motorcycle singletrack and a 72" ORV route were drawn
-   identically, so a rider planning on a side-by-side saw a dense network, chose
-   a line, and only learned it was off-limits when routing declined. The app
-   knew the whole time and did not say.
-
-   DIMMED, not hidden and not dashed. Hidden would be dishonest about what
-   exists — the same reason non-ORV trails are drawn at all (landmine 34's
-   spirit). Dashed already means "not yours to ride, ever", and a motorcycle
-   trail is a perfectly legal ORV trail that simply will not take a 72" machine;
-   conflating the two would be a false statement about the world. Opacity says
-   what is true: still there, still a trail, not for what you are on today.
-
-   Closed line is left at full strength. It is closed to everything, red already
-   says so, and fading it would weaken the one colour that must not be missed. */
+ 
 var MACH_DIM=0.30;
 var MACH_LAYERS=['casing','casing-track','casing-fsroad','minor','paved',
                  'fsroad','track','route72','fstrail','trail50','mccct','moto24'];
@@ -3141,10 +2324,7 @@ var OPA_BASE=null;
 
 function applyMachine(){_legalMemo={};
   if(!map||!map.getLayer)return;
-  /* Base opacities are READ FROM THE STYLE once, never copied into a second
-     table. The casings carry 0.95 / 0.75 / 0.55 and those numbers must not
-     exist in two places — that is exactly how the legend drifted from the map
-     for ten takes (landmine 107). */
+   
   if(!OPA_BASE){
     OPA_BASE={};
     MACH_LAYERS.forEach(function(id){
@@ -3163,8 +2343,7 @@ function applyMachine(){_legalMemo={};
     ' — faded line is legal ORV trail your machine is too wide for';}
 
 function machineIllegal(){
-  /* which drawn network classes the current machine may not use — for the
-     self-test and the picker, so the count is never asserted from memory */
+   
   var ok=(MACHINE[machine]||{}).ok||[];
   return ['route72','trail50','fstrail','mccct','moto24','track','fsroad']
     .filter(function(c){return ok.indexOf(c)<0})}
@@ -3178,8 +2357,7 @@ function actLabel(){
   el('c-act').className='basebtn actbtn'+(act==='all'?'':' on')}
 
 function applyAct(){
-  /* Roads stay visible whatever is selected — you still need to know where the
-     road is, especially when the answer to "can I ride this" is no. */
+   
   var a=ACTS.filter(function(x){return x.k===act})[0],sel=a.cls||null;
   TRAIL_LAYERS.forEach(function(id){
     map.setLayoutProperty(id,'visibility',
@@ -3203,10 +2381,7 @@ function applyAct(){
 function buildActPanel(){
   var p=el('actpanel');
   p.innerHTML=ACTS.map(function(a){
-    /* tier rows EXPLAIN a colour; they do not filter by it. Rendered without a
-       data-k so the binding below skips them — guarding at bind time rather
-       than with a :not() selector, because the harness models dataset and
-       need not model every CSS selector (landmine 62). */
+     
     return '<button class="actrow'+(a.tier?' tierrow':'')+
       (!a.tier&&a.k===act?' on':'')+'"'+(a.tier?'':' data-k="'+a.k+'"')+'>'+
       '<span class="sw'+(a.dash?' dash':'')+'" style="'+
@@ -3218,24 +2393,10 @@ function buildActPanel(){
       act=b.dataset.k;applyAct();buildActPanel();p.hidden=true;
       logAct('tap','activity '+act)})})}
 
-/* ══ MODES (A136/A137, take 125) ═══════════════════════════════════════════
-   Jacob: "each mode for essentially each onX Off-road application". A mode
-   is ONE TAP that sets five things the app already has tables for — which
-   lines draw (act), which pins draw (kinds), which layer groups are on, the
-   basemap, and later the router's machine. Nothing here is new geometry:
-   69,628 foot routes and 2,949 bike routes were in the bundle from take 118,
-   show-only, never drawn by default. A mode is a starting point, never a
-   cage — every default it sets is one tap away in the panels afterwards.
-   Design: docs/DESIGN-modes.md. Hunt/Fish data waits for Jacob's onX
-   screenshots (landmine 190: transcribe, do not invent). */
+ 
 var MODES=[
-  /* Jacob, take 125 field: "if I'm planning an MTB or dirt-bike trip I'd use
-     Ride" — launches and beaches belong to Water (the take-125 rule that Ride
-     is today's map is overruled by the rider), and the wall of store/food
-     badges at 3000 ft is noise on a riding map, so those demote to z13. */
-  /* take 146 · A167, Jacob: the mode is called Off-road; the key 'ride'
-     and the recording verb ("Ride it") stay — saved state and the activity
-     are not the mode's label. */
+   
+   
   {k:'ride',     h:'Off-road', s:'ORV, dirt bike, side-by-side, MTB — trails, riding areas, fuel', act:'ride',
    kinds:['trailhead','camp','fuel','dayuse','view','info','water','toilet','shelter','store','food','mtb'],
    demote:['store','food','info'],
@@ -3244,15 +2405,10 @@ var MODES=[
   {k:'outdoors', h:'Outdoors', s:'Hike, camp, fish — on foot, with trail systems, hills and rivers', act:'foot', machine:'walk',
    kinds:['trailhead','camp','shelter','water','toilet','view','launch','beach','dayuse','info','system','mtb','ski','lighthouse','livery'],
    peaksFrom:9,
-   /* relief OFF: the statewide z10 hillshade upscaled to 5 mi is grey
-      blotches (Jacob, 24416). Named hills and paddling carry the mode. */
+    
    groups:{areas:false,peaks:true,contour:true,relief:false,paddle:true,places:true,county:false,public:false},
    basemap:'Map', zoom:11},
-  /* take 141, Jacob: "split Hunt from the separate modes — there's going to
-     be a lot of squares for public land." Hunt is the land: state forest and
-     game areas, county lines (a hunter thinks in counties), hills from
-     regional zoom, and the typed waypoints (stand / camera / sign / water /
-     gate) live here. On foot. */
+   
   {k:'hunt',     h:'Hunt',     s:'Public land, game areas, counties, stands and cameras — on foot', act:'foot', machine:'walk',
    kinds:['trailhead','camp','water','toilet','info','system','shelter'],
    peaksFrom:9,
@@ -3266,28 +2422,16 @@ var MODES=[
 ];
 var mode='ride', POI_BASE={}, POI_MODEF={}, STACKED={};
 function modeOf(k){return MODES.filter(function(m){return m.k===k})[0]||MODES[0]}
-/* A zoom `step` is legal ONLY at the top of a filter (the same rule that
-   rejected the whole style at take 121, landmine 52). The base destination
-   filter IS a top-level step on zoom, so the mode's constraints are applied
-   to each of its branches, and the step stays on top.
-     kinds  — whitelist for the mode
-     boost  — kinds that ARE the mode (Water's launches): pass at every zoom
-     demote — kinds that are noise for the mode (Ride's stores): wait for z13 */
-/* take 154 · A170 */
+ 
+ 
 function clusterFeatures(m){
   var ks=(m&&m.kinds)||[];
   return poif.filter(function(f){
     return CLUSTERKINDS.indexOf(f.properties.k)>=0&&ks.indexOf(f.properties.k)>=0})}
-var CLUSTN=0;   /* what the clustered source currently holds — a clustered
-                   GeoJSONSource does not hand its data back, so the writer
-                   records it (the harness reads this, not source internals) */
+var CLUSTN=0;    
 function clusterData(m){
   CLUSTPOOL=clusterFeatures(m);CLUSTN=CLUSTPOOL.length;recluster()}
-/* One pass over the mode's destinations: project to screen, bucket by
-   KIND + grid cell, and emit a stack only where two or more of the SAME
-   kind land in one cell. Everything else stays the pin it always was.
-   Runs on moveend, never during a gesture, and not at all above the
-   ceiling — where the map is exactly what it was before take 154. */
+ 
 var CLUSTPOOL=[],CLUSTLAST='';
 function recluster(){
   var src;try{src=map.getSource('poiclust')}catch(e){return}
@@ -3321,8 +2465,7 @@ function recluster(){
   if(stamp===CLUSTLAST)return;
   CLUSTLAST=stamp;
   src.setData({type:'FeatureCollection',features:out})}
-/* Tapping a pile opens it: zoom to where supercluster splits it, or at the
-   ceiling just show what is in there rather than zooming forever. */
+ 
 function clusterTap(f){
   var p=f.geometry.coordinates,n=f.properties.n,k=f.properties.k;
   var lbl=(POIKIND[k]||{}).h||k;
@@ -3338,9 +2481,7 @@ function modeFilter(base,m,id){
   var wrap=function(br){
     var f=['all',inK,(m.boost&&id==='poi-dot-major')
       ?['any',['in',['get','k'],['literal',m.boost]],br]:br];
-    /* take 154 · below the cluster ceiling poiclust owns the clusterable
-       kinds; without this both sources draw them and every destination
-       doubles. */
+     
     if(id==='poi-dot-major')f.push(['step',['zoom'],
       ['!',['in',['get','k'],['literal',CLUSTERKINDS]]],CLUSTER_MAXZ,true]);
     return f};
@@ -3358,24 +2499,20 @@ function modeFilter(base,m,id){
 function applyMode(k,opts){
   opts=opts||{};var m=modeOf(k);mode=m.k;
   try{localStorage.setItem('apex.mode',mode)}catch(e){}
-  /* lines */
+   
   if(ACTS.some(function(a){return a.k===m.act})){act=m.act;applyAct()}
-  /* pins: a whitelist ANDed onto each POI layer's own zoom/prominence filter,
-     which is captured once so modes never compound */
+   
   ['poi-dot','poi-dot-major'].forEach(function(id){
     try{
       if(!POI_BASE[id])POI_BASE[id]=map.getFilter(id)||true;
-      /* take 160 · A176 · remembered so the collision pass can re-apply the
-         SAME filter with a hidden-index exclusion, instead of rebuilding
-         (and quietly diverging from) the mode logic. */
+       
       POI_MODEF[id]=modeFilter(POI_BASE[id],m,id);
       map.setFilter(id,POI_MODEF[id]);
       STACKED={};
     }catch(e){}});
-  /* machine: Outdoors walks; leaving it gives the rider's machine back */
+   
   try{
-    /* take 149 · craft are remembered like the ride machine is: entering
-       Water hands you your last boat, leaving it hands your machine back */
+     
     var tgt=m.machine==='kayak'?waterCraft:m.machine;
     if(tgt){if(machine!==tgt){
         if(machine!=='walk'&&!(MACHINE[machine]&&MACHINE[machine].mph))rideMachine=machine;
@@ -3388,24 +2525,20 @@ function applyMode(k,opts){
     setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''));
     applyMachine();
   }catch(e){}
-  /* take 154 · A170: re-cut the clustered source to THIS mode's clusterable
-     kinds. The count on a badge is therefore a count of pins the rider can
-     actually reach in the mode they are in. */
+   
   clusterData(m);
-  /* layer groups */
+   
   LYRGROUPS.forEach(function(g){if(g.k in m.groups)lyrSet(g,m.groups[g.k])});
-  /* summits from further out where the mode is about the land (onX 24276
-     shows them at regional zoom): Outdoors from z9, others as built */
+   
   try{var pz=m.peaksFrom||10.6;map.setLayerZoomRange('peak-dot',pz,24);
       map.setLayerZoomRange('peak-label',Math.max(pz,9.6),24)}catch(e){}
-  /* basemap — never force satellite when it is unavailable */
+   
   var bi=BASEMAPS.indexOf(m.basemap);
   if(bi>=0&&(bi===0||SAT_OK)&&bi!==bmi)setBasemap(bi);
   setChip('c-mode','mountain',m.h);
   el('c-mode').className='basebtn modebtn'+(mode==='ride'?'':' on');
   if(!opts.silent)logAct('act  mode '+mode);
-  /* only if it is open — building it while hidden leaves opacity-0 rows
-     whose orange ON-swatches the accent budget still counts (take 125) */
+   
   try{if(!el('lyrpanel').hidden)buildLyrPanel()}catch(e){}
 }
 
@@ -3422,34 +2555,15 @@ function setBasemap(i){
   map.setLayoutProperty('sat','visibility',sat?'visible':'none');
   try{map.setLayoutProperty('sat-patch','visibility',sat?'visible':'none');
       map.setLayoutProperty('sat-base','visibility',sat?'visible':'none')}catch(e){}
-  /* The casing is no longer a satellite-only trick: it separates a
-     difficulty-coloured trail from the road network on ANY base, and this
-     line was switching it off on the default map (take 46). */
-  /* Hide the layer, do not just fade it. A raster layer at opacity 0 is still
-     uploaded and drawn every frame — real GPU work for something invisible, and
-     battery is the one thing about this app still unmeasured (A18). Relief is
-     off by default, so that cost was being paid on every frame by default. */
-  /* Ask the map, not a chip that no longer exists. This read the className of
-     an element the layers panel replaced and threw on every basemap change
-     (take 90). */
+   
+   
+   
   var reliefOn=false;
   try{reliefOn=map.getLayoutProperty('hillshade','visibility')!=='none'}catch(e){}
   map.setLayoutProperty('hillshade','visibility',reliefOn?'visible':'none');
   if(reliefOn)map.setPaintProperty('hillshade','raster-opacity',sat?0.16:0.42);
-  /* A153 (take 124) · on satellite the CONTEXT roads step back. minor/paved
-     are #FFFFFF by design (take 113: AllTrails' white roads on light green,
-     and "white also reads over the dimmed hybrid imagery") — true for a 20k-
-     edge box, and statewide the graph carries 246,883 context ways, so at
-     10 mi over Oakland County the entire suburban grid painted pure white
-     and smothered the photo (Jacob, 24319). Roads are context, not data:
-     dimmer, narrower, warmer on imagery; the trail casings — the data —
-     keep their weight. The Map basemap is untouched. Roads stay exempt from
-     the ORV selector on purpose (applyAct): you still need to know where
-     the road is, especially when the answer to "can I ride this" is no. */
-  /* Take 126, Jacob on 24414: at 5 mi the half-opacity grid still read as
-     the subject of the picture. On imagery the residential grid is not
-     needed until you are close enough to turn onto it: minor roads fade in
-     from z12; highways stay, at a third. */
+   
+   
   var roadA=sat?0.35:1, roadC=sat?'#F1EBDD':PAL.minor;
   try{
     map.setPaintProperty('minor','line-opacity',sat
@@ -3462,39 +2576,17 @@ function setBasemap(i){
     map.setPaintProperty('casing-track','line-opacity',sat?0.4:0.75);
     map.setPaintProperty('casing-fsroad','line-opacity',sat?0.3:0.55);
   }catch(e){}
-  /* Satellite used to force every label off — from before labels had a dark
-     halo, when dark-on-light was unreadable over jack pine. They are white on
-     a halo now and survive it. Worse, lbl-show was NOT in LBL, so on satellite
-     the only names left were trails you may NOT ride: "Shore To Shore Trail"
-     labelled, the loop under your wheels not (take 57). */
-  /* Derived, not listed — and note the comment above records this exact bug
-     already happening once at take 57, when lbl-show was missing from the array.
-     It happened again at takes 87-89 with six more layers. A copy of a set
-     drifts from the set; ask the map (take 90, landmine 107). */
-  /* This used to re-apply lbl-trail's visibility to EVERY symbol layer on every
-     basemap change. The reason is in the comment above and it expired: labels
-     have a dark halo now and survive satellite, so the sync was a no-op in the
-     normal case — and a bug for any symbol layer with its own default, which it
-     switched on at load. Summits (A76) default OFF and were being turned on by
-     this line, one take after the layers panel gave them an off switch.
-     Removed rather than special-cased: the Labels control still governs every
-     symbol layer through labelLayers(), which is where that belongs (take 94). */
+   
+   
+   
   setChip('c-base',sat?'sat':'map',m);
   el('c-base').className='basebtn'+(sat?' on':'');
 }
 
-/* LABELS block moved above the map constructor at take 15 — see the note where
-   it now lives. */
+ 
 
-/* ══ TERRAIN ════════════════════════════════════════════════════════════════
-   One DEM ingest gives four things: node elevations, per-edge climb, elevation
-   profiles, and the hillshade underneath. 3DEP via public Terrarium tiles at
-   z13 (~13.6 m/px). Relief across the AOI is 199 m — Bull Gap is a sand hill,
-   and routing that ignores that ignores what riders actually feel. */
-/* Cross-artifact alignment (take 117): terrain arrays index the graph's edges
-   and nodes. A re-emitted graph with stale terrain threw inside a timer and
-   died unheard — 'Routing…' forever. Mismatch now degrades to terrain-absent,
-   loudly, and the profile/climb features simply sit out. */
+ 
+ 
 if(TR&&GR&&TR.pf&&TR.pf.length!==GR.e.length){
   console.warn('terrain payload indexes '+TR.pf.length+' edges but the graph '+
     'has '+GR.e.length+' — stale terrain vs re-emitted graph; climb data '+
@@ -3506,15 +2598,9 @@ function edgeProfile(i){var d=TR.pf&&TR.pf[i];if(!d)return [];
   for(var k=0;k<d.length;k++){v+=d[k];out.push(v)}return out}
 function ft(m){return Math.round(m*3.28084)}
 
-/* Climbing costs more than distance on loose sand. 1 m up is charged like 12 m
-   along; the Least-climbing profile charges it like 45 m. */
+ 
 var CLIMB_K=12;
-/* Take 124: this sampled every 7th node — fine over a 20k-node box, but
-   statewide the nearest SAMPLED node can sit 300 m from the point, and after
-   the take-122 clip re-noded the graph the stride landed on a different node
-   for Mio: 974 ft became 938 (Δ9 → Δ27) with no DEM change at all. It walks
-   the A96 grid now: the true nearest node, every time, and it reports how
-   far away that node is so a Δ can be read as terrain or as distance. */
+ 
 function elevAt(ll){var r=elevNear(ll);return r?r.e:null}
 function elevNear(ll){
   var G=gridBuild(),best=1e18,bi=-1;
@@ -3526,14 +2612,8 @@ function elevNear(ll){
   return bi>=0?{e:NE[bi],mi:mi(ll,NODES[bi])}:null}
 
 
-/* 4.6 — nearest pavement. Not a route: a straight-line bearing to the closest
-   thing a truck can reach you on. Answers "which way do I walk" when the bike
-   will not move, and needs no router. */
-/* Take 134: the last linear scan in the dispatch card. With hiking routable
-   the graph is 995k edges and this took 3.4 s in headless — the whole
-   dispatch budget. It walks the A96 grid now: exact (the ring stops when it
-   is farther than the best hit), and pavement is usually within a few cells
-   of anywhere a phone can be. The linear body stays as the fallback. */
+ 
+ 
 function nearestPavement(ll){
   var G=gridBuild(),best=1e9,bp=null,be=null,seen={};
   var visit=function(list){
@@ -3552,8 +2632,7 @@ function nearestPavement(ll){
       if(d<best){best=d;bp=g[k];be=e}}}
   return {p:bp,d:best,e:be}}
 
-/* 4.12 — what this app is not. A promise about its own limits, in the app,
-   offline, where you would read it. */
+ 
 var ABOUT='<span class="tn">APEX ORV</span>'+
  '<span class="tag legal">offline</span><span class="tag adv">no account</span><br>'+
  'Michigan DNR + USDA Forest Service designations, OpenStreetMap for context. '+
@@ -3563,10 +2642,7 @@ var ABOUT='<span class="tn">APEX ORV</span>'+
  'The MVUM and DNR signage are the legal authority. This app is not a defence.<br>'+
  'Private property lines are not shown; that data is licensed and not public.';
 
-/* ══ PHASE 4 — the reason this exists ═══════════════════════════════════════
-   Everything below is load-bearing (PROTOCOL §9): no network, no map download,
-   no subscription check. Retrace in particular needs nothing but the track you
-   already recorded — not the router, not the graph, not agency data. */
+ 
 
 var JX = GR.jx || {};
 var TRUCK=null, tM=null, crumbs=[], crumbMi=0, riding=null, lost=false, offAlert=false;
@@ -3579,24 +2655,14 @@ function bearing(a,b){var t=Math.PI/180,
 function compass(d){return ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW',
   'W','WNW','NW','NNW'][Math.round(d/22.5)%16]}
 function buzz(p){
-  /* Android WebView does not implement navigator.vibrate — silently. The
-     off-route alert's haptic (4.4) would have been dead in the APK. Bridge to
-     Capacitor Haptics when present; browsers keep navigator.vibrate. */
+   
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Haptics;
   if(C){var d=Array.isArray(p)?p.reduce(function(a,b){return a+b},0):p;
     try{C.vibrate({duration:d})}catch(e){}return}
   try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
 
-/* 4.1 — recording starts with the ride, no button to forget.
-   4.2 — the truck drops itself where you started. */
-/* ══ RIDE TELEMETRY ═════════════════════════════════════════════════════════
-   A18 Stage 1 is the standing blocker and only a real ride can close it: battery
-   cost with the screen held on, and GPS quality under jack pine. Neither can be
-   measured from a container, and "it felt fine" is not a measurement.
-
-   So the ride measures itself. Everything here is local — battery level from the
-   Capacitor Device plugin, fix timing from the watch we already run. Nothing is
-   sent anywhere; it ends up in the same report Jacob already shares. */
+ 
+ 
 var RIDE=null;
 
 function batteryNow(){
@@ -3614,11 +2680,10 @@ function rideStart(at){
   RIDE.ticks=0;
   RIDE.pulse=setInterval(function(){
     if(!RIDE)return;
-    /* battery moves slowly and the read is not free; the dropout watch is the
-       thing that needs to be prompt */
+     
     if(++RIDE.ticks%3===1)batteryNow().then(function(b){
       if(RIDE&&b){RIDE.batt1=b.lvl;RIDE.chg=RIDE.chg||b.chg}});
-    /* a fix that has not arrived in 15s is a dropout, not slowness */
+     
     var since=(Date.now()-RIDE.last)/1000;
     if(since>15){RIDE.drops++;RIDE.last=Date.now();
       if(since>RIDE.maxGap)RIDE.maxGap=since;
@@ -3631,28 +2696,14 @@ function rideFix(acc){
   if(RIDE.fixes>1){RIDE.gaps.push(gap);if(gap>RIDE.maxGap)RIDE.maxGap=gap}
   if(acc!==null&&acc!==undefined)RIDE.acc.push(acc)}
 
-/* ══ RIDE HUD ═══════════════════════════════════════════════════════════════
-   A80/A81/A82. Heading, speed and trip, on screen while riding.
-
-   ONE entry point for both drivers. GPS supplies coords.speed and
-   coords.heading when it has them; the simulator supplies its own; and when
-   neither does — Android reports heading null while stopped — both fall back to
-   differencing the crumb trail, which is the same data the track is drawn from.
-   The simulator therefore exercises every line the GPS path does, which is what
-   makes it a usable test double (take 16).
-
-   bearing() and compass() are reused rather than reimplemented: take 69 verified
-   the four cardinal cases independently, outside the code that produced them,
-   after a reversed bearing sent a reader the wrong way. */
+ 
 var HUD={spd:null,hdg:null,at:null,t:null};
 
 function hudSet(mps,deg,at){
-  /* The compass reads the same heading the ride ribbon does, so it updates on
-     every fix without a second source of truth (take 105). */
+   
   try{if(CMP_ON)setTimeout(cmpPaint,0)}catch(e){}
   var now=Date.now();
-  /* derive from the trail when the fix withholds either — heading is null on
-     Android whenever you are stopped, and the simulator has no coords at all */
+   
   if(at&&HUD.at&&HUD.t){
     var d=mi(HUD.at,at),secs=(now-HUD.t)/1000;
     if(deg===null||deg===undefined){if(d>0.0015)deg=bearing(HUD.at,at)}
@@ -3667,9 +2718,7 @@ function hudShow(on){
   var b=el('hudbar'),s=el('hudstats'),c=el('chips');
   if(b)b.hidden=!on;
   if(s)s.hidden=!on;
-  /* the place chips jump the camera to a town; during a ride the map recentres
-     on the rider every sixth fix, so they undo themselves. The ribbon is worth
-     more in that slot than they are. */
+   
   if(c)c.hidden=!!on;
   if(!on){HUD={spd:null,hdg:null,at:null,t:null}}
   hudPaint()}
@@ -3677,8 +2726,7 @@ function hudShow(on){
 function hudPaint(){
   var b=el('hudbar');
   if(!b||b.hidden)return;
-  /* A ribbon with no heading is a bare orange needle over an empty bar — it
-     looks broken because it IS telling you nothing. Say so instead (take 84). */
+   
   var hint=el('hudhint');
   if(hint)hint.hidden=(HUD.hdg!==null);
   var w=b.clientWidth||360,SPAN=180,ppd=w/SPAN,h=HUD.hdg;
@@ -3714,9 +2762,7 @@ function rideStop(){
     return b[(b.length/2)|0]};
   R.hrs=hrs;R.medGap=med(R.gaps);R.medAcc=med(R.acc);
   R.drain=(R.batt0!==null&&R.batt1!==null)?(R.batt0-R.batt1):null;
-  /* Android reports battery in 1% steps, so a ten-minute ride can show 0% or 1%
-     and extrapolate to anything between "forever" and "two hours". Require a
-     real sample before quoting a rate: 20 minutes AND at least 2% moved. */
+   
   R.longEnough=(hrs>=0.33&&R.drain!==null&&Math.abs(R.drain)>=0.02);
   R.perHr=R.longEnough?R.drain/hrs:null;
   RIDE=null;LASTRIDE=R;return R}
@@ -3757,19 +2803,17 @@ function startRecording(at){
 function record(at){
   if(!crumbs.length)return;
   var prev=crumbs[crumbs.length-1], d=mi(prev,at);
-  if(d<0.004)return;                    /* ~7 m — don't log GPS jitter as travel */
+  if(d<0.004)return;                     
   crumbs.push(at.slice()); crumbMi+=d;
   map.getSource('crumb').setData({type:'FeatureCollection',features:[
     {type:'Feature',properties:{},geometry:{type:'LineString',coordinates:crumbs}}]});
   syncSafety()}
 
-/* 4.3 — back to the vehicle. Never more than a glance away, always on the rail. */
+ 
 function syncSafety(){
   var tv=el('v-truck'), rv=el('v-rec');
   if(!TRUCK){tv.textContent='—';tv.className='v';rv.textContent='—';
-    /* a cell with nothing to say takes no space (take 113); parentNode is
-       guarded because stub elements have none, and a hidden cell is polish —
-       polish must never be why the loader fatals (same rule as the badges) */
+     
     if(tv.parentNode)tv.parentNode.className='cell empty';
     if(rv.parentNode)rv.parentNode.className='cell empty';
     return}
@@ -3779,24 +2823,23 @@ function syncSafety(){
   tv.textContent=(d<10?d.toFixed(1):Math.round(d))+' '+compass(b);
   tv.className='v'+(d>8?' warn':' good');
   rv.textContent=crumbMi.toFixed(1);
-  /* 4.11 — a safety feature that can fail silently needs to show it is alive */
+   
   el('b-src').textContent=crumbs.length?'REC '+crumbs.length:'GRAPH '+EDGES.length;
   el('b-src').className='badge '+(crumbs.length?'good':'good')}
 
-/* 4.4 — off-route alert. Haptic first, because you are looking at the trail. */
+ 
 function checkOffRoute(){
   if(!last||sel===null||!crumbs.length)return;
   var pts=[];last[sel].s.path.forEach(function(e){pts=pts.concat(decode(GR.g[e.i]))});
   var best=1e9;for(var i=0;i<pts.length;i++){var d=mi(ME,pts[i]);if(d<best)best=d}
-  var off=best>0.16;                    /* ~260 m from the planned line */
+  var off=best>0.16;                     
   if(off&&!offAlert){offAlert=true;buzz([120,80,120,80,220]);
     el('alert').className='on';
     el('alert').innerHTML='Off route — '+(best*5280|0)+' ft from your line'+
       '<small>Tap Retrace to follow your own track back to the truck.</small>'}
   else if(!off&&offAlert){offAlert=false;el('alert').className=''}}
 
-/* 4.14 — Retrace. The one that must never fail: no router, no network, no agency
-   data. Just the line you already rode, reversed. */
+ 
 el('btn-retrace').addEventListener('click',function(){
   if(crumbs.length<2)return show('Nothing recorded yet. Tap <b>▶ Ride it</b> to lay a track, or this fills in from GPS on a real ride.','fail');
   var back=crumbs.slice().reverse(), d=0;
@@ -3811,8 +2854,7 @@ el('btn-retrace').addEventListener('click',function(){
    compass(bearing(ME,TRUCK))+' to the truck · '+back.length+' points<br>'+
    'Every foot of this is ground you have already covered.','')});
 
-/* 4.7 — the dispatch card. Decimal degrees is what Oscoda and Ogemaw ask for.
-   Junctions are named by what meets there, never by a number we invented. */
+ 
 function nearestEdge(ll){
   var G=gridBuild(), best=1e9,be=null,seen={};
   var visit=function(list){
@@ -3827,9 +2869,7 @@ function nearestEdge_linear(ll){
   for(var i=0;i<EDGES.length;i++){var g=decode(GR.g[i]);
     for(var k=0;k<g.length;k++){var d=mi(ll,g[k]);if(d<best){best=d;be=EDGES[i]}}}
   return {e:be,d:best}}
-/* Take 134: the last linear scan in dispatch, 723 ms over the junction table
-   once hiking doubled the graph. Rings over the node grid, keeping only
-   junction nodes; exact, and the linear body stays as the fallback. */
+ 
 function nearestJunction(ll){
   var G=gridBuild(),best=1e9,bn=null;
   var visit=function(list){for(var j=0;j<list.length;j++){var i=list[j];
@@ -3855,11 +2895,7 @@ el('btn-disp').addEventListener('click',function(){
     var out='<span class="tn">'+ME[1].toFixed(5)+'  '+ME[0].toFixed(5)+'</span>'+
       '<span class="tag legal">decimal degrees</span><br>';
     var bits=[];
-    /* The address goes FIRST after the coordinate. A street name and number is
-       what a dispatcher types into their own system; the trail name and junction
-       are what the responder needs once they are close. Exact if we have one,
-       otherwise the bearing-and-distance form from take 69 — and labelled
-       "Nearest address" so it is never mistaken for where you are standing. */
+     
     var ad=addressAt(ME)||addressAt(ME,true);
     if(ad)bits.push((ad.near?'Nearest address ':'Address ')+'<b>'+ad.txt+'</b>');
     var cty=countyAt(ME);
@@ -3883,9 +2919,7 @@ el('btn-disp').addEventListener('click',function(){
                 :'Read the coordinates first, then the junction.');
     show(out+bits.join('<br>'),'')},20)});
 
-/* ── ride simulator ────────────────────────────────────────────────────────
-   Not a product feature. A harness, so Phase 4 can be exercised without a bike
-   and a tank of gas — the same reason tools/verify6.py exists. */
+ 
 function edgesAt(node){return ADJ[node]||[]}
 function simPath(){
   if(last&&sel!==null)return last[sel].s.path.slice();
@@ -3901,19 +2935,9 @@ function stopRide(){if(riding){clearInterval(riding);riding=null;
   hudShow(false);
   setChip('c-ride','play','Ride it')}}
 
-/* ── real GPS ────────────────────────────────────────────────────────────
-   One recording path, two drivers. On the phone, watchPosition feeds the same
-   startRecording/record/checkOffRoute chain the simulator exercised in smoke —
-   the sim is the test double, GPS is production, and they share every line
-   after the fix arrives. file:// and the harness fall back to the simulator. */
+ 
 var rideMode=null,gotFix=false,fixN=0;
-/* posMode: 'none'  — no fix yet; ME is a planning cursor, NOT a position
-            'gps'   — live fix inside this region
-            'sim'   — the simulator is driving; real machinery, fabricated position
-   'away'  — live fix, but hundreds of miles from this region
-   The map has to know the difference. Take 20 showed Jacob 44.57072 -84.15770
-   while he was in another state: a plausible, precise, wrong coordinate, on the
-   same screen as the button that reads coordinates out to dispatch. */
+ 
 var posMode='none',awayMi=0;
 function inRegion(at){var b=BUNDLE.bbox;if(!b)return true;
   return at[0]>=b[0]-0.02&&at[0]<=b[2]+0.02&&at[1]>=b[1]-0.02&&at[1]<=b[3]+0.02}
@@ -3931,15 +2955,9 @@ function classifyFix(at){
 function gpsStart(onFix,onFail){
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Geolocation;
   if(C){
-    /* Capacitor 7 hands back the watch id SYNCHRONOUSLY here, not a Promise.
-       Calling .then() on it threw, gpsStart() threw with it, and the whole
-       ▶ Ride it handler died on the device while the watch quietly ran in the
-       background. The self-test caught it on its first real run. Accept both
-       shapes — a plugin's return type is not something to assume (landmine 56). */
+     
     var w;
-    /* Capacitor 8 applies `timeout` to watchPosition on Android too;
-       12 s errored a slow first fix under canopy. Ask for a fix each
-       second via `interval` and never time the watch out. */
+     
     try{ w=C.watchPosition({enableHighAccuracy:true,interval:1000},function(pos,err){
       if(err||!pos)return onFail&&onFail(err);
       onFix([pos.coords.longitude,pos.coords.latitude],pos.coords.accuracy,
@@ -3995,10 +3013,9 @@ function stopReal(){gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=f
 function onFix(at,acc,mps,deg){
   classifyFix(at);
   rideFix(acc);
-  /* speed and heading arrived on every fix since take 21 and were discarded on
-     both drivers. A82: the data was already flowing (take 78). */
+   
   if(posMode==='gps')hudSet(mps,deg,at);
-  if(posMode==='away'){                     /* honest, and still useful */
+  if(posMode==='away'){                      
     gpsStop();rideMode=null;
     setChip('c-ride','play','Ride it');
     paint();return}
@@ -4012,7 +3029,7 @@ el('c-ride').addEventListener('click',function(){
   if(rideMode)return stopReal();
   if(riding)return stopRide();
   rideMode=gpsStart(onFix,function(){
-    if(gotFix)return;                 /* transient mid-ride errors: keep riding */
+    if(gotFix)return;                  
     stopReal();
     show('GPS unavailable here — browsers block it on <b>file://</b>. Running the <b>simulator</b> instead; in the APK this is your real track.','');
     startSim()});
@@ -4020,14 +3037,12 @@ el('c-ride').addEventListener('click',function(){
   startSim()});
 
 function startSim(){
-  /* The simulator must exercise every line the GPS path does — that is what
-     makes it a usable test double (take 16). It does NOT get to be a position:
-     dispatch still refuses, because these coordinates are invented. */
+   
   posMode='sim';
   var path=simPath();
   if(!path)return show('Pick a <b>Return home</b> route first, or move the ◎ pin nearer a trail.','fail');
   var pts=[];path.forEach(function(e){pts=pts.concat(decode(GR.g[e.i]))});
-  /* orient the ride away from wherever we start */
+   
   if(pts.length&&mi(ME,pts[0])>mi(ME,pts[pts.length-1]))pts.reverse();
   startRecording(pts[0]);ME=pts[0].slice();mM.setLngLat(ME);
   lost=false;var i=0;
@@ -4045,12 +3060,7 @@ function startSim(){
     hudSet(null,null,ME);
     if(i%6===0)map.easeTo({center:ME,duration:280})},170)}
 
-/* ══ LAYERS PANEL (A91) ═════════════════════════════════════════════════════
-   Every row reads the map's ACTUAL state when the panel opens, and writes to
-   the map when tapped. It never keeps its own copy of what is on — a copy of a
-   set is what let six label layers escape the Labels chip (landmine 107).
-   Overlay rows are declared by the layer ids they govern, so adding a layer to
-   a group is one entry here rather than a new toggle scattered in the strip. */
+ 
 var LYRGROUPS=[
   {k:'places', h:'Places',      s:'campgrounds, fuel, launches, trailheads',
    ids:['poi-dot','poi-dot-major']},
@@ -4083,8 +3093,7 @@ function lyrSet(g,on){
   var ids=g.ids||labelLayers();
   ids.forEach(function(id){
     try{if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'visible':'none')}catch(e){}});
-  /* Relief carries an opacity that depends on the basemap; setBasemap and the
-     old chip both knew this and disagreed once (see setBasemap). One place now. */
+   
   if(on&&g.k==='relief'){
     try{map.setPaintProperty('hillshade','raster-opacity',
       BASEMAPS[bmi]==='Map'?0.42:0.16)}catch(e){}}
@@ -4120,15 +3129,9 @@ function buildLyrPanel(){
       lyrSet(g,on);logAct('act  layer '+g.k+' '+(on?'on':'off'));
       buildLyrPanel()})})}
 
-/* c-base stays a ONE-TAP CYCLE. Replacing it with a menu cost a rider two taps
-   and a hunt to reach satellite, in gloves, and the render harness said so
-   immediately — its basemap checks encode behaviour worth keeping (take 90).
-   The panel is a separate chip. */
+ 
 el('c-base').addEventListener('click',function(){setBasemap(bmi+1)});
-/* take 145 · the HD sheet. Everything the rider needs to decide is quoted
-   BEFORE the save button appears: tile count, megabytes, what is already
-   on the phone. Over 500 MB the button refuses to exist — "zoom in" is
-   the only path, so nobody saves a Great-Lakes-sized mistake. */
+ 
 function hdChipTxt(t){var e=el('c-hd');if(e)e.querySelector('span').textContent=t}
 function hdChip(){HD.stats().then(function(st){
   if(!HDDL.busy())hdChipTxt(st.tiles?('HD · '+(st.bytes/1048576).toFixed(0)+' MB'):'HD');
@@ -4158,8 +3161,7 @@ function hdCard(){
     var a=el('hd-save');if(a)a.addEventListener('click',function(){startHDSave(b);hdCard()});
     var o=el('hd-stop');if(o)o.addEventListener('click',function(){HDDL.stop()});
     var d=el('hd-del');if(d)d.addEventListener('click',function(){
-      /* take 153 · deleting mid-download raced the writer: landed tiles
-         kept arriving after the clear. Stop first, then clear. */
+       
       HDDL.stop();
       setTimeout(function(){HD.clear().then(function(){refreshSat();hdChip();hdCard()})},350)});
   })}
@@ -4167,7 +3169,7 @@ el('c-hd').addEventListener('click',hdCard);
 el('c-hdmanage').addEventListener('click',hdCard);
 if(!SPARSE){el('c-hd').style.display='none';var _hm=el('c-hdmanage');if(_hm)_hm.style.display='none'}
 else hdChip();
-/* take 130 · the mode chip opens a PICKER (Jacob: choose, don't cycle) */
+ 
 function buildModePanel(){
   var p=el('modepanel');
   p.innerHTML=MODES.map(function(m){
@@ -4179,32 +3181,21 @@ function buildModePanel(){
 el('c-mode').addEventListener('click',function(){
   var p=el('modepanel');buildModePanel();p.hidden=!p.hidden;
   try{el('actpanel').hidden=true;el('lyrpanel').hidden=true}catch(e){}});
-/* A154 · the Tools strip tells the panels how tall it is. Measured, not
-   assumed: chip height follows the type scale and the safe-area inset. */
+ 
 function stripH(){try{var t=el('tools');if(t)document.documentElement.style
   .setProperty('--strip-h',t.offsetHeight+'px')}catch(e){}}
 stripH();setTimeout(stripH,600);
-try{window.addEventListener('resize',stripH)}catch(e){}   /* stubbed window in the harness */
-/* ══ DESTINATIONS (A113) ════════════════════════════════════════════════════
-   Which chips are on screen, and nothing else. Every handler, id and DOM
-   position is untouched — a chip in a closed destination is `hidden`, which the
-   layout self-test already skips (it measures elements with height) and which
-   click() ignores, so the harness needs no changes either.
-
-   Deliberately NOT a router: there are no separate screens to get lost between,
-   and the map stays visible in every destination because on a trail the map is
-   the thing you are looking at. */
+try{window.addEventListener('resize',stripH)}catch(e){}    
+ 
 var TAB='map';
 function showTab(t){
   TAB=t;
   Array.prototype.forEach.call(document.querySelectorAll('.chip[data-tab]'),function(c){
     c.hidden=(c.dataset.tab!==t)});
   Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'),function(b){
-    /* className, not innerHTML — the tab's icon lives in its children and a
-       label rewrite would take it with them (the same trap setChip exists for). */
+     
     b.className='tab'+(b.dataset.go===t?' on':'')});
-  /* the panels belong to specific destinations; leaving one open across a
-     switch is how a UI starts feeling arbitrary */
+   
   var dp=el('diagpanel'); if(dp&&t!=='tools')dp.hidden=true;
   var cp=el('cmppanel'); if(cp&&t!=='tools'){cp.hidden=true;CMP_ON=false}
   var lp=el('lyrpanel'); if(lp&&t!=='map')lp.hidden=true;
@@ -4216,8 +3207,7 @@ Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'),function(b)
 
 el('c-howto').addEventListener('click',function(){guideShow()});
 el('guide-go').addEventListener('click',function(){guideClose(true)});
-/* Tapping the blurred background closes it too — the same gesture as tapping
-   empty map to put the drawer away. */
+ 
 el('guide').addEventListener('click',function(e){
   if(e.target===el('guide'))guideClose(true)});
 
@@ -4226,8 +3216,7 @@ el('c-compass').addEventListener('click',function(){
   if(CMP_ON){magStart();el('diagpanel').hidden=true;cmpPaint()}
   logAct('tap  c-compass')});
 
-/* One tap where you are, rather than long-pressing a map you may not be able to
-   see. Same store and same auto-naming as a dropped waypoint (take 92). */
+ 
 el('c-markme').addEventListener('click',function(){
   if(!ME)return show('<b>No position yet.</b> Wait for a fix, or long-press the '+
     'map to mark a spot by hand.','fail');
@@ -4242,7 +3231,7 @@ el('c-markme').addEventListener('click',function(){
 
 el('peek').addEventListener('click',function(){
   var folded=el('rail').className==='folded';
-  RAIL_MANUAL=!folded;              /* folded by hand stays folded */
+  RAIL_MANUAL=!folded;               
   railSet(folded);
   logAct('tap  rail '+(folded?'open':'fold'))});
 
@@ -4257,14 +3246,7 @@ el('c-act').addEventListener('click',function(){
   var p=el('actpanel');buildActPanel();p.hidden=!p.hidden;
   if(!p.hidden)try{el('modepanel').hidden=true;el('lyrpanel').hidden=true}catch(e){}});
 el('c-about').addEventListener('click',function(){show(ABOUT,'')});
-/* Every label layer, DERIVED from the style rather than listed here.
-   This was a hand-kept array of five and the comment above it claimed it was
-   all of them. By take 89 the style had eleven: lake-label, lbl-trail-short,
-   poi-label, lbl-ref, lbl-lake and lbl-stream all escaped the Labels chip, four
-   of them added by me in takes 87-89 without a thought for the list that was
-   supposed to govern them.
-   A copy of a set drifts from the set (landmine 107, and this is the third
-   place it has happened). Ask the map what symbol layers it has. */
+ 
 function labelLayers(){
   try{
     return map.getStyle().layers.filter(function(l){return l.type==='symbol'})
@@ -4276,14 +3258,7 @@ map.on('error',function(e){var m=(e&&e.error&&e.error.message)||String(e&&e.erro
 function renderedCount(){try{return map.queryRenderedFeatures().length}catch(e){return -1}}
 var healthTries=0,healthOK=false;
 function renderHealth(){
-  /* Sources hold 16k+ features and the style is valid, yet nothing paints:
-     that is the renderer, not the data (landmine 47).
-
-     A single zero reading proves nothing — queryRenderedFeatures() is legitimately
-     empty while tiles are still being built, so an eager check would cry RENDER
-     FAIL on a healthy map. Require three zeros spread over ~7s, and let any
-     non-zero reading settle it permanently. False alarms would be worse than the
-     silence they replace: a rider who learns to ignore this badge has lost it. */
+   
   if(!nf2.length||healthOK)return;
   var got=renderedCount();
   if(got>0){healthOK=true;
@@ -4298,16 +3273,10 @@ function renderHealth(){
     'worker thread in this WebView.'+
     (glErr?'<br><br>Engine said: <b>'+glErr.replace(/[<>]/g,'')+'</b>':'')+
     '<br><br>Tell Claude you saw <b>RENDER FAIL</b>'+(glErr?' and that message':'')+'.','fail')}
-/* The state outline, drawn only below z9.6 and faded out as you approach the
-   data. It answers "where am I relative to my download" and nothing else — the
-   orange DOWNLOADED box that used to do this job was, correctly, called
-   distracting and ugly. The detailed square speaks for itself. */
+ 
 function drawCoverage(){
   if(!CTX||!CTX.rings)return;
-  /* Polygons, not lines: the Census cartographic file is clipped to the
-     SHORELINE, so filling it draws land and leaves the Great Lakes as ground.
-     The legal state boundary used at take 32 ran far out into the lakes and
-     produced a shape nobody recognised. */
+   
   var feats=CTX.rings.map(function(r){
     var ring=r.slice();
     if(ring[0][0]!==ring[ring.length-1][0]||ring[0][1]!==ring[ring.length-1][1])ring.push(ring[0]);
@@ -4316,7 +3285,7 @@ function drawCoverage(){
   var labs=(CTX.labels||[]).map(function(l){
     return {type:'Feature',properties:{n:l.n},geometry:{type:'Point',coordinates:l.at}}});
   try{map.getSource('lakes').setData({type:'FeatureCollection',features:labs})}catch(e){}
-  /* take 129 · counties: rings as lines, one label at each ring's centroid */
+   
   var cl=[],cp=[];
   (CTX.counties||[]).forEach(function(co){
     (co.r||[]).forEach(function(r){
@@ -4328,16 +3297,8 @@ function drawCoverage(){
       cp.push({type:'Feature',properties:{n:co.n},geometry:{type:'Point',coordinates:[sx/big.length,sy/big.length]}})}});
   try{map.getSource('county').setData({type:'FeatureCollection',features:cl});
       map.getSource('countylbl').setData({type:'FeatureCollection',features:cp})}catch(e){}}
-/* take 156 · A171 · the splash comes off when the map is genuinely usable:
-   the first IDLE frame after the style is in. Two backstops so a rider is
-   never trapped behind it — a beat after load, and a hard ceiling. A fatal
-   load error needs no handler here: fatal() replaces document.body, which
-   takes the splash with it. */
-/* take 157 · A173 · armed by a basemap change, disarmed by the map going
-   idle. The 200 ms grace is the difference between an honest indicator and
-   a flicker: a switch to a basemap already in memory settles faster than
-   the eye, and flashing a loading bar at it would be noise pretending to
-   be information. */
+ 
+ 
 var BUSY=(function(){
   var el,armed=false,timer=null,ceil=null;
   function grab(){if(!el)el=document.getElementById('busy');return el}
@@ -4359,21 +3320,14 @@ setTimeout(function(){SPL.lift()},20000);
 setTimeout(function(){try{var s2=document.getElementById('shell');
   if(s2&&s2.className.indexOf('ready')<0)s2.className+=' ready'}catch(e){}},8000);
 map.on('load',drawCoverage);
-/* The map must reflect the current machine from the first frame, not only after
-   someone taps the chip — a rider who never touches it is exactly the one who
-   needs to be told what is off limits (take 80). */
+ 
 map.on('load',applyMachine);
-/* A136 · the mode the rider last chose, applied from the first frame; Ride
-   is the default and is exactly today's map, so a rider who never touches
-   the chip sees no change. Applied after applyMachine so the machine's
-   legality paint is not undone. */
+ 
 map.on('load',function(){var k='ride';
   try{k=localStorage.getItem('apex.mode')||'ride'}catch(e){}
   applyMode(k,{silent:true})});
 
-/* Locate: fly to the real position when known, otherwise ask for one. The old
-   handler delegated to the GeolocateControl, which does nothing useful when the
-   rider is outside the region. */
+ 
 function flyToYou(){
   if(YOU){
     var far=!inRegion(YOU);
@@ -4385,16 +3339,8 @@ function flyToYou(){
     return true}
   return false}
 
-/* ══ ADDRESSES ══════════════════════════════════════════════════════════════
-   Census TIGER address RANGES, baked into the bundle. Each road segment carries
-   the house numbers at each end per side, so a point resolves by finding the
-   nearest segment, working out which side of it you are on, and interpolating.
-   That is how rural geocoding works where there are no address points.
-
-   Both directions are offline. Coverage is partial out here, and when there is
-   no address the card shows nothing rather than announcing an absence. */
-/* Take 139 · the index ships delta-encoded (v2); decoded here into the same
-   `segs` arrays the fifteen consumers below have always read. ~100 ms. */
+ 
+ 
 function addrDecode(){
   if(!ADDR||!ADDR.f||ADDR.segs)return;
   var f=ADDR.f,n=ADDR.n,p=ADDR.p||100000,zips=ADDR.zips||[],segs=new Array(n);
@@ -4405,8 +3351,7 @@ function addrDecode(){
     pn=nm;px=x1;py=y1;k+=10}
   ADDR.segs=segs;ADDR.f=null}
 try{addrDecode()}catch(e){}
-/* and a grid over segment midpoints for addressAt — the last linear scan in
-   the dispatch card (646 + 282 ms in headless at take 134) */
+ 
 var AGRID=null;
 function addrGrid(){
   if(AGRID)return AGRID;
@@ -4415,18 +3360,12 @@ function addrGrid(){
     var c=gcell([(g[1]+g[3])/2,(g[2]+g[4])/2]),kk=gkey(c[0],c[1]);
     var a=m.get(kk);if(a)a.push(i);else m.set(kk,[i])}
   AGRID=m;return m}
-var ADDR_CAP=0.09;                 /* miles; inside this, it IS your address */
-/* Beyond ADDR_CAP the app said nothing at all, and that threw away a true and
-   useful answer: Mio sits 307 m from an addressed road and Luzerne 377 m, so
-   both got silence. "A quarter mile south-west of 4951 S Branch Rd" is exactly
-   what you give dispatch when there is no address where you are standing.
-   Reported as a BEARING AND DISTANCE FROM a road, never as your address — the
-   distinction is the whole point (take 69). */
-var ADDR_NEAR=0.55;                /* miles; beyond this even that is noise */
+var ADDR_CAP=0.09;                  
+ 
+var ADDR_NEAR=0.55;                 
 
 function segNear(at,a,b){
-  /* Point-to-segment in local planar space, returning distance in miles, the
-     parameter t along the segment, and which side the point falls on. */
+   
   var kx=Math.cos(at[1]*Math.PI/180)*69.172, ky=69.172;
   var ax=(a[0]-at[0])*kx, ay=(a[1]-at[1])*ky,
       bx=(b[0]-at[0])*kx, by=(b[1]-at[1])*ky;
@@ -4435,10 +3374,7 @@ function segNear(at,a,b){
   var px=ax+t*dx, py=ay+t*dy;
   return {d:Math.sqrt(px*px+py*py), t:t, px:px, py:py, side:(dx*(-ay)-dy*(-ax))>0?'L':'R'}}
 
-/* Which county a point is in. Michigan dispatch is organised by county — it
-   decides who is sent — and the card could name the road, the junction and the
-   elevation but not the county (take 72). Ray casting against the simplified
-   cartographic rings in context.json; 9 counties, 70 points, 1.4 KB. */
+ 
 function countyAt(at){
   if(!CTX||!CTX.counties)return null;
   var x=at[0],y=at[1];
@@ -4455,8 +3391,7 @@ function countyAt(at){
 function addressAt(at,wide){
   if(!ADDR||!ADDR.segs)return null;
   var S=ADDR.segs,best=null,bd=wide?ADDR_NEAR:ADDR_CAP;
-  /* rings over the midpoint grid; a segment up to ~1 km long can have its
-     midpoint two cells away, so the walk goes two cells past the cap */
+   
   var G=addrGrid(),c=gcell(at),reach=Math.ceil(bd/(GCS*0.714*69))+2;
   for(var dx=-reach;dx<=reach;dx++)for(var dy=-reach;dy<=reach;dy++){
     var list=G.get(gkey(c[0]+dx,c[1]+dy));if(!list)continue;
@@ -4469,21 +3404,19 @@ function addressAt(at,wide){
   if(!f&&!t){f=r.side==='L'?g[7]:g[5];t=r.side==='L'?g[8]:g[6]}
   if(!f&&!t)return null;
   var n=Math.round(f+(t-f)*r.t);
-  /* keep the parity of the side's range — odd side stays odd */
+   
   if(f%2!==n%2)n+=(n>f?-1:1);
   var txt=n+' '+ADDR.names[g[0]]+(g[9]?', '+g[9]:'');
   var out={n:n,street:ADDR.names[g[0]],zip:g[9]||0,d:bd,txt:txt,near:false};
   if(bd>ADDR_CAP){
-    /* far enough that this is NOT the address of this point — say where it is
-       relative to the road instead, and say how far. */
+     
     var c=compass((Math.atan2(-r.px,-r.py)*180/Math.PI+360)%360);
     out.near=true;
     out.txt=(bd<0.1?Math.round(bd*5280)+' ft':bd.toFixed(1)+' mi')+' '+c+' of '+txt}
   return out}
 
 function geocode(q){
-  /* "4952 S Branch Rd" -> a point, by finding a segment of that name whose
-     range contains the number and interpolating along it. */
+   
   if(!ADDR||!ADDR.segs)return null;
   var m=/^\s*(\d+)\s+(.+?)\s*$/.exec(q);
   if(!m)return null;
@@ -4502,11 +3435,7 @@ function geocode(q){
            t:want+' '+ADDR.names[g[0]]+(g[9]?', '+g[9]:'')}})}
   return hit}
 
-/* ══ PLACE CARD ═════════════════════════════════════════════════════════════
-   Tap a pin or open ground and get a card: where it is, how high, what trail is
-   nearest, how far and which way from you — then the things you would actually
-   want to do with it. This is the interaction pattern every first-party map app
-   uses, and the app had none of it. */
+ 
 var dropM=null,DROP=null;
 
 function bearingTo(a,b){
@@ -4518,9 +3447,7 @@ function bearingTo(a,b){
   return {deg:Math.round(d),pt:C[Math.round(d/22.5)%16]}}
 
 function nearestEdgeTo(at){
-  /* A96: was a scan of every edge's START node. The grid gives the true
-     nearest vertex for less, so the pin card's "nearest:" line got more
-     accurate as it got faster. */
+   
   var r=nearestEdge(at);
   return r.e?{e:r.e,mi:r.d}:null}
 
@@ -4552,9 +3479,7 @@ function placeCard(at,kind,title){
   var on=function(id,fn){var b=el(id);if(b)b.addEventListener('click',fn)};
   on('pc-route',function(){routeToPoint(at,title)});
   on('pc-home',function(){logAct('act  make this home');HOME=at.slice();homeSave();homeMark();clearRoute();syncSafety();
-    /* The pin has become the ⌂ marker. Leaving a second marker sitting on top of
-       it was the whole confusion at take 35: the next long-press appeared to
-       "wipe out" a pin that had in fact already done its job. */
+     
     if(kind==='drop')clearDrop();
     show('<b>Home is here now.</b> The ⌂ pin holds this spot — '+
       'press and hold anywhere for a new pin.','')});
@@ -4619,22 +3544,15 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.railState=function(){var b=el('railbody');
       return{folded:el('rail').className==='folded',
              h:b?Math.round(b.getBoundingClientRect().height):-1}};
-    /* The results array itself, not the formatted report — a check that greps
-       rendered text is testing the formatter as much as the result (take 109). */
+     
     window.__st=function(){return ST};
     window.__geo={addressAt:addressAt,geocode:geocode,
                   get ADDR(){return ADDR}};
-    /* A96: the dispatch card runs six full scans on one tap and has never been
-       timed. Exposed so the harness can measure them individually rather than
-       measuring "the card felt slow" (take 93). */
+     
     window.__restrict={of:restrictOf,table:RESTRICT,legal:machineLegal,
-                       /* the memo (take 117) is keyed on machine and bundle:
-                          both bridge mutations below invalidate it, so both
-                          clear it — a debug bridge that lies is worse than
-                          none */
+                        
                        setMachine:function(m){if(MACHINE[m]){machine=m;_legalMemo={}}},
-                       /* the region carries none, so the only way to test the
-                          refusal is to make one (landmine 45) */
+                        
                        inject:function(e,txt){
                          var b=B[e.bi>=0?e.bi:0];
                          if(e.bi<0){B.push(new Array(BK.length).fill(null));e.bi=B.length-1;b=B[e.bi]}
@@ -4650,23 +3568,18 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
                     setMachine:function(m){if(MACHINE[m])machine=m},
                     get machine(){return machine},spd:spd,MACHINE:MACHINE,
                     get ME(){return ME}};
-    /* A140 · areas bridge, harness only, same shape as the rest. */
+     
     window.__areas={card:areaCard,groups:LYRGROUPS};
     window.__mode={apply:applyMode,get:function(){return mode},MODES:MODES};
-    /* take 127: BUNDLE is not a window global (app.js is wrapped — the same
-       lesson as areaCard at 121); the harness reads imagery facts here */
+     
     window.__sat={tiles:TILES,sparse:SPARSE,inPatch:inPatch,blank:Array.from(BLANK_PNG),resolve:_satResolve};
     window.__hd=HD;
-    /* take 145 · app.js is wrapped (the take-127 lesson): nothing reaches
-       window unless placed there. The drill drives the save loop through
-       these. */
+     
     window.HDDL=HDDL;window.__hdChip=hdChip;
     window.__ph={index:PHOTOS,html:photoHTML};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};
-    /* takes 149–150 · these come LAST and defensively: a throw here must
-       never take __ride down with it (it did, under smoke — the batch's
-       first red). */
+     
     try{
       window.__paddle={data:PADDLE,run:runCard,near:nearStop,hours:paddleHours,
         craft:function(){return machine}};
@@ -4682,8 +3595,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         count:function(){return CLUSTN},radius:CLUSTER_R,
         recluster:function(){CLUSTLAST='';recluster()}};
     }catch(e){}
-    /* the layout matrix must be able to put the HUD on screen at four device
-       sizes; measuring it hidden would measure nothing (landmine 85) */
+     
     window.hudShow=hudShow;window.hudSet=hudSet;window.hudPaint=hudPaint;
     window.__mach={set:function(m){if(!MACHINE[m])return;machine=m;
                      var i=ORDER.indexOf(m);if(i>=0)machIdx=i;applyMachine()},
@@ -4691,21 +3603,9 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
                    illegal:machineIllegal};
     window.PAL=PAL}catch(e){}
 
-/* ══ SELF-TEST ══════════════════════════════════════════════════════════════
-   The same battery of checks runs here, on the device, that render.mjs runs in
-   headless Chrome. That is the whole point: Chrome cannot tell me how Android's
-   WebView behaves, and Jacob should not have to tap through thirty features to
-   find out. He taps once and sends the report; anything that differs between
-   the two runs is device-specific by construction.
-
-   Every check records what it OBSERVED, not just pass/fail — a bare "FAIL
-   routing" is nearly useless to debug from, whereas "FAIL routing · 0 profiles,
-   nearestNode returned -1" names the layer that broke. */
+ 
 var ST=[],ACT=[],T0=Date.now();
-/* A ring buffer of what was actually done. Jacob reports symptoms in prose —
-   "I clicked start from here, then tried to drop another pin" — and prose loses
-   the order and the state. Forty entries is enough to cover any confusion and
-   small enough to paste. Nothing here leaves the phone unless he shares it. */
+ 
 function logAct(s){
   ACT.push(((Date.now()-T0)/1000).toFixed(1)+'s  '+s);
   if(ACT.length>40)ACT.shift()}
@@ -4752,22 +3652,14 @@ function stEnv(){
 }
 
 function stLoad(){
-  /* Was 'bundle-complete', asserting state==='complete'. PARTIAL is a DESIGNED
-     state — a region built while Overpass is down legitimately has no water and
-     the app is supposed to SAY so (landmine 34). Asserting completeness scored
-     correct behaviour as a failure, which is landmine 56's corollary: assert the
-     system's RESPONSE to a condition, never the condition itself.
-     What matters is that the state and the named layers agree — that the app is
-     telling the truth about what it has, whichever answer that is (take 76). */
+   
   var _hon=(BUNDLE.state==='partial')===!!(BUNDLE.absent&&BUNDLE.absent.length);
   stAdd('LOAD','bundle-honest',_hon,
     BUNDLE.state+(BUNDLE.absent&&BUNDLE.absent.length?
       ' — names absent: '+BUNDLE.absent.join(','):' — nothing absent'));
   stAdd('LOAD','offline-clean',remoteHits===0,remoteHits+' unexpected remote requests'+
     (inappHits?' \u00b7 '+inappHits+' in-app (HD / gauges \u2014 user taps, \u00a78 allowlist)':''));
-  /* Saved routes are on-device state, not a network surface — PROTOCOL §8 draws
-     the line at requests leaving the phone. Report what storage holds so a
-     rider can see it is local and finite (take 79). */
+   
   var _sv=svLoad();
   stAdd('LOAD','saved-routes',true,
     svAvailable()?_sv.length+' saved on this phone, nothing sent anywhere':
@@ -4778,20 +3670,13 @@ function stLoad(){
     EDGES.length+' edges / '+NODES.length+' nodes');
   stAdd('LOAD','terrain',!!(TR&&TR.ne&&TR.ne.length===NODES.length),
     TR&&TR.ne?TR.ne.length+' node elevations':'absent');
-  /* IDX is built lazily on first search, so reading it cold always says 0 —
-     a number that looks like a failure and is actually just "not built yet". */
+   
   var idx=buildIndex();
   stAdd('LOAD','search-index',idx&&idx.length>100,(idx?idx.length:0)+' entries');
 }
 
 function stRender(cb){
-  /* take 148 · A161: isStyleLoaded() is legitimately false mid-tile-
-     transition — the t143 self-test read it once and reported XX while 292
-     features drew in the same run. Settle-then-measure, as a setTimeout
-     chain and NOT a promise: smoke's harness pumps timers, never
-     microtasks, so a .then here structurally cannot complete under it
-     (the batch's second red). Poll up to 5 s, report the settle time, and
-     only then read the RENDER section against a settled style. */
+   
   var t0=Date.now();
   (function _settle(){
     var okd=map.isStyleLoaded();
@@ -4805,36 +3690,19 @@ function stRender(cb){
     catch(e){return -1}};
   var all=renderedCount();
   stAdd('RENDER','features-drawn',all>0,all+' in viewport');
-  /* Viewport-dependent, so it cannot be a pass/fail: Jacob's map was parked over
-     Brainard Springs, where there is genuinely no designated trail, and this
-     reported FAIL on a perfectly good map. The trail-names check below jumps to
-     a known site and IS a real assertion (take 64). */
+   
   stInfo('RENDER','trails',q(['trail50','route72','moto24','fstrail','mccct'])+
     ' designated · '+q(['track'])+' two-track in the view you left it on');
-  /* Take 121, twice. First it failed on a map drawing 22,782 road features,
-     because it counts the CURRENT viewport and the view it inherited held
-     none. Then jumping to a town anchor and counting in the same tick failed
-     too — a jump needs a frame before anything is rendered there, which is
-     why the trail-names check below waits. A synchronous check cannot do
-     that, so it stays where it is and NAMES the view it counted: a zero is
-     then readable as "nothing here" rather than "roads are broken". */
+   
   var _rc=map.getCenter(),_rn=q(['fsroad','minor','paved','track']);
   stAdd('RENDER','roads',_rn>0,_rn+' features at '+_rc.lat.toFixed(3)+','+
     _rc.lng.toFixed(3)+' z'+map.getZoom().toFixed(1));
-  /* Counted at the CURRENT viewport, this reported 0 on a device whose screen
-     was visibly showing "The Pink Store" — the map was simply zoomed somewhere
-     with no label in frame. Jump to a known anchor, count, restore. Landmine 54
-     for the fifth time: a check must control where it looks. */
+   
   var was={c:map.getCenter(),z:map.getZoom()};
   var site=anchorOf('site');
   map.jumpTo({center:site,zoom:14.5});
-  /* Knowing WHICH trail you are on is the point of a trail map. text-max-angle
-     was 32 degrees, which on a network this twisty placed zero names — the data
-     had a label on 100% of trail edges and almost none were shown (take 44). */
-  /* Symbols are placed ASYNCHRONOUSLY: querying in the same tick as the jump
-     returns 0 on a map that shows several a moment later — which is exactly what
-     it reported for Jacob while trail-names, which waits, found 4. stLabels()
-     already asserts this properly, so here it is only information. */
+   
+   
   var lb=q(['lbl-place','lbl-trail']);
   stInfo('RENDER','labels',lb+' at '+site[1].toFixed(3)+','+site[0].toFixed(3)+
     ' z13.6 — placed asynchronously, see trail-names for the real check');
@@ -4842,9 +3710,7 @@ function stRender(cb){
   map.jumpTo({center:[was.c.lng,was.c.lat],zoom:was.z});
   var vis;try{vis=map.getLayoutProperty('sat','visibility')}catch(e){vis='err'}
   stInfo('RENDER','basemap','sat visibility='+vis+' SAT_OK='+SAT_OK);
-  /* Ground resolution is the whole complaint: at 22 m/px a two-track is a
-     twentieth of a pixel. Report it so the improvement is visible in the
-     report, not just in an opinion. */
+   
   if(TILES){
     var mpp=156543.03*Math.cos(CTR[1]*Math.PI/180)/Math.pow(2,TILES.zmax);
     stAdd('RENDER','imagery',mpp<6,
@@ -4858,26 +3724,13 @@ function stRender(cb){
 }}
 
 function stLayout(){
-  /* Every UI bug Jacob has reported was invisible to this self-test: a strip
-     that could not scroll, options unreachable off-screen, a map that jumped.
-     None of them are data or logic — they are LAYOUT, and layout only exists on
-     a real device at a real viewport. These checks run there. */
+   
   var vw=document.documentElement.clientWidth;
 
-  /* A96. The dispatch card runs six full scans on one tap — nearestEdge alone
-     decodes every edge polyline in the region. It is the highest-stakes screen
-     in the app and had never been timed on a phone, only reasoned about. This
-     puts the real number in Jacob's next report instead of my extrapolation
-     from a desktop, which is the same mistake as measuring a 900x1400 viewport
-     (landmine 87). */
+   
   (function(){
     try{
-      /* ME is only set when you are INSIDE the region (see classifyFix), so
-         this returned silently on Jacob's take-108 report — he tested from home,
-         135 mi away — and in the headless harness, which has no GPS at all.
-         A check added at take 93 had therefore never once run, anywhere.
-         The point is to measure the SCAN, not to require a live fix, so it now
-         times against a point that always exists (take 109, landmine 85). */
+       
       var at=(ME&&ME.slice)?ME.slice():
              (CTR&&CTR.slice)?CTR.slice():null;
       if(!at)return;
@@ -4885,11 +3738,7 @@ function stLayout(){
       nearestEdge(at);nearestJunction(at);nearestPavement(at);
       countyAt(at);addressAt(at);addressAt(at,true);
       var ms=performance.now()-t0;
-      /* Take 117: the budget scales with the network. 600 ms was calibrated
-         on a 20k-edge box; statewide is 451k edges and six linear scans, and a
-         fixed number would fail forever while saying nothing. The per-edge
-         rate is what regressions actually show up in (A96 owns the real fix:
-         typed arrays + a spatial index, queued for tuning). */
+       
       var budget=Math.max(600,Math.round(EDGES.length/150));
       stAdd('PERF','dispatch-scan',ms<budget,
         Math.round(ms)+' ms of '+budget+' ms budget ('+EDGES.length+
@@ -4901,9 +3750,7 @@ function stLayout(){
   stInfo('UI','viewport',vw+'x'+document.documentElement.clientHeight+
     ' css px · dpr '+devicePixelRatio);
 
-  /* Anything wider than the screen is a layout bug. This is exactly what the
-     route strip did at take 35 — 788 px inside a 411 px phone — and nothing
-     caught it but a person squinting at a screenshot. */
+   
   var wide=[];
   Array.prototype.forEach.call(document.querySelectorAll('#shell *'),function(e){
     var r=e.getBoundingClientRect();
@@ -4911,15 +3758,14 @@ function stLayout(){
   stAdd('UI','nothing-overflows',wide.length===0,
     wide.length?wide.slice(0,3).join(' · '):'no element exceeds '+vw+' px');
 
-  /* A scrollable strip that cannot scroll hides its later options entirely. */
+   
   var strips=[],bad=[];
   Array.prototype.forEach.call(document.querySelectorAll('#shell *'),function(e){
     var ov=getComputedStyle(e).overflowX;
     if(ov!=='auto'&&ov!=='scroll')return;
     if(!e.children.length)return;
     strips.push(e.id||e.className);
-    /* content wider than the box is fine — that IS scrolling. Content that
-       overflows the SCREEN while the box does not scroll is the bug. */
+     
     var last=e.children[e.children.length-1].getBoundingClientRect();
     var box=e.getBoundingClientRect();
     if(last.right>box.right+1&&e.scrollWidth<=e.clientWidth+1)
@@ -4927,7 +3773,7 @@ function stLayout(){
   stAdd('UI','strips-scroll',bad.length===0,
     bad.length?bad.join(' · '):strips.length+' scrollable strip(s), all reachable');
 
-  /* Gloved thumbs on a bouncing bike. 38 css px is the floor. */
+   
   var small=[];
   Array.prototype.forEach.call(document.querySelectorAll('.chip,.act,.rc,.hit'),function(e){
     var r=e.getBoundingClientRect();
@@ -4936,26 +3782,11 @@ function stLayout(){
   stAdd('UI','tap-targets',small.length===0,
     small.length?small.slice(0,3).join(' · '):'all ≥38 px tall');
 
-  /* Controls that have slid off the bottom cannot be pressed. */
+   
   var vh=document.documentElement.clientHeight,off=[];
-  /* A folded rail clips its children while they keep their natural positions,
-     so Return home measures as off-screen when it is simply put away. Measure
-     with the drawer OPEN — that is the state where these controls matter — and
-     put it back. Forcing the conditional state is part of the check
-     (landmine 111, take 109). */
-  /* The rail is a drawer now (A127). When it is folded its children keep their
-     natural positions inside a clipped box, so they measure as off-screen while
-     being exactly where they belong — put away, one tap from the handle.
-     Forcing it open to measure was tried and it fought the fold transition; the
-     honest check is simpler. A folded drawer is REPORTED, not failed, and the
-     handle itself is what must be on screen — that is the thing that would
-     actually strand a rider (landmine 173: reachable, not merely wired). */
-  /* Ask the GEOMETRY, not the class name. The check runs in the same tick as
-     the show() that opened the drawer, so the class already reads open while
-     the 260 ms max-height transition has not moved — `rail="" folded=false
-     railbody=0` was the exact state, with Return home at y=1015 inside a
-     zero-height clipped box. A class is an intention; a rect is a fact, and
-     mid-transition they disagree (take 109). */
+   
+   
+   
   var _r=el('rail'),_rb=el('railbody');
   var _folded=!_rb||_rb.getBoundingClientRect().height<8;
   var LIST=_folded?['peek','c-ride','c-locate']
@@ -4971,15 +3802,8 @@ function stLayout(){
               :'primary controls all reachable'));
 
 
-  /* ── LIFTED FROM A DEAD TWIN (take 111) ──────────────────────────────
-     These three checks lived in a SECOND `function stLayout(){}` further
-     up the file. JavaScript keeps the last declaration and discards the
-     first without a word, so they had never run — the same trap that hid
-     dispatch-scan for sixteen takes (landmine 175). The dead twin is gone
-     and a gate check now refuses a duplicate function name. */
-  /* The map must agree with the router about what this machine may use. Both
-     read MACHINE[machine].ok, so this asserts they are actually WIRED, not that
-     two lists happen to match (take 80). */
+   
+   
   var _no=machineIllegal(),_okc=(MACHINE[machine]||{}).ok||[];
   var _wired=true;
   try{['trail50','moto24','track'].forEach(function(id){
@@ -4988,9 +3812,7 @@ function stLayout(){
   stAdd('UI','machine-on-map',_wired,
     MACHINE[machine].lbl.replace(/^\S+\s/,'')+' — '+_okc.length+' classes legal, '+
     _no.length+' faded'+(_no.length?' ('+_no.join(', ')+')':''));
-  /* `_hb`, `_hs` and `_rid` were defined earlier in the dead twin's body and
-     came across as undefined references — which threw, and killed every check
-     after this one. Defined here (take 111). */
+   
   var _hb=el('hudbar'),_hs=el('hudstats'),_rid=!!rideMode;
   stAdd('UI','hud-matches-ride',
     !!_hb&&!!_hs&&_hb.hidden===!_rid&&_hs.hidden===!_rid,
@@ -5001,10 +3823,7 @@ function stLayout(){
     if(r.right<0||r.left>vw+1)off.push(e.textContent.slice(0,12))});
   stAdd('UI','actions-reachable',off.length===0,
     off.length?'off-screen: '+off.join(', '):'all primary actions on screen');
-  /* vh is already in scope from the live function; only the map height is new.
-     The threshold is the ONE number that matters after the take-109 drawer: the
-     map is the product, and if it ever drops below a third of the screen
-     something has gone wrong with the chrome. */
+   
   var mh=map.getContainer().getBoundingClientRect().height;
   stAdd('UI','map-has-room',mh>vh*0.35,
     Math.round(mh)+' of '+vh+' px ('+Math.round(100*mh/vh)+'% of the screen)');
@@ -5012,8 +3831,7 @@ function stLayout(){
 }
 
 function stData(){
-  /* Elevation against surveyed landmarks — catches a DEM that loaded but is
-     georeferenced wrong, which no structural check would notice. */
+   
   var known=[['Mio',-84.1330,44.6597,965],['Bull Gap',-84.0274,44.6166,1070],
              ['The Pink Store',-84.1279,44.5219,1240]];
   known.forEach(function(k){
@@ -5022,9 +3840,7 @@ function stData(){
     var f=Math.round(r.e*3.28084),d=Math.abs(f-k[3]);
     stAdd('DATA','elev-'+k[0],d<=90,f+' ft vs '+k[3]+' surveyed (Δ'+d+') at the '
       +'nearest node, '+Math.round(r.mi*5280)+' ft away')});
-  /* Addresses: coverage out here is partial by nature, so the check is that the
-     geocoder WORKS where data exists and round-trips, not that every point has
-     an address. A point with no address must yield null, never a guess. */
+   
   if(!ADDR||!ADDR.segs)stInfo('DATA','address','no address index in this bundle');
   else{
     stInfo('DATA','address-index',ADDR.segs.length+' segments, '+
@@ -5056,10 +3872,7 @@ function stData(){
 }
 
 function stRouting(){
-  /* take 153 · t152 self-test on the Fold: snap read -1 -> -1 because the
-     current machine was a KAYAK (Jacob was in Water mode) — legal on zero
-     land classes, exactly as designed. The routing drill borrows a land
-     machine and says which, then puts the boat back. */
+   
   var _was=machine;
   if(MACHINE[machine]&&MACHINE[machine].mph){machine=rideMachine||'bike';_legalMemo={}}
   var a=anchorOf('site'),b=anchorOf('town');
@@ -5078,23 +3891,20 @@ function stRouting(){
   stTry('ROUTE','directions',function(){
       var path=route(na,nb,PROFILES[0].f);return directions(path,na)},
     function(v){return{ok:v&&v.length>0,d:(v?v.length:0)+' steps'}});
-  /* legality must actually change what is routable */
+   
   var before=machine;
   try{
     machine='bike';_legalMemo={};var pb=route(na,nb,PROFILES[0].f);
     machine='sxs';_legalMemo={};var _sxsTo=HOME||CTR;
     var ns=nearestNode(ME),ps=ns>=0?route(ns,nearestNode(_sxsTo),PROFILES[0].f):null;
-    /* An SxS finding no route between two points is usually correct — 72"
-       machines are barred from most of this network. The filter is only broken
-       if a 72" machine cannot snap to ANY node at all. */
+     
     var sxsCanSnap=ns>=0;
     stAdd('ROUTE','machine-filter',!!pb&&sxsCanSnap,
       'bike '+(pb?pb.length:0)+' edges · sxs snaps='+sxsCanSnap+
       ' route='+(ps?ps.length+' edges':'none legal (expected on bike-only trail)'));
     var closedUsed=(pb||[]).filter(function(e){return e.c==='closed'||e.c==='fsclosed'}).length;
     stAdd('ROUTE','closures-avoided',closedUsed===0,closedUsed+' closed edges in route');
-  /* Loops are the impromptu-ride feature. Two things make one useful: it lands
-     near the distance asked for, and it does not simply ride out and back. */
+   
   try{
     var la=nearestNode(anchorOf('site'));
     if(la<0)stInfo('ROUTE','loop','no legal node near the site anchor');
@@ -5116,16 +3926,8 @@ function stRouting(){
   if(_was!==machine){machine=_was;_legalMemo={}}
 }
 function stSafety(){
-  /* The drill calls startRecording, which since take 41 also starts ride
-     telemetry and a 20 s interval. A self-test that leaves a live ride running
-     is worse than one that skips the check — it would report the DRILL as the
-     rider's last ride, and leak a timer for the life of the app. */
-  /* The drill calls startRecording(), which turns the ride HUD on. It restored
-     TRUCK, crumbs, RIDE and posMode and left the compass ribbon showing —
-     over the place chips, with no heading, forever. Jacob ran the self-test in
-     the field and got exactly that: "the compass popped up at the top… it
-     doesn't work whatever it is." A drill must put back EVERYTHING it moved,
-     not just the state it was written to think about (take 84). */
+   
+   
   var save={T:TRUCK,c:crumbs.slice(),m:crumbMi,p:posMode,me:ME.slice(),
             ride:RIDE,lastride:LASTRIDE,
             hud:!!(el('hudbar')&&el('hudbar').hidden),
@@ -5161,11 +3963,7 @@ function stPerf(cb){
   var n=0,t0=performance.now(),d=[],last=t0,bgSeen=false;
   function _vis(){if(document.hidden)bgSeen=true}
   try{document.addEventListener('visibilitychange',_vis)}catch(e){}
-  /* A149 (take 121) · Jacob: "is the self-test supposed to take me to Bull
-     Gap? Is that the app zeroing itself?" No — this drill spins the camera at
-     the region centre to measure frame rate and never put it back, so every
-     self-test silently teleported him off whatever he was looking at. The
-     drill puts back what it moved (the same rule stRender already follows). */
+   
   var c=CTR, _cam={c:map.getCenter(),z:map.getZoom(),b:map.getBearing()};
   map.jumpTo({center:c,zoom:12.6});
   function step(){
@@ -5176,29 +3974,19 @@ function stPerf(cb){
       d.sort(function(a,b){return a-b});
       var avg=Math.round(1000/(d.reduce(function(a,b){return a+b},0)/d.length));
       var p99=Math.round(1000/d[Math.floor(d.length*0.99)]);
-      /* count at the drill's own zoom so the number stays comparable between
-         runs, THEN put the rider's view back */
+       
       map.setBearing(0);map.jumpTo({center:c,zoom:11.4});
       var drew=renderedCount();
       map.setBearing(_cam.b);
       map.jumpTo({center:[_cam.c.lng,_cam.c.lat],zoom:_cam.z});
-      /* Headless Chrome rasterises in software at single-digit fps, which says
-         nothing about a phone. Judge the frame rate only on real hardware;
-         everywhere else record it and judge that something DREW. */
-      /* A single hitch and a sustained stutter give the same p99 but need very
-         different answers. Count the slow frames and name the worst one, so the
-         next report distinguishes "one GC pause" from "this device struggles". */
+       
+       
       var slow=0,worst=0;
       for(var q=0;q<d.length;q++){if(d[q]>33.4)slow++;if(d[q]>worst)worst=d[q]}
       var detail='avg '+avg+' · p99 min '+p99+' · '+slow+'/'+d.length+
         ' frames over 33ms · worst '+Math.round(worst)+'ms · '+drew+' features';
       var soft=/swiftshader|llvmpipe|software/i.test(glInfo().r||'');
-      /* requestAnimationFrame STOPS when the app leaves the foreground, so the
-         first frame after you come back is the length of your absence. Jacob's
-         take-82 report read "avg 2 fps · worst 39402ms" — a 39-SECOND frame —
-         which is a screenshot being taken, not a device struggling. Scoring
-         that as a performance failure is landmine 56's corollary: correct
-         behaviour must not be scored as failure. Report it, do not judge it. */
+       
       if(bgSeen||worst>2000)
         stInfo('PERF','fps',detail+' · APP LEFT THE FOREGROUND during the '+
           'sample (rAF pauses; the worst frame is your absence), not a verdict');
@@ -5220,18 +4008,14 @@ function stGps(cb){
       var f=fixes[0];
       stAdd('GPS','first-fix',true,((f.t-t0)/1000).toFixed(1)+'s · ±'+
         Math.round(f.acc)+'m · '+f.at[1].toFixed(5)+','+f.at[0].toFixed(5));
-      /* Marking "away" as FAIL was wrong — the detail line even said so. What
-         matters is that the app REACTED correctly, not where the rider stands. */
+       
       var away=!inRegion(f.at);
       stInfo('GPS','position',away?Math.round(mi(f.at,CTR))+' mi outside '+
         (BUNDLE.name||'the region'):'inside '+(BUNDLE.name||''));
       classifyFix(f.at);
       stInfo('GPS','fixes',fixes.length+' in 20s');
     }else{
-      /* A watch that times out indoors is not the same as "the app has no
-         position" — at take 38 the log showed a startup fix at 2.7 s while this
-         section reported nothing at all, dropping startup-locate and
-         mode-correct precisely when they mattered most. Report state either way. */
+       
       stAdd('GPS','first-fix',!!YOU,YOU?
         'this watch saw nothing in 20s, but the app already has a fix from startup':
         'no fix in 20s and no startup fix (indoors? permission denied?)');
@@ -5312,8 +4096,7 @@ function stReport(){
     ACT.slice(-25).forEach(function(a){L.push('  '+a)});
     L.push('');}
   L.push('--- end ---');
-  /* structured too: a caller needs to tell a data failure from a render one,
-     and only a real engine can judge the render group. */
+   
   return {text:L.join('\n'),pass:pass,fail:fail,results:ST.slice()};
 }
 function pad(s){s=String(s);while(s.length<18)s+=' ';return s}
@@ -5353,17 +4136,8 @@ function stRenderPanel(rep){
     else sh.textContent='No share sheet — use Copy'});
 }
 
-/* Labels are placed asynchronously: jumping and querying in the same tick
-   returns zero on a map that will show eight a moment later. The synchronous
-   sections cannot see placement at all, so this waits (take 44 — my check was
-   wrong, not the map). */
-/* Take 124: this jumped to the 'site' anchor — statewide that is Silver Lake
-   Dunes, an open riding AREA with no trail lines by design — and passed on
-   "0 names for 0 segments" for three takes (landmine 85, a vacuous
-   assertion). It now finds trail country from the DATA: the designated
-   trail edge nearest the region centre, which is never a hardcoded
-   coordinate (landmine 197). And it settles instead of napping: a fixed
-   1.8 s lost to symbol placement on the Fold more than once. */
+ 
+ 
 function stLabels(cb){
   var was={c:map.getCenter(),z:map.getZoom()};
   var DES={trail50:1,route72:1,moto24:1,fstrail:1,mccct:1},best=1e18,at=null;
@@ -5371,8 +4145,7 @@ function stLabels(cb){
     var n=NODES[e.a],dx=n[0]-CTR[0],dy=n[1]-CTR[1],d=dx*dx*0.51+dy*dy;
     if(d<best){best=d;at=n}}
   if(!at){stInfo('RENDER','trail-names','no designated trail in this region — skipped');return cb()}
-  /* modes can hide the designated lines (Outdoors does); the check controls
-     its layer state as well as its viewport, and puts both back */
+   
   var wasAct=act;if(act!=='all'){act='all';try{applyAct()}catch(e){}}
   map.jumpTo({center:at,zoom:14.5});
   var q=function(ids){try{return map.queryRenderedFeatures({layers:ids}).length}
@@ -5389,12 +4162,11 @@ function stLabels(cb){
       return cb()}
     setTimeout(poll,300)})()}
 
-/* opts.gps=false skips the 20s live-fix phase (used by the headless harness) */
+ 
 function selfTest(opts,done){
   opts=opts||{};ST=[];
   stEnv();stLoad();
-  /* take 148 · the chain awaits the settled RENDER section (A161); nothing
-     downstream changed. */
+   
   stRender(function(){
   stLayout();stData();stRouting();stSafety();stRide();stHaptics();
   var finish=function(){var rep=stReport();
@@ -5449,19 +4221,11 @@ el('c-selftest').addEventListener('click',function(){
 ].forEach(function(t){
   try{t[0].getElement().addEventListener('click',function(ev){
     ev.stopPropagation();placeCard(t[2](),t[1],t[3]())})}catch(e){}});
-/* ══ LONG PRESS ═════════════════════════════════════════════════════════════
-   Own implementation rather than relying on the browser's contextmenu, which is
-   inconsistent in a WebView and cannot be tuned. 450 ms with a 12 px tolerance:
-   long enough not to fire while panning, short enough to feel deliberate with
-   gloves on. A buzz confirms it, because a gesture with no feedback feels
-   broken. */
+ 
 var LP_MS=450,LP_TOL=12,lp={t:null,x:0,y:0,fired:false};
 function lpCancel(){if(lp.t){clearTimeout(lp.t);lp.t=null}}
 function lpAt(cx,cy){
-  /* getContainer(), not getCanvasContainer(): the latter is a zero-height
-     wrapper around absolutely-positioned children, and unproject() is defined
-     against the map CONTAINER's top-left anyway. Same origin today, but relying
-     on a rect whose height is 0 is asking for it. */
+   
   var box=map.getContainer().getBoundingClientRect();
   var ll=map.unproject([cx-box.left,cy-box.top]);
   buzz(18);dropPin([ll.lng,ll.lat])}
@@ -5478,11 +4242,9 @@ function lpAt(cx,cy){
   cv.addEventListener('touchend',lpCancel,{passive:true});
   cv.addEventListener('touchcancel',lpCancel,{passive:true});
 })();
-/* desktop / stylus right-click, and the path the harness drives */
+ 
 map.on('contextmenu',function(e){buzz(18);dropPin([e.lngLat.lng,e.lngLat.lat])});
-/* MapLibre's compact attribution renders EXPANDED on first paint, and on a
-   411 px screen that bar sits across the chip strip and hides a button. Collapse
-   it; the (i) still opens it, and the credits are also in About (take 61). */
+ 
 function collapseAttrib(){
   try{Array.prototype.forEach.call(
     document.querySelectorAll('.maplibregl-ctrl-attrib.maplibregl-compact-show'),
@@ -5492,17 +4254,11 @@ map.on('load',collapseAttrib);map.on('idle',collapseAttrib);
 map.on('idle',function(){if(!healthOK)renderHealth()});
 map.on('move',refreshReadout);map.on('load',refreshReadout);
 map.on('moveend',railFoldIfAway);
-/* take 154 · re-bucket after the map settles, never during a gesture */
+ 
 map.on('moveend',recluster);
 
-/* take 160 · A176 · collision above the cluster ceiling. It reads the pins
-   MapLibre ACTUALLY RENDERED rather than the source data, so it sees what
-   the rider sees — after the mode filter, the prominence tier, the boost
-   and the label collision. Groups anything within a pin's width, keeps the
-   best-ranked member, hides the others by feature index, and badges the
-   survivor xN. Every kind takes part up here: two coffee shops drawn on
-   top of each other are unreadable whatever kind they are (Jacob, 24596). */
-var STACKPX=26;   /* a pin is ~26 px across; closer than that is overlap */
+ 
+var STACKPX=26;    
 function restack(){
   var src;try{src=map.getSource('poistack')}catch(e){return}
   if(!src)return;
@@ -5515,16 +4271,12 @@ function restack(){
   var seen={},pts=[];
   for(var i=0;i<fs.length;i++){
     var f=fs[i],id=f.properties.i;
-    if(id===undefined||seen[id])continue;      /* one entry per place */
+    if(id===undefined||seen[id])continue;       
     seen[id]=1;
     var p;try{p=map.project(f.geometry.coordinates)}catch(e){continue}
     pts.push({id:id,x:p.x,y:p.y,r:+f.properties.r||9,
       c:f.geometry.coordinates,k:f.properties.k})}
-  /* The pins hidden by the LAST pass are not rendered any more, so a query
-     alone cannot see them — and a pass blind to what it hid would find no
-     overlap, un-hide everything, find the overlap again, and flicker
-     forever. They are added back from the record, by index, so every pass
-     starts from the same full set. */
+   
   for(var hid in STACKED){
     if(seen[hid])continue;
     var rec=((POIS&&POIS.p)||[])[+hid];
@@ -5543,8 +4295,7 @@ function restack(){
   for(var key2 in bins){
     var g=bins[key2];
     if(g.length<2)continue;
-    /* the survivor is the most prominent — lowest rank wins, the same
-       order the map already uses to decide what sits on top */
+     
     g.sort(function(a,b){return a.r-b.r});
     for(var j=1;j<g.length;j++)hide[g[j].id]=1;
     out.push({type:'Feature',
@@ -5557,9 +4308,7 @@ function restack(){
   if(changed)applyStackFilters();
   src.setData({type:'FeatureCollection',features:out})}
 
-/* take 160 · A176 · the tray Jacob asked for: "when you click it, the tray
-   shows both pins that you can scroll through". Each row opens that place's
-   own card, so nothing about a place is reachable only through the stack. */
+ 
 function stackCard(f){
   var ids=String(f.properties.ids||'').split(',').filter(function(x){return x!==''});
   var recs=ids.map(function(i){return {i:+i,r:((POIS&&POIS.p)||[])[+i]}})
@@ -5581,8 +4330,7 @@ function stackCard(f){
   Array.prototype.forEach.call(host.querySelectorAll('[data-si]'),function(b){
     b.addEventListener('click',function(){
       var o=recs[+b.dataset.si];if(!o)return;
-      /* open THAT place by flying to it and letting the normal pin card do
-         the work — one card implementation, not two (landmine 98) */
+       
       map.easeTo({center:o.r.p,zoom:Math.max(map.getZoom(),15.6),duration:600});
       setTimeout(function(){
         var pt=map.project(o.r.p);
@@ -5604,32 +4352,21 @@ map.on('moveend',restack);
 ['dragstart','zoomstart','rotatestart'].forEach(function(ev){
   map.on(ev,function(e){if(e&&e.originalEvent)_userDrove=true})});
 map.on('load',function(){makeBadges();setBasemap(0);wpDraw();showTab('map');
-  /* Relief starts OFF. The style ships hillshade visible, and over the flat
-     vector basemap it reads as dark blotches — Jacob: "it looks really bad".
-     On Hybrid it earns its place at low opacity, so it stays one tap away under
-     Layers rather than being removed (take 112, field report). */
+   
   try{map.setLayoutProperty('hillshade','visibility','none')}catch(e){}
-  /* First open only. Waits for the map so the blur has something behind it. */
+   
   if(!guideSeen())setTimeout(guideShow,450);
-  /* The map is the product; the rail is a drawer. Opens the moment you touch
-     something (A127). */
+   
   railSet(false);buildActPanel();actLabel();
   setTimeout(renderHealth,1800);
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Geolocation;
   if(C){try{C.requestPermissions().then(locateOnce).catch(locateOnce)}catch(e){locateOnce()}}
   else locateOnce()});
 
-/* One fix at startup. The app used to learn where you were only when you tapped
-   ▶ Ride it, so it happily showed a region you were 135 miles from and said
-   nothing (take 27 field report). Knowing early costs one fix and changes the
-   whole first screen. */
+ 
 var YOU=null,youM=null;
 function locateOnce(){
-  /* Take 30 used getCurrentPosition with enableHighAccuracy:false and a 10s
-     timeout. On the Fold it never produced a fix — the self-test reported
-     posMode=none while its OWN watch got one in 1.0s at +/-17m. So: use the same
-     watch machinery that demonstrably works, take the first fix, stop. One
-     proven path beats two plausible ones (landmine 56 again). */
+   
   var handle=function(at,acc){
     YOU=at.slice();
     if(!youM){var d=mk('you');youM=new maplibregl.Marker({element:d}).setLngLat(YOU).addTo(map)}
@@ -5641,10 +4378,10 @@ function locateOnce(){
   var mode=gpsStart(function(at){
     if(done)return; done=true;
     handle(at,null);
-    gpsStop(); watchId=saveWatch;          /* leave a ride's own watch alone */
+    gpsStop(); watchId=saveWatch;           
   },function(){ if(!done){done=true; gpsStop(); watchId=saveWatch} });
   if(!mode)return;
-  /* Give up quietly after 25s rather than holding the receiver open. */
+   
   setTimeout(function(){ if(!done){done=true; gpsStop(); watchId=saveWatch;
     stInfo&&0; } },25000);}
 
@@ -5657,31 +4394,25 @@ function showAway(acc){
     'jump to the riding area.',
     Math.round(awayMi)+' mi away \u00b7 planning mode')}
 
-/* Relief and Labels moved into the layers panel at take 90; the strip was at
-   sixteen chips with layer toggles scattered among ride actions. lyrSet() still
-   updates these elements if they exist, so re-adding a chip needs no new code. */
+ 
 el('c-lost').addEventListener('click',function(){
   if(rideMode)return show('Live GPS is driving — the alert fires from your actual track, not a button.','');
   if(!riding)return show('Start <b>▶ Ride it</b> first, then take a wrong turn and watch the alert fire.','');
   lost=true;buzz(40);
   show('Veering off at the next junction — this is the failure the whole app exists to catch.','')});
 
-/* ── inspect / place ───────────────────────────────────────────────────── */
+ 
 var HIT=['route72','trail50','moto24','mccct','fstrail','fsroad','closed','fsclosed','track','paved','minor','foot'];
-/* Tapping a dashed line has to answer "what is that and may I ride it".
-   Show-only features are not in EDGES, so the identify branch below cannot
-   describe them — they get their own branch that says plainly what they are. */
+ 
 var HIT_SHOW=['show-line'];
 map.on('click',function(e){
-  if(lp.fired){lp.fired=false;return}   /* the long press already acted */
-  /* take 160 · A176 · a stack badge is checked before the pins beneath it:
-     the tap that lands on a pile of three means the pile. */
+  if(lp.fired){lp.fired=false;return}    
+   
   try{var sf=map.queryRenderedFeatures(
       [[e.point.x-16,e.point.y-16],[e.point.x+16,e.point.y+16]],
       {layers:['poi-stack']});
     if(sf.length&&+sf[0].properties.n>1)return stackCard(sf[0])}catch(_e){}
-  /* take 154 · a cluster is checked FIRST: it is drawn over everything at
-     that zoom, so a tap that lands on one meant it. */
+   
   try{var cf=map.queryRenderedFeatures(
       [[e.point.x-14,e.point.y-14],[e.point.x+14,e.point.y+14]],
       {layers:['poi-cluster']});
@@ -5691,19 +4422,15 @@ map.on('click',function(e){
     if(arm==='home'){HOME=ll;homeSave();homeMark()}else{ME=ll;mM.setLngLat(ll);syncSafety()}
     arm=null;syncArm();clearRoute();
     return show('Placed. Tap <b>Return home</b> to route.','')}
-  /* A115 · a paddle pin is checked before anything else it may be sitting on.
-     A dam is checked before a launch, because if both are under the finger the
-     hazard is the answer. */
-  /* Remember what this card is about, so panning away can take it with it. */
+   
+   
   RAIL_AT=[e.lngLat.lng,e.lngLat.lat];
   var box=[[e.point.x-13,e.point.y-13],[e.point.x+13,e.point.y+13]];
   var dam=map.queryRenderedFeatures(box,{layers:['pad-dam']});
   var padf2=dam.length?dam:map.queryRenderedFeatures(box,{layers:['pad-dot']});
   if(padf2.length&&padf2[0].geometry&&padf2[0].geometry.coordinates)
     return paddleCard(padf2[0]);
-  /* A140 · a riding area under the finger, but only where nothing sharper is:
-     a trail INSIDE Silver Lake still identifies as itself, so areas are checked
-     after pins and only claim the tap when no network edge is there. */
+   
   var pf0=map.queryRenderedFeatures(box,{layers:['pub-fill']});
   if(pf0.length&&pf0[0].properties&&pf0[0].properties.n){
     var nf0=map.queryRenderedFeatures([[e.point.x-9,e.point.y-9],[e.point.x+9,e.point.y+9]],
@@ -5715,34 +4442,23 @@ map.on('click',function(e){
       {layers:HIT.concat(HIT_SHOW)});
     if(!nf.length)return areaCard(af[0].properties);}
 
-  /* A110 · a place is checked FIRST. A pin sits on top of the line it is beside,
-     so tapping it and getting the road underneath would be the wrong answer to
-     an unambiguous gesture. */
+   
   var pf=map.queryRenderedFeatures([[e.point.x-11,e.point.y-11],[e.point.x+11,e.point.y+11]],
     {layers:['poi-dot-major','poi-dot']});
-  /* A feature with no geometry crashes the whole click handler, and a click
-     handler that throws takes every other tap with it — the trail identify, the
-     pin drop, everything. MapLibre always supplies geometry; a harness might
-     not, and neither is a reason to be one bad object away from a dead map. */
+   
   if(pf.length&&pf[0].geometry&&pf[0].geometry.coordinates){
-    /* There is no fmt() — I called one that does not exist. Coordinates are
-       printed lat-then-lon at five places everywhere else in this file, and
-       dispatch reads them aloud in that order (landmine 102: read the code,
-       not your memory of it). */
+     
     var pr=pf[0].properties,pp=pf[0].geometry.coordinates,
         pc='<span class="tn">'+pp[1].toFixed(5)+'  '+pp[0].toFixed(5)+'</span>';
     logAct('tap  place '+(pr.n||pr.k));
-    /* take 149 · the Water-mode run bridge (A163) */
+     
     var wrun=(mode==='water'&&(pr.k==='launch'||pr.k==='livery'||pr.k==='marina'))
       ?nearStop(pp):null;
     show('<b>'+(pr.named?pr.n:pr.h)+'</b>'+
       (pr.named?'<div class="sub">'+pr.h+(pr.mi?' \u00b7 '+pr.mi+' mi of trail':'')+'</div>':
                 '<div class="sub">Unnamed in the source \u2014 shown by what it is</div>')+
       (pr.named?photoHTML(pr.k,pr.n,pp):'')+
-      /* take 142 · a ski hill's card lists its runs with their tagged
-         difficulty — untagged stays grey, never guessed — and links the
-         hill's own website. Read from the RECORD via properties.i: nested
-         arrays do not survive MapLibre's property serialisation. */
+       
       (function(){if(pr.k!=='ski')return '';
         var rec=((POIS&&POIS.p)||[])[pr.i]||{},x='';
         var DCOL={green:'#2F7D4F',blue:'#2E6FA8',black:'#141414',expert:'#141414',park:'#7A5B3A'};
@@ -5781,23 +4497,15 @@ map.on('click',function(e){
   var f=map.queryRenderedFeatures([[e.point.x-9,e.point.y-9],[e.point.x+9,e.point.y+9]],
     {layers:HIT.concat(HIT_SHOW)});
   if(!f.length){
-    /* Empty ground. With a live in-region fix, ME means "where I am" and must
-       not be draggable. Otherwise this is planning: put the start here.
-       Take 21 added a second click handler for this and it clobbered the
-       identify branch above — one handler, one meaning per tap. */
-    /* Tap does ONE job: identify. Pinning moved to long-press at take 36 so a
-       pin can be dropped ON a road or trail — tapping one has to keep selecting
-       it. Google Maps' convention, and the only way both gestures fit. */
-    { /* Tapping empty ground is how a rider says "get out of the way". The
-         rail folds instead of opening a card that says nothing — and the
-         message goes on the peek strip, still readable without costing the map
-         half the screen (A127). */
+     
+     
+    {  
       railSet(false);RAIL_MANUAL=false;
       var pt=el('peek-txt');
       if(pt)pt.textContent='Nothing there \u2014 press and hold to drop a pin';
       return}}
   if(f[0].properties.i===undefined){
-    /* a show-only route: exists, but not ridable on this machine */
+     
     var pr=f[0].properties;
     return show('<span class="tn">'+(pr.n||pr.u||'Route')+'</span>'+
       '<span class="tag adv">'+(pr.u||SHOWN[pr.c]||pr.c)+'</span><br>'+
@@ -5819,10 +4527,7 @@ map.on('click',function(e){
   if(a.atv)bits.push('ATV <b>'+a.atv+'</b>');
   if(a.lic)bits.push(a.lic);
   bits.push((ed.L/1609.34).toFixed(2)+' mi segment');
-  /* A101 · a published restriction goes LAST and on its own line, because it is
-     the thing that decides whether you may be here at all. If we recognise it we
-     say it plainly; if we do not, the source's own words are printed unedited —
-     telling a rider what the sign says is honest, inventing a reading is not. */
+   
   var _rs=restrictOf(ed);
   if(_rs){
     var banned=_rs.ban&&_rs.ban.indexOf(machine)>=0;
@@ -5832,23 +4537,9 @@ map.on('click',function(e){
   if(UP[ed.i]||DN[ed.i])bits.push('+'+ft(UP[ed.i])+' / -'+ft(DN[ed.i])+' ft');
   show(out+bits.join(' · '),'')});
 
-/* ══ THE RAIL, FOLDED (A127) ════════════════════════════════════════════════
-   The rule: THE CARD BELONGS TO A PLACE. It opens when you touch something and
-   it leaves when that thing does.
-
-     opens   tapping a pin, road or trail · a route being planned · any chip
-             that produces a card — all of which go through show(), so there is
-             ONE place that opens it rather than a call at every site
-     folds   tapping empty map · panning until the subject is off screen ·
-             the handle
-     peeks   always. The strip carries distance to the truck while riding and
-             the handle to bring the rest back, so nothing is unreachable —
-             only folded (landmine 173: reachable is not the same as wired).
-
-   A ride keeps it peeked rather than open: mid-trail you want the map, and the
-   one number that matters is already on the strip. */
-var RAIL_AT=null;          /* what the open card is about, in lon/lat */
-var RAIL_MANUAL=false;     /* did the rider fold it by hand? then leave it alone */
+ 
+var RAIL_AT=null;           
+var RAIL_MANUAL=false;      
 
 function railPeekText(){
   if(TRUCK&&ME){
@@ -5872,27 +4563,17 @@ function railSet(open,at){
     (RAIL_AT?'Details':railPeekText());}
 
 function railFoldIfAway(){
-  /* Pan far enough that the thing the card is about has left the screen and the
-     card goes with it. Not a timer and not a scroll threshold — the subject
-     either is on screen or it is not. */
+   
   if(RAIL_MANUAL||!RAIL_AT)return;
   try{
     var p=map.project(RAIL_AT),b=map.getContainer().getBoundingClientRect();
     if(p.x<-40||p.y<-40||p.x>b.width+40||p.y>b.height+40)railSet(false);
   }catch(e){}}
 
-/* Three places wrote the panel directly — saved routes, route options, the step
-   list — so they got no motion and did not open the drawer. Everything goes
-   through one function now; a card written any other way is a card that behaves
-   differently for no reason a rider could name (take 110). */
+ 
 function cardHTML(h,s){show(h,s)}
 
-/* Status messages — "you are 135 mi away", startup notes — are not CARDS about
-   a place the rider touched, so they must not unfold the drawer. Jacob closed
-   the first-run guide and found the drawer standing open under it: the first
-   GPS fix had arrived mid-guide and showAway() opened it (take 112).
-   quiet=true sets the content and a peek summary and leaves the fold alone —
-   the full text is one handle-tap away. */
+ 
 function showQuiet(h,peekLine){
   var p=el('panel');p.innerHTML=h;p.className='';
   var t=el('peek-txt');
@@ -5900,24 +4581,17 @@ function showQuiet(h,peekLine){
 
 function show(h,s){
   var p=el('panel');p.innerHTML=h;
-  /* Restart the animation on every card. Setting the class alone does nothing
-     when it is already there — the browser will not replay an animation for an
-     unchanged class — so it comes off, the layout is read to force the change
-     to land, and it goes back on. */
+   
   p.className=s||'';
   void p.offsetWidth;
   p.className=(s?s+' ':'')+'swap';
-  /* Every card in the app goes through here — place cards, route options,
-     search hits, the self-test, dispatch. One hook, so a new card cannot forget
-     to open the rail (landmine 107's shape applied to behaviour). */
+   
   RAIL_MANUAL=false;railSet(true);}
 
 var geo=new maplibregl.GeolocateControl({positionOptions:{enableHighAccuracy:true},
   trackUserLocation:true,showAccuracyCircle:true});
 map.addControl(geo,'top-right');
-/* A scale bar is the one piece of map furniture every off-road app has and this
-   did not: without it a rider cannot judge whether a gap is 200 yards or two
-   miles, which is exactly the judgement that decides whether to push through. */
+ 
 try{map.addControl(new maplibregl.ScaleControl({maxWidth:96,unit:'imperial'}),'bottom-left')}catch(e){}
 el('c-locate').addEventListener('click',function(){
   if(flyToYou())return;
@@ -5925,12 +4599,7 @@ el('c-locate').addEventListener('click',function(){
   setTimeout(function(){if(!flyToYou())geo.trigger()},1200)});
 geo.on('error',function(){show('Location unavailable — browsers block GPS on <b>file://</b> and in embedded frames. Expected here; works in the APK. Use <b>&#39;I am here&#39;</b> to place yourself manually.','fail')});
 
-/* ── THE PLACE STRIP FOLDS INTO SEARCH (take 113) ─────────────────────────
-   Neither reference keeps a permanent row of place pills eating the top of the
-   map — the quick-jumps now live where you would look for a place: under
-   Search, shown when the query is empty. The #chips element stays in the DOM
-   (the ride HUD swaps with it and the self-test restores it) but it renders
-   nothing and takes no space. */
+ 
 el('chips').innerHTML='';
 el('chips').style.display='none';
 function jumpChipsHTML(){
@@ -5947,9 +4616,7 @@ function wireJumpChips(root){
 function refreshReadout(){
   var c=map.getCenter(),e=elevAt([c.lng,c.lat]);
   var r=el('ro-elev');
-  /* Was a bare "1194 ft" sitting under a scale bar reading "3000 ft" — two
-     numbers in the same unit with nothing to tell them apart. Say which is
-     which (take 65). */
+   
   if(r)r.textContent=(e===null?'':ft(e)+' ft elevation');
   var v=el('v-elev');
   if(v)v.textContent=(e===null?'—':ft(e)+' ft')}
@@ -5973,8 +4640,7 @@ var lastT=performance.now(),win=[],cap=null;
     e.className=f>=50?'v good':f>=30?'v':'v warn'}
   requestAnimationFrame(tick)})(performance.now());
 
-/* A fixed loop over this region's anchors, so two builds stay comparable and any
-   region can be perf-tested the same way. */
+ 
 var LEGS=(function(){
   var z=[15.5,13,15,16],b=[0,40,0,0],out=[];
   for(var i=0;i<Math.min(4,PLACES.length);i++)
@@ -5992,9 +4658,7 @@ function done(){var d=cap.slice().sort(function(a,b){return a-b});cap=null;
   if(d.length<30)return show('Not enough frames. Run it again.','fail');
   var avg=Math.round(1000/(d.reduce(function(a,b){return a+b},0)/d.length)),
       mn=Math.round(1000/d[Math.floor(d.length*0.99)]),
-      /* A frame rate measured over an empty canvas is meaningless. Take 20
-         reported "PASS 121 fps · 16352 edges rendered" while the map was blank
-         sand — the test asserted its own hope. It counts pixels now. */
+       
       drew=renderedCount(),
       pass=avg>=50&&mn>=30&&remoteHits===0&&drew>0;
   show('<b>'+(pass?'PASS':'FAIL')+'</b> · avg <b>'+avg+'</b> fps · p99 min <b>'+mn+
@@ -6004,8 +4668,7 @@ function done(){var d=cap.slice().sort(function(a,b){return a-b});cap=null;
      pass?'Holds up with the full routable network loaded.'
    :'Below threshold — note both numbers before comparing to the APK.'),
    pass?'pass':'fail')}
-/* Say plainly which layers this region does not have. Silently dropping one is
-   how you end up trusting a map that is lying by omission. */
+ 
 if(BUNDLE.state==='partial'){
   var names={imagery:'satellite imagery',relief:'hillshade',hydro:'water'};
   el('b-src').textContent='PARTIAL';

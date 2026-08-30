@@ -23,7 +23,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "play")
 APP_NAME = "APEX ORV"
 APP_ID = "com.sergeantslabs.apex"
-CONTACT = "sergeantetsy@gmail.com"
+CONTACT = "sergeantetsy@gmail.com"   # Play requires a public support address.
 
 
 def take():

@@ -1,4 +1,56 @@
-# HANDOFF — through Take 161 · V2
+# HANDOFF — through Take 162 · V2
+
+## Take 162 — 2026-08-30 — the release artifact carries no commentary
+
+Requested for the Play build: the shipped web assets should not carry
+development notes, ticket numbers or personal names. An .apk is a zip
+anyone can open, so www/app.js and www/index.html are effectively public
+documents.
+
+Done as a BUILD STEP, not a source edit. tools/scrub.mjs strips comments
+from the built artifacts; src/ keeps every annotation, because those
+comments are the reason this project catches its own regressions and
+deleting them to satisfy a release would be trading the record for
+cosmetics. build_app.py runs it on every split and REFUSES the build if
+it fails, and the gate re-checks the artifact — a release cannot ship
+commentary by forgetting a step. APEX_KEEP_COMMENTS=1 leaves them in for
+local debugging.
+
+Comments are removed with a real parser (acorn), not a regular
+expression: a division followed by a block comment and a regex literal
+containing a slash-star are indistinguishable to a pattern matcher. The
+scrubber's own header comment proved the point by closing itself early
+on the sequence it was describing.
+
+Result: 121 KB stripped from app.js, 16 KB from index.html; zero personal
+references remain in anything that ships; both files still parse.
+
+The gate refused this take twice and was right twice. First, the agenda
+id A177 was already taken by the Play kit's own item — an id that means
+two things cannot be cited, and these ledgers are the project's memory,
+so the collision is a real defect; the scrub work is A179 and the
+application-id decision is A180. Second, www/index.html still said Take
+161 while BUILD said 162: the last build ran BEFORE the bump, and www/ is
+exactly what cap sync puts in the APK, so a build labelled 161 would have
+gone to Play. Both are process failures on my side that no amount of
+passing tests would have caught.
+
+Also corrected, against landmine 210: gate.py buffers its entire output
+until it finishes and needs roughly ten minutes. An empty log part-way
+through is not a crash — 210's rule applies only after the run has had
+its full window.
+
+SEAL: render 216/0 and smoke green on the SCRUBBED build — stripping 137
+KB of commentary changed nothing functional — and gate PASSED after the
+two refusals above were fixed. apex-seed-t162.zip sealed (sha256 in
+chat). Prepared for the first Play submission; A180 (the permanent
+application id) is the one decision still outstanding and it is not
+mine to make.
+
+NOT done, and deliberately: a find-and-replace over the data. Three
+"Jacob"/"Sergeant" hits in photos_index.json are Jacobsville Lighthouse,
+Jacobson Marina and Sergeant Marina — real Michigan places. A careless
+scrub would have corrupted the map to tidy a comment.
 
 ## Take 161 — Google Play release engineering (play kit v1)
 
