@@ -223,7 +223,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'   # Capacitor 8 requires Node 22+
 
       # ubuntu-latest preinstalls the Android SDK (ANDROID_HOME set) and
       # setup-java provides a full JDK. Neither was true of the container this
@@ -232,14 +232,29 @@ jobs:
       # Every job is a FRESH runner: the bundle job's pip install does not carry
       # over. android.py imports icon.py which needs PIL, and the apk job had no
       # Python deps at all (landmine 83).
-      - name: Build the signed APK
+      # Play kit: apk.sh now also builds the Play AAB. The upload key is
+      # a repository SECRET (never in the tree); the workflow only passes it
+      # through as env. All logic lives in ci/apk.sh, which the seed updates.
+      # No secrets set → the AAB is built dev-key-signed and NAMED unfit to
+      # upload; the job still succeeds so sideload testing never blocks.
+      - name: Build the signed APK and the Play AAB
         id: pkg
+        env:
+          PLAY_UPLOAD_KEYSTORE_B64: ${{ secrets.PLAY_UPLOAD_KEYSTORE_B64 }}
+          PLAY_UPLOAD_STORE_PASS: ${{ secrets.PLAY_UPLOAD_STORE_PASS }}
+          PLAY_UPLOAD_KEY_ALIAS: ${{ secrets.PLAY_UPLOAD_KEY_ALIAS }}
+          PLAY_UPLOAD_KEY_PASS: ${{ secrets.PLAY_UPLOAD_KEY_PASS }}
         run: bash ci/apk.sh
 
       - uses: actions/upload-artifact@v4
         with:
           name: apk
           path: ${{ steps.pkg.outputs.apk }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aab
+          path: ${{ steps.pkg.outputs.aab }}
 
       # Notes come from ci/RELEASE.md, in the REPO. They used to be inline here —
       # and the workflow is the one file the seed cannot update, so the notes
@@ -251,6 +266,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "take-${{ github.run_number }}" \
-            "${{ steps.pkg.outputs.apk }}" \
+            "${{ steps.pkg.outputs.apk }}" "${{ steps.pkg.outputs.aab }}" \
+            "$(ls play-assets-*.zip)" \
             --title "APEX ORV — take ${{ steps.pkg.outputs.take }}" \
             --notes-file ci/RELEASE.md
