@@ -1,4 +1,54 @@
-# HANDOFF — through Take 166 · V2
+# HANDOFF — through Take 167 · V2
+
+## Take 167 — 2026-08-30 — sources named, affiliation disclaimed (A184)
+
+Build 166 was REJECTED under Play's Misleading Claims policy: "Missing
+Source Link for Government Information". The evidence names the location
+— Full description (en-US) — so the store listing is what failed, but the
+notice says the issue may exist elsewhere in the app, and it did: nothing
+in the app named the agencies either.
+
+Both fixed:
+- The listing now OPENS with the disclaimer, not a footnote, because
+  "easy-to-see" was the requirement: this app is not affiliated with,
+  endorsed by, or acting on behalf of Michigan, the DNR, the Forest
+  Service, the USGS or any government agency. A WHERE THE DATA COMES FROM
+  section names each agency with its official link.
+- The app gained Tools -> Data sources carrying the same disclaimer and
+  the same links. That belongs there regardless of policy: a rider
+  deciding whether a trail is open should know exactly whose data said
+  so.
+
+Every URL was checked with a request before it was written down, because
+Play requires them to be "valid and functional" and a dead link is
+another rejection. www.usgs.gov answers 503 to automated requests (bot
+protection) though it works in a browser, so the USGS citations use
+apps.nationalmap.gov and waterdata.usgs.gov, which both answer 200.
+
+§8 note: the gate flags any remote origin in shipped assets, and these
+links would trip it. They are allowlisted as DISPLAY-ONLY with that
+reasoning recorded — §8 exists to stop the app DEPENDING on the network,
+not to stop it citing its sources.
+
+§8 caught the other half, correctly, and I had only half-anticipated it:
+there are TWO host checks, one over shipped assets and one over the
+tooling, and the six links now appearing in play_assets.py tripped the
+second. Widening a regex would have silenced it; instead they are
+declared in manifest.py as a new phase, "citation (displayed to the
+rider; never requested)". The rule is that any host named in the tooling
+is accounted for, and "we only display this one" is a claim worth writing
+down rather than assuming. 21 hosts declared, none undeclared.
+
+SEAL: render 219/0 (216 + three compliance checks proving the app itself
+opens the panel, disclaims affiliation, and links DNR, USFS, USGS and
+OSM), smoke green, gate PASSED. apex-seed-t167.zip sealed (sha256 in
+chat).
+
+RESUBMISSION IS NOT COMPLETE WITH THIS SEED ALONE. The rejection names
+the store DESCRIPTION, and Play Console copy is not in this repository —
+the listing text must be pasted from tools/play_assets.py output before
+sending for review, or the reviewer will find the same violation in the
+same place.
 
 ## Take 166 — 2026-08-30 — the advertising-ID declaration, made verifiable
 

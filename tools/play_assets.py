@@ -169,7 +169,17 @@ None, none, none. The app is free and has no in-app purchases.
 def listing(t):
     """Store listing copy. 30/80/4000 character limits are Play's."""
     short = "Offline ORV, trail and water navigation for all of Michigan."
-    full = """Michigan trails, off the grid.
+    # Play rejected build 166 under the Misleading Claims policy: an app that
+    # presents government information must name the official source of that
+    # information with a working link, and must say plainly that it is not the
+    # government. Both are below, and the disclaimer is the first thing in the
+    # description rather than a footnote — "easy-to-see" was the requirement.
+    full = """APEX ORV is an independent app. It is not affiliated with,
+endorsed by, or acting on behalf of the State of Michigan, the Michigan
+Department of Natural Resources, the U.S. Forest Service, the U.S. Geological
+Survey, or any other government agency.
+
+Michigan trails, off the grid.
 
 APEX ORV is a free, fully offline trail app for Michigan riders. Every trail,
 road, contour and satellite tile ships inside the app — once it is installed,
@@ -201,6 +211,24 @@ Trail legality comes from agency data and can lag a closure — signs on the
 ground always win. County and township boat ramps are missing where no public
 dataset lists them. High-detail imagery beyond the built-in level needs wifi
 to save first.
+
+WHERE THE DATA COMES FROM
+This app republishes public data from the agencies below. They are the
+authority; the app is a convenience. Always check the official source, and
+the signs on the ground, before you ride.
+- Michigan DNR — trail designations, closures, state land, boating access:
+  https://www.michigan.gov/dnr
+  Open data portal: https://gis-midnr.opendata.arcgis.com
+- U.S. Forest Service — national forest roads and trails:
+  https://data.fs.usda.gov/geodata/
+- U.S. Geological Survey — satellite imagery and elevation:
+  https://apps.nationalmap.gov/downloader/
+  River gauge readings: https://waterdata.usgs.gov
+- OpenStreetMap contributors — roads, places and context, under ODbL:
+  https://www.openstreetmap.org/copyright
+
+The same list, with the same links, is inside the app under Tools -> Data
+sources.
 
 Michigan only, on purpose."""
     assert len(APP_NAME) <= 30 and len(short) <= 80 and len(full) <= 4000

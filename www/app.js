@@ -3167,6 +3167,39 @@ function hdCard(){
   })}
 el('c-hd').addEventListener('click',hdCard);
 el('c-hdmanage').addEventListener('click',hdCard);
+ 
+var SOURCES=[
+  ['Michigan DNR','Trail designations, closures, state land, boating access',
+   'https://www.michigan.gov/dnr'],
+  ['Michigan DNR open data','The GIS layers this app ingests',
+   'https://gis-midnr.opendata.arcgis.com'],
+  ['U.S. Forest Service','National forest roads and trails',
+   'https://data.fs.usda.gov/geodata/'],
+  ['U.S. Geological Survey','Satellite imagery and elevation',
+   'https://apps.nationalmap.gov/downloader/'],
+  ['USGS Water Services','Live river gauge readings',
+   'https://waterdata.usgs.gov'],
+  ['OpenStreetMap contributors','Roads, places and context, under ODbL',
+   'https://www.openstreetmap.org/copyright']];
+function sourcesCard(){
+  logAct('tap  data sources');
+  show('<b>Where the data comes from</b>'+
+    '<div class="sub">APEX ORV is an <b>independent app</b>. It is not '+
+    'affiliated with, endorsed by, or acting on behalf of the State of '+
+    'Michigan, the Michigan Department of Natural Resources, the U.S. Forest '+
+    'Service, the U.S. Geological Survey, or any other government agency.</div>'+
+    '<div class="k">OFFICIAL SOURCES</div>'+
+    '<div class="sub">These agencies are the authority; this app is a '+
+    'convenience. Check the official source, and the signs on the ground, '+
+    'before you ride.</div>'+
+    '<div class="sub">'+SOURCES.map(function(r){
+      return '<b>'+r[0]+'</b><br>'+r[1]+'<br><a href="'+r[2]+
+        '" target="_blank" rel="noopener" style="color:#D98E32">'+r[2]+'</a>'
+      }).join('<br><br>')+'</div>'+
+    '<div class="sub">Links open in your browser and need a connection. '+
+    'The map itself does not.</div>','');
+}
+el('c-sources').addEventListener('click',sourcesCard);
 if(!SPARSE){el('c-hd').style.display='none';var _hm=el('c-hdmanage');if(_hm)_hm.style.display='none'}
 else hdChip();
  

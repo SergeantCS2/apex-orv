@@ -73,7 +73,15 @@ def check_stamps():
 ALLOW = re.compile(r"openstreetmap\.org|maplibre\.org|github\.com/maplibre"
                    r"|basemap\.nationalmap\.gov"
                    # take 150 · A164: live gauge values, user tap only (§8)
-                   r"|waterservices\.usgs\.gov")
+                   r"|waterservices\.usgs\.gov"
+                   # take 167 · A184: attribution links shown in Tools ->
+                   # Data sources. DISPLAYED, never fetched — Play requires an
+                   # app presenting government data to link its official
+                   # source, and §8 exists to stop the app depending on the
+                   # network, not to stop it citing anyone.
+                   r"|michigan\.gov|gis-midnr\.opendata\.arcgis\.com"
+                   r"|data\.fs\.usda\.gov|apps\.nationalmap\.gov"
+                   r"|waterdata\.usgs\.gov")
 
 
 def check_scrub():

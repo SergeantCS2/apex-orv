@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 166.* Ranked by blocking-ness, not by interest.
+*Current as of take 167.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2961,4 +2961,18 @@ are R8, and both are warnings, not blockers.
 - **Revisit when:** the app is in front of testers and a device-verified
   R8 pass can be proven before it ships, or if package size becomes the
   binding constraint (it is imagery, not code).
+
+## A184 — Play rejection: government source links · SHIPPED take 167
+Misleading Claims policy — an app presenting government information must
+link the official source and disclaim affiliation. Listing opens with the
+disclaimer and lists every agency with a verified link; the app carries
+the same under Tools -> Data sources.
+- **Ruled out:** fixing only the store listing. The rejection names the
+  description, but the policy is about the app presenting the data, and
+  the notice says to check every area — a fix that satisfies the reviewer
+  without telling riders whose data it is misses the point of the policy.
+- **Ruled out:** citing www.usgs.gov. It answers 503 to automated
+  requests; Play requires links that are valid and functional, so the
+  citations use the USGS endpoints that verify.
+- **Ruled out:** claiming any endorsement or partnership. There is none.
 

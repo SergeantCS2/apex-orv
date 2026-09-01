@@ -1136,6 +1136,32 @@ if (zoomed.trails === 0) {
          "below the ceiling the collision pass stands down — take 154 owns that zoom");
     }
   }
+  /* Take 167 · A184 · Play rejected build 166 for presenting government data
+     without naming its source or disclaiming affiliation. The store listing
+     is where they found it; this asserts the APP says it too, since the
+     notice says to check every area. */
+  const src = await page.evaluate(async () => {
+    const s = (ms) => new Promise((r) => setTimeout(r, ms));
+    const b = document.getElementById("c-sources");
+    if (!b) return { missing: true };
+    b.click(); await s(400);
+    const t = document.body.innerText;
+    const hrefs = [...document.querySelectorAll("a[href]")].map((a) => a.href);
+    return { shown: /Where the data comes from/i.test(t),
+             disclaims: /not\s+affiliated/i.test(t) && /any other government agency/i.test(t),
+             dnr: hrefs.some((h) => /michigan\.gov\/dnr/.test(h)),
+             usfs: hrefs.some((h) => /fs\.usda\.gov/.test(h)),
+             usgs: hrefs.some((h) => /nationalmap\.gov|waterdata\.usgs\.gov/.test(h)),
+             osm: hrefs.some((h) => /openstreetmap\.org\/copyright/.test(h)) };
+  });
+  if (src.missing) ok(false, "no Data sources control in Tools (A184)");
+  else {
+    ok(src.shown, "Tools -> Data sources opens");
+    ok(src.disclaims,
+       "and states plainly that the app is not affiliated with any government agency");
+    ok(src.dnr && src.usfs && src.usgs && src.osm,
+       `every government source it republishes is linked (DNR ${src.dnr}, USFS ${src.usfs}, USGS ${src.usgs}, OSM ${src.osm})`);
+  }
   if (shl.missing) ok(false, "no #shell to check");
   else {
     ok(shl.ready && shl.opacity === "1",

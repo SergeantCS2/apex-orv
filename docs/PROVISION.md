@@ -188,3 +188,20 @@ glyph range, not a tile, not a licence check.
   pipeline runs before `npm ci` and must not depend on it
 - **Refresh** only if the parser needs updating; it is a pinned copy
 
+### Citation-only hosts (displayed, never fetched)
+
+Play's Misleading Claims policy requires an app that presents government
+information to link the official source. Six hosts therefore appear in the
+store listing and in the app's Tools -> Data sources panel:
+`www.michigan.gov`, `gis-midnr.opendata.arcgis.com`, `data.fs.usda.gov`,
+`apps.nationalmap.gov`, `waterdata.usgs.gov`, `www.openstreetmap.org`.
+
+- **Fetched by** nobody. They are printed as text and links a rider may
+  follow in their own browser; no tool requests them and the app never
+  does. Declared in manifest.py under the `citation` phase (take 167,
+  A184) so the claim is on the record rather than assumed.
+- **Refresh** re-check each link resolves before every store submission —
+  Play requires them to be valid and functional, and note that
+  www.usgs.gov answers 503 to automated requests, which is why the USGS
+  citations use apps.nationalmap.gov and waterdata.usgs.gov.
+

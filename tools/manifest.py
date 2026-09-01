@@ -13,6 +13,68 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 SOURCES = [
+    # take 167 · A184 · CITATION-ONLY hosts. Play's Misleading Claims policy
+    # requires an app presenting government information to link the official
+    # source of it; these six appear in the store listing and in the app's
+    # Tools -> Data sources panel as text and links a rider can follow. No
+    # tool fetches them and the app never requests them — they are printed,
+    # not called. Declared here anyway, because §8's rule is that any host
+    # named in the tooling is accounted for, and "we only display it" is a
+    # claim that should be written down rather than assumed.
+    {
+        "host": "www.michigan.gov",
+        "name": "Michigan DNR (citation)",
+        "what": "official agency page for the trail, closure, state-land and boating-access data",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation (displayed to the rider; never requested)",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
+        "host": "gis-midnr.opendata.arcgis.com",
+        "name": "Michigan DNR open data (citation)",
+        "what": "public portal for the GIS layers the pipeline ingests",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation (displayed to the rider; never requested)",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
+        "host": "data.fs.usda.gov",
+        "name": "USDA Forest Service geodata (citation)",
+        "what": "official source for national forest roads and trails",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation (displayed to the rider; never requested)",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
+        "host": "apps.nationalmap.gov",
+        "name": "USGS The National Map (citation)",
+        "what": "official source for satellite imagery and elevation",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation (displayed to the rider; never requested)",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
+        "host": "waterdata.usgs.gov",
+        "name": "USGS water data (citation)",
+        "what": "official source for the live river gauge readings",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation (displayed to the rider; never requested)",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
+        "host": "www.openstreetmap.org",
+        "name": "OpenStreetMap copyright page (citation)",
+        "what": "licence and attribution for OSM-derived roads, places and context",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation (displayed to the rider; never requested)",
+        "refresh": "re-check the link still resolves before each submission",
+    },
     {
         # take 150 · A164: the one source with TWO phases — the site
         # inventory at build, and LIVE values fetched in-app on a user tap
