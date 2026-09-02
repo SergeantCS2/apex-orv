@@ -205,3 +205,13 @@ store listing and in the app's Tools -> Data sources panel:
   www.usgs.gov answers 503 to automated requests, which is why the USGS
   citations use apps.nationalmap.gov and waterdata.usgs.gov.
 
+### USFS forest boundaries (Camp mode, take 174 · A186)
+
+- **Host** `apps.fs.usda.gov` — Enterprise Data Warehouse, layer
+  `EDW_ForestSystemBoundaries_01/MapServer/0`
+- **Fetched by** `tools/nf.py`, build time, cached as `nf_cache.json`
+- **What** administrative boundaries of Michigan's three national forests
+  (Ottawa, Hiawatha, Huron-Manistee), generalised to ~60 m — 23 KB
+- **Licence** US federal government work, public domain
+- **Refresh** rarely; forest boundaries do not move
+

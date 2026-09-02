@@ -25,6 +25,7 @@ STEPS = [
     # the DNR ramps it was sealed with. Caught at the seal, not in CI.
     ("bas",        ["bas.py"],         "DNR boating access sites (A169)"),
     ("gauges",     ["gauges.py"],      "USGS gauge inventory (live values are the app's, on a tap)"),
+    ("nf",         ["nf.py"],          "national forest boundaries (Camp mode, A186)"),
     ("pack",       ["pack.py"],        "water layer"),
     ("poi",        ["poi.py"],         "places you can ride to"),
     ("graph",      ["graph.py"],       "conflate and node the network"),

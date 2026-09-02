@@ -78,10 +78,12 @@ j('bundle/manifest.json').then(function(man){
     have.photos?j('bundle/'+have.photos):Promise.resolve(null),
     have.publicland?j('bundle/'+have.publicland):Promise.resolve(null),
      
-    have.gauges?j('bundle/'+have.gauges):Promise.resolve(null)]);
+    have.gauges?j('bundle/'+have.gauges):Promise.resolve(null),
+     
+    have.nf?j('bundle/'+have.nf):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
-  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];NF=r[18];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -433,6 +435,7 @@ var poif=((POIS&&POIS.p)||[]).map(function(r,i){
   var k=POIKIND[r.k]||{c:'#4A443B',h:r.k,r:7};
   return {type:'Feature',
     properties:{i:i,k:r.k,h:k.h,c:k.c,r:k.r,d:k.d?1:0,pri:(r.pri==null?3:r.pri),
+      ct:r.ct?JSON.stringify(r.ct):'',
        
       n:r.n||k.h,named:r.n?1:0,mi:r.mi||0},
     geometry:{type:'Point',coordinates:r.p}}});
@@ -1026,6 +1029,8 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     padpin:{type:'geojson',data:{type:'FeatureCollection',features:padpin}},
     areas:{type:'geojson',data:{type:'FeatureCollection',features:areaf}},
     pubs:{type:'geojson',data:{type:'FeatureCollection',features:pubf}},
+     
+    nf:{type:'geojson',data:(NF&&NF.features)?NF:{type:'FeatureCollection',features:[]}},
     pubpt:{type:'geojson',data:{type:'FeatureCollection',features:pubpt}},
     areapt:{type:'geojson',data:{type:'FeatureCollection',features:areapt}},
 
@@ -1069,6 +1074,10 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     {id:'pub-fill',type:'fill',source:'pubs',layout:{visibility:'none'},
       paint:{'fill-color':['match',['get','t'],'game','#5E9E4A','park','#7FB77E','launch','#4F8FB5','#8FBF7A'],
         'fill-opacity':['match',['get','t'],'game',0.30,'launch',0.35,0.20]}},
+    {id:'nf-fill',type:'fill',source:'nf',layout:{visibility:'none'},
+      paint:{'fill-color':'#3F7D4B','fill-opacity':0.16}},
+    {id:'nf-line',type:'line',source:'nf',layout:{visibility:'none'},
+      paint:{'line-color':'#2F6E24','line-width':w(1.0,1.6,2.2),'line-dasharray':[3,2]}},
     {id:'area-fill',type:'fill',source:'areas',
       paint:{'fill-color':'#0FAE57','fill-opacity':0.22}},
      
@@ -1324,6 +1333,10 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     {id:'pub-label',type:'symbol',source:'pubpt',minzoom:8.5,maxzoom:12,
       layout:{visibility:'none','text-field':['get','n'],'text-font':['APEX'],
         'text-size':w(9,10.5,12),'text-max-width':9,'text-allow-overlap':false,'text-padding':4},
+      paint:{'text-color':'#2F6E24','text-halo-color':'#FFFFFF','text-halo-width':1.8}},
+    {id:'nf-label',type:'symbol',source:'nf',minzoom:6.5,maxzoom:11,
+      layout:{visibility:'none','text-field':['concat',['get','n'],' National Forest'],'text-font':['APEX'],
+        'text-size':w(10,12,13),'text-max-width':10,'symbol-placement':'point'},
       paint:{'text-color':'#2F6E24','text-halo-color':'#FFFFFF','text-halo-width':1.8}},
     {id:'area-label',type:'symbol',source:'areapt',minzoom:7,
       layout:{'text-field':['get','lb'],'text-font':['APEX'],
@@ -2383,8 +2396,10 @@ var MODES=[
    demote:['store','food','info'],
    groups:{areas:true,peaks:false,contour:false,relief:false,paddle:false,places:true,county:false,public:false},
    basemap:'Map', zoom:9},
-  {k:'outdoors', h:'Outdoors', s:'Hike, camp, fish — on foot, with trail systems, hills and rivers', act:'foot', machine:'walk',
+   
+  {k:'outdoors', h:'Outdoors', s:'Hike, fish, explore — on foot, with trail systems, hills and rivers', act:'foot', machine:'walk',
    kinds:['trailhead','camp','shelter','water','toilet','view','launch','beach','dayuse','info','system','mtb','ski','lighthouse','livery'],
+   demote:['camp'],
    peaksFrom:9,
     
    groups:{areas:false,peaks:true,contour:true,relief:false,paddle:true,places:true,county:false,public:false},
@@ -2399,13 +2414,22 @@ var MODES=[
    kinds:['livery','launch','beach','camp','dayuse','info','toilet','fuel','lighthouse','marina'],
    boost:['launch','beach','lighthouse'],
    groups:{areas:false,peaks:false,contour:false,relief:false,paddle:true,places:true,county:false,public:false},
-   basemap:'Hybrid', zoom:10}
+   basemap:'Hybrid', zoom:10},
+   
+  {k:'camp',     h:'Camp',     s:'Campgrounds by type, national and state forest, supplies', act:'ride',
+   kinds:['camp','dayuse','shelter','trailhead','launch','beach','water','toilet','fuel','store','food','info'],
+   boost:['camp'], demote:['info','launch','beach','fuel','store','food'],
+   groups:{areas:false,peaks:false,contour:false,relief:false,paddle:false,places:true,county:false,public:true,forest:true},
+   basemap:'Map', zoom:10}
 ];
 var mode='ride', POI_BASE={}, POI_MODEF={}, STACKED={};
 function modeOf(k){return MODES.filter(function(m){return m.k===k})[0]||MODES[0]}
  
 function modeFilter(base,m,id){
   var inK=['in',['get','k'],['literal',m.kinds]];
+   
+  if(m.demote&&m.demote.length)
+    inK=['all',inK,['step',['zoom'],['!',['in',['get','k'],['literal',m.demote]]],13,true]];
   var wrap=function(br){
     var f=['all',inK,(m.boost&&id==='poi-dot-major')
       ?['any',['in',['get','k'],['literal',m.boost]],br]:br];
@@ -2415,10 +2439,6 @@ function modeFilter(base,m,id){
     for(var i=3;i<base.length;i+=2){out.push(base[i]);out.push(wrap(base[i+1]))}
     return out}
   var b=(base===true)?['literal',true]:base;
-  if(m.demote&&id==='poi-dot')
-    return ['step',['zoom'],
-      ['all',inK,b,['!',['in',['get','k'],['literal',m.demote]]]],
-      13,['all',inK,b]];
   return ['all',inK,b]}
 
 function applyMode(k,opts){
@@ -3302,6 +3322,8 @@ var LYRGROUPS=[
    ids:['county-line','county-label']},
   {k:'public', h:'Public land', s:'DNR state forest, game areas, parks — 4.7M acres',
    ids:['pub-fill','pub-line','pub-label']},
+  {k:'forest', h:'National forests', s:'Ottawa, Hiawatha, Huron-Manistee — dispersed camping allowed',
+   ids:['nf-fill','nf-line','nf-label']},
   {k:'paddle', h:'Rivers & paddling', s:'runs, launches, campgrounds and dams',
    ids:['pad-case','pad-line','pad-dot','pad-lbl','pad-dam','pad-damlbl']},
   {k:'relief', h:'Relief',      s:'hillshade', ids:['hillshade']},
@@ -4754,9 +4776,20 @@ map.on('click',function(e){
      
     var wrun=(mode==='water'&&(pr.k==='launch'||pr.k==='livery'||pr.k==='marina'))
       ?nearStop(pp):null;
+     
+    var campLine='';
+    if(pr.k==='camp'){var ct=null;try{ct=pr.ct?JSON.parse(pr.ct):null}catch(e){}
+      var bits=[];
+      if(ct&&ct.op)bits.push({dnr:'State forest campground (DNR)',usfs:'National forest campground (USFS)',
+        county:'County or municipal',private:'Private'}[ct.op]||ct.op);
+      if(ct&&ct.ty)bits.push(ct.ty==='rustic'?'rustic — vault toilets, no hookups':'modern — hookups or services');
+      if(ct&&ct.fee===true)bits.push('fee');if(ct&&ct.fee===false)bits.push('free');
+      if(ct&&ct.disp)bits.push('dispersed');
+      campLine='<div class="sub">'+(bits.length?bits.join(' \u00b7 '):'Type not recorded in the source')+'</div>'}
     show('<b>'+(pr.named?pr.n:pr.h)+'</b>'+
       (pr.named?'<div class="sub">'+pr.h+(pr.mi?' \u00b7 '+pr.mi+' mi of trail':'')+'</div>':
                 '<div class="sub">Unnamed in the source \u2014 shown by what it is</div>')+
+      campLine+
       (pr.named?photoHTML(pr.k,pr.n,pp):'')+
        
       (function(){if(pr.k!=='ski')return '';

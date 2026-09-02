@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 173.* Ranked by blocking-ness, not by interest.
+*Current as of take 174.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -3030,7 +3030,7 @@ of anything else.
 - **Ruled out:** MapLibre's supercluster, again — it cannot honour the
   prominence order or the services rule, and its count is per-source.
 
-## A186 — Camping mode · DESIGN NEXT (Jacob, 2026-09-01)
+## A186 — Camping mode · SHIPPED take 174
 Jacob's reference shots show campgrounds and national forests, "which I'd
 like under camping mode" — a fifth mode. Questions to settle first: what
 it shows (campgrounds by type — state forest, national forest, private,
@@ -3128,4 +3128,13 @@ north-up as a toggle or heading-up only.
   instruction, once when it becomes next and once close in.
 - **Ruled out:** voice on by default. A rider who did not ask for a
   voice should not get one at the first turn.
+
+### Take 174 — shipped (A186)
+- **Ruled out:** guessing a campground's type. 47% carry one from OSM;
+  the rest say "type not recorded" on the card.
+- **Ruled out:** forcing a machine. A campground is reached on whatever
+  you rode in on; Camp keeps the rider's machine, as Off-road does.
+- **Ruled out:** full-resolution forest boundaries. Generalised to ~60 m
+  the three forests are 23 KB and right to the width of a two-track,
+  which is the question a camper asks.
 

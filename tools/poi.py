@@ -147,8 +147,32 @@ def main():
         if key in seen:
             continue
         seen.add(key)
-        out.append({"k": kind, "n": nm or None,
-                    "p": [round(c[0], 5), round(c[1], 5)]})
+        rec = {"k": kind, "n": nm or None,
+               "p": [round(c[0], 5), round(c[1], 5)]}
+        # take 174 · A186 · a campground's TYPE is what a camper decides by,
+        # and OSM carries it: who runs it, whether it is rustic or serviced,
+        # whether it costs. Kept only for camps, compact, and honest — an
+        # unknown stays unknown rather than defaulting to "modern".
+        if kind == "camp":
+            t = e.get("tags", {}) or {}
+            op = (t.get("operator") or "").lower()
+            cs = (t.get("camp_site") or "").lower()
+            fee = (t.get("fee") or "").lower()
+            who = ("dnr" if ("natural resources" in op or "dnr" in op or "state of michigan" in op)
+                   else "usfs" if ("forest service" in op or "usfs" in op or "usda" in op)
+                   else "county" if ("county" in op or "township" in op or "city of" in op)
+                   else "private" if op else None)
+            ty = ("rustic" if (cs == "basic" or t.get("backcountry") == "yes" or
+                               (who in ("dnr", "usfs") and not cs and t.get("power_supply") in (None, "no")))
+                  else "modern" if cs in ("standard", "serviced", "deluxe") or t.get("power_supply") in ("yes", "true")
+                  else None)
+            ct = {}
+            if who: ct["op"] = who
+            if ty: ct["ty"] = ty
+            if fee in ("yes", "no"): ct["fee"] = fee == "yes"
+            if t.get("backcountry") == "yes": ct["disp"] = True
+            if ct: rec["ct"] = ct
+        out.append(rec)
 
     # agency lines count as trails too — a DNR hiking trailhead is real
     if os.path.exists("authoritative.json"):

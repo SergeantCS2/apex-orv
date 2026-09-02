@@ -41,6 +41,7 @@ IN_BUNDLE = {"graph_payload.json": "graph.json",
              # take 150 · A164 — the second explicit map that had to learn a
              # new artifact by hand (bundle.py's manifest was the first).
              "gauges_payload.json": "gauges.json",
+             "nf.json": "nf.json",
              "landcover_payload.json": "landcover.json",
              "areas_payload.json": "areas.json",
              "photos_index.json": "photos.json",
@@ -179,10 +180,12 @@ j('bundle/manifest.json').then(function(man){
     have.photos?j('bundle/'+have.photos):Promise.resolve(null),
     have.publicland?j('bundle/'+have.publicland):Promise.resolve(null),
     /* take 150 · A164: gauge inventory — optional, absent-safe */
-    have.gauges?j('bundle/'+have.gauges):Promise.resolve(null)]);
+    have.gauges?j('bundle/'+have.gauges):Promise.resolve(null),
+    /* take 174 · A186: national forest boundaries — optional, absent-safe */
+    have.nf?j('bundle/'+have.nf):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
-  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];NF=r[18];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -314,8 +317,19 @@ def split():
     # An .apk is a zip anyone can open, so the shipped web assets are public.
     # The repository keeps its annotations; the release does not carry them.
     # APEX_KEEP_COMMENTS=1 leaves them in for local debugging.
+    # take 174 · a syntax error in the assembled app.js must fail the build
+    # BEFORE the scrub, or the scrub raises after app.js has already been
+    # written and a broken artifact is left in www/ for the next tool to trip
+    # over (smoke did). Parse first; write nothing further if it fails.
+    import subprocess
+    chk = subprocess.run(["node", "-e",
+        "import('./tools/vendor/acorn.mjs').then(a=>{a.parse(require('fs').readFileSync(process.argv[1],'utf8'),{ecmaVersion:'latest'});console.log('ok')}).catch(e=>{console.error(e.message);process.exit(1)})",
+        os.path.join(ROOT, "www", "app.js")], cwd=ROOT, capture_output=True, text=True)
+    if chk.returncode != 0:
+        try: os.remove(os.path.join(ROOT, "www", "app.js"))
+        except Exception: pass
+        raise SystemExit(f"app.js does not parse — {chk.stderr.strip()}; www/app.js removed so nothing ships it")
     if not os.environ.get("APEX_KEEP_COMMENTS"):
-        import subprocess
         try:
             subprocess.run(["node", os.path.join(ROOT, "tools", "scrub.mjs"),
                             os.path.join(ROOT, "www", "app.js"),
@@ -367,7 +381,7 @@ def single(out):
             f'LAND = {rd("landcover_payload.json") or "null"};\n'
             f'AREAS = {rd("areas_payload.json") or "null"};\n'
             f'PHOTOS = {rd("photos_index.json") or "null"};\n'
-            f'PUBS = {rd("publicland_payload.json") or "null"};\n'            f'GAUGES = {rd("gauges_payload.json") or "null"};\n'
+            f'PUBS = {rd("publicland_payload.json") or "null"};\n'            f'GAUGES = {rd("gauges_payload.json") or "null"};\n'            f'NF = {rd("nf.json") or "null"};\n'
             f'var SHADE = "{uri("hillshade.jpg")}";\n'
             f'var SAT = "{uri("imagery.jpg")}";\n'
             f'var SATB = {json.dumps(json.loads(meta)["b"]) if meta else "[0,0,0,0]"};\n'

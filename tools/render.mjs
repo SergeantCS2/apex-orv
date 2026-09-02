@@ -639,8 +639,8 @@ if (zoomed.trails === 0) {
     return { open, labels, after, closed, chip };
   });
   if (pick.missing) { ok(false, "mode bridge missing"); } else {
-    ok(pick.open && pick.labels.length === 4 && pick.labels.join() === "Off-road,Outdoors,Hunt,Water",
-       `the mode chip opens a picker with four rows (${pick.labels.join(" · ")})`);
+    ok(pick.open && pick.labels.length === 5 && pick.labels.join() === "Off-road,Outdoors,Hunt,Water,Camp",
+       `the mode chip opens a picker with five rows (${pick.labels.join(" · ")})`);
     ok(pick.after === "water" && pick.closed && pick.chip === "Water",
        "choosing Water selects it directly and closes the picker");
   }
@@ -1406,7 +1406,13 @@ if (zoomed.trails === 0) {
          due NORTH (0) — the map must ignore it and point down the river */
       let bearingsOK = 0, samples = 0, sawCall = false, sawEta = false, milesSeen = [];
       for (let mi = a.mi + 0.1; mi < b.mi - 0.1; mi += 0.2) {
-        const at = atMile(mi); N.fix(at, 12, 1.4, 0); await s(700);
+        const at = atMile(mi); N.fix(at, 12, 1.4, 0);
+        /* the camera EASES over 900 ms; the invariant is about where it
+           settles, not a frame mid-turn. Sampling at 700 ms read 17/19
+           here and 15/19 on the CI runner — timing, not steering. Wait for
+           the ease to finish before comparing. */
+        await s(950);
+        for (let w = 0; w < 20 && m.isMoving(); w++) await s(100);
         const st = N.river(at); samples++;
         const mb = ((m.getBearing() % 360) + 360) % 360, rb = ((st.brg % 360) + 360) % 360;
         const diff = Math.min(Math.abs(mb - rb), 360 - Math.abs(mb - rb));
@@ -1504,6 +1510,89 @@ if (zoomed.trails === 0) {
       ok(hk.saidTurns === hk.distinct * 1 || hk.saidTurns <= hk.distinct * 2,
          `and says each turn at most twice — once when it becomes next, once close in (${hk.saidTurns} spoken, ${hk.distinct} distinct)`);
     }
+  }
+  /* Take 174 · A186 · Camp mode: a fifth mode in the picker; national forest
+     land drawn in Camp and hidden elsewhere; campgrounds carry a type where
+     the source recorded one and say so where it did not. */
+  {
+    const cp = await page.evaluate(async () => {
+      const m = window.map, M = window.__mode,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      if (!M) return { missing: true };
+      const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+      const modes = M.MODES.map((x) => x.k);
+      const vis = (id) => { try { return m.getLayoutProperty(id, "visibility") !== "none"; } catch (e) { return null; } };
+      /* in Off-road the forest layer stays off */
+      M.apply("ride", { silent: true }); await s(300);
+      const nfInRide = vis("nf-fill");
+      /* in Camp it is on, and the forest polygons actually render over the Huron */
+      M.apply("camp", { silent: true }); await s(300);
+      const nfInCamp = vis("nf-fill"), pubInCamp = vis("pub-fill");
+      m.jumpTo({ center: [-84.45, 44.60], zoom: 8.6 }); await s(500);
+      let nfDrawn = 0, nfName = null;
+      for (let i = 0; i < 30; i++) { await s(400);
+        try { const f = m.queryRenderedFeatures({ layers: ["nf-fill"] }); nfDrawn = f.length;
+          if (f.length) { nfName = f[0].properties.n; break; } } catch (e) { } }
+      /* a typed campground, from the bundle, says its type on its card */
+      const P = window.POIS ? window.POIS.p : [];
+      let typed = -1; for (let i = 0; i < P.length; i++) if (P[i].k === "camp" && P[i].ct && P[i].ct.op === "dnr" && P[i].ct.ty) { typed = i; break; }
+      let cardType = "", campKinds = false;
+      if (typed >= 0) {
+        const r = P[typed];
+        m.jumpTo({ center: r.p, zoom: 14.2 }); await s(600);
+        const pt = m.project(r.p), cv = m.getCanvas(), rc = cv.getBoundingClientRect();
+        for (let k = 0; k < 20; k++) { await s(300);
+          try { if (m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major"] }).length) break; } catch (e) { } }
+        for (const type of ["mousedown", "mouseup", "click"])
+          cv.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: rc.left + pt.x, clientY: rc.top + pt.y }));
+        await s(500);
+        cardType = document.body.innerText;
+        campKinds = (M.MODES.find((x) => x.k === "camp").kinds || []).includes("camp");
+      }
+      M.apply(was, { silent: true });
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+      return { modes, nfInRide, nfInCamp, pubInCamp, nfDrawn, nfName, typed, campKinds,
+               typedSays: /State forest campground/.test(cardType) && /rustic|modern/.test(cardType) };
+    });
+    if (cp.missing) ok(false, "mode hook missing");
+    else {
+      ok(cp.modes.includes("camp") && cp.modes.length === 5,
+         `Camp is the fifth mode (${cp.modes.join(" · ")})`);
+      ok(cp.nfInRide === false && cp.nfInCamp === true && cp.pubInCamp === true,
+         "national forest and state land draw in Camp and stay off in Off-road");
+      ok(cp.nfDrawn > 0 && !!cp.nfName,
+         `the Huron-Manistee is on the map in Camp (${cp.nfDrawn} feature(s), ${cp.nfName})`);
+      ok(cp.typed >= 0 && cp.typedSays,
+         "a DNR campground's card says it is a state forest campground and whether it is rustic");
+    }
+    /* Jacob: "do we need to adjust outdoors or any other mode?" Yes — camp
+       sat in every mode at full prominence, and demote only ever reached
+       the minor layer, so a major kind could not be stepped back at all.
+       Now: Outdoors demotes campgrounds (out below z13), Camp leads with
+       them. Same camera, both modes, count the camp pins. */
+    const ov = await page.evaluate(async () => {
+      const m = window.map, M = window.__mode, S = window.__stack,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+      const campsIn = async (mode) => {
+        M.apply(mode, { silent: true }); await s(300);
+        m.jumpTo({ center: [-84.45, 44.62], zoom: 11.0 }); await s(400);
+        S.run(); const src = m.getSource("poistack");
+        for (let w = 0; w < 40; w++) { if (src.loaded() && m.areTilesLoaded()) break; await s(400); }
+        await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]); await s(300);
+        let pins = 0, inStacks = 0;
+        try { pins = m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major"] })
+          .filter((f) => f.properties.k === "camp").length; } catch (e) { }
+        try { m.queryRenderedFeatures({ layers: ["poi-stack-bg"] }).forEach((b) => {
+          if (b.properties.k === "camp") inStacks += +b.properties.n; }); } catch (e) { }
+        return pins + inStacks;
+      };
+      const out = await campsIn("outdoors"), camp = await campsIn("camp");
+      M.apply(was, { silent: true }); m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+      return { out, camp };
+    });
+    ok(ov.out === 0 && ov.camp > 0,
+       `at z11 over the Huron, Outdoors steps campgrounds back (${ov.out}) while Camp leads with them (${ov.camp})`);
   }
   /* Take 167 · A184 · Play rejected build 166 for presenting government data
      without naming its source or disclaiming affiliation. The store listing

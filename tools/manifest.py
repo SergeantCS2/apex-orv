@@ -13,6 +13,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 SOURCES = [
+    {
+        "host": "apps.fs.usda.gov",
+        "name": "USFS Enterprise Data Warehouse — forest boundaries",
+        "what": "administrative boundaries of the three Michigan national forests (Ottawa, Hiawatha, Huron-Manistee)",
+        "licence": "US federal government work — public domain",
+        "tool": "nf.py",
+        "phase": "provision (build-time fetch, cached as nf_cache.json)",
+        "refresh": "rarely; forest boundaries do not move",
+    },
     # take 167 · A184 · CITATION-ONLY hosts. Play's Misleading Claims policy
     # requires an app presenting government information to link the official
     # source of it; these six appear in the store listing and in the app's

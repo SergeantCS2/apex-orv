@@ -1,4 +1,70 @@
-# HANDOFF — through Take 173 · V2
+# HANDOFF — through Take 174 · V2
+
+## Take 174 — 2026-09-02 — Camp mode (A186)
+
+Jacob's reference shots were campgrounds and national forests, "which
+I'd like under camping mode". A fifth mode: Off-road · Outdoors · Hunt
+· Water · Camp.
+
+Two of the three design questions answered by looking rather than
+asking. The campground records carried nothing but a name, so poi.py now
+keeps what OSM records about a camp — operator, camp_site class, fee,
+backcountry — as a compact type: 433 of 915 typed (94 DNR, 52 USFS, 52
+county, 101 private; 239 rustic, 30 modern; 136 fee, 15 free). The card
+says "State forest campground (DNR) · rustic — vault toilets, no
+hookups · fee", and for the other 482 says "Type not recorded in the
+source" rather than guessing. And national forest boundaries were not
+ingested: tools/nf.py fetches Michigan's three (Ottawa, Hiawatha,
+Huron-Manistee) from the USFS Enterprise Data Warehouse, generalised to
+about 60 m — 23 KB — declared in manifest.py and PROVISION.md, wired
+through the three explicit maps of take 150 (bundle, IN_BUNDLE, the
+split loader).
+
+Camp shows campgrounds, boosted, with the two lands where dispersed
+camping is allowed — state forest (the public group) and national forest
+(a new forest group with fill, dashed outline and label) — and what a
+camper needs on the way in: supplies, fuel, water, launches,
+trailheads. No machine forced: you reach a campground on whatever you
+rode in on, so Camp keeps the rider's machine like Off-road does.
+
+The third question — what it PLANS — is left as Off-road's answer (a
+route by machine); on-foot planning from a campground is Outdoors'.
+
+Jacob: "do we need to adjust outdoors or any other mode? Other modes
+likely have a lot of overlap." They did — camp sat in all five modes at
+full prominence, and Outdoors' tagline promised "Hike, camp, fish". A
+campground IS relevant to every activity (riders camp at St. Helen,
+paddlers along the Au Sable), so they stay everywhere; the change is
+that only Camp LEADS with them. Outdoors now reads "Hike, fish,
+explore" and demotes campgrounds; Camp demotes the way-in kinds
+(launch, beach, fuel, store, food) so its statewide view is campgrounds
+and forest. And Camp is last in the picker: Off-road · Outdoors · Hunt
+· Water · Camp.
+
+Found while doing it, a real defect: demote only ever reached the MINOR
+pin layer, so demoting a major kind — camp, launch, beach — did nothing.
+Outdoors could not have stepped campgrounds back at all. Demote is now
+folded into the kind gate for both layers: out below z13, in from z13,
+whichever layer draws it. Asserted at one camera in both modes: Outdoors
+0 campgrounds at z11 over the Huron, Camp leading with them.
+
+Two mistakes of mine on the way, and a guard so they stay fixed: moving
+Camp to the end of the mode array left a missing comma, and the build's
+scrub step caught the syntax error only AFTER app.js had been written —
+smoke tripped over a broken file. build_app now parses app.js before
+scrubbing and removes it if it fails; that guard refused my own first
+fix attempt, which is the point of a guard.
+
+SEAL: render 247/0 (242 + five Camp checks), smoke 6 modes, gate
+PASSED. apex-seed-t174.zip sealed (sha256 in chat). Jacob: "all testing
+will come from this new zip" — it carries the whole navigation arc
+(170–173) and Camp. CI, on take 173, refused the river drill: "15 of 19 fixes within 15°"
+against an 80% bar that had read 17 of 19 here. Timing, not steering:
+the camera eases over 900 ms and the drill sampled at 700 ms — a frame
+mid-turn — and the CI runner is slower. The invariant is about where the
+camera SETTLES; the drill now waits for the ease to finish and for
+isMoving() to clear before comparing. Fixed here before 174 sealed,
+because 174 carries the same drill.
 
 ## Take 173 — 2026-09-02 — navigation N4 + N5: on foot, and spoken
 
