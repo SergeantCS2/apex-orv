@@ -1,4 +1,306 @@
-# HANDOFF — through Take 167 · V2
+# HANDOFF — through Take 173 · V2
+
+## Take 173 — 2026-09-02 — navigation N4 + N5: on foot, and spoken
+
+Carries take 172 (the river), which the gate refused twice for a drill
+timing artefact, now fixed.
+
+N4 · HIKE. Nothing to build: the guidance engine of take 171 runs on any
+planned route in any mode, and the ETA floor is the machine's own pace —
+walking, on foot. What was missing was PROOF: a route planned in
+Outdoors, walked at 1.2 m/s, must still show an ETA computed at walking
+pace, not at the crawl of the fixes. Asserted.
+
+N5 · VOICE, feature-detected and never assumed. Jacob's Fold has
+Samsung's on-device English (US) pack (24758); the Android WebView has
+been patchier than Chrome about exposing the Web Speech API on top of
+it, so the toggle on the strip appears only when a voice is actually
+present, and the self-test gains a VOICE line that says exactly what
+this phone has — voice count, the voice chosen, and whether it is marked
+on-device. It speaks the INSTRUCTION, not the strip: once when a turn
+becomes the next one, once more inside 300 ft, "Dam in 1.2 miles.
+Portage." once per dam, and arrival once. Off by default; the toggle
+remembers. Proven with a stand-in engine so the check is about what the
+app says, not what headless Chrome can pronounce.
+
+With this the A187 arc is complete as designed: follow and resume (170),
+turn-by-turn (171), the river, on foot, and spoken (173). What remains
+is the field: the FEEL of the camera, and the VOICE line of the
+self-test on the Fold.
+
+THE HARNESS OUTGREW ONE PAGE, and that is what refused this take three
+times. Measured, not guessed: 3,616 MB used, 158 MB free mid-render on
+the 4 GB box, and the render dying at the same place each time — check
+234, right before the machine-legality probe (three statewide repaints
+across 573k edges) — twice standalone and once inside the gate with a
+puppeteer stack the gate had truncated to 120 characters. render.mjs
+now respawns the browser before that probe: same launch, same
+listeners, the app reloaded and waited for, nothing about what is
+measured changed. Memory after the respawn: 3.4 GB free. And the gate
+now keeps 700 characters of a render failure, because a stack you
+cannot read is not evidence.
+
+Landmine 212: a render that dies at the same check on every run, with
+the whole process gone rather than an error, is memory before it is
+anything else. free -m mid-run is the instrument; a respawn is the
+fix; a bigger swap is not (the page thrashes into a protocol timeout).
+
+SEAL: render 242/0 (238 + hike and voice checks), smoke 5 modes, gate
+PASSED. apex-seed-t173.zip sealed (sha256 in chat). The A187 arc ships.
+
+## Take 172 — 2026-09-02 — navigation N3: the river
+
+A run — put-in, take-out, river — becomes the thing being navigated. The
+run card gains "Navigate this run": it sets the active run, switches to
+Water, and starts recording.
+
+The river's reaches are chained into one downstream-ordered line with
+cumulative metres. Verified before building on it, against the
+pipeline's own mile marks: 0.03 mi on the main reach, 0.1 mi past the
+impoundments, where the centreline runs mid-lake and an access on the
+shore sits a quarter mile off it (correct, and why arrival at the
+take-out uses the take-out's own point as well as the mile). Every fix
+projects onto the line — window-searched around the last progress, with
+a whole-line search when the window comes up empty — giving a river
+mile, how far off the line, and the line's DOWNSTREAM tangent there.
+
+The tangent steers the camera instead of the GPS course. A kayak drifts,
+spins and back-paddles; the river does not. The map points downriver.
+
+The strip counts down: miles to the take-out, a time from paddleHours()
+for the rider's craft, the current river mile — and what is coming: a
+dam first if one is within three miles ("Dam in 1.2 mi — portage"),
+otherwise the next access or camp within five. Off the mapped river by
+more than 250 m is said; so is heading upstream. Reaching the take-out
+buzzes, announces it, stops following, keeps recording. The trip carries
+the run, so a killed app resumes it.
+
+Proven on the real Au Sable corridor: fixes every 0.2 mi between two
+named accesses with the GPS course deliberately reported as due north,
+asserting the river mile advances, the map bearing matches the river's
+tangent (not north) on at least 80% of fixes, the countdown and a call
+appear, and the take-out is announced.
+
+Result on the first clean run: Rayburns to Keystone Landing, river mile
+20.6 -> 24.2 over a 3.9 mi run, the map pointing downriver on 17 of 19
+fixes with the GPS reporting due north throughout, the countdown and the
+call showing, the take-out announced.
+
+NOT sealed on its own. Render 238/0 standalone, but the gate's inner
+render — starved harder than a standalone run — twice read stack badges
+before the map had painted them (the mode probe, then the floor probe:
+data present, frame not). Both probes now wait for the map's idle event
+before reading the screen. Take 172 ships inside take 173.
+
+## Take 171 — 2026-09-01 — navigation N2: guidance, ETA, arrival, re-route
+
+Google Maps for offroad, on the route the rider already planned.
+
+The model is built once per route from directions(): the whole line as
+one polyline with cumulative metres, each step's start as a metre mark
+along it. Every fix projects onto that line — nearest segment, searched
+in a window around the last known progress so a two-track that doubles
+back does not snap to the wrong pass — giving progress, distance to the
+next turn, distance remaining, and how far off the line the rider is.
+
+The strip gains a guidance line: the turn arrow, "In 400 ft · Turn left
+onto Trail 7", then remaining distance and an ETA. The ETA is the rider's
+OWN rolling speed over the last minute of movement, floored at the
+machine's walking pace so it never reads zero while stopped — a
+two-track at 12 mph and a hill climb at 4 are not the same route.
+
+Arrival: within the fix's own accuracy radius of the destination, or
+past the last 25 m of the line — never a fixed distance against a bad
+fix. It buzzes, says "You have arrived", stops following, and keeps
+recording (arrival is not the end of the ride; Stop is). Off route: more
+than 40 m from the line for three consecutive fixes re-routes from where
+the rider IS, keeps their profile, debounced to once per 20 s so a noisy
+trail edge cannot re-route forever.
+
+Proven with synthetic fixes walked every 40 m along a REAL planned route
+near Mio: the banner names the next turn, the distance to it shrinks,
+an ETA shows, three fixes 125 m off the line are called, and the end
+announces arrival.
+
+Found on the way, a REAL product bug from take 169: the stack-tap
+intercept sits above the line where the click handler records what a
+card is about (RAIL_AT), so tapping a stack opened the tray but never
+registered its location — and panning away never folded it. Surfaced by
+the fold check landing on a stacked pin. One line in stackCard.
+
+Two drill corrections, both mine: "the distance shrinks" compared the
+distance to the FIRST turn against the distance to the NEXT one after it
+was passed (1584 -> 5280, both correct); it now compares like with like
+(Wagner Lake: 1584 -> 100 ft). And the off-route fix was placed 95 m
+east of a route that doubles back on itself, landing near another pass;
+the drill now asks the app's own projection for a direction that is
+genuinely clear (125 m).
+
+SEAL: render 233/0 (227 + six guidance checks), smoke 5 modes, gate
+PASSED. apex-seed-t171.zip sealed (sha256 in chat). N3 next.
+
+## Take 170 — 2026-09-01 — navigation N1: the trip survives, the map follows
+
+The first take of A187, and Jacob added the foundation before it was
+built: "the app will need memory to resume a trip if the phone turns off
+or app hard closes while on a trip". So persistence went first and the
+follow camera sits on it.
+
+Decisions taken in the absence of answers to the four design questions,
+all reversible, all stated: following starts automatically when a real
+ride starts (Ride it), route or no route; text strip first, voice later;
+arrival does not stop recording (N2's problem); north-up is a toggle on
+the strip, heading-up by default.
+
+TRIP PERSISTENCE. JavaScript stops when the screen locks or Android
+reaps the app, so the trip is written to localStorage as it happens —
+throttled to every 5 s, forced on the first fix — carrying the breadcrumb
+so far, the destination and profile, the run, mode, machine and the ride
+clock. Quota failure keeps every other crumb and retries. On the next
+launch, once the map is up and before the first-run guide, "Resume your
+trip?" names when it started, the miles recorded and where it was going;
+Resume restores the crumb line, re-routes from where the rider IS now
+to the saved destination (the router is deterministic), re-selects the
+profile, and restarts recording on the same clock. Anything older than a
+day is treated as abandoned. Ending a ride marks the trip ended so a
+finished ride is never offered back.
+
+FOLLOW CAMERA. onFix has received speed and heading on every fix since
+take 21 and discarded them; now they steer. Bearing is the GPS course
+when faster than a walk (below that it is noise), else the line between
+the last two fixes, else it holds. Pitch 55, zoom eases out with speed.
+A rider's own drag, rotate or pinch pauses following — programmatic
+moves carry no originalEvent and never do — and the strip's Re-centre or
+Locate resumes it. The old sixth-fix nudge yields while following, or it
+would fight the camera. Screen wake lock through the standard API (no
+plugin), re-acquired on return to the foreground.
+
+Proven with SYNTHETIC fixes along a 45-degree course: bearing lands
+within 6 degrees of the course at pitch 55; a drag pauses; Re-centre
+resumes; north-up flattens the map on the next fix; a trip saved with
+five fixes comes back whole after the ride is stopped and the state
+wiped; ending it clears the offer.
+
+AUDIT (Jacob: "audit all your changes and ensure we got this right"),
+done by reading the take cold, and it found three real defects that the
+harness had not:
+1. Resume would have wiped itself. startRecording() resets crumbs and
+   crumbMi, so the first GPS fix after Resume destroyed what Resume had
+   just restored. A RESUMING flag makes that first fix continue the line
+   and the clock; the drill now crosses that boundary (7 -> 8).
+2. A zoom jolt at every ride start: navFollow eased to pitch 55/z16.4 and
+   the first-fix branch immediately eased to z14.5. That ease yields
+   while following.
+3. fixN incremented twice on every non-sixth fix (++ in the condition
+   and ++ in the else). One increment; the forced first save keys off it.
+All three would have shown on the first real ride and none in the
+original checks — the argument for auditing before sealing.
+
+Harness lessons, both mine: driving the REAL fix path marks the position
+as a live GPS fix, after which the app rightly refuses a tapped position
+— the dispatch-refuses-fake rule — so the downstream route probe planned
+from 50 km away and drew nothing; the drill restores posMode. And a
+render died at the 8-minute protocol timeout inside a bounded probe —
+starvation, not a spin; it did not recur on a clean run.
+
+SEAL: render 227/0, smoke 5 modes, gate PASSED. apex-seed-t170.zip sealed
+(sha256 in chat). N2 next.
+
+## Take 169 — 2026-09-01 — the pin clusters, rebuilt (A174)
+
+The 2026-09-01 audit found the defect behind every pile Jacob kept
+photographing: takes 154 and 160 merged pins by GRID CELL, and a grid cell
+is not a proximity test. Proved with the code's arithmetic — 4 px apart
+across a cell edge: separate; 74 px apart in one cell: stacked; 2 px apart
+at high zoom, in different rounding bins: separate. No radius tunes that
+away. Jacob's verdict was "feels bad and cheap", and he was right.
+
+Both systems are gone. One clusterer now runs at every zoom:
+- Distance-based greedy: pool the mode's places from the RECORD, project,
+  cull to the viewport, sort most prominent first; each pin joins the
+  nearest stack within stackRadius(zoom) or starts one. The grid that
+  remains is an accelerator for the nearest-stack search — neighbouring
+  cells only — and never the merge criterion. That one sentence is the
+  difference.
+- stackRadius: 48 px at statewide, 40 at z10, 32 at z12, 24 (a pin's
+  width) from z14 — one curve, no seam at z11.4.
+- Members hidden by feature index; the badge — a solid circle carrying
+  the count, kind-coloured when one kind, charcoal when mixed — sits on
+  the most prominent member's real position, never a centroid.
+- Mixed stacks ALLOWED, per Jacob today: "combining beaches is fine as
+  long as I can click the pin conglomerates and scroll through all pins".
+  Services still stay out below z11.4.
+- Tap does both things he asked: the tray lists every member grouped by
+  kind, each row opening that place's card, AND the map moves in — fitting
+  the members if they will separate, a modest step if they are truly on
+  top of each other.
+- Deleted on the way: the poiclust source, poi-cluster and poi-clust-one
+  layers, the double-draw guard in modeFilter, and the second styling of
+  singleton pins. The main pin layers are the sole renderers again.
+
+The check that matters is the INVARIANT the old code violated: after a
+pass, no two visible things — badge or lone pin — sit within the radius
+of each other. Asserted at the statewide floor, at the old seam, and over
+a dense town.
+
+Filed for Jacob (A186): a Camping mode. His reference shots are
+campgrounds and national forests, and he wants them "under camping
+mode". Design after this take.
+
+What the rebuild took to get right, all of it measured:
+- Badges computed but never rendered at the floor. First suspect: the
+  hide filter — thousands of ids through a linear-scan `in`. Switched to
+  a hashed `match` (kept: it is the right form). Still stuck. Isolation
+  probes: a single hand-fed feature would not load at the floor either,
+  so neither filter nor volume was the cause. Timeline probe: the harness
+  has ONE worker and no GPU, and at the floor 44 layers tile the whole
+  state through it — one badge feature waited 15.9 s for its turn. A
+  phone has four workers and a GPU. The drills now wait for the source to
+  load, up to a ceiling, instead of a fixed 450 ms; and the app no longer
+  re-submits an unchanged badge set on every moveend.
+- A tray drill that returned early WITHOUT restoring mode and camera
+  broke three unrelated checks downstream. Restore before every return.
+- Jacob: "ensure we're not losing the fact that different modes have
+  different default pins." Asserted: at one camera, a stack never
+  contains a kind its mode does not show (0 strays across Water, Off-road,
+  Hunt) and the three modes stack different totals (722 / 598 / 566).
+- A REAL app bug the harness found by trace: tapping a stack moved
+  nothing when the drawer was already open. fitBounds silently refuses
+  when padding exceeds the canvas, and the padding was half the WINDOW.
+  Padding is sized against the canvas now, the camera is computed first
+  so a refusal is visible, and a refusal falls back to a plain step in.
+
+SEAL: render 218/0 (216 + the mode-respect pair), smoke 5 modes, gate
+PASSED — after one honest refusal: MapStub had no cameraForBounds(), the
+same stub gap as take 157's clearTimeout, fixed in the harness. A second
+inner-render failure on an unrelated drill did not recur once Chrome
+profile debris was cleared (landmine 210). apex-seed-t169.zip sealed
+(sha256 in chat). A187, the navigation arc, is designed and waiting on
+four answers from Jacob.
+
+## Take 168 — 2026-08-30 — store copy must survive being re-flowed
+
+Jacob pasted take 167's description into the console and the preview
+collapsed it into one wall of text: the bullets lost their structure and
+the paragraphs ran together.
+
+My fault, and an easy mistake to make from inside a code editor: I
+hard-wrapped the description at 80 characters, the way source is written.
+Store copy is re-flowed by whatever reads it — the console field, the web
+listing, a phone three inches wide — so a hard-wrapped line leaves its
+continuation stranded and the "- " bullet prefixes stop reading as
+bullets.
+
+Now every paragraph and every bullet is ONE line, blank lines do the
+separating, and bullets use "•" rather than a hyphen that can be mistaken
+for a wrap artefact. Asserted in the generator: no line may begin with a
+space, because a continuation indent is exactly the thing that broke.
+2,750 characters of 4,000. Content unchanged — the disclaimer still opens
+it and every source link is still there.
+
+The general lesson, worth more than the fix: text that only reads
+correctly at one width is a formatting bug waiting to ship, and the
+preview is the only place it shows up.
 
 ## Take 167 — 2026-08-30 — sources named, affiliation disclaimed (A184)
 

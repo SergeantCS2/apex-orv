@@ -174,63 +174,58 @@ def listing(t):
     # information with a working link, and must say plainly that it is not the
     # government. Both are below, and the disclaimer is the first thing in the
     # description rather than a footnote — "easy-to-see" was the requirement.
-    full = """APEX ORV is an independent app. It is not affiliated with,
-endorsed by, or acting on behalf of the State of Michigan, the Michigan
-Department of Natural Resources, the U.S. Forest Service, the U.S. Geological
-Survey, or any other government agency.
-
-Michigan trails, off the grid.
-
-APEX ORV is a free, fully offline trail app for Michigan riders. Every trail,
-road, contour and satellite tile ships inside the app — once it is installed,
-it needs no signal, no subscription and no account. That is the whole idea: the
-places worth riding are the places without bars.
-
-WHAT IS IN IT
-- Michigan's ORV trail system: routes, connectors and forest roads, drawn from
-  state DNR and U.S. Forest Service data alongside OpenStreetMap.
-- Four modes that each plan something. Off-road plans by machine on the trail
-  network. Outdoors and Hunt plan on foot. Water plans river runs by boat.
-- Turn-by-turn routing and Return Home, computed on the phone.
-- Terrain and elevation, with a live elevation readout.
-- Satellite imagery for the whole state, offline, with optional high-detail
-  imagery you can save for a specific area when you have wifi.
-- Trailheads, campgrounds, launches, liveries, fuel and food as searchable
-  pins, with photos where they exist.
-- Ride recording, waypoints, and a self-test that tells you the app is
-  actually working before you are three miles in.
-- Live river conditions from USGS gauges when you have signal and tap for them.
-
-WHAT IT DOES NOT DO
-No account. No ads. No tracking. No analytics. Nothing you do is sent
-anywhere. It does not need a data connection to do its job, and it will not
-quietly use one.
-
-HONEST LIMITS
-Trail legality comes from agency data and can lag a closure — signs on the
-ground always win. County and township boat ramps are missing where no public
-dataset lists them. High-detail imagery beyond the built-in level needs wifi
-to save first.
-
-WHERE THE DATA COMES FROM
-This app republishes public data from the agencies below. They are the
-authority; the app is a convenience. Always check the official source, and
-the signs on the ground, before you ride.
-- Michigan DNR — trail designations, closures, state land, boating access:
-  https://www.michigan.gov/dnr
-  Open data portal: https://gis-midnr.opendata.arcgis.com
-- U.S. Forest Service — national forest roads and trails:
-  https://data.fs.usda.gov/geodata/
-- U.S. Geological Survey — satellite imagery and elevation:
-  https://apps.nationalmap.gov/downloader/
-  River gauge readings: https://waterdata.usgs.gov
-- OpenStreetMap contributors — roads, places and context, under ODbL:
-  https://www.openstreetmap.org/copyright
-
-The same list, with the same links, is inside the app under Tools -> Data
-sources.
-
-Michigan only, on purpose."""
+    #
+    # NOT hard-wrapped, deliberately (take 168). Store copy is re-flowed by
+    # whatever is reading it — the console field, the web listing, a phone
+    # three inches wide — so every paragraph and every bullet is ONE line and
+    # blank lines do the separating. Wrapping this at 80 characters like
+    # source code is what collapsed it into a wall of text in Jacob's preview:
+    # the continuation lines had nowhere sensible to go.
+    L = [
+     "APEX ORV is an independent app. It is not affiliated with, endorsed by, or acting on behalf of the State of Michigan, the Michigan Department of Natural Resources, the U.S. Forest Service, the U.S. Geological Survey, or any other government agency.",
+     "",
+     "Michigan trails, off the grid.",
+     "",
+     "APEX ORV is a free, fully offline trail app for Michigan riders. Every trail, road, contour and satellite tile ships inside the app — once it is installed, it needs no signal, no subscription and no account. That is the whole idea: the places worth riding are the places without bars.",
+     "",
+     "WHAT IS IN IT",
+     "",
+     "• Michigan's ORV trail system: routes, connectors and forest roads, drawn from state DNR and U.S. Forest Service data alongside OpenStreetMap.",
+     "• Four modes that each plan something. Off-road plans by machine on the trail network. Outdoors and Hunt plan on foot. Water plans river runs by boat.",
+     "• Turn-by-turn routing and Return Home, computed on the phone.",
+     "• Terrain and elevation, with a live elevation readout.",
+     "• Satellite imagery for the whole state, offline, with optional high-detail imagery you can save for a specific area when you have wifi.",
+     "• Trailheads, campgrounds, launches, liveries, fuel and food as searchable pins, with photos where they exist.",
+     "• Ride recording, waypoints, and a self-test that tells you the app is actually working before you are three miles in.",
+     "• Live river conditions from USGS gauges when you have signal and tap for them.",
+     "",
+     "WHAT IT DOES NOT DO",
+     "",
+     "No account. No ads. No tracking. No analytics. Nothing you do is sent anywhere. It does not need a data connection to do its job, and it will not quietly use one.",
+     "",
+     "HONEST LIMITS",
+     "",
+     "Trail legality comes from agency data and can lag a closure — signs on the ground always win. County and township boat ramps are missing where no public dataset lists them. High-detail imagery beyond the built-in level needs wifi to save first.",
+     "",
+     "WHERE THE DATA COMES FROM",
+     "",
+     "This app republishes public data from the agencies below. They are the authority; the app is a convenience. Always check the official source, and the signs on the ground, before you ride.",
+     "",
+     "• Michigan DNR — trail designations, closures, state land, boating access: https://www.michigan.gov/dnr",
+     "• Michigan DNR open data portal: https://gis-midnr.opendata.arcgis.com",
+     "• U.S. Forest Service — national forest roads and trails: https://data.fs.usda.gov/geodata/",
+     "• U.S. Geological Survey — satellite imagery and elevation: https://apps.nationalmap.gov/downloader/",
+     "• USGS river gauge readings: https://waterdata.usgs.gov",
+     "• OpenStreetMap contributors — roads, places and context, under ODbL: https://www.openstreetmap.org/copyright",
+     "",
+     "The same list, with the same links, is inside the app under Tools > Data sources.",
+     "",
+     "Michigan only, on purpose.",
+    ]
+    full = "\n".join(L)
+    # A store description must survive being re-flowed. Anything that only
+    # reads correctly at one width is a formatting bug waiting to ship.
+    assert not any(len(x) and x[0] == " " for x in L), "no continuation indents"
     assert len(APP_NAME) <= 30 and len(short) <= 80 and len(full) <= 4000
     return f"""# Play store listing — {APP_NAME} (build {t})
 

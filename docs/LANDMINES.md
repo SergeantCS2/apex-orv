@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 167.*
+*Current as of take 173.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -2691,3 +2691,16 @@ when one is found — any patch that changes what it writes must change what it
 checks for. Companion found the same hour: bundletool's derived universal APK
 is signed by bundletool's own key, so a signer read from it says nothing about
 the bundle; read the signer from the artifact Play actually receives.
+
+**212. A render that dies at the SAME check every run, with the whole
+process gone rather than an error, is memory before it is anything
+else.** Take 173: three deaths at check 234, right before the
+machine-legality probe (three statewide repaints across 573k edges).
+`free -m` mid-run read 3,616 MB used, 158 MB free on the 4 GB box. Two
+standalone deaths looked like turn-boundary kills (landmine 207) and
+were not; the third, inside the gate, was a puppeteer stack the gate had
+truncated to 120 characters. The fix is structural — render.mjs
+respawns the browser before the heavy tail, on a clean page — not a
+bigger swap, which only turns the crash into a protocol timeout. And the
+gate now keeps 700 characters of a failure: a stack you cannot read is
+not evidence.

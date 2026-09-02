@@ -1,22 +1,23 @@
-**Take 167 — data sources named, affiliation disclaimed.**
+**Take 173 — navigate a river, on foot, and out loud.**
 
-Google rejected the previous build under its Misleading Claims policy: an
-app that presents government information has to link the official source
-of that information and state plainly that it isn't the government. Fair
-enough — and the app should have said this anyway.
+The navigation set is complete. On top of follow mode, trip resume and
+turn-by-turn from the last builds:
 
-- **New: Tools → Data sources.** Every agency whose data is in the app,
-  what it provides, and a link to the official site: Michigan DNR, the
-  U.S. Forest Service, USGS, and OpenStreetMap.
-- **A clear disclaimer**, both there and at the top of the store listing:
-  APEX ORV is an independent app, not affiliated with or endorsed by any
-  government agency. Those agencies are the authority; this app is a
-  convenience.
+- **Navigate a river.** Plan a run, tap Navigate this run: the map faces
+  downstream (not where the phone thinks you're heading — a kayak drifts),
+  the strip counts down to the take-out for your craft, and it calls
+  what's coming: "Dam in 1.2 mi — portage" first if there's one within
+  three miles, otherwise the next access or camp. It says so if you're
+  off the mapped river or heading upstream, and announces the take-out.
+- **On foot.** Outdoors and Hunt routes are guided the same way, with the
+  time computed at walking pace.
+- **Voice.** A 🔊 button on the strip — shown only if your phone has a
+  voice — speaks each turn once when it becomes next and once close in,
+  the dam warning, and arrival. Off by default; it remembers.
 
-No change to the map, routing or anything you use on the trail.
-
-### Before resubmitting
-1. Update the store listing description from tools/play_assets.py output —
-   the disclaimer and source links must be in the listing, not only in
-   the app.
-2. Tools → Data sources: check every link opens.
+### Check on the phone
+1. Tools → Self-test: read the new **VOICE** line. It says exactly what
+   this phone has and whether it works offline. Tell me what it says.
+2. Plan a run, Navigate this run: map faces downriver, strip counts down.
+3. Plan a hike in Outdoors, Ride it: turn-by-turn with a walking ETA.
+4. Turn on 🔊 and take a turn.

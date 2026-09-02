@@ -64,7 +64,7 @@ await new Promise((r) => server.listen(0, r));
 const port = server.address().port;
 console.log(`render: serving ${WWW} on :${port}`);
 
-const browser = await puppeteer.launch({
+const LAUNCH = {
   headless: "new",
   /* take 134: a 75 MB graph makes single evaluate() calls in headless slow
      enough to trip the 180 s default protocol timeout (the summit block did) */
@@ -72,8 +72,9 @@ const browser = await puppeteer.launch({
   args: ["--no-sandbox", "--disable-setuid-sandbox",
          "--use-gl=swiftshader", "--enable-unsafe-swiftshader",
          "--disable-dev-shm-usage"],
-});
-const page = await browser.newPage();
+};
+let browser = await puppeteer.launch(LAUNCH);
+let page = await browser.newPage();
 // Measure the screen the app RUNS on, not a desktop window. The harness used to
 // run at 900x1400 — three times the area — so every label-density figure it
 // reported was optimistic (landmine 87).
@@ -113,6 +114,45 @@ await page.evaluateOnNewDocument(() => {
 });
 
 await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle0", timeout: 60000 });
+
+/* Take 173 · the run outgrew one page. On a 4 GB box with one worker and no
+   GPU, two hundred checks of accumulated state plus the machine-legality
+   probe — three statewide repaints across 573k edges — pushed the page past
+   what memory allows (measured: 3,616 MB used, 158 MB free mid-run), and the
+   render died there three times, twice standalone and once inside the gate.
+   respawn() closes the browser, launches a fresh one with the same setup,
+   reloads the app and waits for it, so the heavy tail runs on a clean page.
+   Listeners re-attach to the same arrays; nothing about what is measured
+   changes, only what the browser has to carry. */
+async function respawn() {
+  try { await browser.close(); } catch (e) { }
+  browser = await puppeteer.launch(LAUNCH);
+  page = await browser.newPage();
+  await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2.6 });
+  page.on("response", (r) => { if (r.status() >= 400) badRequests.push(r.status() + " " + r.url()); });
+  page.on("requestfailed", (r) => badRequests.push("FAILED " + r.url() + " " + (r.failure()||{}).errorText));
+  page.on("console", (m) => consoleErrors.push(m.type().toUpperCase() + ": " + m.text()));
+  page.on("pageerror", (e) => pageErrors.push(String(e.message)));
+  await page.evaluateOnNewDocument(() => {
+    window.__mapErrors = []; window.__evts = [];
+    const iv = setInterval(() => {
+      if (!window.map || !window.map.on) return;
+      clearInterval(iv);
+      for (const ev of ["load", "idle", "style.load", "sourcedata", "render"])
+        window.map.on(ev, () => { if (window.__evts.filter((x) => x === ev).length < 2) window.__evts.push(ev); });
+      window.map.on("error", (e) => window.__mapErrors.push((e && e.error && e.error.message) || String(e)));
+    }, 10);
+  });
+  await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle0", timeout: 60000 });
+  await page.evaluate(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    for (let i = 0; i < 240; i++) {
+      if (window.map && window.__mode && window.__nav && window.map.loaded && window.map.loaded()) break;
+      await sleep(500); }
+    await sleep(1500);
+  });
+  console.log("  (fresh browser for the heavy tail)");
+}
 
 /* the app does not expose `map`, so reach it the way the page does */
 const ready = await page.evaluate(async () => {
@@ -851,11 +891,12 @@ if (zoomed.trails === 0) {
      the bundle with live values behind a seam. Every target comes from the
      bundle's own data (landmine 197). */
   {
-    let liv = [];
-    try { liv = JSON.parse(readFileSync("www/bundle/poi.json", "utf8")).p
-      .filter((r) => r.k === "livery"); } catch (e) { }
+    let liv = [], livIdx = -1;
+    try { const all = JSON.parse(readFileSync("www/bundle/poi.json", "utf8")).p;
+      livIdx = all.findIndex((r) => r.k === "livery");
+      liv = all.filter((r) => r.k === "livery"); } catch (e) { }
     ok(liv.length > 0, `the bundle carries canoe/kayak liveries (${liv.length}; e.g. ${liv[0] ? liv[0].n : "-"})`);
-    const wb = await page.evaluate(async (liv0) => {
+    const wb = await page.evaluate(async (liv0, livIdx) => {
       const m = window.map, M = window.__mode, P = window.__paddle,
             G = window.__gauge, GS = window.__gauges,
             s = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -882,10 +923,18 @@ if (zoomed.trails === 0) {
       }
       let livDrawn = -1;
       if (liv0) {
+        /* take 169: a livery sharing a dock with a marina is now a STACK, and
+           its pin is hidden on purpose. It counts as drawn if its own pin
+           renders OR a stack badge on screen lists its index. */
         m.jumpTo({ center: liv0.p, zoom: 12.5 });
-        for (let i = 0; i < 16; i++) { await s(300);
-          try { livDrawn = m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major"] })
-            .filter((f) => f.properties.k === "livery").length; } catch (e) { }
+        for (let i = 0; i < 50; i++) { await s(400);
+          try {
+            const pins = m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major"] })
+              .filter((f) => f.properties.k === "livery").length;
+            const inStack = m.queryRenderedFeatures({ layers: ["poi-stack-bg"] })
+              .filter((b) => String(b.properties.ids || "").split(",").indexOf(String(livIdx)) >= 0).length;
+            livDrawn = pins + inStack;
+          } catch (e) { }
           if (livDrawn > 0) break; }
       }
       const canned = { value: { timeSeries: [
@@ -899,7 +948,7 @@ if (zoomed.trails === 0) {
       return { craft0, craft1, hK, hAfter, riv: c && c.n, run, livDrawn,
                bridge: bridge && bridge.riv, gcount: GS ? GS.g.length : 0,
                gnear: gnear && gnear.g.id, fmt };
-    }, liv[0] || null);
+    }, liv[0] || null, livIdx);
     if (wb.missing) ok(false, "water-batch hooks missing");
     else {
       ok(wb.craft0 === "kayak" && wb.craft1 === "canoe",
@@ -912,7 +961,7 @@ if (zoomed.trails === 0) {
       ok(/canoe at/.test(wb.run || ""),
          "the run card names the craft and its calibrated pace");
       ok(wb.bridge === wb.riv, "a launch point projects to its river's run flow (the pin bridge)");
-      ok(wb.livDrawn > 0, `a livery pin draws in Water (${wb.livDrawn} at ${liv[0] ? liv[0].n : "-"})`);
+      ok(wb.livDrawn > 0, `a livery is on the map in Water — as its own pin or inside a stack (${wb.livDrawn} at ${liv[0] ? liv[0].n : "-"})`);
       ok(wb.gcount > 100 && !!wb.gnear,
          `the bundle carries the USGS gauge inventory (${wb.gcount} sites; nearest to the run: ${wb.gnear})`);
       ok(wb.fmt.rows.length === 2 && /1,240 cfs/.test(wb.fmt.rows[0]) && /50\u00b0F|50°F/.test(wb.fmt.rows[1]),
@@ -936,82 +985,6 @@ if (zoomed.trails === 0) {
          `the Rifle carries the DNR accesses OSM never had (${rr.named.length} named: ${rr.named.slice(0, 4).join(", ")}…)`);
       ok(rr.riv === "Rifle River" && rr.rank >= 0 && rr.rank <= 4,
          `"rifle river" finds the RIVER, ranked with the best hits (row ${rr.rank + 1})`);
-    }
-    /* Take 154 · A170 pin clusters. The check that matters is the TRAP: a
-       badge must count only what the current mode shows of the clusterable
-       kinds — never the services Jacob excluded, never a hidden kind. */
-    const cl = await page.evaluate(async () => {
-      const m = window.map, M = window.__mode, C = window.__clust,
-            s = (ms) => new Promise((r) => setTimeout(r, ms));
-      if (!C || !M) return { missing: true };
-      const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
-      const MODES = M.MODES || [];
-      const modeOf = (k) => MODES.find((x) => x.k === k);
-      M.apply("water", { silent: true }); await s(300);
-      const water = C.count();
-      const waterKinds = new Set(C.feats(modeOf("water")).map((f) => f.properties.k));
-      M.apply("ride", { silent: true }); await s(300);
-      const ride = C.count();
-      // draw a real cluster: sit over the launch-dense southeast at low zoom
-      M.apply("water", { silent: true }); await s(300);
-      m.jumpTo({ center: [-83.5, 42.6], zoom: 8.4 });
-      let clusters = 0, biggest = 0, kinds = new Set(), sample = null;
-      C.recluster();
-      for (let i = 0; i < 22; i++) { await s(320);
-        try {
-          const f = m.queryRenderedFeatures({ layers: ["poi-cluster"] });
-          clusters = f.length;
-          f.forEach((x) => { kinds.add(x.properties.k);
-            if (+x.properties.n > biggest) {
-              biggest = +x.properties.n; sample = x.properties.k; } });
-        } catch (e) { }
-        if (clusters) break; }
-      // take 155 · Jacob asked plainly: "when fully zoomed out I should see
-      // the pin clusters, will I?" The map's own floor is minZoom 5.2, and
-      // the z8.4 pass above does not answer for it. This does.
-      m.jumpTo({ center: [-85.5, 44.8], zoom: 5.2 });
-      C.recluster();
-      let wide = 0, wideBig = 0, wideKinds = new Set();
-      for (let i = 0; i < 18; i++) { await s(320);
-        try { const f = m.queryRenderedFeatures({ layers: ["poi-cluster"] });
-          wide = f.length;
-          f.forEach((x) => { wideKinds.add(x.properties.k);
-            if (+x.properties.n > wideBig) wideBig = +x.properties.n; });
-        } catch (e) { }
-        if (wide) break; }
-      // above the ceiling, clusters are gone and the plain pins are back
-      m.jumpTo({ center: [-83.5, 42.6], zoom: 12.6 }); 
-      let above = -1, pins = 0;
-      for (let i = 0; i < 16; i++) { await s(320);
-        try {
-          above = m.queryRenderedFeatures({ layers: ["poi-cluster"] }).length;
-          pins = m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major", "poi-clust-one"] }).length;
-        } catch (e) { }
-        if (pins) break; }
-      M.apply(was, { silent: true });
-      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
-      return { water, ride, waterKinds: [...waterKinds], clusters,
-               badgeKinds: [...kinds], biggest, sample, above, pins,
-               wide, wideBig, wideKinds: [...wideKinds],
-               maxz: C.maxz, kinds: C.kinds, radius: C.radius,
-               minz: m.getMinZoom() };
-    });
-    if (cl.missing) ok(false, "cluster hooks missing");
-    else {
-      ok(cl.kinds.length > 0 && !cl.kinds.some((k) => ["fuel", "food", "store"].includes(k)),
-         `services never cluster (${cl.kinds.length} clusterable kinds, no fuel/food/store)`);
-      ok(cl.water !== cl.ride && cl.water > 0 && cl.ride > 0,
-         `the clustered source follows the mode — the count cannot include hidden pins (Water ${cl.water}, Off-road ${cl.ride})`);
-      ok(!cl.waterKinds.some((k) => ["fuel", "food", "store"].includes(k)),
-         `Water's clustered kinds are destinations only (${cl.waterKinds.join(", ")})`);
-      ok(cl.clusters > 0 && cl.biggest > 1,
-         `piles draw as clusters at z8.4 (${cl.clusters} badges, biggest ×${cl.biggest} ${cl.sample})`);
-      ok(cl.badgeKinds.length > 0 && cl.badgeKinds.every((k) => cl.kinds.includes(k)),
-         `every stack is ONE kind and wears its badge — Jacob's "similar pins" rule (${cl.badgeKinds.join(", ")})`);
-      ok(cl.wide > 0 && cl.wideBig > 1,
-         `fully zoomed out (z${cl.minz}, the map's floor) the stacks still draw — ${cl.wide} badges, biggest ×${cl.wideBig}, kinds: ${cl.wideKinds.join(", ")}`);
-      ok(cl.above === 0 && cl.pins > 0,
-         `above z${cl.maxz} the clusters are gone and the pins are back (${cl.pins} drawn)`);
     }
   }
 
@@ -1088,52 +1061,448 @@ if (zoomed.trails === 0) {
              btnTokens: [...sh.querySelectorAll("button")]
                .filter((b) => b.innerHTML.indexOf("__IC_") >= 0).length };
   });
-  /* Take 160 · A176 · overlapping pins at HIGH zoom — the case take 154's
-     ceiling never covered, and the one Jacob photographed at 1000 ft. */
+  /* Take 169 · A174 · the clusterer, every zoom, one algorithm. The invariant
+     that takes 154/160 violated and this must not: after a pass, no two
+     visible things — badge or lone pin — sit within stackRadius of each
+     other. Checked at the statewide floor, at the old seam, and zoomed in
+     over a dense town. Every target comes from the bundle (landmine 197). */
   {
-    const st = await page.evaluate(async () => {
+    const cz = await page.evaluate(async () => {
       const m = window.map, S = window.__stack, M = window.__mode,
             s = (ms) => new Promise((r) => setTimeout(r, ms));
       if (!S) return { missing: true };
       const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
-      // a dense town at a zoom where pins genuinely collide
-      M.apply("ride", { silent: true }); await s(200);
-      m.jumpTo({ center: [-83.35, 42.66], zoom: 13.4 });
-      let stacks = 0, biggest = 0, hidden = 0, ids = null, badge = null;
-      for (let i = 0; i < 22; i++) { await s(320);
-        S.run();
-        try {
-          const f = m.queryRenderedFeatures({ layers: ["poi-stack"] });
-          stacks = f.length;
-          f.forEach((x) => { if (+x.properties.n > biggest) {
-            biggest = +x.properties.n; ids = x.properties.ids; badge = x.properties.k; } });
-        } catch (e) { }
-        hidden = S.hidden();
-        if (stacks) break; }
-      // and the members really are suppressed from the pin layers
-      let drawnIds = new Set();
-      try { m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major"] })
-        .forEach((f) => drawnIds.add(String(f.properties.i))); } catch (e) { }
-      const members = (ids || "").split(",").filter(Boolean);
-      const stillDrawn = members.filter((x) => drawnIds.has(x)).length;
-      // below the ceiling the pass must stand down entirely
-      m.jumpTo({ center: [-83.35, 42.66], zoom: 10.4 }); await s(500);
-      S.run(); await s(400);
-      let low = -1;
-      try { low = m.queryRenderedFeatures({ layers: ["poi-stack"] }).length; } catch (e) { }
+      M.apply("water", { silent: true }); await s(250);
+      const probe = async (center, zoom) => {
+        m.jumpTo({ center, zoom }); await s(350); S.run();
+        /* the harness has ONE worker and no GPU; at the floor the badge
+           source can wait 15+ s behind the whole state being tiled. Wait
+           for it, up to a ceiling, rather than measure a queue. */
+        const src = m.getSource("poistack");
+        for (let w = 0; w < 70; w++) { if (src.loaded() && m.areTilesLoaded()) break; await s(400); }
+        /* loaded() is the worker; idle is the SCREEN. Under gate starvation
+           the floor read 0 badges with 6,410 pins folded — the data was
+           there and the frame was not. */
+        await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]);
+        await s(300);
+        const R = S.radius(zoom);
+        let badges = [], pins = [];
+        try { badges = m.queryRenderedFeatures({ layers: ["poi-stack-bg"] }); } catch (e) { }
+        try { pins = m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major"] }); } catch (e) { }
+        // dedupe pins by place index (a symbol can be reported per tile)
+        const seen = new Set(); pins = pins.filter((f) => { const k = String(f.properties.i);
+          if (seen.has(k)) return false; seen.add(k); return true; });
+        const pts = badges.map((b) => ({ p: m.project(b.geometry.coordinates), n: +b.properties.n, k: "badge" }))
+          .concat(pins.map((f) => ({ p: m.project(f.geometry.coordinates), n: 1, k: f.properties.k })));
+        let worst = Infinity, pairs = 0;
+        for (let a = 0; a < pts.length; a++) for (let b = a + 1; b < pts.length; b++) {
+          const d = Math.hypot(pts[a].p.x - pts[b].p.x, pts[a].p.y - pts[b].p.y);
+          if (d < worst) worst = d; if (d < R) pairs++; }
+        const biggest = badges.reduce((mx, b) => Math.max(mx, +b.properties.n), 0);
+        const mixed = badges.filter((b) => b.properties.mixed === true || b.properties.mixed === "true").length;
+        const services = badges.filter((b) => (S.services || []).includes(b.properties.k)).length;
+        return { R, badges: badges.length, pins: pins.length, worst: isFinite(worst) ? +worst.toFixed(1) : null,
+                 pairs, biggest, mixed, hidden: S.hidden(), services };
+      };
+      const floor = await probe([-85.5, 44.8], m.getMinZoom());
+      const seam = await probe([-83.5, 42.6], 11.2);
+      M.apply("ride", { silent: true }); await s(300);   /* the mode with the most pins */
+      const town = await probe([-83.35, 42.66], 13.4);
       M.apply(was, { silent: true });
       m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
-      return { stacks, biggest, hidden, members: members.length, stillDrawn, low, badge };
+      return { floor, seam, town, minz: m.getMinZoom() };
     });
-    if (st.missing) ok(false, "the stack hook is missing");
+    if (cz.missing) ok(false, "stack hook missing");
     else {
-      ok(st.stacks > 0 && st.biggest > 1,
-         `overlapping pins stack at z13.4 — the case z11.4 clustering never covered (${st.stacks} badges, biggest ×${st.biggest})`);
-      ok(st.members === st.biggest && st.stillDrawn === 1,
-         `a stack of ${st.members} leaves exactly ONE pin drawn, not ${st.stillDrawn}`);
-      ok(st.hidden > 0, `and the rest are hidden by index (${st.hidden} suppressed)`);
-      ok(st.low === 0,
-         "below the ceiling the collision pass stands down — take 154 owns that zoom");
+      const f = cz.floor, e = cz.seam, t = cz.town;
+      ok(f.badges > 0 && f.biggest > 1,
+         `fully zoomed out (z${cz.minz}) the state stacks — ${f.badges} badges, biggest ${f.biggest}, ${f.hidden} pins folded in`);
+      ok(f.pairs === 0,
+         `and NOTHING overlaps there: closest two visible things are ${f.worst} px apart, radius ${f.R} (${f.pairs} violations)`);
+      ok(f.services === 0, "services never stack at statewide zoom (Jacob's rule)");
+      ok(e.pairs === 0,
+         `at the old z11.4 seam there is no seam: ${e.badges} badges, ${e.pins} lone pins, closest ${e.worst} px, ${e.pairs} violations`);
+      ok(t.pairs === 0 && (t.badges + t.pins) >= 4,
+         `zoomed in over a dense town (Off-road): ${t.badges} stacks, ${t.pins} lone pins, closest ${t.worst} px vs radius ${t.R} (${t.pairs} violations)`);
+      ok(f.mixed >= 0 && (f.badges === 0 || f.badges >= f.mixed),
+         `mixed stacks are allowed and marked (${f.mixed} of ${f.badges} at the floor)`);
+    }
+    /* Jacob, 2026-09-01: "ensure we're not losing the fact that different
+       modes have different default pins". A stack must only ever contain
+       the kinds its mode shows, and the same camera must stack DIFFERENT
+       things in different modes. Asserted, not assumed. */
+    const md = await page.evaluate(async () => {
+      const m = window.map, S = window.__stack, M = window.__mode,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+      const kindsOf = (k) => (M.MODES.find((x) => x.k === k) || {}).kinds || [];
+      const stacksIn = async (mode) => {
+        M.apply(mode, { silent: true }); await s(250);
+        m.jumpTo({ center: [-83.5, 42.6], zoom: 9.0 }); await s(300); S.run();
+        const src = m.getSource("poistack");
+        /* loaded() says the worker has the data; it does not say the screen
+           shows it. Under gate starvation the first query after loaded()
+           returned the PREVIOUS mode's badges (Off-road 722 = Water 722,
+           322 "strays"). Wait for the map to go idle — the final frame with
+           every tile drawn — before reading what it shows. */
+        for (let w = 0; w < 70; w++) { if (src.loaded() && m.areTilesLoaded()) break; await s(400); }
+        await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]);
+        await s(300);
+        let b = []; for (let w = 0; w < 30; w++) {
+          try { b = m.queryRenderedFeatures({ layers: ["poi-stack-bg"] }); } catch (e) { }
+          if (b.length) break; await s(400); }
+        const P = window.POIS ? window.POIS.p : null;
+        const allowed = new Set(kindsOf(mode));
+        let stray = 0, members = 0;
+        b.forEach((f) => String(f.properties.ids || "").split(",").filter(Boolean).forEach((id) => {
+          members++; const r = P ? P[+id] : null; if (r && !allowed.has(r.k)) stray++; }));
+        return { badges: b.length, members, stray, total: b.reduce((a, f) => a + +f.properties.n, 0) };
+      };
+      const water = await stacksIn("water"), ride = await stacksIn("ride"), hunt = await stacksIn("hunt");
+      M.apply(was, { silent: true });
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+      return { water, ride, hunt, poisExposed: !!window.POIS };
+    });
+    ok(md.poisExposed ? (md.water.stray === 0 && md.ride.stray === 0 && md.hunt.stray === 0) : true,
+       `a stack never contains a kind its mode does not show (strays: Water ${md.water.stray}, Off-road ${md.ride.stray}, Hunt ${md.hunt.stray})`);
+    ok(md.water.total !== md.ride.total && md.ride.total !== md.hunt.total,
+       `the same camera stacks different things per mode (Water ${md.water.total}, Off-road ${md.ride.total}, Hunt ${md.hunt.total} places)`);
+    /* the tray: the whole pile, listed, and the map moves in */
+    const tr = await page.evaluate(async () => {
+      const m = window.map, S = window.__stack, M = window.__mode,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+      M.apply("ride", { silent: true }); await s(200);
+      m.jumpTo({ center: [-83.5, 42.6], zoom: 9.0 }); await s(350); S.run();
+      const src = m.getSource("poistack");
+      for (let w = 0; w < 70; w++) { if (src.loaded() && m.areTilesLoaded()) break; await s(400); }
+      await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]);
+      let b = [];
+      for (let w = 0; w < 30; w++) { await s(400);
+        try { b = m.queryRenderedFeatures({ layers: ["poi-stack-bg"] }); } catch (e) { }
+        if (b.length) break; }
+      b.sort((x, y) => +y.properties.n - +x.properties.n);
+      if (!b.length) {
+        /* restore BEFORE returning — an early return that left the map in
+           Water at z9 is what broke three unrelated checks downstream */
+        M.apply(was, { silent: true });
+        m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+        return { none: true }; }
+      const n = +b[0].properties.n, z0 = m.getZoom();
+      /* fitBounds animates over 700 ms via requestAnimationFrame; a starved
+         headless page can defer frames, so poll for the camera to actually
+         arrive rather than assume a timer. The trace rides in the message. */
+      let fitCalled = null; const of = m.fitBounds.bind(m);
+      m.fitBounds = function (a, o) { fitCalled = JSON.stringify(o && o.maxZoom); return of(a, o); };
+      S.card(b[0]);
+      const zs = []; let z1 = z0;
+      for (let i = 0; i < 25; i++) { await s(200); z1 = m.getZoom(); zs.push(+z1.toFixed(2));
+        if (z1 > z0 + 0.5 && !m.isMoving()) break; }
+      m.fitBounds = of;
+      const txt = document.body.innerText;
+      const rows = document.querySelectorAll("[data-si]").length;
+      M.apply(was, { silent: true });
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+      return { n, rows, z0: +z0.toFixed(2), z1: +z1.toFixed(2), fitCalled, trace: zs.slice(0, 8).join(">"),
+               titled: new RegExp(n + " places here").test(txt) };
+    });
+    if (tr.none) ok(false, "no stack to tap at z9 over the southeast");
+    else {
+      ok(tr.titled && tr.rows === tr.n,
+         `tapping a stack of ${tr.n} lists all ${tr.rows} in a scrollable tray`);
+      ok(tr.z1 > tr.z0,
+         `and the map moves in toward them (z${tr.z0} -> z${tr.z1}; fitBounds maxZoom ${tr.fitCalled}; trace ${tr.trace})`);
+    }
+  }
+  /* Take 170 · A187 N1 · the follow camera and trip persistence, driven by
+     SYNTHETIC fixes along a bearing so nothing here needs a satellite. */
+  {
+    const nv = await page.evaluate(async () => {
+      const m = window.map, N = window.__nav, R = window.__ride,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      if (!N || !R) return { missing: true };
+      const cam = { c: m.getCenter(), z: m.getZoom(), b: m.getBearing(), p: m.getPitch() };
+      /* driving the REAL fix path marks the position as a live GPS fix, and
+         the app then rightly refuses to let a tap fake a position — which
+         the route probe downstream relies on. Restore it on the way out. */
+      const pm0 = N.pos();
+      const st = [-84.62, 44.56];   // near Mio, on the network
+      N.start();
+      /* drive the REAL fix path — onFix sets the position, records the
+         crumb, persists, and steers the camera — six fixes heading
+         north-east at ~8 m/s with GPS course 45 */
+      let at = st.slice();
+      N.fix(at, 9, 8, 45); await s(300);
+      for (let i = 0; i < 5; i++) {
+        at = [at[0] + 0.00025, at[1] + 0.00018];
+        N.fix(at, 9, 8, 45); await s(1000);
+      }
+      const b1 = m.getBearing(), p1 = m.getPitch(), z1 = m.getZoom();
+      const chip = document.getElementById("nav");
+      /* measured NOW, not at return time after the strip has been stopped */
+      const chipShown = !!chip && !chip.hidden;
+      const chipText = document.getElementById("nav-sp").textContent;
+      // a rider's own drag pauses following
+      m.fire("dragstart", { originalEvent: {} }); await s(100);
+      const pausedAfterDrag = N.state.follow === false;
+      const recenterShown = !document.getElementById("nav-center").hidden;
+      // the strip's Re-centre resumes it
+      document.getElementById("nav-center").click(); await s(600);
+      const resumed = N.state.follow === true;
+      // north-up: bearing goes to 0, pitch flat, on the next fix
+      document.getElementById("nav-north").click(); await s(600);
+      at = [at[0] + 0.0003, at[1] + 0.0002];
+      N.fix(at, 9, 8, 45); await s(1000);
+      const b2 = m.getBearing(), p2 = m.getPitch();
+      document.getElementById("nav-north").click(); await s(300);
+      // persistence: save, wipe the live state, restore, compare
+      N.save(true);
+      const saved = JSON.parse(localStorage.getItem("apex.trip.v1") || "null");
+      const savedCrumbs = saved ? saved.crumbs.length : -1;
+      /* the app dies: live state gone, storage kept */
+      N.reset();
+      const wiped = N.crumbs();
+      const loaded = N.load();
+      const restored = loaded ? N.resume(loaded) : false;
+      await s(500);
+      let crumbNow = -1;
+      try { crumbNow = m.getSource("crumb").serialize().data.features[0].geometry.coordinates.length; } catch (e) { }
+      /* and the FIRST fix after Resume must continue the line, not restart it —
+         the audit found startRecording resetting crumbs to one point here */
+      N.start();
+      at = [at[0] + 0.0003, at[1] + 0.0002]; N.fix(at, 9, 8, 45); await s(300);
+      at = [at[0] + 0.0003, at[1] + 0.0002]; N.fix(at, 9, 8, 45); await s(300);
+      const afterResumeFix = N.crumbs();
+      N.stopReal();              /* ends the ride: navStop + tripEnd, like Stop does */
+      const gone = N.load() === null;
+      N.rail(false);             /* leave the screen as we found it */
+      N.pos(pm0);
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z, bearing: cam.b, pitch: cam.p });
+      return { wiped, afterResumeFix, b1: +b1.toFixed(1), p1: +p1.toFixed(0), z1: +z1.toFixed(1), chipShown,
+               chipText, pausedAfterDrag, recenterShown, resumed, b2: +b2.toFixed(1), p2: +p2.toFixed(0),
+               savedCrumbs, restored, crumbNow, gone };
+    });
+    if (nv.missing) ok(false, "nav / ride hooks missing");
+    else {
+      ok(Math.abs(nv.b1 - 45) < 6 && nv.p1 >= 50,
+         `the camera follows the ride: bearing ${nv.b1} (course 45), pitch ${nv.p1}, zoom ${nv.z1}`);
+      ok(nv.chipShown && /mph/.test(nv.chipText),
+         `the strip reads speed and heading ("${nv.chipText}")`);
+      ok(nv.pausedAfterDrag && nv.recenterShown,
+         "a rider's own drag pauses following and offers Re-centre");
+      ok(nv.resumed, "Re-centre resumes following");
+      ok(Math.abs(nv.b2) < 1 && nv.p2 === 0,
+         `north-up flattens and squares the map on the next fix (bearing ${nv.b2}, pitch ${nv.p2})`);
+      ok(nv.savedCrumbs >= 5,
+         `the trip is written as it happens (${nv.savedCrumbs} fixes in localStorage)`);
+      ok(nv.wiped === 0 && nv.restored && nv.crumbNow === nv.savedCrumbs,
+         `and comes back whole after the app is gone — ${nv.crumbNow} of ${nv.savedCrumbs} fixes restored (live state was ${nv.wiped})`);
+      ok(nv.afterResumeFix > nv.savedCrumbs,
+         `the first fixes after Resume CONTINUE the line (${nv.savedCrumbs} -> ${nv.afterResumeFix}), not restart it`);
+      ok(nv.gone, "ending a trip clears the offer, so a finished ride is never offered again");
+    }
+  }
+  /* Take 171 · A187 N2 · guidance, driven along a REAL planned route with
+     synthetic fixes: the banner names the next turn with a shrinking
+     distance, an ETA is shown, a fix 100 m off the line is counted as off
+     route, and reaching the end announces arrival. */
+  {
+    const gd = await page.evaluate(async () => {
+      const m = window.map, N = window.__nav, M = window.__mode,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      if (!N || !N.plan) return { missing: true };
+      const pm0 = N.pos(), cam = { c: m.getCenter(), z: m.getZoom(), b: m.getBearing(), p: m.getPitch() };
+      N.reset();
+      /* plan a real route the way the app does: a start and a destination on
+         the network near Mio, via the long-press card */
+      m.fire("contextmenu", { lngLat: { lng: -84.12855, lat: 44.53949 } }); await s(200);
+      const s1 = document.getElementById("pc-start"); if (s1) s1.click(); await s(200);
+      m.fire("contextmenu", { lngLat: { lng: -84.10724, lat: 44.55265 } }); await s(200);
+      const r1 = document.getElementById("pc-route"); if (r1) r1.click();
+      let G = null;
+      for (let i = 0; i < 60; i++) { await s(250); G = N.plan(); if (G) break; }
+      if (!G) return { noRoute: true };
+      /* walk the route: fixes every ~40 m along the polyline */
+      N.start();
+      const banners = [], etas = [];
+      let firstDist = null, lastDist = null, firstTurn = null, offCount = 0, arrived = false;
+      const total = G.total, pts = G.pts, cum = G.cum;
+      const at = (metres) => { let i = 0; while (i < cum.length - 2 && cum[i + 1] < metres) i++;
+        const t = (metres - cum[i]) / Math.max(1, cum[i + 1] - cum[i]);
+        return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; };
+      N.fix(at(0), 9, 6, 45); await s(250);
+      for (let d = 40; d < Math.min(total, 1600); d += 40) {
+        N.fix(at(d), 9, 6, 45); await s(120);
+        const g = document.getElementById("nav-g");
+        const t = g && !g.hidden ? g.innerText : "";
+        const mIn = /In ([\d.,]+) (ft|mi) · (.+)$/m.exec(t);
+        if (mIn) { const v = parseFloat(mIn[1].replace(",", "")) * (mIn[2] === "mi" ? 5280 : 1);
+          /* the distance to ONE turn must shrink; once it is passed the
+             banner names the next one, further away — compare like with like */
+          if (firstTurn === null) { firstTurn = mIn[3]; firstDist = v; }
+          if (mIn[3] === firstTurn) lastDist = v; }
+        if (/~\d+ min/.test(t)) etas.push(t);
+        banners.push(t.split("\n")[0]);
+      }
+      /* a fix well off the line, three times — in whichever direction the
+         app's own projection says is clear of every nearby segment (a route
+         that doubles back can sit 95 m east of itself) */
+      const p0 = at(Math.min(total, 1600) - 80);
+      let offPt = null, offM = 0;
+      for (const [dx, dy] of [[0.0015, 0], [0, 0.0012], [-0.0015, 0], [0, -0.0012], [0.0025, 0]]) {
+        const c = [p0[0] + dx, p0[1] + dy]; const pr = N.project(c);
+        if (pr.off > 60) { offPt = c; offM = Math.round(pr.off); break; } }
+      for (let k = 0; k < 3; k++) { N.fix(offPt || [p0[0] + 0.0025, p0[1]], 9, 6, 45); await s(120); }
+      const gOff = document.getElementById("nav-g").innerText;
+      /* then to the end */
+      for (let d = Math.max(0, total - 200); d <= total; d += 40) { N.fix(at(d), 9, 6, 45); await s(120); }
+      N.fix(pts[pts.length - 1], 9, 2, 45); await s(300);
+      arrived = /arrived/i.test(document.getElementById("nav-g").innerText) || /You have arrived/.test(document.body.innerText);
+      N.stopReal(); N.rail(false); N.pos(pm0);
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z, bearing: cam.b, pitch: cam.p });
+      return { total: Math.round(total), steps: G.steps.length, banner: banners.find((b) => /onto/.test(b)) || banners[0],
+               firstDist, lastDist, firstTurn, eta: etas.length > 0, offM, offText: /off the line|Re-routing/.test(gOff), arrived };
+    });
+    if (gd.missing) ok(false, "guidance hooks missing");
+    else if (gd.noRoute) ok(false, "no route could be planned for the guidance drill");
+    else {
+      ok(gd.steps > 0 && gd.total > 200,
+         `a planned route becomes a guidance model (${gd.steps} steps over ${gd.total} m)`);
+      ok(/In [\d.,]+ (ft|mi)/.test(gd.banner || "") && /onto/.test(gd.banner || ""),
+         `the banner names the next turn with its distance ("${gd.banner}")`);
+      ok(gd.firstDist !== null && gd.lastDist !== null && gd.lastDist < gd.firstDist,
+         `and the distance to that same turn shrinks as the rider closes on it (${gd.firstTurn}: ${gd.firstDist} -> ${gd.lastDist} ft)`);
+      ok(gd.eta, "an ETA is shown from the rider's own pace");
+      ok(gd.offText, `three fixes ${gd.offM} m off the line are called off route or trigger a re-route`);
+      ok(gd.arrived, "reaching the end announces You have arrived");
+    }
+  }
+  /* Take 172 · A187 N3 · river navigation, on a REAL corridor from the bundle:
+     the camera points DOWNSTREAM regardless of the GPS course, the strip
+     counts down to the take-out for the craft and calls what is coming, and
+     reaching the take-out announces it. */
+  {
+    const rv = await page.evaluate(async () => {
+      const m = window.map, N = window.__nav, M = window.__mode, P = window.__paddle,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      if (!N || !N.runSet || !P) return { missing: true };
+      const pm0 = N.pos(), was = M.get(), cam = { c: m.getCenter(), z: m.getZoom(), b: m.getBearing(), p: m.getPitch() };
+      N.reset(); M.apply("water", { silent: true }); await s(250);
+      const c = (P.data.c || []).find((x) => x.n === "Au Sable River");
+      if (!c) return { noRiver: true };
+      const named = c.f.filter((f) => f.n && (f.k === "access" || f.k === "launch"));
+      /* a run of a few miles with something downstream to call */
+      let a = null, b = null;
+      for (let i = 0; i < named.length && !b; i++) for (let j = i + 1; j < named.length; j++) {
+        const d = named[j].mi - named[i].mi; if (d >= 3 && d <= 8) { a = named[i]; b = named[j]; break; } }
+      if (!a) return { noRun: true };
+      N.runSet("Au Sable River", a, b);
+      const L = N.riverLine("Au Sable River");
+      const atMile = (mi) => { const mm = mi * 1609.34; let i = 0; while (i < L.cum.length - 2 && L.cum[i + 1] < mm) i++;
+        const t = (mm - L.cum[i]) / Math.max(1, L.cum[i + 1] - L.cum[i]);
+        return [L.pts[i][0] + (L.pts[i + 1][0] - L.pts[i][0]) * t, L.pts[i][1] + (L.pts[i + 1][1] - L.pts[i][1]) * t]; };
+      N.start();
+      /* paddle downstream with the GPS course deliberately reported as
+         due NORTH (0) — the map must ignore it and point down the river */
+      let bearingsOK = 0, samples = 0, sawCall = false, sawEta = false, milesSeen = [];
+      for (let mi = a.mi + 0.1; mi < b.mi - 0.1; mi += 0.2) {
+        const at = atMile(mi); N.fix(at, 12, 1.4, 0); await s(700);
+        const st = N.river(at); samples++;
+        const mb = ((m.getBearing() % 360) + 360) % 360, rb = ((st.brg % 360) + 360) % 360;
+        const diff = Math.min(Math.abs(mb - rb), 360 - Math.abs(mb - rb));
+        if (diff < 15) bearingsOK++;
+        const t = document.getElementById("nav-g").innerText;
+        if (/Dam in|Access in|Camp in/.test(t)) sawCall = true;
+        if (/mi to .* · ~/.test(t)) sawEta = true;
+        milesSeen.push(+st.rm.toFixed(2));
+      }
+      N.fix(atMile(b.mi), 12, 1.0, 0); await s(500);
+      N.fix(b.p, 12, 0.5, 0); await s(500);
+      const arrived = /reached the take-out/i.test(document.getElementById("nav-g").innerText);
+      N.stopReal(); N.rail(false); N.pos(pm0);
+      M.apply(was, { silent: true });
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z, bearing: cam.b, pitch: cam.p });
+      const mono = milesSeen.every((v, i) => i === 0 || v >= milesSeen[i - 1] - 0.05);
+      return { a: a.n, b: b.n, len: +(b.mi - a.mi).toFixed(1), samples, bearingsOK, sawCall, sawEta, arrived, mono,
+               first: milesSeen[0], last: milesSeen[milesSeen.length - 1] };
+    });
+    if (rv.missing) ok(false, "river navigation hooks missing");
+    else if (rv.noRiver || rv.noRun) ok(false, "no Au Sable run of 3-8 mi between named accesses in the bundle");
+    else {
+      ok(rv.mono && rv.last > rv.first,
+         `the rider's river mile advances downstream (${rv.first} -> ${rv.last} on a ${rv.len} mi run, ${rv.a} to ${rv.b})`);
+      ok(rv.bearingsOK >= rv.samples * 0.8,
+         `the map points DOWNRIVER, not at the GPS course of due north (${rv.bearingsOK} of ${rv.samples} fixes within 15°)`);
+      ok(rv.sawEta, "the strip counts down to the take-out with a time for the craft");
+      ok(rv.sawCall, "and calls what is coming downstream (a dam, access or camp)");
+      ok(rv.arrived, "reaching the take-out announces it");
+    }
+  }
+  /* Take 173 · A187 N4 + N5 · a hike is guidance on foot: the same engine,
+     with the ETA floored at walking pace. And voice: the instruction is
+     spoken ONCE when a turn becomes the next one, with a stand-in engine
+     so the check is about what the app says, not what headless Chrome can
+     pronounce. */
+  {
+    const hk = await page.evaluate(async () => {
+      const m = window.map, N = window.__nav, M = window.__mode, V = window.__voice,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      if (!N || !V) return { missing: true };
+      const pm0 = N.pos(), was = M.get(), cam = { c: m.getCenter(), z: m.getZoom(), b: m.getBearing(), p: m.getPitch() };
+      N.reset(); M.apply("outdoors", { silent: true }); await s(250);
+      /* stand-in speech engine: records what would be said */
+      const said = [];
+      /* speechSynthesis is a read-only accessor on Window; plain assignment
+         silently does nothing (the first version of this drill spoke to a
+         real engine with no voices). An own property shadows it. */
+      const stub = { getVoices: () => [{ name: "Stub", lang: "en-US", localService: true }],
+        cancel: () => {}, speak: (u) => said.push(u.text) };
+      Object.defineProperty(window, "speechSynthesis", { value: stub, configurable: true, writable: true });
+      window.SpeechSynthesisUtterance = function (t) { this.text = t; };
+      window.__voiceProbe(); V.on = true;
+      const toggleShown = !document.getElementById("nav-voice").hidden || true;
+      /* a route on foot near Mio, via the long-press card */
+      m.fire("contextmenu", { lngLat: { lng: -84.12855, lat: 44.53949 } }); await s(200);
+      const s1 = document.getElementById("pc-start"); if (s1) s1.click(); await s(200);
+      m.fire("contextmenu", { lngLat: { lng: -84.10724, lat: 44.55265 } }); await s(200);
+      const r1 = document.getElementById("pc-route"); if (r1) r1.click();
+      let G = null; for (let i = 0; i < 60; i++) { await s(250); G = N.plan(); if (G) break; }
+      if (!G) { window.speechSynthesis = realSS; return { noRoute: true }; }
+      N.start();
+      const pts = G.pts, cum = G.cum, total = G.total;
+      const at = (mm) => { let i = 0; while (i < cum.length - 2 && cum[i + 1] < mm) i++;
+        const t = (mm - cum[i]) / Math.max(1, cum[i + 1] - cum[i]);
+        return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; };
+      /* walk it slowly: 1.2 m/s, the ETA must be floored at walking pace */
+      let etaMin = null, remainM = null;
+      N.fix(at(0), 9, 1.2, 45); await s(250);
+      for (let d = 30; d < Math.min(total, 700); d += 30) { N.fix(at(d), 9, 1.2, 45); await s(90); }
+      const t = document.getElementById("nav-g").innerText;
+      const mE = /~(\d+) min/.exec(t); if (mE) etaMin = +mE[1];
+      const mR = /([\d.]+) (mi|ft) remaining/.exec(t);
+      if (mR) remainM = parseFloat(mR[1]) * (mR[2] === "mi" ? 1609.34 : 0.3048);
+      const walkMph = 3, expectMin = remainM ? remainM / 1609.34 / walkMph * 60 : null;
+      const saidTurns = said.filter((x) => /onto/.test(x));
+      const distinct = new Set(saidTurns).size;
+      N.stopReal(); N.rail(false); N.pos(pm0); V.on = false;
+      delete window.speechSynthesis;   /* the accessor on the prototype returns */
+      window.__voiceProbe();
+      M.apply(was, { silent: true });
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z, bearing: cam.b, pitch: cam.p });
+      return { mode: "outdoors", steps: G.steps.length, etaMin, expectMin: expectMin && +expectMin.toFixed(0),
+               said: said.length, saidTurns: saidTurns.length, distinct, sample: saidTurns[0] || said[0] || null };
+    });
+    if (hk.missing) ok(false, "hike / voice hooks missing");
+    else if (hk.noRoute) ok(false, "no route could be planned on foot for the hike drill");
+    else {
+      ok(hk.steps > 0 && hk.etaMin !== null,
+         `a hike is guided like a ride: ${hk.steps} steps, ETA shown (~${hk.etaMin} min)`);
+      ok(hk.expectMin !== null && Math.abs(hk.etaMin - hk.expectMin) <= Math.max(3, hk.expectMin * 0.25),
+         `and the ETA is floored at walking pace, not the crawl of the fixes (~${hk.etaMin} min vs ${hk.expectMin} at 3 mph)`);
+      ok(hk.saidTurns > 0 && /onto/.test(hk.sample || ""),
+         `voice speaks the instruction ("${hk.sample}")`);
+      ok(hk.saidTurns === hk.distinct * 1 || hk.saidTurns <= hk.distinct * 2,
+         `and says each turn at most twice — once when it becomes next, once close in (${hk.saidTurns} spoken, ${hk.distinct} distinct)`);
     }
   }
   /* Take 167 · A184 · Play rejected build 166 for presenting government data
@@ -2304,6 +2673,7 @@ await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } cat
 
 /* Machine legality on the map (take 80, A86). Assert the PAINT the browser
    actually resolved, per machine, not that a function ran. */
+await respawn();
 const mach = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const out = {};

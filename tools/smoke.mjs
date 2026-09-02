@@ -197,6 +197,12 @@ class MapStub {
   /* take 145 · hdCard reads the view, refreshSat pokes the painter */
   getBounds() { return { getWest: () => -84.30, getSouth: () => 44.50,
     getEast: () => -84.20, getNorth: () => 44.60 }; }
+  /* take 169 · stackCard computes the camera before easing so a refused
+     fit is visible; the stub answers with a plausible camera */
+  /* take 170 · the follow camera and the nav strip read these */
+  getBearing() { return 0; } getPitch() { return 0; }
+  cameraForBounds(b) { const w = b[0][0], s0 = b[0][1], e = b[1][0], n = b[1][1];
+    return { center: [(w + e) / 2, (s0 + n) / 2], zoom: 12 }; }
   triggerRepaint() { record.repaints = (record.repaints || 0) + 1; }
   getSource(n) { return { setData: (d) => { (record.setData[n] ||= []).push(d); } }; }
   addControl() {}

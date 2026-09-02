@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 167.* Ranked by blocking-ness, not by interest.
+*Current as of take 173.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2839,7 +2839,7 @@ there is now nothing ugly to cover.
   tappable is worse than ugly and honest, so the reveal is unconditional
   with an 8 s backstop on top.
 
-## A174 — Pin cluster tuning · OPEN (Jacob, after t157 field test)
+## A174 — Pin clusters rebuilt · SHIPPED take 169
 "The pin clusters will need additional tuning, but good enough for now."
 Knobs, all measured rather than guessed when the report arrives: cluster
 radius (38 px today — 46 was too greedy at ×150, 38 gives ×65), the
@@ -2975,4 +2975,157 @@ the same under Tools -> Data sources.
   requests; Play requires links that are valid and functional, so the
   citations use the USGS endpoints that verify.
 - **Ruled out:** claiming any endorsement or partnership. There is none.
+
+## A185 — Store description formatting · SHIPPED take 168
+Take 167's copy was hard-wrapped at 80 characters and collapsed in the
+console preview. One line per paragraph and per bullet now, blank lines
+between, "•" bullets, and the generator asserts no line starts with a
+space.
+- **Ruled out:** hard-wrapping store copy at all. It is re-flowed by the
+  reader; wrapping it fixes the width to the one place it was written.
+- **Ruled out:** hyphen bullets. Against a wrapped paragraph a leading
+  "-" reads as a stray dash, and that is exactly how it rendered.
+
+### Audit of takes 141–168 (2026-09-01) — what a second look found
+
+Clusters, the headline. Both passes (154 low-zoom, 160 high-zoom) merge
+pins by GRID CELL, and a grid cell is not a proximity test. Proved with
+the code's own arithmetic: at low zoom two launches 4 px apart that
+straddle a cell edge are NOT stacked, while two 74 px apart in one cell
+ARE; at high zoom two pins 2 px apart — badges fully overlapping — fall
+in different bins and stay separate. That inversion is why piles still
+show. Compounding it: the two passes are separate code paths with a hard
+seam at z11.4, low zoom is per-kind only (a beach, a launch and a camp on
+one lake still overlap there), and the low-zoom pass re-renders singleton
+pins through a second layer (poi-clust-one) that duplicates the main
+layers' styling and needs a double-draw guard to coexist.
+- **Ruled out:** tuning the radius or the cell size. The defect is the
+  binning, and no cell size makes a grid into a distance.
+
+Everything else, briefly, so the record is honest about the whole span:
+- HD store + save (144/145): sound. Sequential fetching is the known
+  limit (one tile at a time); WAKE_LOCK is declared but unused, so a
+  long save dies when the screen locks. Not defects; scope for the
+  county/whole-state download arc if it goes ahead.
+- Imagery pyramid (143) and shrink (159): CI-confirmed on a clean runner,
+  183 -> 127 MB, SSIM 0.991. Sound.
+- Splash (156/158) and busy line (157): field-confirmed by Jacob and by a
+  47/0 self-test. Sound.
+- Release hardening (162–167): scrub vendored and proven with the package
+  removed; appId set before it locked; AD_ID asserted on the built
+  artifact; sources and disclaimer in listing and app. Sound.
+- Store copy (168): unwrapped after the preview collapsed it. Sound, and
+  still unsealed — 168 changed generated copy only.
+
+### Take 169 — shipped
+One distance-based clusterer at every zoom replaces the two grid-bucketed
+passes; mixed stacks allowed (Jacob 2026-09-01); tap lists the pile and
+moves the map in. Invariant asserted: nothing visible within the radius
+of anything else.
+- **Ruled out:** keeping per-kind stacking at low zoom. Jacob: "combining
+  beaches is fine" provided the tray lists everything, and per-kind is
+  what left a beach, a launch and a camp overlapping on one lake.
+- **Ruled out:** a centroid badge. It lands in lakes; the badge sits on
+  the most prominent member.
+- **Ruled out:** MapLibre's supercluster, again — it cannot honour the
+  prominence order or the services rule, and its count is per-source.
+
+## A186 — Camping mode · DESIGN NEXT (Jacob, 2026-09-01)
+Jacob's reference shots show campgrounds and national forests, "which I'd
+like under camping mode" — a fifth mode. Questions to settle first: what
+it shows (campgrounds by type — state forest, national forest, private,
+rustic vs modern; dispersed camping where data exists; national forest
+boundaries), what it plans (foot? drive-to?), and what data we hold versus
+would need (national forest boundaries are not yet ingested).
+- **Ruled out:** building it blind. The mode list is the app's top-level
+  contract with the rider and every prior mode got a design pass first.
+
+## A187 — Navigation mode: follow, guide, arrive · SHIPPED (N1 t170, N2 t171, N3–N5 t173) — field verdict pending
+"Google Maps, but for offroad." Start a ride, a run or a hike and the map
+centres on you, turns to your direction of travel, tilts, follows at 1 Hz,
+tells you the next turn and how far, the time left, and says so when you
+arrive. On a river: distance and time to the take-out for YOUR craft, and
+what is coming downstream (dam, access, camp) by river mile.
+
+What already exists and is reused, not rebuilt:
+- rideFix(): 1 Hz GPS into ME, breadcrumb, checkOffRoute(), and a
+  re-centre every 6th fix — a follow mode missing bearing and pitch.
+- directions(): route legs with names and bearings (159 steps in the
+  self-test). The graph router runs on-phone fast enough to re-route.
+- Corridors: river-mile features, dams as portages; paddleHours() knows
+  the craft's pace. Compass heading is already read.
+
+Staged, each its own take, each proven with SYNTHETIC fixes driven along
+a real route in the harness before any device sees it:
+- N1 · Follow camera. Centre on every fix, bearing = course over ground
+  smoothed, compass when slower than ~2 mph, pitch ~55, zoom by speed.
+  A user pan pauses following; Locate resumes. Screen kept awake through
+  the Screen Wake Lock API (no plugin). North-up toggle.
+- N2 · Guidance. Project position onto the route; banner "In 400 ft,
+  left onto Trail 7"; remaining distance and ETA from MACHINE speed;
+  arrival within accuracy radius of the destination -> "You have
+  arrived", follow ends; off-route beyond ~40 m -> re-route from here.
+- N3 · River. Position -> river mile by nearest point on the corridor
+  (cumulative distance per vertex, computed once); bearing = the river's
+  own downstream tangent, so the map points downriver even while
+  drifting; banner: miles and minutes to take-out for the craft; "Dam in
+  1.2 mi — portage"; arrival at the take-out.
+- N4 · Hike: N2 on foot. N5 · Voice, if the Fold has an offline TTS
+  engine — verified on device first, never assumed.
+
+Honest hard parts, stated up front:
+- GPS course is noise below ~2 mph: kayaks drift, hikers stop. Compass
+  fills in; on a river the corridor tangent is better than either.
+- JS stops when the screen locks. Wake lock covers the mounted-phone
+  case; true background navigation needs a native foreground service and
+  is out of scope until someone asks for it with the screen off.
+- Arrival near a bad fix: use the fix's own accuracy radius, never a
+  fixed 30 m.
+- **Ruled out:** a separate "navigation app" mode with its own map.
+  This is a camera and a banner on the map the rider already has.
+- **Ruled out:** re-routing on every fix. Only past the off-route
+  threshold, debounced, or a noisy trail edge re-routes forever.
+Open questions for Jacob: (1) start trigger — Navigate on the route card,
+or automatic when Ride it starts with a route present; (2) voice wanted
+in v1 or later; (3) on arrival, stop recording or keep going; (4)
+north-up as a toggle or heading-up only.
+
+### Take 170 — shipped (A187 N1 + trip persistence)
+- **Ruled out:** IndexedDB for the trip. A day-long ride at 7 m spacing is
+  a few hundred KB of JSON; localStorage holds it, is synchronous (a
+  write on the last fix before a kill actually lands), and the quota
+  path thins crumbs and retries rather than failing silently.
+- **Ruled out:** storing the route geometry. The router is deterministic
+  on the same graph, and a resume should route from where the rider IS,
+  not from where they were; the destination and profile are enough.
+- **Ruled out:** compass heading in N1. The GPS course above walking pace
+  plus the fix-to-fix line covers riding; compass is for the river take,
+  where drift makes both useless and the corridor tangent is better than
+  either.
+
+### Take 171 — shipped (A187 N2)
+- **Ruled out:** ETA from a fixed machine speed. The rider's own rolling
+  pace is the honest number; the machine's walking speed is only a floor.
+- **Ruled out:** a fixed arrival radius. A 30 m rule against a 45 m fix
+  either never fires or fires early; the fix's accuracy is the radius.
+- **Ruled out:** re-routing on the first off-line fix. Three consecutive,
+  debounced — or a noisy edge re-routes forever.
+
+### Take 172 — shipped (A187 N3)
+- **Ruled out:** steering by GPS course on the water. Drift and
+  back-paddling make it noise; the river's own tangent is the truth.
+- **Ruled out:** arrival by river mile alone. Impoundment accesses sit a
+  quarter mile from the centreline; the take-out's point is checked too.
+- **Ruled out:** calling every feature downstream. A dam within three
+  miles pre-empts everything, because a surprise dam is the whole reason
+  to have the map.
+
+### Take 173 — shipped (A187 N4 + N5, carrying N3)
+- **Ruled out:** a native TTS plugin before the Web Speech API is known
+  to fail on the Fold. The self-test's VOICE line is the measurement; a
+  plugin is the answer only if it says the API is absent.
+- **Ruled out:** speaking on every fix, or reading the whole strip. The
+  instruction, once when it becomes next and once close in.
+- **Ruled out:** voice on by default. A rider who did not ask for a
+  voice should not get one at the first turn.
 

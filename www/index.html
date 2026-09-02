@@ -145,6 +145,24 @@
   
   #shell{opacity:0}
   #shell.ready{opacity:1;transition:opacity .18s ease}
+  
+  #nav{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:5;
+    display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:12px;
+    background:rgba(28,26,22,.92);color:#F2EDE3;
+    font:600 13px/1 'Barlow Condensed',Barlow,system-ui,sans-serif;letter-spacing:.03em;
+    box-shadow:0 2px 8px rgba(0,0,0,.35)}
+  #nav[hidden]{display:none}
+  #nav button{font:inherit;color:#F2EDE3;background:rgba(255,255,255,.12);border:0;
+    border-radius:8px;padding:5px 8px}
+  #nav button.on{background:#E2182A}
+  #nav{flex-direction:column;align-items:stretch;gap:5px}
+  
+  #nav-g{display:flex;flex-direction:column;gap:2px;padding-top:5px;
+    border-top:1px solid rgba(255,255,255,.14)}
+  #nav-g[hidden]{display:none}
+  #nav-g b{font-size:15px}
+  #nav-g .arw{font-size:18px;margin-right:6px;color:#E2182A}
+  #nav-g .eta{color:rgba(255,255,255,.7);font-weight:500}
   #busy{position:fixed;left:0;right:0;top:0;height:3px;z-index:9998;
     overflow:hidden;pointer-events:none;opacity:0;transition:opacity .18s ease}
   #busy.on{opacity:1}
@@ -431,10 +449,12 @@
 </div>
 
 <div id="busy"><i></i></div>
+
+<div id="nav" hidden><div style="display:flex;align-items:center;gap:8px"><span id="nav-sp">—</span><button id="nav-north" title="North up">N&#8593;</button><button id="nav-voice" title="Voice guidance" hidden>&#128266;</button><button id="nav-center" hidden>Re-centre</button></div><div id="nav-g" hidden></div></div>
 <div id="shell">
   
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 167</span>
+    <span id="title"><b>APEX</b> ORV · Take 173</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>

@@ -1311,7 +1311,7 @@ def check_render():
     r = subprocess.run(["node", rm], capture_output=True, text=True, timeout=1200)
     if r.returncode:
         bad = [l.strip() for l in r.stdout.splitlines() if "FAIL" in l][:2]
-        fails.append("render failed: " + ("; ".join(bad) or r.stderr[-120:]))
+        fails.append("render failed: " + ("; ".join(bad) or r.stderr[-700:]))
     else:
         n = sum(1 for l in r.stdout.splitlines() if l.strip().startswith("ok"))
         notes.append(f"render: real browser drew the map, {n} checks green")
