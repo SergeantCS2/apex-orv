@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 174.* Ranked by blocking-ness, not by interest.
+*Current as of take 175.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -3137,4 +3137,15 @@ north-up as a toggle or heading-up only.
 - **Ruled out:** full-resolution forest boundaries. Generalised to ~60 m
   the three forests are 23 KB and right to the width of a two-track,
   which is the question a camper asks.
+
+## A188 — Unnamed pins muddy the view · SHIPPED take 175
+1,982 unnamed pins, all launches and beaches. At ingest: 98 private
+dropped, 383 shadows dropped, 440 named for their lake; the remaining
+1,085 step back to z13.5 outside Water (z12 in it).
+- **Ruled out:** hiding all unnamed pins. Some are real and a paddler
+  wants every launch; Water keeps them from z12.
+- **Ruled out:** presenting a borrowed lake name as the place's name.
+  The card says it is borrowed.
+- **Ruled out:** dropping unnamed pins that shadow NOTHING. A launch on
+  an unnamed pond is still a launch; it just waits for z13.5.
 

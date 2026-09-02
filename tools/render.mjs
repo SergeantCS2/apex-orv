@@ -1594,6 +1594,61 @@ if (zoomed.trails === 0) {
     ok(ov.out === 0 && ov.camp > 0,
        `at z11 over the Huron, Outdoors steps campgrounds back (${ov.out}) while Camp leads with them (${ov.camp})`);
   }
+  /* Take 175 · A188 · the unnamed-pin cleanup. The bundle is asserted first
+     (the counts are the feature), then the map: over the Cass Lake district
+     Jacob photographed, Off-road at z12.5 draws no unnamed launch or beach,
+     while Water at the same camera still draws them. */
+  {
+    let P = [];
+    try { P = JSON.parse(readFileSync("www/bundle/poi.json", "utf8")).p; } catch (e) { }
+    const un = P.filter((r) => !r.n && (r.k === "launch" || r.k === "beach"));
+    const byLake = P.filter((r) => r.w);
+    const mt = (a, b) => Math.hypot((a[0] - b[0]) * 111320 * Math.cos(a[1] * Math.PI / 180), (a[1] - b[1]) * 111320);
+    const DEST = new Set(["launch", "beach", "marina", "camp", "dayuse", "livery", "lighthouse", "trailhead"]);
+    const g = new Map();
+    P.filter((r) => r.n && DEST.has(r.k)).forEach((r) => {
+      const k = Math.round(r.p[0] * 100) + "|" + Math.round(r.p[1] * 100);
+      if (!g.has(k)) g.set(k, []); g.get(k).push(r); });
+    let shadows = 0;
+    for (const r of un) {
+      const kx = Math.round(r.p[0] * 100), ky = Math.round(r.p[1] * 100); let hit = false;
+      for (let dx = -1; dx <= 1 && !hit; dx++) for (let dy = -1; dy <= 1 && !hit; dy++)
+        for (const q of (g.get((kx + dx) + "|" + (ky + dy)) || [])) if (mt(r.p, q.p) < 300) { hit = true; break; }
+      if (hit) shadows++;
+    }
+    ok(un.length > 0 && un.length <= 1200,
+       `unnamed launches and beaches are down to ${un.length} in the bundle (were 1,982)`);
+    ok(byLake.length >= 400 && byLake.every((r) => r.n && (r.k === "launch" || r.k === "beach")),
+       `${byLake.length} of them now carry the name of the lake they are on, flagged as borrowed`);
+    ok(shadows === 0,
+       `and none of the rest shadows a named destination within 300 m (${shadows})`);
+    const vz = await page.evaluate(async () => {
+      const m = window.map, M = window.__mode, S = window.__stack,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+      const count = async (mode) => {
+        M.apply(mode, { silent: true }); await s(300);
+        m.jumpTo({ center: [-83.36, 42.61], zoom: 12.5 }); await s(400); S.run();
+        const src = m.getSource("poistack");
+        for (let w = 0; w < 40; w++) { if (src.loaded() && m.areTilesLoaded()) break; await s(400); }
+        await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]); await s(300);
+        let unnamed = 0, named = 0;
+        try { m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major"] }).forEach((f) => {
+          if (f.properties.k !== "launch" && f.properties.k !== "beach") return;
+          if (+f.properties.named === 1) named++; else unnamed++; }); } catch (e) { }
+        return { unnamed, named };
+      };
+      /* Outdoors carries launches and beaches and is not Water; Off-road
+         carries neither, which made the first version of this check vacuous */
+      const ride = await count("outdoors"), water = await count("water");
+      M.apply(was, { silent: true }); m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+      return { ride, water };
+    });
+    ok(vz.ride.unnamed === 0 && vz.ride.named > 0,
+       `over Cass Lake at z12.5, Outdoors draws no unnamed launch or beach (${vz.ride.unnamed}) while ${vz.ride.named} named ones stay`);
+    ok(vz.water.unnamed > 0,
+       `while Water at the same camera still draws them for the paddler (${vz.water.unnamed})`);
+  }
   /* Take 167 · A184 · Play rejected build 166 for presenting government data
      without naming its source or disclaiming affiliation. The store listing
      is where they found it; this asserts the APP says it too, since the

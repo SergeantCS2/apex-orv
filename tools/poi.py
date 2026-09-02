@@ -119,6 +119,7 @@ def main():
                     if ddx * ddx + (py - lat) ** 2 <= r2:
                         return True
         return False
+    _private = 0
     for e in els:
         tags = e.get("tags", {})
         if e.get("type") == "way" and tags.get("highway") in TRAILWAYS:
@@ -136,6 +137,12 @@ def main():
             continue
         nm = (e.get("tags", {}).get("name") or "").strip()
         if not nm and not unnamed_ok:
+            continue
+        # take 175 · A188 · a residential dock tagged access=private is not a
+        # launch a rider can use, and a lake district is full of them (Jacob,
+        # 24766/24768, Cass Lake). Counted so the ledger says how many.
+        if kind in ("launch", "beach") and (tags.get("access") or "").lower() in ("private", "no"):
+            _private += 1
             continue
         c = centre(e)
         if not c or not (W <= c[0] <= E and S <= c[1] <= N):
@@ -391,6 +398,108 @@ def main():
         print(f"poi: launches — {len(drop)} unnamed within ~200 m of another launch "
               f"collapsed (A151)")
         out = [r for r in out if id(r) not in drop]
+    # take 175 · A188 · the unnamed-pin cleanup. Measured first: 1,982
+    # unnamed pins, ALL launches and beaches (45% and 86% of their kinds),
+    # 370 of them within 300 m of a named destination, 568 on the shore of
+    # a named lake. Three passes, each counted:
+    #   shadows — an unnamed launch or beach within 300 m of a NAMED
+    #     destination is the same place twice (a slipway node beside the
+    #     named launch it belongs to). Dropped.
+    #   named by water — an unnamed launch or beach within 150 m of a named
+    #     lake's shore takes the lake's name and a flag, so the card can say
+    #     "named for the lake it is on" rather than pretend OSM named it.
+    #   the rest stay unnamed; the app steps them back outside Water mode.
+    print(f"poi: {_private} private launches/beaches dropped (access=private)")
+    import math as _m
+    def _mt(a, b):
+        return _m.hypot((a[0] - b[0]) * 111320 * _m.cos(_m.radians(a[1])), (a[1] - b[1]) * 111320)
+    DEST = ("launch", "beach", "marina", "camp", "dayuse", "livery", "lighthouse", "trailhead")
+    named_dest = [r for r in out if r.get("n") and r["k"] in DEST]
+    g = {}
+    for r in named_dest:
+        g.setdefault((round(r["p"][0], 2), round(r["p"][1], 2)), []).append(r)
+    shadow = set()
+    for r in out:
+        if r.get("n") or r["k"] not in ("launch", "beach"):
+            continue
+        kx, ky = round(r["p"][0], 2), round(r["p"][1], 2)
+        for dx in (-0.01, 0, 0.01):
+            for dy in (-0.01, 0, 0.01):
+                for q in g.get((round(kx + dx, 2), round(ky + dy, 2)), []):
+                    if _mt(r["p"], q["p"]) < 300:
+                        shadow.add(id(r)); break
+                if id(r) in shadow: break
+            if id(r) in shadow: break
+    out = [r for r in out if id(r) not in shadow]
+    print(f"poi: {len(shadow)} unnamed launches/beaches within 300 m of a named destination dropped (shadows)")
+    named_by_water = 0
+    if os.path.exists("water_payload.json"):
+        try:
+            sys.path.insert(0, os.path.dirname(__file__))
+            from pack import decode_ring
+            W = json.load(open("water_payload.json"))
+            lakes = []
+            for nm_, geo in zip(W["nm"]["water"], W["l"]["water"]):
+                if not nm_: continue
+                try: lakes.append((nm_, decode_ring(geo)))
+                except Exception: pass
+            wg = {}
+            for nm_, ring in lakes:
+                for v in ring[::max(1, len(ring) // 60)]:
+                    wg.setdefault((round(v[0], 2), round(v[1], 2)), []).append((nm_, ring))
+            for r in out:
+                if r.get("n") or r["k"] not in ("launch", "beach"):
+                    continue
+                best = None; seen = set()
+                for dx in (-0.01, 0, 0.01):
+                    for dy in (-0.01, 0, 0.01):
+                        for nm_, ring in wg.get((round(r["p"][0] + dx, 2), round(r["p"][1] + dy, 2)), []):
+                            if nm_ in seen: continue
+                            seen.add(nm_)
+                            d = min(_mt(r["p"], v) for v in ring[::max(1, len(ring) // 300)])
+                            if d < 150 and (best is None or d < best[0]): best = (d, nm_)
+                if best:
+                    r["n"] = best[1]; r["w"] = 1; named_by_water += 1
+        except Exception as ex:
+            print(f"poi: water naming skipped ({ex})")
+    print(f"poi: {named_by_water} unnamed launches/beaches named for the lake they are on")
+    # A borrowed name is still a name: two unnamed launches on one shore both
+    # become "Cass Lake" — collapse same-kind, same-name pins within 300 m to
+    # one — and an unnamed neighbour of a now-named pin is a shadow of it.
+    # Both passes counted. (The first render found 3 such shadows.)
+    bw = [r for r in out if r.get("w")]
+    bg = {}
+    for r in bw:
+        bg.setdefault((r["k"], r["n"], round(r["p"][0], 2), round(r["p"][1], 2)), []).append(r)
+    dup = set()
+    for r in bw:
+        if id(r) in dup: continue
+        for dx in (-0.01, 0, 0.01):
+            for dy in (-0.01, 0, 0.01):
+                for q in bg.get((r["k"], r["n"], round(r["p"][0] + dx, 2), round(r["p"][1] + dy, 2)), []):
+                    if q is not r and id(q) not in dup and _mt(r["p"], q["p"]) < 300:
+                        dup.add(id(q))
+    out = [r for r in out if id(r) not in dup]
+    print(f"poi: {len(dup)} lake-named duplicates collapsed (same lake, same kind, within 300 m)")
+    named_dest2 = [r for r in out if r.get("n") and r["k"] in DEST]
+    g2 = {}
+    for r in named_dest2:
+        g2.setdefault((round(r["p"][0], 2), round(r["p"][1], 2)), []).append(r)
+    shadow2 = set()
+    for r in out:
+        if r.get("n") or r["k"] not in ("launch", "beach"): continue
+        kx, ky = round(r["p"][0], 2), round(r["p"][1], 2); hit = False
+        for dx in (-0.01, 0, 0.01):
+            for dy in (-0.01, 0, 0.01):
+                for q in g2.get((round(kx + dx, 2), round(ky + dy, 2)), []):
+                    if _mt(r["p"], q["p"]) < 300: hit = True; break
+                if hit: break
+            if hit: break
+        if hit: shadow2.add(id(r))
+    out = [r for r in out if id(r) not in shadow2]
+    print(f"poi: {len(shadow2)} unnamed shadows of lake-named pins dropped")
+    still = sum(1 for r in out if not r.get("n") and r["k"] in ("launch", "beach"))
+    print(f"poi: {still} launches/beaches remain unnamed (stepped back outside Water in the app)")
     out.sort(key=lambda r: (r["k"], r["n"] or ""))
     blob = json.dumps({"bbox": list(R.bbox), "p": out}, separators=(",", ":"))
     open("poi_payload.json", "w").write(blob)

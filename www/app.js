@@ -435,7 +435,7 @@ var poif=((POIS&&POIS.p)||[]).map(function(r,i){
   var k=POIKIND[r.k]||{c:'#4A443B',h:r.k,r:7};
   return {type:'Feature',
     properties:{i:i,k:r.k,h:k.h,c:k.c,r:k.r,d:k.d?1:0,pri:(r.pri==null?3:r.pri),
-      ct:r.ct?JSON.stringify(r.ct):'',
+      ct:r.ct?JSON.stringify(r.ct):'',w:r.w?1:0,
        
       n:r.n||k.h,named:r.n?1:0,mi:r.mi||0},
     geometry:{type:'Point',coordinates:r.p}}});
@@ -2430,6 +2430,11 @@ function modeFilter(base,m,id){
    
   if(m.demote&&m.demote.length)
     inK=['all',inK,['step',['zoom'],['!',['in',['get','k'],['literal',m.demote]]],13,true]];
+   
+  var unZ=(m.k==='water')?12:13.5;
+  inK=['all',inK,['any',['==',['get','named'],1],
+    ['!',['in',['get','k'],['literal',['launch','beach']]]],
+    ['step',['zoom'],false,unZ,true]]];
   var wrap=function(br){
     var f=['all',inK,(m.boost&&id==='poi-dot-major')
       ?['any',['in',['get','k'],['literal',m.boost]],br]:br];
@@ -4787,7 +4792,8 @@ map.on('click',function(e){
       if(ct&&ct.disp)bits.push('dispersed');
       campLine='<div class="sub">'+(bits.length?bits.join(' \u00b7 '):'Type not recorded in the source')+'</div>'}
     show('<b>'+(pr.named?pr.n:pr.h)+'</b>'+
-      (pr.named?'<div class="sub">'+pr.h+(pr.mi?' \u00b7 '+pr.mi+' mi of trail':'')+'</div>':
+      (pr.named?'<div class="sub">'+pr.h+(pr.mi?' \u00b7 '+pr.mi+' mi of trail':'')+
+          (pr.w?' \u00b7 named for the lake it is on; the source has no name for this spot':'')+'</div>':
                 '<div class="sub">Unnamed in the source \u2014 shown by what it is</div>')+
       campLine+
       (pr.named?photoHTML(pr.k,pr.n,pp):'')+

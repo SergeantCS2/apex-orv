@@ -1,29 +1,29 @@
-**Take 174 — Camp mode.**
+**Take 175 — fewer naked pins.**
 
-A fifth mode, last in the picker: Off-road · Outdoors · Hunt · Water ·
-Camp.
+You pointed at Cass Lake and said the unnamed pins were muddying the
+view. They were — and it turned out to be exactly two kinds: boat launches
+and beaches, which OpenStreetMap often maps without names. Everything
+else was already named.
 
-- **Campgrounds by type.** Where the source records it, a campground's
-  card says who runs it (state forest / national forest / county /
-  private), whether it's rustic or modern, and fee or free. Where it
-  doesn't, the card says "type not recorded" instead of guessing. About
-  half are typed.
-- **National forests, on the map.** Ottawa, Hiawatha and Huron-Manistee
-  — outlined, shaded and labelled in Camp. With state forest land, that's
-  everywhere dispersed camping is allowed.
-- **Supplies on the way in** — fuel, stores, food, water, launches,
-  trailheads — appear as you zoom in, so the statewide view stays
-  campgrounds and forest.
-- **Outdoors adjusted.** It no longer promises "camp"; campgrounds still
-  show there but step back so trails lead. Camp is where they lead.
+- **Private docks are gone.** 98 launches and beaches tagged private
+  dropped — not places you can use.
+- **Duplicates are gone.** An unnamed launch or beach sitting right next to
+  a named one is the same place twice; 383 dropped, plus 37 more after
+  the next step created new neighbours.
+- **440 now carry the name of the lake they're on.** "Beach" becomes
+  "Carter Lake", and the card says the name is borrowed from the lake,
+  since the source has no name for the spot itself.
+- **The rest step back.** About a thousand truly unnamed launches and
+  beaches remain. In Water mode — where a paddler wants every launch —
+  they show from z12. Everywhere else they wait until you're zoomed well
+  in.
 
-Everything since 169 rides along: follow mode, trip resume,
-turn-by-turn, river navigation, hike guidance, voice.
+Everything since 169 rides along: follow mode, trip resume, turn-by-turn,
+river and hike navigation, voice, Camp mode.
 
 ### Check on the phone
-1. Mode chip → Camp: forests shaded, campgrounds statewide.
-2. Tap a state forest campground: "State forest campground (DNR) ·
-   rustic …".
-3. Mode chip → Outdoors: at regional zoom, campgrounds gone; zoom in,
-   they return.
-4. Tools → Self-test → the VOICE line (still want this one).
+1. Outdoors or Off-road over Cass Lake, zoomed to a few miles: the pile
+   of unnamed beaches and launches is gone; named ones remain.
+2. Water mode, same spot: the launches are back for the paddler.
+3. Tap a lake-named beach: "Carter Lake · Beach · named for the lake it
+   is on".

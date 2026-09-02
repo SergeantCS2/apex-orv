@@ -1,4 +1,49 @@
-# HANDOFF — through Take 174 · V2
+# HANDOFF — through Take 175 · V2
+
+## Take 175 — 2026-09-02 — the unnamed pins (A188)
+
+Jacob, 24766/24768, over Cass Lake: "in this one tiny area alone I see a
+ton of pins naked as unnamed or unknown ... it's muddying the view."
+
+Measured before anything moved: 1,982 unnamed pins, 8% of everything —
+and ONLY two kinds, launches (1,035 of 2,295, 45%) and beaches (947 of
+1,106, 86%). Every other kind is fully named. Of those, 370 sat within
+300 m of a named destination and 568 on the shore of a named lake. So
+this was never a general filtering problem; it was OSM's slipway and
+beach nodes, mapped without names, and a residential lake district is
+full of them.
+
+Three passes at ingest, each counted in the pipeline log:
+- 98 private docks dropped — access=private is a tag the ingest had been
+  throwing away; a private slipway is not a launch a rider can use.
+- 383 shadows dropped — an unnamed launch or beach within 300 m of a
+  named destination is the same place twice.
+- 440 named for the lake they are on — a spatial join against the water
+  layer's named polygons (decoded with pack.py's own decode_ring). The
+  card says "named for the lake it is on; the source has no name for
+  this spot", because pretending OSM named it would be a lie.
+- 1,085 remain unnamed. In the app they step back: z12 in Water, where
+  a paddler wants every launch; z13.5 everywhere else. Named ones,
+  borrowed name or not, are untouched.
+
+The first render refused the shadow assertion with 3 survivors, and it
+was right: the shadow pass ran BEFORE lake-naming, so an unnamed launch
+beside a pin that only later got its lake name was never caught. And a
+borrowed name is still a name — two unnamed launches on one shore both
+became "Cass Lake", 100 m apart. Two more passes, both counted: 34
+lake-named duplicates collapsed (same lake, same kind, within 300 m),
+then 3 shadows of lake-named pins dropped. The first Off-road check was
+also vacuous — Off-road carries neither launches nor beaches — so the
+map check uses Outdoors, which carries both and is not Water.
+
+25,798 places -> 25,291. Asserted in the bundle (counts, and that no
+survivor shadows a named place) and on the map: over Cass Lake at
+z12.5, Outdoors draws no unnamed launch or beach while named ones stay,
+and Water at the same camera still draws the unnamed ones.
+
+SEAL: render 252/0 (247 + five cleanup checks), smoke 6 modes, gate
+PASSED. apex-seed-t175.zip sealed (sha256 in chat). Carries everything
+since 169: the navigation arc, Camp, and this.
 
 ## Take 174 — 2026-09-02 — Camp mode (A186)
 

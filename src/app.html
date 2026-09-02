@@ -580,7 +580,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 174</span>
+    <span id="title"><b>APEX</b> ORV · Take 175</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -1299,7 +1299,7 @@ var poif=((POIS&&POIS.p)||[]).map(function(r,i){
   var k=POIKIND[r.k]||{c:'#4A443B',h:r.k,r:7};
   return {type:'Feature',
     properties:{i:i,k:r.k,h:k.h,c:k.c,r:k.r,d:k.d?1:0,pri:(r.pri==null?3:r.pri),
-      ct:r.ct?JSON.stringify(r.ct):'',
+      ct:r.ct?JSON.stringify(r.ct):'',w:r.w?1:0,
       /* A beach has no name in OSM and is still a destination — it ships
          unnamed and is labelled by KIND. Saying "Beach" is honest; inventing
          "Island Lake Beach" from the day-use area 6 m away is not
@@ -3981,6 +3981,14 @@ function modeFilter(base,m,id){
      draws it. */
   if(m.demote&&m.demote.length)
     inK=['all',inK,['step',['zoom'],['!',['in',['get','k'],['literal',m.demote]]],13,true]];
+  /* take 175 · A188 · an UNNAMED launch or beach is a real place a paddler
+     wants and noise on every other map (Jacob, 24766/24768: "so many").
+     On the water it steps back to z12; everywhere else to z13.5. Named ones
+     — including the 440 named for their lake at ingest — are untouched. */
+  var unZ=(m.k==='water')?12:13.5;
+  inK=['all',inK,['any',['==',['get','named'],1],
+    ['!',['in',['get','k'],['literal',['launch','beach']]]],
+    ['step',['zoom'],false,unZ,true]]];
   var wrap=function(br){
     var f=['all',inK,(m.boost&&id==='poi-dot-major')
       ?['any',['in',['get','k'],['literal',m.boost]],br]:br];
@@ -6851,7 +6859,8 @@ map.on('click',function(e){
       if(ct&&ct.disp)bits.push('dispersed');
       campLine='<div class="sub">'+(bits.length?bits.join(' \u00b7 '):'Type not recorded in the source')+'</div>'}
     show('<b>'+(pr.named?pr.n:pr.h)+'</b>'+
-      (pr.named?'<div class="sub">'+pr.h+(pr.mi?' \u00b7 '+pr.mi+' mi of trail':'')+'</div>':
+      (pr.named?'<div class="sub">'+pr.h+(pr.mi?' \u00b7 '+pr.mi+' mi of trail':'')+
+          (pr.w?' \u00b7 named for the lake it is on; the source has no name for this spot':'')+'</div>':
                 '<div class="sub">Unnamed in the source \u2014 shown by what it is</div>')+
       campLine+
       (pr.named?photoHTML(pr.k,pr.n,pp):'')+
