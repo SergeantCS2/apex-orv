@@ -978,6 +978,92 @@ if (zoomed.trails === 0) {
        `the sheet opened mid-save names the tier and the count (${h1.pr && (h1.pr.done + h1.pr.skipped)} of ${h1.pr && h1.pr.total} at the read), and nothing holds the screen afterwards`);
   }
 
+  /* Take 179 · A190 H2 · the three tiers, quoted from the bundle's own
+     rings. Stubs go on with defineProperty (landmine 216). */
+  const h2 = await page.evaluate(async () => {
+    const S = window.__sat, H = window.__hd, D = window.HDDL, T = window.__hdTiers, IR = window.__inRings;
+    const CTX = window.__ctx && window.__ctx();
+    if (!S || !H || !D || !T || !IR || !CTX || !CTX.rings) return { missing: true };
+    const wait = (ms) => new Promise((z) => setTimeout(z, ms));
+    const centre = (z, x, y) => { const n = 2 ** z; return [(x + .5) / n * 360 - 180,
+      Math.atan(Math.sinh(Math.PI * (1 - 2 * (y + .5) / n))) * 180 / Math.PI]; };
+    const txt = () => (document.getElementById('panel') || document.body).textContent || '';
+    const has = (id) => !!document.getElementById(id);
+    /* never throw out of this block: a missing button is a finding, and an
+       uncaught throw inside evaluate ends the whole render with no verdict */
+    const click = (id) => { const e = document.getElementById(id); if (e) e.click(); return !!e; };
+    const stubQuota = (mb) => Object.defineProperty(navigator, 'storage', { configurable: true,
+      value: { estimate: () => Promise.resolve({ quota: mb * 1048576, usage: 0 }) } });
+    await H.clear();
+    const tiers = T();
+    const county = tiers.find((t) => t.id === 'county'), state = tiers.find((t) => t.id === 'state');
+    /* 1 · county plan */
+    let cInside = 0, cz = { 13: 0, 14: 0, 15: 0 }, cName = county && county.label;
+    if (county) {
+      const co = CTX.counties.find((c) => c.n + ' County' === county.label);
+      for (const t of county.tiles) { cz[t[0]]++; const p = centre(t[0], t[1], t[2]); if (IR(p[0], p[1], co.r)) cInside++; }
+    }
+    /* 2 · state clip */
+    let W = 180, So = 90, E = -180, N = -90;
+    for (const r of CTX.rings) for (const q of r) { W = Math.min(W, q[0]); E = Math.max(E, q[0]); So = Math.min(So, q[1]); N = Math.max(N, q[1]); }
+    const n13 = 8192, tx = (lon) => Math.floor((lon + 180) / 360 * n13),
+      ty = (lat) => { const r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n13); };
+    const box = (tx(E) - tx(W) + 1) * (ty(So) - ty(N) + 1);
+    const sN = state ? state.n : 0, sZ = state ? state.tiles.every((t) => t[0] === 13) : false,
+      sPatch = state ? state.tiles.filter((t) => S.inPatch(13, t[1], t[2])).length : -1;
+    /* 3 · the sheet quotes three tiers, nothing starts */
+    stubQuota(2048);
+    window.__hdCard(); await wait(200);
+    const sheet = txt(), sheetBtns = { view: has('hd-go-view') || /zoom in to a smaller area/.test(txt()) || /already sharp here/.test(txt()), county: has('hd-go-county'), state: has('hd-ask-state') }, busy3 = D.busy();
+    const viewTier = tiers.find((t) => t.id === 'view'), viewN = viewTier ? viewTier.n : 0, viewMB = viewTier ? Math.round(viewTier.mb) : 0;
+    /* 4 · 100 MB quota: no state button, others stay */
+    stubQuota(100); window.__hdCard(); await wait(200);
+    const q100 = { txt: txt(), state: has('hd-ask-state'), county: has('hd-go-county') };
+    /* 5 · 2 GB quota restores it */
+    stubQuota(2048); window.__hdCard(); await wait(200);
+    const q2g = has('hd-ask-state');
+    /* 6 · the confirmation */
+    const clk1 = click('hd-ask-state'); await wait(200);
+    const ask = txt(), askBtns = { yes: has('hd-go-state'), no: has('hd-no') };
+    const clk2 = click('hd-no'); await wait(200);
+    const afterNo = { busy: D.busy(), ask: has('hd-ask-state') };
+    D.fetchTile = () => wait(5).then(() => new ArrayBuffer(300));
+    const clk3 = click('hd-ask-state'); await wait(150);
+    const clk4 = click('hd-go-state'); await wait(60);
+    const started = { busy: D.busy(), label: D.progress() && D.progress().label };
+    D.stop(); for (let i = 0; i < 100 && D.busy(); i++) await wait(50);
+    const stStop = (await H.stats()).tiles;
+    /* 7 · measured minutes-left after 60 tiles */
+    await H.clear();
+    const list = []; for (let k = 0; k < 130; k++) list.push([13, 4100 + k, 3000]);
+    D.fetchTile = () => wait(10).then(() => new ArrayBuffer(100));
+    const p7 = D.save(list, null, 'a list');
+    for (let i = 0; i < 100 && !(D.progress() && D.progress().done >= 70); i++) await wait(20);
+    window.__hdCard(); await wait(150);
+    const eta = { txt: txt(), eta: D.progress() && D.progress().eta };
+    await p7; await H.clear(); window.__hdChip();
+    return { cName, cInside, cN: county ? county.n : 0, cz, box, sN, sZ, sPatch, sMB: state && state.mb,
+             sheet, sheetBtns, busy3, viewN, viewMB, q100, q2g, ask, askBtns, afterNo, started, stStop, eta, clicks: [clk1, clk2, clk3, clk4] };
+  });
+  if (h2.missing) ok(false, "take-179 tier hooks missing (__hdTiers / __inRings / __ctx)");
+  else {
+    ok(h2.cN > 0 && h2.cInside === h2.cN && h2.cz[14] > 2.5 * h2.cz[13] && h2.cz[15] > 2.5 * h2.cz[14],
+       `${h2.cName}: ${h2.cN} tiles planned at z13–15, every centre inside its rings (z13 ${h2.cz[13]} · z14 ${h2.cz[14]} · z15 ${h2.cz[15]})`);
+    ok(h2.sN >= 12300 && h2.sN <= 12600 && h2.sZ && h2.sPatch === 0 && h2.sN < 0.4 * h2.box,
+       `the state clips the ${h2.box.toLocaleString()}-tile box to ${h2.sN.toLocaleString()} land tiles at z13, none already shipped (~${Math.round(h2.sMB)} MB)`);
+    ok(/THIS VIEW/.test(h2.sheet) && /COUNTY/.test(h2.sheet) && /THE WHOLE STATE/.test(h2.sheet) && (h2.sheet.match(/ tiles · /g) || []).length >= 2
+       && h2.sheetBtns.view && h2.sheetBtns.county && h2.sheetBtns.state && !h2.busy3,
+       `the sheet quotes all three tiers before any button is pressed (this view ${h2.viewN.toLocaleString()} tiles / ${h2.viewMB} MB${h2.viewMB > 500 ? ', told to zoom in' : h2.viewN === 0 ? ', already sharp here' : ''}), and nothing has started`);
+    ok(/Not enough space/.test(h2.q100.txt) && !h2.q100.state && h2.q100.county,
+       `a 100 MB quota replaces the state button with "Not enough space" and keeps the county's`);
+    ok(h2.q2g, `a 2 GB quota gives the state button back`);
+    ok(/Yes, save the whole state/.test(h2.ask) && /screen stays on/.test(h2.ask) && /about \d+ MB/.test(h2.ask) && h2.askBtns.yes && h2.askBtns.no
+       && !h2.afterNo.busy && h2.afterNo.ask && h2.started.busy && h2.started.label === 'the whole state' && h2.stStop > 0 && h2.stStop < 12000 && h2.clicks.every(Boolean),
+       `the state tier asks first, "Not now" starts nothing, "Yes" starts a save labelled "the whole state" (Stop kept ${h2.stStop})`);
+    ok(typeof h2.eta.eta === 'number' && /(min|minute) left/.test(h2.eta.txt) && /DOWNLOADING A LIST/.test(h2.eta.txt),
+       `after 60 tiles the card shows a MEASURED time-left (${h2.eta.eta} s remaining at the read)`);
+  }
+
   /* Takes 147–150 · the tester batch (A163–A166): liveries in Water, boats
      as Water's machine, the run flow reachable and craft-paced, gauges in
      the bundle with live values behind a seam. Every target comes from the

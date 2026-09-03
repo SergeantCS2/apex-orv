@@ -1,13 +1,18 @@
-**Take 178 — HD saves: faster, awake, honest about progress.**
+**Take 179 — HD for a county or the whole state, and a build that survives USGS.**
 
-The first change since the production baseline. Saving HD imagery now
-fetches six tiles at a time instead of one, pauses briefly between
-batches so the USGS server is treated politely, retries a tile once
-before giving up, keeps the screen on for the whole save, and the HD
-sheet opened mid-save says which area is downloading and how many tiles
-are done. Stop still keeps what landed; the same save still resumes free.
+The HD sheet now offers three sizes: this view (as before), the county
+under the map centre by name, and the whole state one level sharper
+than the built-in map — about 179 MB, and the sheet says so before you
+press anything. Each is checked against the space the phone allows; the
+state one asks twice. While a save runs the sheet shows a time-left
+measured from how fast tiles are actually landing, not a guess.
 
-On the phone: open the HD chip over an area, save it, and lock nothing —
-the screen should stay on until it finishes. Press Stop partway, reopen
-the sheet: it should say how far it got. Then run the same save again
-and watch it skip ahead. Nothing else changed.
+Behind the scenes: a Google/USGS server refusing for a minute stopped a
+build last time. It no longer can — the build retries, then keeps the
+previous gauge list and says so.
+
+On the phone: open the HD chip. You should see THIS VIEW, your county
+by name, and THE WHOLE STATE, each with tiles and MB. Save your county;
+open the sheet mid-save and look for "about N min left" once it has
+done sixty tiles. If you have the space and the patience, save the
+whole state on wifi — that one is the real test.

@@ -7,7 +7,7 @@ APP fetches live values on a user tap under PROTOCOL §8's in-app
 provisioning rules. Inventory source: the NWIS site service, surface-water
 sites with instantaneous values, statewide.
 """
-import json, os, sys, urllib.request
+import json, os, sys, time, urllib.error, urllib.request
 
 sys.path.insert(0, os.path.dirname(__file__))
 from osm_local import region
@@ -25,7 +25,31 @@ URL = ("https://waterservices.usgs.gov/nwis/site/?format=rdb"
 
 def main():
     print(f"gauges: NWIS site inventory for {STATE} (surface water, live data)")
-    raw = urllib.request.urlopen(URL, timeout=60).read().decode("utf-8", "replace")
+    # take 179 (A191): one refusal from a public service must not stop a
+    # build. Retry once after a pause; then keep the previous build's
+    # payload if there is one (CI restores it with the region cache); only
+    # with nothing cached does the payload go missing.
+    raw = None
+    for attempt in (1, 2):
+        try:
+            raw = urllib.request.urlopen(URL, timeout=60).read().decode("utf-8", "replace")
+            break
+        except (urllib.error.URLError, urllib.error.HTTPError, OSError, TimeoutError) as e:
+            print(f"gauges: NWIS refused ({e}) on attempt {attempt}")
+            if attempt == 1:
+                time.sleep(20)
+    if raw is None:
+        if os.path.exists("gauges_payload.json"):
+            try:
+                n = len(json.load(open("gauges_payload.json")).get("g", []))
+            except (ValueError, OSError):
+                n = "?"
+            print(f"gauges: NWIS refused twice — keeping {n} sites from the "
+                  "previous build (gauges_payload.json unchanged)")
+            return
+        print("gauges: NWIS refused twice and nothing is cached — payload "
+              "omitted, the card simply offers no conditions button")
+        return
     rows = [l for l in raw.splitlines() if l and not l.startswith("#")]
     if len(rows) < 3:
         print("gauges: inventory empty — payload omitted, the card simply "

@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 178.*
+*Current as of take 179.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -125,6 +125,9 @@ Start here. Do not read top to bottom.
 | Render dies at the same check every run, process gone | 212 |
 | A render or gate polled across a turn boundary dies | 214 |
 | swapon --show is empty though /tmp/sw exists | 215 |
+| A stub is assigned but the real browser API keeps answering | 216 |
+| Render ends with a stack trace instead of a verdict | 217 |
+| pkill/grep -f finds or kills your own shell | 204 |
 
 ---
 
@@ -2713,3 +2716,19 @@ a platform object with `Object.defineProperty(navigator, name,
 {configurable: true, value: stub})`, and prove the stub is the thing
 answering (count a call) before trusting what the check says about the
 app.
+
+**217. A harness block that throws ends the render with no verdict.**
+Take 179's first render died at check 262 with "Cannot read properties
+of null (reading 'click')": the block clicked a button the sheet did
+not have (the tiers quoted 0 tiles — a real app bug) and the uncaught
+throw inside page.evaluate killed node, so the run ended in a stack
+trace with the 260 earlier checks unreported and the real finding one
+line further on. Rule: nothing inside an evaluate block may throw. A
+missing element is a FINDING — `const click = (id) => { const e =
+document.getElementById(id); if (e) e.click(); return !!e; }` and the
+result goes into the return value the ok() line reads. Companion, same
+take: landmine 204 applies to pkill -f exactly as to grep — `pkill -f
+"node tools/render.mjs"` from a shell whose own command line contains
+those words kills the caller first and the target never. Kill by exact
+process name (`pkill -x node; pkill -x chrome`) or by a PID read from
+ps; never by a pattern the calling shell also carries.

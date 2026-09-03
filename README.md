@@ -212,7 +212,7 @@ record of every take since the first; `docs/LANDMINES.md` numbers 200+
 known failure modes so they are stepped around instead of rediscovered;
 `docs/AGENDA.md` carries every decision with what was *ruled out* and why.
 The build gates on all of it: ~300 smoke assertions across six modes,
-260 rendered-pixel checks in a real browser, and a final gate that has
+267 rendered-pixel checks in a real browser, and a final gate that has
 refused seals for a stale document stamp, a missing ruled-out line, and a
 URL that hadn't been declared — each time correctly.
 

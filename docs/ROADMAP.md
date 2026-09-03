@@ -1,6 +1,6 @@
 # ROADMAP — APEX ORV · V3
 
-*Current as of take 178. Take 176 is the production baseline: on Google
+*Current as of take 179. Take 176 is the production baseline: on Google
 Play as com.apexoffroad.app, closed testing with real users from
 2026-09-02.*
 
@@ -19,8 +19,9 @@ finish the arcs the design already committed to.
 - A190 · HD download tiers — this view, this county, whole state one
   level sharper (clipped to land). The downloader shipped in take 178
   (six lanes, batch pause, one retry, wake lock, tier-named progress);
-  the county and state tiers are take 179, quoted from measured per-zoom
-  tile sizes and checked against the phone's storage quota first.
+  the county and state tiers shipped in take 179 (the state is 12,496
+  tiles / ~179 MB, measured — not the 430 MB the design guessed), each
+  checked against the phone's storage quota first. Field verdict pending.
 
 **Next**
 - A183 · R8 shrinking/obfuscation, once testers can device-verify the

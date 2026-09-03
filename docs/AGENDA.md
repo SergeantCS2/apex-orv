@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 178.* Ranked by blocking-ness, not by interest.
+*Current as of take 179.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2641,7 +2641,7 @@ Watch across future self-tests; profile only if the field ever feels it.
 - **Ruled out:** acting on one frame from one run — a stall that never
   recurs is noise, and the self-test already reran itself to prove it.
 
-## A163 — Paddle planning: Water mode routes on WATER · OPEN (design next)
+## A163 — Paddle planning: Water mode routes on WATER · SHIPPED take 149 (header corrected take 179)
 Tester: planned launch-to-launch and got walked down major roads. The
 plan system is the land graph in every mode; Water should route down the
 river using the corridor lines we already ship (76 corridors, ordered
@@ -2652,21 +2652,21 @@ Hinchman Acres' Au Sable times as calibration).
   different network with different legality; corridors stay their own
   system.
 
-## A164 — Live gauge data on rivers (USGS waterdata) · OPEN (design next)
+## A164 — Live gauge data on rivers (USGS waterdata) · SHIPPED take 150 (header corrected take 179)
 Tester's link: USGS-04137500 (Au Sable at Mio) — flow, stage, temp are
 public and current. Fits §8's in-app provisioning rules exactly: user-
 invoked or clearly-stated streaming, host declared, never load-bearing.
 - **Ruled out:** shipping stale gauge readings in the bundle — a
   water level from build time is worse than none.
 
-## A165 — Water mode's "machine" should be a boat · OPEN
+## A165 — Water mode's "machine" should be a boat · SHIPPED take 149 (header corrected take 179)
 Kayak / canoe / raft as the activity in Water, switching with the mode
 (tester: "we kinda do this already but it could use improvement").
 Feeds A163's float-time estimates (a raft is not a kayak).
 - **Ruled out:** a separate boat button beside the machine button — one
   activity control, mode-aware, as today's foot/machine switch is.
 
-## A166 — Canoe/kayak liveries appear in Ride, vanish in Water · OPEN
+## A166 — Canoe/kayak liveries appear in Ride, vanish in Water · SHIPPED take 147 (header corrected take 179)
 Backwards, per the tester. Find which kind swallows rental POIs (store?
 marina?) and put liveries in Water's kind list — they are put-in
 infrastructure, not shopping.
@@ -3189,7 +3189,7 @@ than becoming a sixth thing to cycle past. Not built until designed.
 - **Ruled out:** guessing camera positions or types. OSM only, with the
   same "shown by what the source says" honesty as every other pin.
 
-## A190 — HD download tiers: this view, this county, whole state at z13 · BUILDING (H1 shipped take 178 · H2 the tiers, next)
+## A190 — HD download tiers: this view, this county, whole state at z13 · BUILDING (H1 take 178 · H2 take 179 · field verdict pending)
 The maintainer asked whether "download all of Michigan" is possible. Measured:
 z13–15 statewide is 877,182 tiles and ~22.8 GB — not offered. z13 alone
 is 41,904 tiles / ~860 MB over the bounding box, and clipping to the
@@ -3228,6 +3228,21 @@ What the downloader needs to earn it, and does not have today:
 - **Measured take 178:** shipped z13 tiles average 14.6 KB, z14 17.7,
   z15 19.4 — EST=22 KB was a z13–15 average and overstates a z13-only
   tier by half. Per-zoom from 178.
+- **Measured take 179, against this build's context.json (counties: 83
+  polygons, 1,107 points; outline: 6 rings, 368 points), tiles by
+  centre-in-polygon at z13:** WHOLE STATE = 12,559 tiles (12,496 after
+  the 63 already shipped in patches) ≈ 179 MB at 14.6 KB — NOT the
+  ~21,000 / ~430 MB above, which was the bbox (38,613 tiles) guessed at
+  half land; the bbox is 69% water. The outline's 17.35 deg² is 151,600
+  km² against Michigan's 146,435 km² of land, so the clip is honest.
+  COUNTY at z13 only: median 123 tiles = 1.8 MB, Benzie 1.0 MB, Marquette
+  6.3 MB — too small to be a tier of its own. COUNTY at z13–15 (each z13
+  cell carries 1+4+16 tiles = ~395 KB): median ≈ 47 MB, Benzie ≈ 27 MB,
+  Marquette ≈ 169 MB — which is the 50–300 MB band the design reached
+  for, so "this county" means z13–15, the same sharpness as "this view".
+  STATE at z14 would be ~50,000 tiles / ~870 MB and is not offered. Time
+  for the state tier at 250 ms a tile on six lanes with the drains: ~10
+  minutes.
 
 ### Take 178 — shipped (A190 H1: the downloader)
 Six-lane pool through the fetchTile seam, 300 ms drain after every 60
@@ -3244,3 +3259,42 @@ tile list as well as a bbox.
 - **Ruled out:** adaptive concurrency (ramping lanes up while responses
   are fast). Six is the ceiling by design, not a starting point.
 
+### Take 179 — shipped (A190 H2: the tiers)
+THIS VIEW (z13–15), <NAME> COUNTY (z13–15, the county under the map
+centre) and THE WHOLE STATE (z13, clipped to the outline; 12,496 tiles,
+~179 MB), each quoted before its button, each checked against
+navigator.storage.estimate(), the state tier behind a confirmation.
+Time-left is measured from the observed pace after 60 tiles.
+- **Ruled out:** a state tier at z14 — ~50,000 tiles, ~870 MB; the
+  pyramid law (4x per level) wins.
+- **Ruled out:** a county tier at z13 only — 1–6 MB, one level over the
+  bundle; not worth a button when z13–15 is 27–169 MB and useful.
+- **Ruled out:** any tier that is a bounding box rather than a polygon —
+  the state's box is 69% water and the quote would lie by 2.4x.
+- **Ruled out:** a minutes estimate from an assumed pace on the sheet
+  before the save starts (the maintainer: real progress, never timers) —
+  time-left appears only once measured.
+- **Ruled out:** hiding the state tier when the quota is unknown. The
+  button stays with the sentence that the save stops itself; refusing on
+  no evidence would hide the feature from every phone that keeps
+  storage.estimate() private.
+
+## A191 — gauges.py stops the build on an upstream 503 · SHIPPED take 179
+The first CI run of take 178 died at the gauges step: HTTP 503 from
+waterservices.usgs.gov, a public service refusing for a few minutes.
+No take had touched the pipeline (every pipeline file byte-identical
+between the 177 and 178 seeds), the same URL answered 200 from the
+sandbox before and after — and one refusal still stopped the build.
+Fix: one retry after a 20 s pause; then the previous build's
+gauges_payload.json, restored by CI's cache and until now ignored, is
+kept and the log says "NWIS refused — N sites from the previous build";
+only with no cache at all is the payload omitted (the card degrades
+honestly, as it already did for an empty inventory). The gate asserts
+the fallback the way it asserts the OSM chain.
+- **Ruled out:** making gauges optional in the pipeline — a missing
+  inventory must stay loud; a stale one is acceptable, an absent one is
+  a decision.
+- **Ruled out:** skipping the step in CI and shipping a committed
+  inventory — it would never be refreshed.
+- **Ruled out:** retry-until-it-works — a server that is refusing is not
+  to be hammered by a build.

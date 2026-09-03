@@ -982,6 +982,30 @@ var HDDL=(function(){
     return out}
   function estimate(tiles){var s=0;
     for(var i=0;i<tiles.length;i++)s+=EST_Z[tiles[i][0]]||22*1024;return s}
+   
+  function planPoly(rings,z0,z1){
+    var out=[];if(!rings||!rings.length)return out;
+    var W=180,S=90,E=-180,N=-90;
+    for(var r=0;r<rings.length;r++)for(var i=0;i<rings[r].length;i++){
+      var q=rings[r][i];if(q[0]<W)W=q[0];if(q[0]>E)E=q[0];if(q[1]<S)S=q[1];if(q[1]>N)N=q[1]}
+    for(var z=z0;z<=z1;z++){
+      var n=Math.pow(2,z),a=txy(W,N,z),c=txy(E,S,z);   
+      for(var x=a[0];x<=c[0];x++)for(var y=a[1];y<=c[1];y++){
+        var lon=(x+0.5)/n*360-180,lat=Math.atan(Math.sinh(Math.PI*(1-2*(y+0.5)/n)))*180/Math.PI;
+        if(inRings(lon,lat,rings)&&!inPatch(z,x,y))out.push([z,x,y])}}
+    return out}
+  var STATE_PLAN=null;
+  function statePlan(){
+    if(!STATE_PLAN&&typeof CTX!=='undefined'&&CTX&&CTX.rings)STATE_PLAN=planPoly(CTX.rings,13,13);
+    return STATE_PLAN||[]}
+   
+  function quota(){
+    try{
+      if(navigator.storage&&navigator.storage.estimate)
+        return navigator.storage.estimate().then(function(e){
+          return {known:true,free:Math.max(0,(e.quota||0)-(e.usage||0))}}).catch(function(){return {known:false}})
+    }catch(e){}
+    return Promise.resolve({known:false})}
   function fetchTile(z,x,y){
     return fetch(USGS.replace('{z}',z).replace('{y}',y).replace('{x}',x))
       .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer()})}
@@ -992,9 +1016,12 @@ var HDDL=(function(){
     var tiles=(what&&what.length&&Array.isArray(what[0]))?what:plan(what||[]);
     var done=0,skipped=0,bytes=0,inflight=0,peak=0,retries=0,pauses=0,err=null;
     label=label||'this view';
-    prog={label:label,done:0,skipped:0,total:tiles.length};
+    prog={label:label,done:0,skipped:0,total:tiles.length,t0:Date.now(),eta:null};
     WAKE.hold('hd');
     function report(){prog.done=done;prog.skipped=skipped;
+       
+      var el=(Date.now()-prog.t0)/1000;
+      prog.eta=(done>=60&&el>0)?Math.round((tiles.length-done-skipped)/(done/el)):null;
       if(onp)onp(done+skipped,tiles.length,label)}
     function one(t){
       return HD.get(t[0],t[1],t[2]).then(function(have){
@@ -1024,7 +1051,8 @@ var HDDL=(function(){
       running=false;prog=null;WAKE.drop('hd');
       return {error:err,done:done,skipped:skipped,bytes:bytes,total:tiles.length,
               stopped:stopReq,peak:peak,retries:retries,pauses:pauses,label:label}})}
-  var M={plan:plan,save:save,fetchTile:fetchTile,estimate:estimate,EST_Z:EST_Z,
+  var M={plan:plan,planPoly:planPoly,statePlan:statePlan,quota:quota,
+    save:save,fetchTile:fetchTile,estimate:estimate,EST_Z:EST_Z,
     LANES:LANES,BATCH:BATCH,PAUSE:PAUSE,
     progress:function(){return prog},
     stop:function(){stopReq=true},busy:function(){return running}};
@@ -3434,31 +3462,59 @@ function hdChip(){HD.stats().then(function(st){
   var e=el('c-hd');if(e)e.className='basebtn'+(st.tiles?' on':'')}).catch(function(){})}
 function refreshSat(){try{var sc=(map.style.sourceCaches||{})['satpatch'];
   if(sc){sc.clearTiles();map.triggerRepaint()}}catch(e){}}
-function startHDSave(b){
+function startHDSave(tiles,label){
   hdChipTxt('HD 0%');
-  HDDL.save(b,function(d,t){hdChipTxt('HD '+Math.round(d/Math.max(1,t)*100)+'%')},'this view')
+  HDDL.save(tiles,function(d,t){hdChipTxt('HD '+Math.round(d/Math.max(1,t)*100)+'%')},label)
     .then(function(r){hdChip();refreshSat();
       if(r&&r.error)show('<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
         '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');})}
-function hdCard(){
+ 
+var HD_CONFIRM=null;
+function hdTiers(){
   var v=map.getBounds(),b=[v.getWest(),v.getSouth(),v.getEast(),v.getNorth()];
-  HD.stats().then(function(st){
-    var pl=HDDL.plan(b),n=pl.length,mb=HDDL.estimate(pl)/1048576,big=mb>500,pr=HDDL.progress();
+  var c=map.getCenter(),co=countyObjAt([c.lng,c.lat]);
+  var t=[{id:'view',label:'this view',name:'THIS VIEW',tiles:HDDL.plan(b),btn:'Save HD for this view'}];
+  if(co)t.push({id:'county',label:co.n+' County',name:co.n.toUpperCase()+' COUNTY',
+    tiles:HDDL.planPoly(co.r,13,15),btn:'Save HD for '+co.n+' County'});
+  if(typeof CTX!=='undefined'&&CTX&&CTX.rings)t.push({id:'state',label:'the whole state',
+    name:'THE WHOLE STATE',tiles:HDDL.statePlan(),btn:'Save the whole state',confirm:true,
+    note:'one level sharper than the built-in map, everywhere'});
+  for(var i=0;i<t.length;i++){t[i].n=t[i].tiles.length;t[i].mb=HDDL.estimate(t[i].tiles)/1048576}
+  return t}
+function hdMB(mb){return mb<1?'under 1 MB':'about '+Math.round(mb)+' MB'}
+function hdCard(){
+  var tiers=hdTiers(),pr=HDDL.progress();
+  Promise.all([HD.stats(),HDDL.quota()]).then(function(res){
+    var st=res[0],q=res[1],busy=HDDL.busy();
     var h='<b>HD imagery</b>'+
-      '<div class="sub">Sharper satellite for places you choose. Nothing downloads on its own.</div>'+
-       
-      (pr?'<div class="k">DOWNLOADING '+String(pr.label).toUpperCase()+'</div><div class="sub">'+
-        (pr.done+pr.skipped).toLocaleString()+' of '+pr.total.toLocaleString()+
-        ' tiles'+(WAKE.active()?' · the screen stays on until it finishes':'')+'</div>':'')+
-      '<div class="k">THIS VIEW</div><div class="sub">'+n.toLocaleString()+' tiles · about '+
-        (mb<1?'under 1':Math.round(mb))+' MB'+(big?' — zoom in to a smaller area to save':'')+'</div>'+
-      (HDDL.busy()?'<button class="chip" id="hd-stop">'+ic('alert')+'<span>Stop downloading</span></button>':
-        (big||!n?'':'<button class="chip" id="hd-save">'+ic('layers')+'<span>Save HD for this view</span></button>'))+
-      '<div class="k">SAVED ON THIS PHONE</div><div class="sub">'+st.tiles.toLocaleString()+
+      '<div class="sub">Sharper satellite for places you choose. Nothing downloads on its own.</div>';
+    if(pr){
+      var left=pr.eta==null?'':(pr.eta<60?' · under a minute left':' · about '+Math.ceil(pr.eta/60)+' min left');
+      h+='<div class="k">DOWNLOADING '+String(pr.label).toUpperCase()+'</div><div class="sub">'+
+        (pr.done+pr.skipped).toLocaleString()+' of '+pr.total.toLocaleString()+' tiles'+left+
+        (WAKE.active()?' · the screen stays on until it finishes':'')+'</div>'+
+        '<button class="chip" id="hd-stop">'+ic('alert')+'<span>Stop downloading</span></button>'}
+    for(var i=0;i<tiers.length;i++){
+      var t=tiers[i],big=t.id==='view'&&t.mb>500,fits=!q.known||q.free>=t.mb*1048576*1.2;
+      h+='<div class="k">'+t.name+'</div><div class="sub">'+(t.n?t.n.toLocaleString()+' tiles · '+hdMB(t.mb)+
+        (t.note?' · '+t.note:'')+(big?' — zoom in to a smaller area to save':''):'already sharp here — built in or saved, nothing to download')+'</div>';
+      if(busy||big||!t.n)continue;
+      if(!fits){h+='<div class="sub">Not enough space: needs '+hdMB(t.mb*1.2)+', the phone allows '+
+        hdMB(q.free/1048576)+'</div>';continue}
+      if(t.confirm&&HD_CONFIRM===t.id){
+        h+='<div class="sub">'+hdMB(t.mb)+' and '+t.n.toLocaleString()+' tiles. The screen stays on until it finishes; Stop keeps what landed.</div>'+
+          '<button class="chip" id="hd-go-'+t.id+'">'+ic('layers')+'<span>Yes, save the whole state</span></button>'+
+          '<button class="chip" id="hd-no">'+ic('alert')+'<span>Not now</span></button>'}
+      else h+='<button class="chip" id="hd-'+(t.confirm?'ask-':'go-')+t.id+'">'+ic('layers')+'<span>'+t.btn+'</span></button>'}
+    if(!q.known)h+='<div class="sub">This phone does not say how much space it allows — a save stops itself if space runs out, and keeps what landed.</div>';
+    h+='<div class="k">SAVED ON THIS PHONE</div><div class="sub">'+st.tiles.toLocaleString()+
         ' tiles · '+(st.bytes/1048576).toFixed(1)+' MB</div>'+
       (st.tiles?'<button class="chip" id="hd-del">'+ic('alert')+'<span>Delete all saved HD</span></button>':'');
     show(h);
-    var a=el('hd-save');if(a)a.addEventListener('click',function(){startHDSave(b);hdCard()});
+    tiers.forEach(function(t){
+      var g=el('hd-go-'+t.id);if(g)g.addEventListener('click',function(){HD_CONFIRM=null;startHDSave(t.tiles,t.label);hdCard()});
+      var a=el('hd-ask-'+t.id);if(a)a.addEventListener('click',function(){HD_CONFIRM=t.id;hdCard()})});
+    var no=el('hd-no');if(no)no.addEventListener('click',function(){HD_CONFIRM=null;hdCard()});
     var o=el('hd-stop');if(o)o.addEventListener('click',function(){HDDL.stop()});
     var d=el('hd-del');if(d)d.addEventListener('click',function(){
        
@@ -3710,18 +3766,21 @@ function segNear(at,a,b){
   return {d:Math.sqrt(px*px+py*py), t:t, px:px, py:py, side:(dx*(-ay)-dy*(-ax))>0?'L':'R'}}
 
  
-function countyAt(at){
+ 
+function inRings(x,y,rings){
+  for(var r=0;r<rings.length;r++){
+    var ring=rings[r],inside=false;
+    for(var i=0,j=ring.length-1;i<ring.length;j=i++){
+      var xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];
+      if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi))inside=!inside}
+    if(inside)return true}
+  return false}
+function countyObjAt(at){
   if(!CTX||!CTX.counties)return null;
-  var x=at[0],y=at[1];
-  for(var c=0;c<CTX.counties.length;c++){
-    var co=CTX.counties[c];
-    for(var r=0;r<co.r.length;r++){
-      var ring=co.r[r],inside=false;
-      for(var i=0,j=ring.length-1;i<ring.length;j=i++){
-        var xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];
-        if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi))inside=!inside}
-      if(inside)return co.n}}
+  for(var c=0;c<CTX.counties.length;c++)
+    if(inRings(at[0],at[1],CTX.counties[c].r))return CTX.counties[c];
   return null}
+function countyAt(at){var co=countyObjAt(at);return co?co.n:null}
 
 function addressAt(at,wide){
   if(!ADDR||!ADDR.segs)return null;
@@ -3910,7 +3969,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.__sat={tiles:TILES,sparse:SPARSE,inPatch:inPatch,blank:Array.from(BLANK_PNG),resolve:_satResolve};
     window.__hd=HD;
      
-    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__wake=WAKE;
+    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};
     window.__ph={index:PHOTOS,html:photoHTML};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};

@@ -176,6 +176,13 @@ routing, the machine button.
   HD sheet should say what is downloading and how many tiles are done.
   Does a save feel faster than it did? (It fetches six tiles at a time
   now.)
+- The sheet offers three sizes: THIS VIEW, your county by name, and THE
+  WHOLE STATE (~179 MB). Does the county named match where the map is
+  centred? Save your county on wifi. After sixty tiles the sheet should
+  show "about N min left" — does that number track reality? If you have
+  the space, save the whole state: tell us how long it took, whether the
+  phone ever said "Not enough space", and whether the imagery looks
+  sharper everywhere afterwards.
 - Airplane mode, back to that area: saved HD must still draw.
 - **Tools → Saved HD imagery**: does deleting a save free the space?
 

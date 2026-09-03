@@ -438,6 +438,20 @@ def check_ledgers():
 # different shape. Reordering them, or losing the middle tier, silently changes
 # what a rider's map is made of on any build where Overpass is down — and
 # Overpass has been down for every local build since take 76.
+def check_gauges_fallback():
+    """take 179 (A191): the gauges step must survive a refusing NWIS the way
+    ingest survives a refusing Overpass — retry, then the previous build's
+    payload, then a spoken omission. Call-site checks, not definitions."""
+    g = read("tools", "gauges.py")
+    if not g:
+        return fails.append("tools/gauges.py missing")
+    if "for attempt in (1, 2)" not in g or "time.sleep(" not in g:
+        return fails.append("gauges.py has no retry — one NWIS 503 stops the build (A191)")
+    if 'os.path.exists("gauges_payload.json")' not in g or "previous build" not in g:
+        return fails.append("gauges.py does not fall back to the cached payload (A191)")
+    notes.append("gauges fallback: retry once -> previous build's payload -> spoken omission")
+
+
 def check_osm_fallback():
     ing = read("tools", "ingest.py")
     if not ing:
@@ -1747,7 +1761,7 @@ def check_ledger_order():
 
 for fn in (check_handoff, check_stamps, check_offline, check_splash, check_scrub,
            check_style, check_palette, check_machine_legality,
-           check_ledgers, check_osm_fallback, check_drawn,
+           check_ledgers, check_osm_fallback, check_gauges_fallback, check_drawn,
            check_region_clean, check_no_duplicate_defs, check_ledger_order,
            check_layer_control,
            check_artifacts_agree, check_agenda, check_syntax, check_stubs,
