@@ -1,13 +1,5 @@
 # APEX ORV — tester guide
 
-*Generated into `play/testing.html` and published on Pages beside the privacy
-policy, so the guide a tester reads is the one this build actually shipped
-(landmine 98: a document kept apart from the thing it describes drifts).*
-
-The guide's job is to send riders at the parts that have never been touched by
-anyone but the developer's own phone. Sections are ordered by how badly a
-failure would hurt, not by how the app is laid out.
-
 ---
 
 ## Before you start
