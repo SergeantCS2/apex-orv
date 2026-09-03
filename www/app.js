@@ -1028,8 +1028,9 @@ var HDDL=(function(){
         if(have){skipped++;return}
         return M.fetchTile(t[0],t[1],t[2])
           .catch(function(){retries++;
-            return sleep(PAUSE).then(function(){return M.fetchTile(t[0],t[1],t[2])})})
-          .then(function(buf){return HD.put(t[0],t[1],t[2],buf)
+             
+            return sleep(PAUSE).then(function(){return stopReq?null:M.fetchTile(t[0],t[1],t[2])})})
+          .then(function(buf){if(!buf)return;return HD.put(t[0],t[1],t[2],buf)
             .then(function(){done++;bytes+=buf.byteLength})})})}
     function batch(start,end){
       var j=start;
@@ -3469,7 +3470,6 @@ function startHDSave(tiles,label){
       if(r&&r.error)show('<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
         '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');})}
  
-var HD_CONFIRM=null;
 function hdTiers(){
   var v=map.getBounds(),b=[v.getWest(),v.getSouth(),v.getEast(),v.getNorth()];
   var c=map.getCenter(),co=countyObjAt([c.lng,c.lat]);
@@ -3482,7 +3482,9 @@ function hdTiers(){
   for(var i=0;i<t.length;i++){t[i].n=t[i].tiles.length;t[i].mb=HDDL.estimate(t[i].tiles)/1048576}
   return t}
 function hdMB(mb){return mb<1?'under 1 MB':'about '+Math.round(mb)+' MB'}
-function hdCard(){
+ 
+function hdCard(confirmId){
+  var conf=typeof confirmId==='string'?confirmId:null;
   var tiers=hdTiers(),pr=HDDL.progress();
   Promise.all([HD.stats(),HDDL.quota()]).then(function(res){
     var st=res[0],q=res[1],busy=HDDL.busy();
@@ -3501,7 +3503,7 @@ function hdCard(){
       if(busy||big||!t.n)continue;
       if(!fits){h+='<div class="sub">Not enough space: needs '+hdMB(t.mb*1.2)+', the phone allows '+
         hdMB(q.free/1048576)+'</div>';continue}
-      if(t.confirm&&HD_CONFIRM===t.id){
+      if(t.confirm&&conf===t.id){
         h+='<div class="sub">'+hdMB(t.mb)+' and '+t.n.toLocaleString()+' tiles. The screen stays on until it finishes; Stop keeps what landed.</div>'+
           '<button class="chip" id="hd-go-'+t.id+'">'+ic('layers')+'<span>Yes, save the whole state</span></button>'+
           '<button class="chip" id="hd-no">'+ic('alert')+'<span>Not now</span></button>'}
@@ -3512,9 +3514,9 @@ function hdCard(){
       (st.tiles?'<button class="chip" id="hd-del">'+ic('alert')+'<span>Delete all saved HD</span></button>':'');
     show(h);
     tiers.forEach(function(t){
-      var g=el('hd-go-'+t.id);if(g)g.addEventListener('click',function(){HD_CONFIRM=null;startHDSave(t.tiles,t.label);hdCard()});
-      var a=el('hd-ask-'+t.id);if(a)a.addEventListener('click',function(){HD_CONFIRM=t.id;hdCard()})});
-    var no=el('hd-no');if(no)no.addEventListener('click',function(){HD_CONFIRM=null;hdCard()});
+      var g=el('hd-go-'+t.id);if(g)g.addEventListener('click',function(){startHDSave(t.tiles,t.label);hdCard()});
+      var a=el('hd-ask-'+t.id);if(a)a.addEventListener('click',function(){hdCard(t.id)})});
+    var no=el('hd-no');if(no)no.addEventListener('click',function(){hdCard()});
     var o=el('hd-stop');if(o)o.addEventListener('click',function(){HDDL.stop()});
     var d=el('hd-del');if(d)d.addEventListener('click',function(){
        

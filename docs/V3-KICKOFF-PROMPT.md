@@ -9,7 +9,7 @@ top entries of HANDOFF.md, then PROTOCOL.md, then LANDMINES.md entries
 until you have.
 
 The workspace is /home/claude/apex; the seed to restore if it is gone is
-apex-seed-t177.zip. Verify the workspace state first (BUILD, the HANDOFF
+apex-seed-t180.zip. Verify the workspace state first (BUILD, the HANDOFF
 head, the highest agenda and landmine numbers) and tell me what you find
 before proposing work.
 

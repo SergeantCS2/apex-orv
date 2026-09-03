@@ -1,6 +1,6 @@
 # ROADMAP — APEX ORV · V3
 
-*Current as of take 179. Take 176 is the production baseline: on Google
+*Current as of take 180. Take 176 is the production baseline: on Google
 Play as com.apexoffroad.app, closed testing with real users from
 2026-09-02.*
 
@@ -26,7 +26,11 @@ finish the arcs the design already committed to.
 **Next**
 - A183 · R8 shrinking/obfuscation, once testers can device-verify the
   native bridge. Mapping file into CI, android_check asserting it.
-- A189 · Road-hazards ("Security") mode — Flock ALPR cameras, speed
+- A189 · "Road hazards" LAYER — DESIGNED take 180, measured on the extract
+  (3,675 plate readers, 1,938 low bridges, 694 fords, 0 speed cameras);
+  build after A183 on approval. A160 streaming CLOSED: nothing downloads
+  without a tap. The item as first written:
+  Road-hazards ("Security") mode — Flock ALPR cameras, speed
   cameras, low bridges, rail crossings, cattle guards — all OpenStreetMap
   tags the ingest can keep. Design first: name, membership, sixth mode or
   a layer.

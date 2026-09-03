@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 179.* Ranked by blocking-ness, not by interest.
+*Current as of take 180.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2601,7 +2601,7 @@ Hybrid with cache-as-you-go, offline falls back to the z12 base;
 - **Ruled out:** raising the statewide in-APK base past z12 — z13 is
   ~550 MB, z14 ~2.2 GB, z15 8.6 GB (take 75's measurement stands).
 
-## A160 — HD imagery: manual streaming + area saves · IN PROGRESS (144 store+resolver · 145 chip+saves · streaming next)
+## A160 — HD imagery: manual streaming + area saves · CLOSED take 180 (144 store · 145 chip+saves · 179 tiers · streaming ruled out)
 The maintainer picked a hybrid of streaming and downloads with two hard rules:
 NOTHING automatic, and one simple visible control. Design of record:
 - One **HD chip** top-right by the basemap control. OFF by default.
@@ -2620,13 +2620,18 @@ NOTHING automatic, and one simple visible control. Design of record:
   127.7 + z11 38.0 + patches 17.3 = imagery 183; photos only 9.8 (ski
   added ~2). The pyramid law: each level costs 4x for 2x sharpness.
 - **Ruled out:** automatic/background downloads of any kind (the maintainer).
+- **Ruled out (the maintainer, 2026-09-03, take 180):** the streaming
+  half itself. Fetching z13–15 live as the map pans is downloading
+  without a tap — the one thing the app promises never to do — and it
+  spends cellular data by the pan. HD in this app is the saves (145) and
+  the three tiers (179); nothing else fetches imagery.
 - **Ruled out:** raising the in-APK base past z12 (A159 numbers stand).
 - A158 (WebP on the SHIPPED bundle) proceeds independently to shrink the
   APK itself.
 
 ### Field report — t143 self-test on the Fold (PASS 50 · FAIL 2), and the FIRST EXTERNAL TESTER's notes (via the maintainer)
 
-## A161 — self-test style-loaded reads a flickering flag · OPEN
+## A161 — self-test style-loaded reads a flickering flag · SHIPPED take 148 (header corrected take 180)
 XX style-loaded false while 292 features drew, roads passed, 0 map
 errors. isStyleLoaded() is legitimately false mid-tile-transition; the
 check reads it once. Fix: settle-then-measure (poll a few seconds) like
@@ -3171,7 +3176,7 @@ dropped, 383 shadows dropped, 440 named for their lake; the remaining
 - **Ruled out:** dropping unnamed pins that shadow NOTHING. A launch on
   an unnamed pond is still a launch; it just waits for z13.5.
 
-## A189 — "Security" mode: cameras and road hazards · IDEA (the maintainer, 2026-09-02)
+## A189 — "Road hazards" layer: plate readers, low bridges, crossings · DESIGNED take 180 (build after A183, on the maintainer's approval)
 A mode that marks Flock Safety automatic licence-plate readers and other
 potential hazards on the road. The data exists and is already in the
 app's main source: the DeFlock project maps Flock cameras into
@@ -3188,6 +3193,52 @@ the road network, by truck), and how it sits with the five modes rather
 than becoming a sixth thing to cycle past. Not built until designed.
 - **Ruled out:** guessing camera positions or types. OSM only, with the
   same "shown by what the source says" honesty as every other pin.
+
+### Design (take 180) — measured first
+A pyosmium pass over this build's Geofabrik extract (2026-09-03):
+- `man_made=surveillance` 4,387 nodes; `surveillance:type=ALPR` **3,675**;
+  of those 3,587 carry a manufacturer (Flock Safety 3,004 · Motorola
+  Solutions 278 · Genetec 179 · Avigilon 58 · Axis 22 · others <20 each),
+  2,542 an operator, 3,651 a direction. 526 are plain `camera`, 66
+  gunshot detectors.
+- Roads: 1,938 ways with `maxheight`, 244 with `maxweight`, 694 fords
+  (618 nodes + 76 ways), 61 seasonal/winter-service ways, 18 cattle
+  guards, 166 toll booths, 7,451 `railway=level_crossing`, 458 police
+  posts, 2,659 traffic-calming features.
+- `highway=speed_camera`: **0** — Michigan does not permit them; the
+  layer will not invent a category the source is empty on.
+- `hazard=*`: ~60 statewide (school_zone 23, curve 16, contamination 7,
+  washout 3, flooding 1…). Thin; shown where present, never padded.
+
+What it is: a LAYER, "Road hazards", off by default, available in every
+mode from Layers — not a sixth chip row. What it shows, each pin labelled
+only by what OSM says: plate-reader cameras ("Plate reader · Flock
+Safety · operated by Grand Rapids PD" where tagged, "Plate reader ·
+operator not recorded" where not, its direction as a small tick when
+tagged); low bridges as the recorded height; weight limits; fords and
+cattle guards; rail crossings; toll booths; hazard=* pins by their
+value. Stacked by distance like every pin (169). It plans nothing new:
+drive-to on the road network already exists; a route crossing a low
+bridge or a ford is TOLD SO in the turn list ("low bridge, 11 ft 6 in,
+in 0.4 mi") when the machine is a truck and a height was recorded — an
+addition to the turn-by-turn, not a router change.
+
+Data: one pipeline step (hazards.py) keeps those tags from aoi.json —
+the ingest already streams the whole extract — into hazards.json,
+roughly 15,000 points and 2,200 way-attributes, ~350 KB. Freshness is
+the bundle's OSM date, on the card like every other pin's source line.
+
+- **Ruled out:** a sixth mode. Every mode owns pins, layers, a router
+  and a basemap; this is a set of pins that matters in every mode.
+- **Ruled out:** routing AROUND cameras. The app informs; a route that
+  dodges plate readers implies evasion and is not what a trail map is for.
+- **Ruled out:** showing generic CCTV (526) or gunshot detectors (66) —
+  not road hazards; a doorbell camera is not what a rider asks about.
+- **Ruled out:** the name "Security" — it reads as the app guarding you.
+  "Road hazards" reads as what it shows.
+- **Ruled out:** any category the source is empty on (speed cameras).
+- **Ruled out:** building before the maintainer approves this design and
+  before A183, by his order.
 
 ## A190 — HD download tiers: this view, this county, whole state at z13 · BUILDING (H1 take 178 · H2 take 179 · field verdict pending)
 The maintainer asked whether "download all of Michigan" is possible. Measured:

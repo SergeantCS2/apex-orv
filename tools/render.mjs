@@ -1025,6 +1025,10 @@ if (zoomed.trails === 0) {
     /* 6 · the confirmation */
     const clk1 = click('hd-ask-state'); await wait(200);
     const ask = txt(), askBtns = { yes: has('hd-go-state'), no: has('hd-no') };
+    /* take 180 · a dismissed and reopened sheet forgets the question */
+    window.__hdCard(); await wait(200);
+    const reopen = has('hd-ask-state') && !has('hd-go-state');
+    click('hd-ask-state'); await wait(200);
     const clk2 = click('hd-no'); await wait(200);
     const afterNo = { busy: D.busy(), ask: has('hd-ask-state') };
     D.fetchTile = () => wait(5).then(() => new ArrayBuffer(300));
@@ -1043,7 +1047,7 @@ if (zoomed.trails === 0) {
     const eta = { txt: txt(), eta: D.progress() && D.progress().eta };
     await p7; await H.clear(); window.__hdChip();
     return { cName, cInside, cN: county ? county.n : 0, cz, box, sN, sZ, sPatch, sMB: state && state.mb,
-             sheet, sheetBtns, busy3, viewN, viewMB, q100, q2g, ask, askBtns, afterNo, started, stStop, eta, clicks: [clk1, clk2, clk3, clk4] };
+             sheet, sheetBtns, busy3, viewN, viewMB, q100, q2g, ask, askBtns, reopen, afterNo, started, stStop, eta, clicks: [clk1, clk2, clk3, clk4] };
   });
   if (h2.missing) ok(false, "take-179 tier hooks missing (__hdTiers / __inRings / __ctx)");
   else {
@@ -1058,8 +1062,8 @@ if (zoomed.trails === 0) {
        `a 100 MB quota replaces the state button with "Not enough space" and keeps the county's`);
     ok(h2.q2g, `a 2 GB quota gives the state button back`);
     ok(/Yes, save the whole state/.test(h2.ask) && /screen stays on/.test(h2.ask) && /about \d+ MB/.test(h2.ask) && h2.askBtns.yes && h2.askBtns.no
-       && !h2.afterNo.busy && h2.afterNo.ask && h2.started.busy && h2.started.label === 'the whole state' && h2.stStop > 0 && h2.stStop < 12000 && h2.clicks.every(Boolean),
-       `the state tier asks first, "Not now" starts nothing, "Yes" starts a save labelled "the whole state" (Stop kept ${h2.stStop})`);
+       && !h2.afterNo.busy && h2.afterNo.ask && h2.started.busy && h2.started.label === 'the whole state' && h2.stStop > 0 && h2.stStop < 12000 && h2.clicks.every(Boolean) && h2.reopen,
+       `the state tier asks first, a reopened sheet asks again, "Not now" starts nothing, "Yes" starts a save labelled "the whole state" (Stop kept ${h2.stStop})`);
     ok(typeof h2.eta.eta === 'number' && /(min|minute) left/.test(h2.eta.txt) && /DOWNLOADING A LIST/.test(h2.eta.txt),
        `after 60 tiles the card shows a MEASURED time-left (${h2.eta.eta} s remaining at the read)`);
   }

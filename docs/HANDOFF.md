@@ -1,4 +1,53 @@
-# HANDOFF — through Take 179 · V3
+# HANDOFF — through Take 180 · V3
+
+## Take 180 — 2026-09-03 — paperwork and small fixes: A189 designed, A160 closed, the brief at 179
+
+A housekeeping take — every item small, all in one render and one gate.
+
+A189 DESIGNED (no build). Measured on this build's Geofabrik extract with
+a pyosmium pass (the counts are in the item): 3,675 ALPR cameras tagged
+by DeFlock and others, 3,004 of them Flock Safety by manufacturer, 2,542
+with an operator; 1,938 road ways with a maxheight, 244 with a
+maxweight, 694 fords, 7,451 rail crossings, 166 toll booths, 18 cattle
+guards, 61 seasonal roads — and ZERO highway=speed_camera, which is what
+Michigan law predicts. hazard=* is thin: about 60 statewide. The design
+is a LAYER, not a sixth mode ("Road hazards", off by default, any mode),
+each pin labelled by what OSM says and nothing more. Ruled-outs in the
+item, the maintainer's approval before any build, and the build after
+A183 by his order.
+
+A160 CLOSED. The "stream HD while connected" half — z13–15 fetched live
+as you pan, into a rolling cache — is ruled out by the maintainer
+(2026-09-03): it is downloading without a tap, the one thing the app
+promises never to do, and it spends a rider's cellular data by the pan.
+HD in this app is the saves (145) and the tiers (179).
+
+A161's header corrected — the settle-then-measure fix shipped in take
+148 and the code says so; the ledger still said OPEN.
+
+Code, three small ones, all from earlier audits: HD_CONFIRM was a global
+that outlived a dismissed sheet — the state row could reopen straight
+on its Yes/Not-now confirmation; it is a parameter now, so the ask is
+asked every time. A retry that was mid-pause when Stop landed still
+fired one fetch; the retry checks stopReq first. osm_local.py's
+stream-mode prints said "0 touching the region" and a blank Counter for
+a path that never fills those — the stream path prints its own line;
+ingest re-ran here before the seal (touched-step rule).
+
+Documents: NEW-CHAT-BRIEF rewritten at 179 (state, environment rules
+215–217 and launch-first, the cold-rebuild recipe, the measured tier
+numbers); V3-KICKOFF-PROMPT restores from this seed; ROADMAP's Now list.
+
+AUDIT (§0.3): the diff is the three changes and the harness clause,
+nothing else. A retry cancelled by Stop resolves null, which put()
+skips — the tile is neither done nor an error, and the same save
+picks it up next time. Render 267/0 on the first run — the first take
+this session with nothing re-run.
+
+SEAL: gate PASSED, 41 checks (smoke 300 across 5 modes, render 267/0
+inside it). Ingest executed its changed stream path before the seal
+(358 s, 733,622 elements — the same). apex-seed-t180.zip sealed
+(sha256 in chat); V3-KICKOFF-PROMPT names it.
 
 ## Take 179 — 2026-09-03 — A191 gauges fallback · A190 H2: the three tiers
 

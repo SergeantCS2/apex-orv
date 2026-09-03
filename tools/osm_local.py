@@ -219,6 +219,11 @@ def build(rid=None, sink=None):
         os.remove(_idx)
     except OSError:
         pass
+    # take 180: in stream mode h.out never fills (elements go to the sink), so
+    # the old line read "0 touching the region" — a false alarm every build.
+    if sink is not None:
+        print(f"  {h.seen:,} candidate ways in Michigan, streamed to the sink")
+        return h.out
     print(f"  {h.seen:,} candidate ways in Michigan, {len(h.out):,} touching the region")
 
     from collections import Counter
