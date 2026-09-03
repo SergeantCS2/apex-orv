@@ -1,5 +1,17 @@
 # DESIGN — Modes (A136 / A137)
-*Take 124 · a proposal, not a build. Jacob: "each mode for essentially each
+
+> **V3 addendum (take 177).** What this study became, as shipped in the
+> production baseline (take 176): five modes — Off-road · Outdoors · Hunt
+> · Water · Camp — each with its own pins, layers, machine and basemap;
+> distance-based pin stacking at every zoom (take 169); navigation —
+> follow camera, turn-by-turn with ETA and arrival, river guidance that
+> points downstream and calls dams first, hike guidance, feature-detected
+> voice, trip resume after a kill (takes 170–173); Camp with typed
+> campgrounds and the three national forests (174); and the unnamed-pin
+> rule — private docks dropped, duplicates dropped, launches and beaches
+> named for their lake, the rest stepped back outside Water (175). The
+> study below is history and is kept as written.
+*Take 124 · a proposal, not a build. The maintainer: "each mode for essentially each
 onX Off-road application" — ORV/MTB, Fish/Camp/Hunt/Hiking, Beach/Kayak/
 Tubing/Boating. Landmine 190 applies: transcribe his onX screenshots, do not
 invent what a hunter or angler wants.*
@@ -46,7 +58,7 @@ Nothing about a mode is new geometry. The exception is hunting (below).
   is 87 polygons — the Census/DNR public-land layer is far denser).
 - **Fish** needs: lakes as tappable objects (water.json has 12,826 named
   polys — already there), DNR Boating Access Sites (found, not fetched),
-  and species/stocking if Jacob's onX Fish screenshots show that is the
+  and species/stocking if the maintainer's onX Fish screenshots show that is the
   point. **Transcribe first.**
 
 ### 3 · Water — Beach / Kayak / Tube / Boat
@@ -64,7 +76,7 @@ Nothing about a mode is new geometry. The exception is hunting (below).
 
 ## The one thing every mode shares
 
-The default VIEW. Jacob: "the default map view changing". Today the app
+The default VIEW. The maintainer: "the default map view changing". Today the app
 opens at your position zoomed out, else HOME, else mid-Michigan. A mode can
 carry a zoom preference (Ride: z9 to see trail systems; Water: z10 on the
 nearest lake; Trail: z11) but not a place — position is position.
@@ -84,11 +96,11 @@ nearest lake; Trail: z11) but not a place — position is position.
 3. **`walk` machine + profile.** A MACHINE row and a profile label.
 4. **Water mode data:** `leisure=marina`; DNR Boating Access Sites
    (authoritative, named); A139 Great Lakes POI.
-5. **Hunt/Fish data**, after Jacob's onX screenshots are transcribed:
+5. **Hunt/Fish data**, after the maintainer's onX screenshots are transcribed:
    DNR game areas, public-land ownership, hunting units; lake cards.
 6. The guide rewrite (A155) teaches modes; its key bumps (A147).
 
-## Transcribed from Jacob's onX screenshots (take 128)
+## Transcribed from the maintainer's onX screenshots (take 128)
 
 Four screens, transcribed — what is ON them, then what we already hold for
 each. Nothing below is invented; where a source is unknown it says so.
@@ -172,14 +184,14 @@ Layers, Offline Maps, My Content, Tools, Trail Cameras, Go & Track.
   486/487, the NLP's 352/355 etc.). Faithful DMU polygons therefore need
   EITHER a DNR layer that does not exist as of 2026-08-27, OR the exception
   list from the current digest applied over our county rings. Landmine 190:
-  not invented. Blocked on a source; Jacob's digest page would unblock the
+  not invented. Blocked on a source; the maintainer's digest page would unblock the
   county-based part.
 - **Typed waypoints** (stand / camera / sign / water / gate) — next; a picker
   on the existing waypoint, no new data.
 - **Contours over public land** — patches, later.
 - **Wind, parcel owners** — out of scope, stated.
 
-## What I need from Jacob before step 5
+## What I need from the maintainer before step 5
 
 The onX Hunt and onX Fish screenshots he holds — what is on screen, what
 is one tap away, what the pin set is. Steps 1–4 are transcribable from what
@@ -189,4 +201,4 @@ we already have; 5 is not.
 - A mode as a separate bundle or region: every mode reads the same 132 MB.
 - Hiding roads in any mode: the `applyAct` exemption stands.
 - Inventing a fishing or hunting pin set from general knowledge — landmine
-  190. The hunter is Jacob's expert, not me.
+  190. The hunter is the maintainer's expert, not me.

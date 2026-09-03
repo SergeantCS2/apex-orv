@@ -1,8 +1,65 @@
-# HANDOFF — through Take 175 · V2
+# HANDOFF — through Take 177 · V3
+
+## Take 177 — 2026-09-02 — V3: take 176 locked as production
+
+No change to the app. Take 176 is declared the production baseline —
+on Google Play as com.apexoffroad.app, closed testing with real users
+from today — and every document is brought up to what actually shipped:
+- NEW-CHAT-BRIEF.md rewritten for V3 (what the app is at 176, the
+  environment's hard-won facts, how a take works, what V3 is for) and
+  V3-KICKOFF-PROMPT.md, the first message for a new chat.
+- README.md: v3, five modes, the navigation section, Camp, pins that
+  behave, Play install; ~185 MB.
+- ROADMAP.md: a V3 head — now / next / later — with V2 kept as history.
+- PROTOCOL.md: §0, the production-line rules.
+- DESIGN.md and DESIGN-modes.md: a V3 addendum on what the study became.
+- LANDMINES 213–214: the two shapes of a turn-boundary death, and one
+  heavy stage per turn.
+- The ledgers refer to "the maintainer" rather than a name; quotations
+  are kept verbatim and re-attributed. The repository is public.
+- TESTING.md as rewritten in 176; RELEASE-t176.md is the production
+  release note.
+
+SEAL: gate PASSED (render 252/0 and smoke 6 modes inside it; the app is
+identical to 176). The gate now takes about 23 minutes — five polls in
+one turn, not three; landmine 214 amended. apex-seed-t177.zip sealed
+(sha256 in chat). This is the seed the V3 kickoff prompt restores from.
+
+## Take 176 — 2026-09-02 — the tester guide, rewritten for testers
+
+Real testers arrive in four hours from the Play closed track, and the
+guide they would have read had a broken intro, a leaked "landmine 98",
+said "four modes", and did not mention navigation, Camp, or the pin
+cleanup — the six takes that have never met a stranger's phone.
+
+docs/TESTING.md is rewritten whole, for the phone in a tester's hand:
+what they are testing (whether the app is RIGHT, not whether it looks
+nice), install and reporting, then sections ordered by how much a
+failure would matter — the first minute, airplane mode, NAVIGATION
+(following, turn by turn, arrival, re-route, resume after a kill, the
+VOICE line from the self-test), the river, routing against the ground,
+the five modes with Camp, pin stacks and the unnamed cleanup, imagery
+and HD, search, safety features, feel-broken, reading the map like a
+rider, and the ranked list of what we most want to hear. No internal
+references; asserted by the generator. It renders to play/testing.html
+and publishes on Pages from this seed.
+
+Also recorded, at the maintainer's ask: what R8 is and entails (under A183), and
+a "Security" mode idea — Flock ALPR cameras and road hazards, which
+turn out to be OpenStreetMap tags the ingest can keep (A189, design
+first).
+
+Also designed while the gate ran: A190, the HD download tiers (build
+starts in take 177). Appended after the gate had read the ledger; a new
+agenda item with its ruled-out line is structurally what the gate
+checks for.
+
+SEAL: gate PASSED (render 252/0 and smoke 6 modes inside it; the app is
+unchanged from 175). apex-seed-t176.zip sealed (sha256 in chat).
 
 ## Take 175 — 2026-09-02 — the unnamed pins (A188)
 
-Jacob, 24766/24768, over Cass Lake: "in this one tiny area alone I see a
+The maintainer, 24766/24768, over Cass Lake: "in this one tiny area alone I see a
 ton of pins naked as unnamed or unknown ... it's muddying the view."
 
 Measured before anything moved: 1,982 unnamed pins, 8% of everything —
@@ -47,7 +104,7 @@ since 169: the navigation arc, Camp, and this.
 
 ## Take 174 — 2026-09-02 — Camp mode (A186)
 
-Jacob's reference shots were campgrounds and national forests, "which
+The maintainer's reference shots were campgrounds and national forests, "which
 I'd like under camping mode". A fifth mode: Off-road · Outdoors · Hunt
 · Water · Camp.
 
@@ -75,7 +132,7 @@ rode in on, so Camp keeps the rider's machine like Off-road does.
 The third question — what it PLANS — is left as Off-road's answer (a
 route by machine); on-foot planning from a campground is Outdoors'.
 
-Jacob: "do we need to adjust outdoors or any other mode? Other modes
+The maintainer: "do we need to adjust outdoors or any other mode? Other modes
 likely have a lot of overlap." They did — camp sat in all five modes at
 full prominence, and Outdoors' tagline promised "Hike, camp, fish". A
 campground IS relevant to every activity (riders camp at St. Helen,
@@ -101,7 +158,7 @@ scrubbing and removes it if it fails; that guard refused my own first
 fix attempt, which is the point of a guard.
 
 SEAL: render 247/0 (242 + five Camp checks), smoke 6 modes, gate
-PASSED. apex-seed-t174.zip sealed (sha256 in chat). Jacob: "all testing
+PASSED. apex-seed-t174.zip sealed (sha256 in chat). The maintainer: "all testing
 will come from this new zip" — it carries the whole navigation arc
 (170–173) and Camp. CI, on take 173, refused the river drill: "15 of 19 fixes within 15°"
 against an 80% bar that had read 17 of 19 here. Timing, not steering:
@@ -122,7 +179,7 @@ walking, on foot. What was missing was PROOF: a route planned in
 Outdoors, walked at 1.2 m/s, must still show an ETA computed at walking
 pace, not at the crawl of the fixes. Asserted.
 
-N5 · VOICE, feature-detected and never assumed. Jacob's Fold has
+N5 · VOICE, feature-detected and never assumed. The maintainer's Fold has
 Samsung's on-device English (US) pack (24758); the Android WebView has
 been patchier than Chrome about exposing the Web Speech API on top of
 it, so the toggle on the strip appears only when a voice is actually
@@ -252,7 +309,7 @@ PASSED. apex-seed-t171.zip sealed (sha256 in chat). N3 next.
 
 ## Take 170 — 2026-09-01 — navigation N1: the trip survives, the map follows
 
-The first take of A187, and Jacob added the foundation before it was
+The first take of A187, and the maintainer added the foundation before it was
 built: "the app will need memory to resume a trip if the phone turns off
 or app hard closes while on a trip". So persistence went first and the
 follow camera sits on it.
@@ -292,7 +349,7 @@ resumes; north-up flattens the map on the next fix; a trip saved with
 five fixes comes back whole after the ride is stopped and the state
 wiped; ending it clears the offer.
 
-AUDIT (Jacob: "audit all your changes and ensure we got this right"),
+AUDIT (the maintainer: "audit all your changes and ensure we got this right"),
 done by reading the take cold, and it found three real defects that the
 harness had not:
 1. Resume would have wiped itself. startRecording() resets crumbs and
@@ -319,12 +376,12 @@ SEAL: render 227/0, smoke 5 modes, gate PASSED. apex-seed-t170.zip sealed
 
 ## Take 169 — 2026-09-01 — the pin clusters, rebuilt (A174)
 
-The 2026-09-01 audit found the defect behind every pile Jacob kept
+The 2026-09-01 audit found the defect behind every pile the maintainer kept
 photographing: takes 154 and 160 merged pins by GRID CELL, and a grid cell
 is not a proximity test. Proved with the code's arithmetic — 4 px apart
 across a cell edge: separate; 74 px apart in one cell: stacked; 2 px apart
 at high zoom, in different rounding bins: separate. No radius tunes that
-away. Jacob's verdict was "feels bad and cheap", and he was right.
+away. The maintainer's verdict was "feels bad and cheap", and he was right.
 
 Both systems are gone. One clusterer now runs at every zoom:
 - Distance-based greedy: pool the mode's places from the RECORD, project,
@@ -338,7 +395,7 @@ Both systems are gone. One clusterer now runs at every zoom:
 - Members hidden by feature index; the badge — a solid circle carrying
   the count, kind-coloured when one kind, charcoal when mixed — sits on
   the most prominent member's real position, never a centroid.
-- Mixed stacks ALLOWED, per Jacob today: "combining beaches is fine as
+- Mixed stacks ALLOWED, per the maintainer today: "combining beaches is fine as
   long as I can click the pin conglomerates and scroll through all pins".
   Services still stay out below z11.4.
 - Tap does both things he asked: the tray lists every member grouped by
@@ -354,7 +411,7 @@ pass, no two visible things — badge or lone pin — sit within the radius
 of each other. Asserted at the statewide floor, at the old seam, and over
 a dense town.
 
-Filed for Jacob (A186): a Camping mode. His reference shots are
+Filed for the maintainer (A186): a Camping mode. His reference shots are
 campgrounds and national forests, and he wants them "under camping
 mode". Design after this take.
 
@@ -371,7 +428,7 @@ What the rebuild took to get right, all of it measured:
   re-submits an unchanged badge set on every moveend.
 - A tray drill that returned early WITHOUT restoring mode and camera
   broke three unrelated checks downstream. Restore before every return.
-- Jacob: "ensure we're not losing the fact that different modes have
+- the maintainer: "ensure we're not losing the fact that different modes have
   different default pins." Asserted: at one camera, a stack never
   contains a kind its mode does not show (0 strays across Water, Off-road,
   Hunt) and the three modes stack different totals (722 / 598 / 566).
@@ -387,11 +444,11 @@ same stub gap as take 157's clearTimeout, fixed in the harness. A second
 inner-render failure on an unrelated drill did not recur once Chrome
 profile debris was cleared (landmine 210). apex-seed-t169.zip sealed
 (sha256 in chat). A187, the navigation arc, is designed and waiting on
-four answers from Jacob.
+four answers from the maintainer.
 
 ## Take 168 — 2026-08-30 — store copy must survive being re-flowed
 
-Jacob pasted take 167's description into the console and the preview
+The maintainer pasted take 167's description into the console and the preview
 collapsed it into one wall of text: the bullets lost their structure and
 the paragraphs ran together.
 
@@ -506,7 +563,7 @@ permission and now proves it on every run.
 Take 163's rename branched from t161, so two things sealed in t162 never
 reached this line: `docs/TESTING.md` and the `play_assets.py` that renders it
 to `play/testing.html` and copies it into `www/` for Pages. The release notes
-in Jacob's hand point at `/testing.html`; without this the URL 404s at the
+in the maintainer's hand point at `/testing.html`; without this the URL 404s at the
 moment twelve riders tap it. Also restored: release notes cut on a paragraph
 or sentence boundary rather than a hard 480-character slice, which had cut a
 note mid-word ("exactly a").
@@ -518,7 +575,7 @@ have DIFFERENT ids: they sit side by side, and waypoints, rides and saved HD
 imagery do not carry across, because WebView storage is scoped per app. The
 guide says so, and tells a tester how to know which icon they opened.
 
-Measured, not estimated, from the take-164 bundle Jacob built: download size
+Measured, not estimated, from the take-164 bundle the maintainer built: download size
 184.1–184.2 MB (bundletool get-size total). Under Play's 200 MB threshold, so
 no mobile-data confirmation dialog. The bundle itself is 181 MB against a
 500 MB base-module limit — Play Asset Delivery stays unnecessary (A170).
@@ -631,7 +688,7 @@ application id) is the one decision still outstanding and it is not
 mine to make.
 
 NOT done, and deliberately: a find-and-replace over the data. Three
-"Jacob"/"Sergeant" hits in photos_index.json are Jacobsville Lighthouse,
+the name hits in photos_index.json are Jacobsville Lighthouse,
 Jacobson Marina and Sergeant Marina — real Michigan places. A careless
 scrub would have corrupted the map to tidy a comment.
 
@@ -701,7 +758,7 @@ seeding, diffed job by job (landmine 202).
 
 ## Take 160 — 2026-08-29 — overlapping pins stack at ANY zoom (A176)
 
-Jacob, 24596, at 1000 ft: pins still sit on top of each other — three by
+The maintainer, 24596, at 1000 ft: pins still sit on top of each other — three by
 Bosko's Coffee, two on Cass Lake Road — "the whole reason we implemented
 this feature". He is right, and take 154 does not cover it: that
 clustering stops at z11.4 and everything above it draws exactly as it
@@ -718,7 +775,7 @@ Design of record:
 - Every kind participates up here, food and fuel included. The take-154
   rule ("services never cluster") was about mass grouping at statewide
   zoom; two coffee shops drawn on top of each other are unreadable
-  whatever kind they are, and Jacob's screenshot IS food pins.
+  whatever kind they are, and the maintainer's screenshot IS food pins.
 - Tapping the badge opens a card listing the whole stack, scrollable,
   each row opening that place — his ask, verbatim.
 - The existing poi layers keep doing the rendering. Hiding is a filter
@@ -726,7 +783,7 @@ Design of record:
   boosts all keep working untouched; nothing about pin drawing is
   reimplemented.
 
-The bug the drill caught, and it would have flickered in Jacob's hand:
+The bug the drill caught, and it would have flickered in the maintainer's hand:
 the pass reads RENDERED pins, so once it hid the overlapping members it
 could no longer see them — next pass finds no overlap, un-hides
 everything, finds the overlap again, forever. Pins hidden by the previous
@@ -796,7 +853,7 @@ mode that landmine describes. apex-seed-t159.zip sealed (sha256 in chat).
 
 Take 156 COVERED the broken boot; this removes it. paintIcons() runs at
 the top of the app body — but the app body is inside start(), and start()
-only runs once the whole bundle has fetched, which is why Jacob watched
+only runs once the whole bundle has fetched, which is why the maintainer watched
 __IC_map__ sit there for seconds (24582). The shell is now transparent
 until its icons are real, and paintIcons reveals it.
 
@@ -820,7 +877,7 @@ now the drill borrows a land machine; and fps is avg 119, worst 21 ms,
 0/70 frames over budget — the 1,783 ms first-paint stall of A162 has not
 recurred in two clean runs, so A162 closes as noise.
 
-Jacob's splash verdict: "works great — when it goes away, everything is
+The maintainer's splash verdict: "works great — when it goes away, everything is
 mostly loaded". That settles the open question from the take-156 seal:
 lifting on the first idle frame is the right moment, and holding for
 tile-settle is NOT needed. Pin clusters: "will need additional tuning,
@@ -833,7 +890,7 @@ apex-seed-t158.zip sealed (sha256 in chat).
 
 ## Take 157 — 2026-08-29 — the basemap busy line (A173)
 
-The other half of Jacob's ask: "when the map changes to relief / auto
+The other half of the maintainer's ask: "when the map changes to relief / auto
 hides after it fully loads." Switching to Satellite or Hybrid pulls
 imagery that may be a saved HD store, a bundled tile, or nothing at all,
 and until it lands the map looks half-drawn with no explanation.
@@ -867,14 +924,14 @@ apex-seed-t157.zip sealed (sha256 in chat).
 
 ## Take 156 — 2026-08-29 — the loading screen (A171)
 
-Jacob's screenshot 24582 is the diagnosis: on a cold start the shipped
+The maintainer's screenshot 24582 is the diagnosis: on a cold start the shipped
 index.html paints its chrome with the icon TOKENS still raw —
 __IC_map__, __IC_layers__, __IC_vehicle__ — on the bare tan map
 background, because those tokens are substituted by app.js at RUNTIME and
 app.js is still parsing a 46 MB graph. It fixes itself; it looks broken
 until it does.
 
-Design of record (Jacob's spec, built as specified):
+Design of record (the maintainer's spec, built as specified):
 - A splash in index.html's STATIC markup, first child of body, styled by
   the inline stylesheet already in <head> — so it paints on the browser's
   FIRST paint, before app.js is even parsed. It carries no __IC_ token by
@@ -885,7 +942,7 @@ Design of record (Jacob's spec, built as specified):
   (measured), so the bar is 76.37% wide, offset 12.6% — A to X, as asked.
 - REAL progress, not a 10-second lie. The boot already has countable
   milestones: every bundle artifact the loader fetches, the style, and
-  the first idle frame. Jacob offered the fake timer as a simplification;
+  the first idle frame. The maintainer offered the fake timer as a simplification;
   it is rejected on the project's own terms — a bar that says 60% while
   the phone is done, or 100% while it is not, is a lying instrument, and
   this app does not ship those.
@@ -894,7 +951,7 @@ Design of record (Jacob's spec, built as specified):
   it, and a fatal load error lifts it immediately so the error is the
   thing on screen.
 
-Basemap-switch busy state (Jacob also asked) is take 157 — a lighter
+Basemap-switch busy state (the maintainer also asked) is take 157 — a lighter
 indicator, not this full-screen splash.
 
 The bug worth keeping: the app body runs INSIDE start(), so the no-op
@@ -915,7 +972,7 @@ apex-seed-t156.zip sealed (sha256 in chat).
 
 ## Take 155 — 2026-08-29 — the zoom floor, and the paperwork 154 owed
 
-Jacob, reading the take-154 seal: "when fully zoomed out I should see the
+The maintainer, reading the take-154 seal: "when fully zoomed out I should see the
 pin clusters, will I?" The honest answer was that I did not know — the
 drill measured z8.4 and the map's floor is minZoom 5.2. It measures the
 floor now, naming the badge count, the biggest stack and the kinds.
@@ -939,30 +996,30 @@ apex-seed-t155.zip sealed (sha256 in chat).
 
 ## Take 154 — 2026-08-29 — pin clusters at low zoom (A170)
 
-Jacob's reference shots (24507/24509): numbered clusters zoomed out,
+The maintainer's reference shots (24507/24509): numbered clusters zoomed out,
 plain pins zoomed in, and his rule — destinations only, never fuel/food/
 store. Built to A170's recorded design.
 
 The architectural trap, named before building: MapLibre clusters at the
 SOURCE and this app selects pins by LAYER FILTER, so cluster:true on the
 existing `poi` source would count all 25,798 places including the 17,544
-Jacob excludes and every kind the mode hides. Instead a SECOND source,
+The maintainer excludes and every kind the mode hides. Instead a SECOND source,
 `poiclust`, carries clusterable kinds INTERSECTED with the mode's kinds,
 re-set on every mode switch — the source is the filter, so the count
 cannot lie. clusterProperties carries per-kind counts so a homogeneous
-cluster draws its own glyph with xN (Jacob's idea) and a mixed one draws
+cluster draws its own glyph with xN (the maintainer's idea) and a mixed one draws
 a plain numbered circle (the reference app's behaviour). Below the
 cluster ceiling the existing layers drop clusterable kinds so nothing
 draws twice; above it the map is exactly what it was.
 
-TUNED (Jacob: "only for similar and major pins"). The first build used
+TUNED (the maintainer: "only for similar and major pins"). The first build used
 MapLibre's supercluster and produced 20 MIXED piles of 23 — proximity is
 all supercluster knows, and it cannot partition by property. Rebuilt to
 bucket per KIND in JS: project the mode's destinations, bin by kind +
 grid cell, emit a stack only where 2+ of the SAME kind share a cell.
 Every cluster is one kind by construction, no per-kind sources needed,
 and the layer count went DOWN (the mixed circle and its count layer are
-gone). Radius 38 per Jacob's agreement: the ×150 pile became ×65.
+gone). Radius 38 per the maintainer's agreement: the ×150 pile became ×65.
 
 "Major" is the app's own flag, not a fresh opinion: POIKIND marks
 destinations d:1 and that flag already gated the low-zoom layer. shelter
@@ -986,11 +1043,11 @@ hit for the third time this project).
 
 ---
 
-## Take 153 — 2026-08-29 — v2 field report one (Jacob, t152 on the Fold)
+## Take 153 — 2026-08-29 — v2 field report one (the maintainer, t152 on the Fold)
 
 Five fixes from one report and one self-test:
 1. The HD chip had no per-id position — it sat ON the basemap chip in the
-   left stack. Top right now, parallel to the elevation readout (Jacob's
+   left stack. Top right now, parallel to the elevation readout (the maintainer's
    spec, twice: the sketch and the correction).
 2. The hdCard's three buttons showed literal __IC_layers__/__IC_alert__ —
    the token pass substitutes STATIC markup only; runtime HTML must use
@@ -1015,12 +1072,12 @@ once first and was right: a combined "Takes 151–152" heading parses as
 neither take, so the batch's own record was incomplete — split into two
 entries. ci/RELEASE.md was written BEFORE this seal, closing the t152
 miss where the notes still carried take 146 (landmine 96's shape, caught
-by Jacob's own reading of the Releases tab). apex-seed-t153.zip sealed
+by the maintainer's own reading of the Releases tab). apex-seed-t153.zip sealed
 (sha256 in chat).
 
 ---
 
-## Takes 147–150 — 2026-08-28/29 — the tester batch (Jacob: "do not seal
+## Takes 147–150 — 2026-08-28/29 — the tester batch (the maintainer: "do not seal
 ## until all of these are hit... every mode should plan something")
 
 Order of work, one at a time: 147 liveries into Water (A166, new ingest
@@ -1076,7 +1133,7 @@ before it ever ran.
 
 ## Take 151 — 2026-08-29 — DNR boating access sites (A169)
 
-Mid-batch field report two, half one: Jacob has dropped at ramps the app
+Mid-batch field report two, half one: The maintainer has dropped at ramps the app
 never showed. DNR Boating Access Sites (1,325; the layer verified to
 exist before anything was promised — landmine 190) merge into launches
 (+280) and corridor candidates; the Rifle goes from 2 named accesses to
@@ -1098,13 +1155,13 @@ order is not load-bearing); and stRender's promise chain structurally
 cannot complete under a harness that pumps timers, never microtasks — it
 is a setTimeout chain now, the pattern the file already used.
 
-SEAL (the batch, takes 147–152 as one — Jacob: "do not seal until all of
+SEAL (the batch, takes 147–152 as one — The maintainer: "do not seal until all of
 these are hit"): smoke 5/5 modes, render 195/0 (184 + the water batch +
 the Rifle pair), gate PASSED. The gauges artifact had to be taught to
 THREE explicit maps (bundle manifest, IN_BUNDLE, the split loader's fetch
 list) — a 404 at boot took the whole app down in the harness, which is
 exactly the loud failure the offline-integrity check exists to make.
-README.md rewritten for v2 in Jacob's own README voice — every capability,
+README.md rewritten for v2 in the maintainer's own README voice — every capability,
 stated honestly, limits included. Two more gate refusals answered on the
 way: the HANDOFF title line, and NWIS missing from manifest.py — the
 declaration of RECORD, not just PROVISION's prose (the gate knew the
@@ -1117,7 +1174,7 @@ chat). This is v2's candidate build.
 
 ## Take 146 — 2026-08-28 — the Ride mode is called Off-road (A167)
 
-Jacob's direct call from the first EXTERNAL tester session. Label, mode
+The maintainer's direct call from the first EXTERNAL tester session. Label, mode
 subtitle context and guide only — the internal key 'ride' and the
 recording verb ("Ride it", the Ride tab) deliberately stay: saved state
 hangs off the key, and "go for a ride" is the activity, not the mode's
@@ -1137,7 +1194,7 @@ boats as Water's machine, liveries into Water) — recorded, designs next.
 
 ## Take 145 — 2026-08-28 — the HD chip and "Save HD for this view"
 
-The visible half of A160, built to Jacob's sketch: an HD chip in the
+The visible half of A160, built to the maintainer's sketch: an HD chip in the
 top-right stack (hidden entirely for non-sparse regions), a sheet that
 quotes tiles and megabytes BEFORE a save button exists, progress in the
 chip's own label ("HD 42%"), a Stop button, saved totals and a delete
@@ -1178,7 +1235,7 @@ building: the HD button is field-visible.
 
 ## Take 144 — 2026-08-28 — HD imagery arc opens: the saved store + resolver
 
-A160 (Jacob's call after field report 24542): sharp-past-z12 comes from a
+A160 (the maintainer's call after field report 24542): sharp-past-z12 comes from a
 manual HD system — stream with signal, save areas by choice, NOTHING
 automatic. This take ships the foundation alone and proves it before any
 UI exists: an IndexedDB tile store (no plugin, survives restarts, the
@@ -1194,14 +1251,14 @@ winning inside its boxes, stats counting what clear removes.
 
 SEAL: render 178/0 (173 + the five store checks). Gate PASSED.
 apex-seed-t144.zip sealed (sha256 in chat). Field-invisible by design —
-Jacob can skip building this take; 145 puts the chip on it.
+The maintainer can skip building this take; 145 puts the chip on it.
 
 ---
 
 ## Take 143 — 2026-08-28 — z12 statewide imagery base
 
 Field report 24493 (Onondaga at 1 mi, take-140 APK): Hybrid still reads
-pixelated — the z11 base is 54 m/px stretched ~5x at that view. Jacob
+pixelated — the z11 base is 54 m/px stretched ~5x at that view. The maintainer
 made the z12 call and accepted the size for now ("work backwards and not
 worry… 114 MB isn't bad"): the statewide base moves to z12 — 10,573
 tiles, ~104 MB, 27 m/px, 2x sharper again — under the unchanged z12–15
@@ -1209,10 +1266,10 @@ riding-area patches. One-line change: the APEX_IMAGERY_BASE_Z default in
 imagery.py, so CI builds it with no env plumbing. Elevation readout
 confirmed good in the same report (take 140's text stroke did its job).
 
-Size ledger, measured from Jacob's own t140 APK: 110.6 MB on the wire, of
+Size ledger, measured from the maintainer's own t140 APK: 110.6 MB on the wire, of
 which the Android shell is <8 MB — the bundle IS the APK. Expected next
 APK ≈ 175–180 MB. The WebP re-encode measurement is queued as its own
-arc to work back toward Jacob's sub-100 MB ideal.
+arc to work back toward the maintainer's sub-100 MB ideal.
 
 Two catches on the way, both worth keeping:
 1. A z12-ONLY base regresses the z11-11.9 band to the 234 m/px mosaic —
@@ -1234,7 +1291,7 @@ apex-seed-t143.zip sealed (sha256 in chat).
 
 ## Take 142 — 2026-08-28 — ski and snowboard hills
 
-Jacob (24280): "add all ski resorts… pictures, descriptions, link to
+The maintainer (24280): "add all ski resorts… pictures, descriptions, link to
 website and what ski runs are available." Mt Holly and Pine Knob are the
 archetypes. Plan of record: `landuse=winter_sports` polygons pin as a
 `ski` kind in Outdoors; `piste:type=downhill` and `snow_park` ways whose
@@ -1277,7 +1334,7 @@ www stale. apex-seed-t142.zip sealed (sha256 in chat).
 
 ## Take 141 — 2026-08-28 — Hunt as its own mode; MTB pins are bikes
 
-Jacob: "split Hunt from the separate modes — there's going to be a lot of
+The maintainer: "split Hunt from the separate modes — there's going to be a lot of
 squares for public land." MODES gains `hunt` (on foot; public land + county
 lines + summits from z9 + the typed waypoints); Outdoors is the hiker's map
 again (trail systems, hills, rivers — public land and counties OFF). The
@@ -1308,7 +1365,7 @@ reseal.
 
 ## Take 140 — 2026-08-28 — the readout outline, and a statewide imagery base
 
-Jacob's 138 self-test: PASS 47 / FAIL 0, dispatch 88 ms on the Fold (was
+The maintainer's 138 self-test: PASS 47 / FAIL 0, dispatch 88 ms on the Fold (was
 654 at take 119), imagery "tiles z12-z15 · 3.40 m/px", trail-names 4 for
 25 segments. Two field notes:
 
@@ -1330,7 +1387,7 @@ z12+ tile outside a patch answers blank and the base never shows past z11.
 Render: at a point outside every box, on Satellite at z13, the base source
 has loaded and the layer is visible. 168/0. Imagery 55.9 MB / 3,513 tiles.
 
-**Jacob's call, with numbers:** z12 statewide is 10,573 tiles / 104 MB
+**the maintainer's call, with numbers:** z12 statewide is 10,573 tiles / 104 MB
 (27 m/px, 9× the mosaic); z13 is 400 MB. `APEX_IMAGERY_BASE_Z=12` in
 ci/bundle.sh is the one-line switch if he wants it.
 
@@ -1362,12 +1419,12 @@ A probe must not depend on file order.
 
 Render 167/0: dispatch card 2 ms of scanning, every lookup on a grid. Gate
 PASSED, smoke 5 modes. apex-seed-t139.zip sealed, photos inside (sha256 in
-chat). **Next:** DMUs on Jacob's digest page; contours over public land as
-patches; Jacob's 138 bug report.
+chat). **Next:** DMUs on the maintainer's digest page; contours over public land as
+patches; the maintainer's 138 bug report.
 
 ---
 
-## Take 138 — 2026-08-27 — two regressions from Jacob's 136 test, both mine
+## Take 138 — 2026-08-27 — two regressions from the maintainer's 136 test, both mine
 
 **Hybrid turned blue from z12 up, with "random white lines".** The
 "blank" tile the apexsat:// protocol returns for anything outside a patch
@@ -1393,7 +1450,7 @@ photos inside (sha256 in chat).
 
 ## Take 137 — 2026-08-27 — typed hunting waypoints
 
-Transcribed from Jacob's onX Hunt screen (24280): tree stand, trail camera,
+Transcribed from the maintainer's onX Hunt screen (24280): tree stand, trail camera,
 deer sign, water, gate. In Outdoors the dropped-pin card offers the five
 beneath "Save as waypoint"; Ride's card is unchanged. A type is a colour
 and a name prefix on the SAME waypoint record (`t`), so the Saved panel,
@@ -1408,11 +1465,11 @@ synthetic long press (touchstart/touchend) without the trailing click leaves
 the app's "long press already acted" flag set, which swallowed the NEXT
 drill's tap. A real finger always sends the click; the drill does now.
 
-Jacob's build #55 (t135) measured the CI throttle: 100 lookups in 1,251 s.
+The maintainer's build #55 (t135) measured the CI throttle: 100 lookups in 1,251 s.
 Recorded in landmine 205.
 
 Gate PASSED, smoke 5 modes. apex-seed-t137.zip sealed, photos inside
-(sha256 in chat). **Next:** DMU county layer on Jacob's digest page;
+(sha256 in chat). **Next:** DMU county layer on the maintainer's digest page;
 contours over public land as patches; address index diet.
 
 ---
@@ -1430,7 +1487,7 @@ job); `ci/bundle.sh` exports `APEX_PHOTO_BUDGET_S=0` and photos.py then
 uses the shipped set as-is with one line of output. Seed ~12 MB — still a
 phone upload. Future fetches save at the smaller size.
 
-Jacob's builds: #53 (t131) timed out at 1h30; #54 cancelled by the next
+The maintainer's builds: #53 (t131) timed out at 1h30; #54 cancelled by the next
 upload; #55 (t135) will time out too — cancel it and upload t136.
 
 Gate PASSED. apex-seed-t136.zip sealed with photos/ inside (sha256 in chat).
@@ -1439,7 +1496,7 @@ Gate PASSED. apex-seed-t136.zip sealed with photos/ inside (sha256 in chat).
 
 ## Take 135 — 2026-08-27 — the photo step no longer holds CI hostage
 
-Jacob's CI: two builds sat after `address:` with no output; one was
+The maintainer's CI: two builds sat after `address:` with no output; one was
 cancelled by the next upload, the second was heading for the 90-minute job
 timeout. Cause: `photos.py` (take 131) on a runner with an EMPTY cache does
 ~2,940 Wikipedia lookups at ~59/min — ~50 minutes — and printed nothing
@@ -1454,7 +1511,7 @@ fills progressively across builds — the cache (img_cache/photos/) is in
 CI's region cache list. Proven: warm cache 3 s with 608 photos; a 20-second
 cold budget stopped, shipped 5, and reported 2,924 deferred.
 
-Expect Jacob's next CI run: ~30 min to address, 25 min of photos (with a
+Expect the maintainer's next CI run: ~30 min to address, 25 min of photos (with a
 line every ~2 min), then render + gate — under the 90. The run after that
 gets the rest of the photos from cache.
 
@@ -1464,7 +1521,7 @@ Gate PASSED. apex-seed-t135.zip sealed (sha256 in chat).
 
 ## Take 133 — 2026-08-27 — the guide, rewritten and versioned
 
-Jacob: "the tutorial still doesn't show up on app launch." Not a race with
+The maintainer: "the tutorial still doesn't show up on app launch." Not a race with
 the location prompt — `apex.guide.v1` survived every install since an early
 take (A147). The guide is rewritten for the whole state and the three modes
 (what each is for; a mode is a starting point, never a cage; public land,
@@ -1475,7 +1532,7 @@ now reads the key by prefix. 160/0.
 
 ## Take 134 — 2026-08-27 — hiking trails routable in Outdoors
 
-Jacob's answer to the open question: hiking trails "should be added to
+The maintainer's answer to the open question: hiking trails "should be added to
 Outdoors and highlight the paths / start / end like we would for ORV."
 `foot` leaves SHOW_ONLY in graph.py and becomes a routable class, legal for
 the `walk` machine ONLY (the gate's class-legality check guards that no ORV
@@ -1501,7 +1558,7 @@ Mio failed at the first profile. `ROUTE_CAP` scales with NODES (×1.2, floor
 of 995k edges (65 %); foot not in the top eight. The 12,451 DNR hiking
 features average 65 vertices, and a trail that RUNS ALONG a two-track shares
 every snapped vertex with it — every shared vertex was a junction, so both
-lines were chopped into confetti. Jacob's instinct ("455 routes sounds much
+lines were chopped into confetti. The maintainer's instinct ("455 routes sounds much
 more reasonable") pointed at the right symptom; the cause was the noder.
 Fix in graph.py: within a run of consecutive vertices shared with a foot
 line, only the run's ENDS stay junctions (join the road, leave the road); a
@@ -1524,7 +1581,7 @@ never both" holds unchanged. Gate PASSED, render 161 inside it.
 apex-seed-t134.zip sha256 b1cdbaf0…0e9e, 85 files, carries take 133.
 
 **Next:** typed hunting waypoints (stand / camera / sign / water / gate);
-DMU county-based layer once Jacob sends the digest page; contours over
+DMU county-based layer once the maintainer sends the digest page; contours over
 public land as patches; address index diet (the last ~900 ms of dispatch).
 
 
@@ -1571,14 +1628,14 @@ killed the gate mid-run; third run clean. apex-seed-t132.zip sha256
 line in the seed list; caught by the manifest check before sending).
 
 **DMUs: not published** (see DESIGN-modes.md). **Next:** typed waypoints;
-contours over public land as patches; guide; Jacob's call on foot routes
+contours over public land as patches; guide; the maintainer's call on foot routes
 in the router.
 
 ---
 
 ## Take 131 — 2026-08-27 — photos on major pins, A139 lighthouses, and two old landmines found alive
 
-**Photos (Jacob's idea).** Measured first: OSM carries a photo link on
+**Photos (the maintainer's idea).** Measured first: OSM carries a photo link on
 ~2 % of destinations, so `tools/photos.py` goes to Wikipedia — geosearch
 within 3 km, article matched on NAME (tokens minus stop words, ≥ 60 %
 overlap), lead image as a 320 px thumbnail, Commons author + licence for
@@ -1617,7 +1674,7 @@ into the file header; ingest rebuilds when it differs. Printed:
 **Landmine 204** (pkill/pgrep matching the calling shell) is written; it
 cost four calls this take.
 
-**Jacob's reference (Google Maps place cards).** Photo carousel, rating,
+**the maintainer's reference (Google Maps place cards).** Photo carousel, rating,
 one-line description, address, hours. Offline reality: photo + description
 + address ship; rating, reviews and hours are Google's and cannot. The
 coverage he wants is beaches, launches, state parks / campgrounds, MTB
@@ -1646,7 +1703,7 @@ left). Then bundle → build → suites → seal. Nothing sealed under 131 yet.
 
 ## Take 130 — 2026-08-26 — the mode picker
 
-Jacob: "make the mode switcher pop out, let me select what mode I want
+The maintainer: "make the mode switcher pop out, let me select what mode I want
 rather than it swapping between them." The chip now opens a picker built the
 way the activity chip's is — three rows, each with the mode's name and a
 one-line description of what it is FOR ("Beach, kayak, tube, boat —
@@ -1658,7 +1715,7 @@ Gate PASSED, smoke 5 modes. apex-seed-t130.zip sealed (sha256 in chat).
 
 **Next, in order:** marina tag + DNR Boating Access Sites + A139 Great
 Lakes destinations for Water; Hunt data (DNR public-land polygons, DMUs,
-typed waypoints); guide (A147/A155). Jacob's open call: foot routes into
+typed waypoints); guide (A147/A155). The maintainer's open call: foot routes into
 the routing graph.
 
 ---
@@ -1693,9 +1750,9 @@ apex-seed-t129.zip sealed; sha256 in chat.
 
 ---
 
-## Take 128 — 2026-08-26 — the walking router, and Jacob's onX screens transcribed
+## Take 128 — 2026-08-26 — the walking router, and the maintainer's onX screens transcribed
 
-**Transcribed, not invented (landmine 190).** Jacob sent four onX screens —
+**Transcribed, not invented (landmine 190).** the maintainer sent four onX screens —
 one MTB (Backcountry-style), three Hunt. DESIGN-modes.md now carries a
 line-by-line transcription of each, paired with what we already hold and
 what is missing. The two cheap, high-value things they reveal:
@@ -1724,7 +1781,7 @@ apex-seed-t128.zip sha256 f0591f14…41b2, 83 files.
 lines/labels + summits from z9 in Outdoors (all from held data); marina tag
 + DNR Boating Access Sites + A139 for Water; Hunt data (DNR public-land
 polygons, DMUs, typed waypoints); guide (A147/A155). Open decision for
-Jacob: put the 69,628 foot routes INTO the routing graph (walkable, at a
+The maintainer: put the 69,628 foot routes INTO the routing graph (walkable, at a
 graph-size cost) or keep them show-only.
 
 ---
@@ -1766,13 +1823,13 @@ it already described the conditional case. apex-seed-t127.zip sha256
 db816651…b82c, 83 files.
 
 **Next:** `walk` machine + profile (DESIGN-modes step 3); marina tag + DNR
-Boating Access Sites + A139 for Water; hunt/fish after Jacob's onX
+Boating Access Sites + A139 for Water; hunt/fish after the maintainer's onX
 screenshots; guide (A147/A155). Open from the field: 69,628 foot routes at
-state zoom — Jacob's verdict pending.
+state zoom — The maintainer's verdict pending.
 
 ---
 
-## Take 126 — 2026-08-26 — Jacob's first field pass on modes
+## Take 126 — 2026-08-26 — The maintainer's first field pass on modes
 
 Three screenshots and a log. Every item below is his verdict, then the
 cause, then what changed.
@@ -1801,7 +1858,7 @@ leaves the step on top, rather than wrapping it in `all`.
 **"Roads still showing as white, looks really bad."** Half-opacity was not
 enough at 5 mi. On imagery, minor roads now fade in from z12 (you only
 need the residential grid when you are about to turn onto it) and highways
-sit at 0.35. The Map basemap is untouched — Jacob: "the default white view
+sit at 0.35. The Map basemap is untouched — The maintainer: "the default white view
 looks better."
 
 **"Hybrid is super pixelated."** The statewide mosaic was 1500 px — about
@@ -1813,7 +1870,7 @@ per-area tile patches (A153 second half, not started).
 **Three orange dots.** My ON-indicator broke the one-accent rule three
 times on one screen (24414). Bone now.
 
-**Self-test `trail-names` FAIL.** It ran while Jacob was in Outdoors, which
+**Self-test `trail-names` FAIL.** It ran while the maintainer was in Outdoors, which
 hides ORV lines, so it counted names over 0 segments. The check now
 controls its layer state (act → all) as well as its viewport, and restores
 both. Mio Δ30 "at the nearest node, 985 ft away" is now readable: the
@@ -1825,13 +1882,13 @@ apex-seed-t126.zip sha256 908aeb68…9e97, 83 files, bundle 136.5 MB.
 **Next:** per-area imagery tiles (A153 second half — read the app's tile
 source and imagery.py's budget machinery first; both are box-era); `walk`
 machine + profile; marina + DNR Boating Access Sites + A139 for Water;
-hunt/fish after Jacob's onX screenshots (landmine 190); guide (A147/A155).
+hunt/fish after the maintainer's onX screenshots (landmine 190); guide (A147/A155).
 
 ---
 
 ## Take 125 — 2026-08-26 — Modes, step 1: Ride / Outdoors / Water
 
-Jacob renamed "Trail" to **Outdoors**. Built exactly what DESIGN-modes.md
+The maintainer renamed "Trail" to **Outdoors**. Built exactly what DESIGN-modes.md
 step 1 promised: a `MODES` table and a chip, each mode a preset over tables
 that already existed — act, POI kinds, layer groups, basemap — applied
 through the existing setters, persisted in `apex.mode`, restored on load
@@ -1863,13 +1920,13 @@ Two gate refusals on the way, both correct: the harness stub lacked
 
 Still to build (DESIGN-modes.md steps 2–6): field-check 69,628 foot routes
 at state zoom; `walk` machine + profile; marina + DNR Boating Access Sites +
-A139; hunt/fish data after Jacob's onX screenshots (landmine 190); guide.
+A139; hunt/fish data after the maintainer's onX screenshots (landmine 190); guide.
 
 ---
 
 ## Take 124 — 2026-08-26 — A153 and two self-test truths, before modes
 
-Jacob's t123 log: dispatch 662 → **217 ms**, worst frame 16 ms, Bull Gap Δ3,
+The maintainer's t123 log: dispatch 662 → **217 ms**, worst frame 16 ms, Bull Gap Δ3,
 graph 468,940 edges after the clip. He is holding his remaining notes for a
 later round and asked for A153 and the open checks to be closed before the
 modes work begins.
@@ -1908,7 +1965,7 @@ must teach. A148 (compass) waits for a ride.
 
 ## Take 123 — 2026-08-26 — A151 / A151b: pins that stay put
 
-Jacob's take-121 verdict: the pins "pop in/out like crazy". Measured cause
+The maintainer's take-121 verdict: the pins "pop in/out like crazy". Measured cause
 (DIAGNOSIS-t121): 670 destination badges in one 10-mile view handed to the
 collision solver with overlap forbidden below z11.4, whose answer changed on
 every pan; and badge and name split into two layers that collided
@@ -1945,7 +2002,7 @@ Great Lakes POI, private MX parks, DNR Boating Access Sites.
 
 ## Take 122 — 2026-08-26 — the diagnosis, fact-checked and worked in order
 
-Jacob asked for the take-121 diagnosis (docs/DIAGNOSIS-t121.md) to be
+The maintainer asked for the take-121 diagnosis (docs/DIAGNOSIS-t121.md) to be
 fact-checked before anything was built on it. Every claim held against the
 tree except one mechanism: the A156 write-up said landcover clips to the
 state polygon; its "outside" test is a BBOX test (landcover.py:148), and
@@ -1954,7 +2011,7 @@ state-clipped. Conclusion unchanged, attribution corrected in the document.
 
 **A150 · one opaque control surface.** `.basebtn.on` was a 16 % cream tint
 under cream text — invisible over satellite, and over the light map the pill
-showed while the text vanished into it. Jacob asked whether the tint was
+showed while the text vanished into it. The maintainer asked whether the tint was
 still needed: no. The label already says the state ("Hybrid", "ORV / dirt
 bike"). Rule adopted: *every floating control is one opaque surface; state
 lives in the label, never in the background.* ON = brighter border + accent
@@ -2006,13 +2063,13 @@ A148 (compass, after a real ride).
 
 ---
 
-## Take 121 — 2026-08-26 — Jacob's field report, worked in his order
+## Take 121 — 2026-08-26 — The maintainer's field report, worked in his order
 
 Nine items came off the Fold (A141–A149 in AGENDA, verbatim). Six are done.
 
 **A141 withdrawn, and it matters.** First read was "CI served a stale cache,
 landmine 196 again." Checked instead: the local bundle with the terrain
-patches hashes 3509f18c, Jacob's build hashes 4d051023 — byte-identical to
+patches hashes 3509f18c, the maintainer's build hashes 4d051023 — byte-identical to
 his t119, which is exactly what the FIRST t120 zip (grid only) produces. He
 built the pre-reseal zip. Two seals under one take number caused it;
 landmine 203.
@@ -2039,7 +2096,7 @@ elevation/scale take the colour of the ground: near-black with a bone halo
 on the light map, white on satellite, via body.satmode. It was white-on-
 white before — unreadable on exactly the basemap that ships by default.
 
-**A146 · the missing kayak drops.** Jacob named Waterford. Of 81 slipways
+**A146 · the missing kayak drops.** the maintainer named Waterford. Of 81 slipways
 there, 66 have no name in OSM and were dropped: beaches got the "absence is
 the point" exception at take 89 and launches never did, for no stated
 reason. Statewide 989 → 2,156 launches. The smoke rule moved with the
@@ -2081,7 +2138,7 @@ launches with names, the same shape as the scramble-area win; next take).
 
 ## Take 120 — 2026-08-26 — A96: the spatial grid. Box-era scans, state-era cost.
 
-Jacob asked for every box lesson applied to the state. The largest unpaid
+The maintainer asked for every box lesson applied to the state. The largest unpaid
 one was in the render log all along: `nearestEdge 304 ms` in desktop
 headless. Three "nearest X" functions were linear scans — every tap that
 drops a pin, every dispatch card, every Return Home snap decoded 1.4M
@@ -2129,7 +2186,7 @@ Sealed: render PASSED 133, smoke 5 modes green, gate PASSED.
 
 ## Take 119 — 2026-08-25 — Riding areas, summits without a mosaic, and the line that killed CI
 
-### Jacob's GitHub build reached all of Michigan — and died one line later
+### the maintainer's GitHub build reached all of Michigan — and died one line later
 
 Take 118's workflow paste worked: CI built the state in 1,637 s, 474,047
 edges, 130 MB, five smoke modes green, `graph.json 01cdc37a60d5` byte-identical
@@ -2154,14 +2211,14 @@ a payload of 323 real hills. First **COMPLETE** statewide bundle.
 
 ### A140 · Riding areas — the DNR draws Silver Lake as a polygon, and so do we
 
-Jacob's take-117 call: Silver Lake Dunes is an open-riding AREA. The DNR
+The maintainer's take-117 call: Silver Lake Dunes is an open-riding AREA. The DNR
 trails MapServer we have ingested for 118 takes holds only two short ACCESS
 routes into it (1.1 mi, both open, 72"). The perimeter lives in a SEPARATE
 service on ArcGIS Online — `DNR_ORV_Scramble_Areas`, MichiganDNR — eight
 polygons statewide: St. Helen Motorsport Area 1,285 ac, **Silver Lake ORV
 Area 447** (the DNR's published "450"), Holly Oaks 239, The Mounds 213, Black
 Mountain 64, Gladwin 20, Rock Climb 10, and Bull Gap Hill Climb 3. Server
-count 8 = 8 shipped. Jacob: draw every one — the small ones are how a rider
+count 8 = 8 shipped. The maintainer: draw every one — the small ones are how a rider
 finds the hill. Private MX parks (Ogemaw Hills) are NOT in the designated
 layer and belong to the POI pass, not a legal riding-area layer (open).
 
@@ -2208,12 +2265,12 @@ a puppeteer protocol error that looks like a product failure and is not —
 
 ### After the seal: why t119 never reached CI (landmine 202)
 
-Jacob uploaded t119 and CI kept saying 118. The take-118 workflow paste had
+The maintainer uploaded t119 and CI kept saying 118. The take-118 workflow paste had
 no `seed` job — the job that unpacks the zip was dropped when the file was
 regenerated — and the zip was not in push.paths, so uploads no longer
 triggered anything. Restored in ci/build.yml as Stage -1 (`seed`, with
 `bundle: needs: seed`), zip added to the trigger paths. Seed resealed with
-the corrected file. ONE manual step for Jacob again: paste ci/build.yml over
+the corrected file. ONE manual step for the maintainer again: paste ci/build.yml over
 .github/workflows/build.yml.
 
 ### Verified
@@ -2238,11 +2295,11 @@ lakes are already pack.py's. **738 water bodies**, landcover now 8,882 areas /
 paint, one water. The state-overview screenshot is the milestone: the Mitten,
 both peninsulas, the big three, Drummond in the St. Marys.
 
-Jacob's direction recorded as **A139**: the big lakes get DESTINATION POI in a
+The maintainer's direction recorded as **A139**: the big lakes get DESTINATION POI in a
 future pass (major launches, lighthouses, famous grounds — Manistee the
 archetype), never corridor treatment.
 
-### The audit Jacob ordered ("you made a ton of changes")
+### The audit the maintainer ordered ("you made a ton of changes")
 
 Seventeen statewide-arc mechanisms verified present and correctly shaped in
 one adversarial pass — HOME spec end to end, open-view, ME-at-centre, the
@@ -2256,7 +2313,7 @@ routing mystery once and costs bytes.
 
 ### The take-117 GitHub build shipped the box — root cause and cure
 
-Jacob installed the michigan seed and got the test square wearing take 117,
+The maintainer installed the michigan seed and got the test square wearing take 117,
 same speed and size as ever. Root cause, found in the workflow's own words:
 `.github/workflows/build.yml` — hand-pasted, un-updatable by the seed
 (landmine 84) — still pinned `APEX_REGION: neml-bullgap`, and the env var
@@ -2279,7 +2336,7 @@ switch also clears the old stamp (region.py DERIVED_EXTRA).
 
 Smoke 5/5 modes, render 124+ with the Great Lakes in frame, gate green with
 the scaled stopwatch, the stamp guard's negative control fired and reset.
-Sealed as `apex-seed-t118.zip`, hash in the message. **Jacob's one manual
+Sealed as `apex-seed-t118.zip`, hash in the message. **the maintainer's one manual
 action: paste ci/build.yml over .github/workflows/build.yml.**
 
 ---
@@ -2287,7 +2344,7 @@ action: paste ci/build.yml over .github/workflows/build.yml.**
 
 ## Take 117 — 2026-08-25 — ALL OF MICHIGAN. Built, routed, suites green, sealed.
 
-The statewide arc, Jacob's call: "It's time to do all of Michigan." Region
+The statewide arc, the maintainer's call: "It's time to do all of Michigan." Region
 `michigan` is now the default and the built bundle. The longest take in the
 project by far — many sessions, four OOM battles, and a parade of box-era
 premises expiring at state scale, each caught by the machinery built for
@@ -2302,7 +2359,7 @@ exactly that.
 - **Authoritative**: the fetcher had NO pagination (the box never exceeded
   ArcGIS's 2000-record cap, so it never showed). Now: 1000-row pages, per-layer
   disk cache (restarts resume), politeness delays, and QUADRANT SPLITTING for
-  any layer whose statewide envelope makes the server shed load — Jacob's
+  any layer whose statewide envelope makes the server shed load — The maintainer's
   staging idea, applied surgically. 1,399 edges statewide carry live DNR
   restrictions: A72's preparation met real data.
 - **Graph**: **346,907 nodes / 473,674 edges, 38.5 MB payload** — 22x the box,
@@ -2327,7 +2384,7 @@ now it is.
 ### Routing at state scale — the whole detective story
 
 Return Home statewide first said "no legal route" after 31–41 s. The chain, in
-order, each step evidence-first: HOME was a phantom (first town anchor — Jacob's
+order, each step evidence-first: HOME was a phantom (first town anchor — The maintainer's
 spec landed: **unset until set, persisted, refuses politely**; open-view spec
 with it). ME was Silver Lake Dunes, ninety miles from the map (now centre).
 The graph WAS connected — the legal subgraph too — and the real wall was the
@@ -2359,7 +2416,7 @@ premises from harness physics:
   asserts identity, not stub-fragile count. Dispatch-scan budget scales with
   edge count and prints its µs/edge (A96 owns the real fix).
 
-### Still open, in Jacob's declared order
+### Still open, in the maintainer's declared order
 
 Great Lakes water polygons → tuning: riding-area polygon (Silver Lake), 
 statewide summits OOM, address size, corridor box-prose, A96 typed arrays,
@@ -2371,7 +2428,7 @@ references, the modes era.
 
 ## Take 116 — 2026-08-25 — The CI break was mine: bulk patches that never ran
 
-Jacob's GitHub build died at terrain: `NameError: ROOT` — my take-114 bulk-mode
+The maintainer's GitHub build died at terrain: `NameError: ROOT` — my take-114 bulk-mode
 patch referenced a ROOT that terrain.py never defines, and imagery.py carried
 the identical latent crash. The patches had been verified by PARSE ONLY; their
 steps never executed locally because the payloads were cached. CI, the clean
@@ -2387,15 +2444,15 @@ contour, imagery full pyramid — all green), both regions' flag resolution
 verified, full suite green. PROTOCOL gains the rule: touched steps run before
 the seal.
 
-Jacob's ordering confirmed for the statewide arc: **Michigan first, the Great
+The maintainer's ordering confirmed for the statewide arc: **Michigan first, the Great
 Lakes right after, then tuning** (A135 note updated).
 
 ---
 
 
-## Take 115 — 2026-08-25 — Full adversarial audit of T1–T4, at Jacob's order
+## Take 115 — 2026-08-25 — Full adversarial audit of T1–T4, at the maintainer's order
 
-Jacob: confirm T1–T4 are real, find every loose end, and audit the landmines
+The maintainer: confirm T1–T4 are real, find every loose end, and audit the landmines
 themselves — trust to be re-earned by verification. Audited the SEALED ZIP
 first, because the zip is what he gets (landmine 191's content corollary).
 
@@ -2442,7 +2499,7 @@ is IN the outputs directory, named and hashed.
 
 Statewide prep re-verified dormant and intact (default region unchanged, bulk
 paths inert, all patched tools parse). **onX Backcountry** joins as the third
-reference — DESIGN.md §7 reserves the slot, A136 awaits Jacob's screenshots.
+reference — DESIGN.md §7 reserves the slot, A136 awaits the maintainer's screenshots.
 Transcribe, don't invent.
 
 ### Verified
@@ -2456,9 +2513,9 @@ hash in the message.
 
 ## Take 114 — 2026-08-24 — T4, a delivery failure, and Michigan parked at the door
 
-### The take-113 seed never reached Jacob — and his report was the evidence
+### The take-113 seed never reached the maintainer — and his report was the evidence
 
-Jacob installed "the latest" and got take 112. Direct check: the deliverable in
+The maintainer installed "the latest" and got take 112. Direct check: the deliverable in
 the outputs directory WAS the take-112 zip (685,907 bytes, 18:51), despite the
 take-113 seal having verified and listed the new file (844,951 bytes, 20:01) in
 the same turn. The workspace held take 113 intact throughout; only the delivered
@@ -2484,7 +2541,7 @@ names still place, the shield text renders in the new face.
 
 ### Michigan: fully prepped, deliberately parked
 
-Jacob's call mid-preparation: the visual arc ships and gets judged FIRST, then
+The maintainer's call mid-preparation: the visual arc ships and gets judged FIRST, then
 statewide. The preparation LANDED and sleeps in the tree, all of it dormant
 while `neml-bullgap` stays default:
 
@@ -2501,7 +2558,7 @@ while `neml-bullgap` stays default:
   scales by network. And `corridor.py` already proved the statewide memory
   model in CI.
 
-When Jacob says go: switch region, run, measure, tune. Multiple takes budgeted.
+When the maintainer says go: switch region, run, measure, tune. Multiple takes budgeted.
 
 ### Verified
 
@@ -2514,13 +2571,13 @@ Smoke 5 modes, 274 assertions. Render 131. Gate green. Sealed as
 ## Take 113 — 2026-08-24 — The reference redesign: audit, study, and T1–T3
 
 The biggest single take in the project, run under the NEW WORKFLOW: checkpoints
-during the work, one seal at the end. Jacob's brief: *"a love child of onX
+during the work, one seal at the end. The maintainer's brief: *"a love child of onX
 Offroad and AllTrails, but Michigan only"* — hybrid reads like onX, the light
 map reads like AllTrails, our ORV network on both.
 
 ### First, the audit that started it
 
-Jacob asked whether the time was being spent well and whether a different AI
+The maintainer asked whether the time was being spent well and whether a different AI
 would design better. Honest answers, on the record: the stack (Capacitor +
 MapLibre + the offline bundle) is RIGHT and stays; the presentation lagged
 because I designed from first principles instead of references and because my
@@ -2596,7 +2653,7 @@ loader kinds with `ground`. Sealed as one take.
 
 ## Take 112 — 2026-08-24 — Four field findings from the take-110 session
 
-Jacob rode the drawer build. PASS 42 / FAIL 1, and four findings — every one
+The maintainer rode the drawer build. PASS 42 / FAIL 1, and four findings — every one
 real, and one of them a category of bug this project had not hit before.
 
 ### "A random string of test/error code" — twice
@@ -2604,7 +2661,7 @@ real, and one of them a category of bug this project had not hit before.
 The drawer chevron was written as `\u25BE` **in the HTML markup**. That is a
 JavaScript escape; in markup it is six literal characters. So the handle
 rendered the text `\u25BE` — and the folded state's `rotate(180deg)` then
-mirrored it into gibberish near the bar. Both of Jacob's "random strings" were
+mirrored it into gibberish near the bar. Both of the maintainer's "random strings" were
 the same six characters, once upright and once upside down.
 
 Now an HTML entity. The render check asserts the chevron is ONE glyph, so an
@@ -2653,7 +2710,7 @@ findings. Gate green.
 
 ## Take 111 — 2026-08-24 — Hardening: four checks that never ran, and two norths
 
-Jacob: *"Harden and lock down this take, and we'll work out all bugs and
+The maintainer: *"Harden and lock down this take, and we'll work out all bugs and
 issues/loose ends."* No new features. What follows was already broken.
 
 ### The dead twin was still there, and it held three more checks
@@ -2715,7 +2772,7 @@ beats an exact one applied to half the app.
 ### And the drawer handle was too small to press
 
 At 20 px the open-state grab handle failed the 38 px minimum — a rule that exists
-because Jacob wears gloves. The chevron still looks slim; the touchable area does
+because the maintainer wears gloves. The chevron still looks slim; the touchable area does
 not.
 
 ### Verified
@@ -2757,7 +2814,7 @@ an `addEventListener`, so replacing its tail needed `})` and I wrote `}`, then
 
 ### A129 · the first-run guide
 
-Jacob asked for a short guide the first time the app opens, with the map blurred
+The maintainer asked for a short guide the first time the app opens, with the map blurred
 behind it, reachable afterwards from Tools.
 
 `backdrop-filter: blur(9px)` — the blur is the point, because the map staying
@@ -2806,7 +2863,7 @@ puts itself away. Gate green.
 
 ## Take 109 — 2026-08-24 — The drawer, and three bugs from the first real session
 
-Jacob rode take 108 — **PASS 42, FAIL 0** — and reported three things. All three
+The maintainer rode take 108 — **PASS 42, FAIL 0** — and reported three things. All three
 were real, and one of them had been broken for sixteen takes without anyone
 seeing it.
 
@@ -2843,7 +2900,7 @@ redrawn as a silhouette with a cabin, bonnet and two round wheels.
 
 ### The drawer (A127)
 
-Jacob's design, and his diagnosis of why the app felt cheap: the rail was always
+The maintainer's design, and his diagnosis of why the app felt cheap: the rail was always
 there, taking nearly half a map app's screen.
 
 **The rule: the card belongs to a place.** It opens when you touch something and
@@ -2904,7 +2961,7 @@ clean. Gate green.
 
 ## Take 108 — 2026-08-23 — Wiring audit before the ride
 
-Jacob, before testing: *"Ensure all new features have buttons... ensure
+The maintainer, before testing: *"Ensure all new features have buttons... ensure
 everything is connected properly and tie up any loose ends."*
 
 Done mechanically rather than by eye — every button in the source cross-checked
@@ -2967,7 +3024,7 @@ All four device sizes clean. Gate green across all 28 checks.
 
 ## Take 107 — 2026-08-23 — Full audit before Michigan
 
-Jacob has not ridden since **take 82**. Twenty-four takes have landed since. He
+The maintainer has not ridden since **take 82**. Twenty-four takes have landed since. He
 asked for a full audit before committing to statewide, and set the scope:
 Michigan only, permanently.
 
@@ -3069,7 +3126,7 @@ the app had been apologising for the correct number.
 
 ### Which is exactly what makes a time estimate possible
 
-Jacob has paddled these floats and says the outfitter's HOURS are about right.
+The maintainer has paddled these floats and says the outfitter's HOURS are about right.
 Both can be true, and together they settle the pace:
 
 ```
@@ -3123,7 +3180,7 @@ Gate green.
 ## Take 105 — 2026-08-23 — The Tools bucket gets tools
 
 Take 101 made Tools a bucket by putting About, Self-test and Pan test behind one
-Diagnostics entry. It has been nearly empty since. Jacob: *"additional tools to
+Diagnostics entry. It has been nearly empty since. The maintainer: *"additional tools to
 the tools bucket, like compass"*.
 
 ### Compass
@@ -3253,13 +3310,13 @@ run — take 103's fix holds.
 ## Take 103 — 2026-08-23 — The pins answer the shuttle question
 
 Take 102 drew the rivers. The pins did nothing when tapped, which is the part
-Jacob actually asked for — *"drop offs, pickups and campgrounds in pins I can
+The maintainer actually asked for — *"drop offs, pickups and campgrounds in pins I can
 click"*.
 
 ### A pin that says its own name answers nothing
 
 What a two-car shuttle needs is what is **above**, what is **below**, and
-whether a **dam** sits between. Jacob's description: drop the boats at a put-in,
+whether a **dam** sits between. The maintainer's description: drop the boats at a put-in,
 drive both cars to the take-out, one car back. Get the order wrong and the trip
 is wrong.
 
@@ -3332,7 +3389,7 @@ above and below, dam-between, take-out-and-portage, and the caveat. Gate green.
 
 ## Take 102 — 2026-08-23 — Rivers, chosen by evidence
 
-Jacob wants to paddle. He named the Au Sable, Rifle, Black, Pine and others, and
+The maintainer wants to paddle. He named the Au Sable, Rifle, Black, Pine and others, and
 then said the thing that shaped this take: *"this would get crazy for every
 river. We need a filter."*
 
@@ -3352,11 +3409,11 @@ points.** Score each river by access points within 500 m:
 
 The ranking falls out as Michigan's canonical paddling list with nobody choosing
 it: Huron 78, Au Sable 54, Manistee 51, Grand 44, Clinton 40, Muskegon 33. Every
-river Jacob named clears the threshold — Rifle 6, Black 9, Pine 15.
+river the maintainer named clears the threshold — Rifle 6, Black 9, Pine 15.
 
 **Six corridors near this region, 390 river miles, 265 KB.** The Rifle came back
 at rank four, unnamed by me, with The Ranch Canoe Launch at mile 0.2, Klacking
-Creek at 8.7, and six campgrounds from 35.5 to 57.3 — the shuttle Jacob
+Creek at 8.7, and six campgrounds from 35.5 to 57.3 — the shuttle the maintainer
 described, on a river that has **zero points inside the region bbox**.
 
 Extrapolated, all 83 paddled rivers statewide is roughly 3 MB.
@@ -3425,7 +3482,7 @@ drawing, the layer being off by default, and the dams named. Gate green.
 
 ## Take 101 — 2026-08-23 — Tools becomes a bucket
 
-Jacob, on being told the Tools destination held About, Self-test and Pan test:
+The maintainer, on being told the Tools destination held About, Self-test and Pan test:
 *"Add those under a different bucket, under tools. Under tools, there could be a
 diagnostic button that opens another menu."*
 
@@ -3465,7 +3522,7 @@ Smoke 5 modes, 274 assertions. Render **78 checks**. Gate green.
 
 ## Take 100 — 2026-08-23 — Type scale and motion, and the overhaul closes
 
-Third of three. The gap Jacob felt against onX, measured at take 98, is now shut:
+Third of three. The gap the maintainer felt against onX, measured at take 98, is now shut:
 
 | | take 98 | take 100 |
 |---|---|---|
@@ -3578,7 +3635,7 @@ Smoke 5 modes, 274 assertions. Render **70 checks**. Gate green.
 
 ## Take 98 — 2026-08-23 — Four destinations instead of fourteen chips
 
-Jacob, after asking why onX feels more premium: *"I know how to use the
+The maintainer, after asking why onX feels more premium: *"I know how to use the
 application but I fear others would get quite confused with the current UI —
 trips, loops and saved stuff."*
 
@@ -3605,7 +3662,7 @@ every action belongs to exactly one destination — none orphaned
 ```
 
 Loop, Saved, Set home, Machine and Fuel now sit together under **Plan**, which is
-precisely the grouping Jacob said nobody could infer. Self-test and Pan test are
+precisely the grouping the maintainer said nobody could infer. Self-test and Pan test are
 under **Tools**, where nobody presses them on a trail.
 
 ### Deliberately the most boring implementation available
@@ -3630,7 +3687,7 @@ touching the check: they do, at z14.4 and z15.2. It now probes three zooms.
 A check that flips on an unrelated change is testing a boundary. That is worth
 more attention than the 52 px.
 
-### On the mode selector Jacob asked for
+### On the mode selector the maintainer asked for
 
 The container is built; the selector is not. **A mode selector with one mode is
 a promise, not a feature.** Paddle needs the river network, the corridor model
@@ -3673,7 +3730,7 @@ It is not one-sided either. The CSP build needs `setWorkerUrl` pointing at a fil
 that must exist, and `ci/bundle.sh` carries `test -s
 www/vendor/maplibre-gl-csp-worker.js` **because that file went missing once**.
 The standard build has no such failure mode. 364 KB is 0.7% of a ~50 MB APK
-against a possible dead map. Jacob's call, recorded with both numbers.
+against a possible dead map. The maintainer's call, recorded with both numbers.
 
 ### Three headings were lying
 
@@ -3738,7 +3795,7 @@ trust it.
 
 Removed from `sthelen` rather than widening the bbox, and the reason is written
 into the region's own note: widening changes what that region *downloads*, which
-is Jacob's judgement, not a bug fix. A region that has never been built or
+is the maintainer's judgement, not a bug fix. A region that has never been built or
 ridden is not the place to make that call unasked.
 
 ### The checks, and one that was its own control
@@ -3768,7 +3825,7 @@ Smoke 5 modes, 274 assertions. Render 61 checks. Gate green.
 
 A101, an A72 precondition. The DNR publishes a free-text restriction on 180
 features statewide and **67 of them read "Off road motorcycles are prohibited"**
-— Jacob's exact machine. **Zero are inside the Bull Gap box**, which is the
+— The maintainer's exact machine. **Zero are inside the Bull Gap box**, which is the
 whole reason to build it now: the machinery should exist before A72 widens the
 region, not be discovered missing afterwards.
 
@@ -3973,7 +4030,7 @@ PERF  dispatch-scan   N ms to assemble the dispatch card (20222 edges scanned)
                       — this is what you wait for after tapping Dispatch
 ```
 
-Jacob's next report carries the real number instead of my arithmetic. Threshold
+The maintainer's next report carries the real number instead of my arithmetic. Threshold
 600 ms — generous, because the question is whether a rider notices, not whether
 it is fast.
 
@@ -4238,7 +4295,7 @@ region. Shipping them would be clutter, not information, so `amenity=parking`
 ships only when it carries a name — which is how a trailhead identifies itself.
 
 Beaches are the documented exception: all four are unnamed in OSM and a beach is
-still a destination, so they ship and are labelled **"Beach"** by kind. Jacob's
+still a destination, so they ship and are labelled **"Beach"** by kind. The maintainer's
 Island Lake beach sits 6 m from the named `Island Lake Day Use Area`, and it
 would be easy to borrow that name. That is inference dressed as fact and the
 answer is no — both are drawn, and the day-use name sits beside it.
@@ -4271,7 +4328,7 @@ be right.
 
 ## Take 88 — 2026-08-22 — Posted route numbers
 
-A75, the other half of the orientation furniture from Jacob's onX screenshots.
+A75, the other half of the orientation furniture from the maintainer's onX screenshots.
 "Two east of M 33" is how a rider says where they are, and the number is on
 every sign where the street name often is not. We had it in the data and threw
 it away twice.
@@ -4349,7 +4406,7 @@ placed, the ref layer's position, and the new trail-label denominator. Palette
 
 A77. The map drew Shaw Lake and the Au Sable as anonymous blue shapes. It now
 names them. A lake you can name is a landmark you navigate by; a blue blob is
-scenery — Jacob's onX screenshots labelled Lake Saint Helen, Cooke Dam Pond and
+scenery — The maintainer's onX screenshots labelled Lake Saint Helen, Cooke Dam Pond and
 Maltbys Swamp, and ours labelled nothing.
 
 ### The data was there and being thrown away
@@ -4429,7 +4486,7 @@ assertions. Palette 18. Gate green.
 
 ## Take 86 — 2026-08-22 — A60: route both, draw one
 
-The doubled parallel lines Jacob reported at take 62 — *"some paths don't match
+The doubled parallel lines the maintainer reported at take 62 — *"some paths don't match
 the road properly"* — are gone. Open since take 60, blocked on measurement until
 take 84 fixed the instrument.
 
@@ -4502,7 +4559,7 @@ among them. Render 44. Palette 18. Self-test 38.
 
 ## Take 85 — 2026-08-22 — Geofabrik becomes a real fallback tier
 
-A108, with Jacob's agreement. The chain is now:
+A108, with the maintainer's agreement. The chain is now:
 
 ```
 Overpass mirrors  ->  Geofabrik extract  ->  Census TIGER roads
@@ -4590,7 +4647,7 @@ blind, and then uses it.
 ### The instrument
 
 Take 83 established that CI reaches Overpass and this container does not:
-Jacob's take-82 APK came back with 20,428 edges and a complete bundle while
+The maintainer's take-82 APK came back with 20,428 edges and a complete bundle while
 every local probe returned 0/24. That is a broken instrument, not a broken
 product — but it blocked anything that must be MEASURED against the OSM road
 network, which is most of A60.
@@ -4605,7 +4662,7 @@ immediately by WARNing on my first run: my regex looked for
 
 **Validated against the record**, which is the only thing that makes it usable:
 
-| | take-74 record | this instrument | Jacob's take-82 APK |
+| | take-74 record | this instrument | the maintainer's take-82 APK |
 |---|---|---|---|
 | edges | 20,222 | **20,222** | 20,428 |
 | nodes | 12,236 | **12,236** | 12,338 |
@@ -4636,7 +4693,7 @@ dnr  + usfs   354   CROSS-SOURCE
 ```
 
 **5,169 cross-source pairs, 222.7 mi** — `fsroad+track` 2,651, `fsroad+minor`
-1,314. That is Jacob's complaint exactly: the OSM copy jittering alongside the
+1,314. That is the maintainer's complaint exactly: the OSM copy jittering alongside the
 agency copy.
 
 **And 2,934 same-source pairs that must NOT be collapsed.** The largest group is
@@ -4676,7 +4733,7 @@ its edge count before doing anything.
 
 ## Take 83 — 2026-08-22 — Three faults from the first real ride, and a sandbox that was lying to me
 
-Jacob rode take 82 and sent a self-test report and two screenshots. Everything
+The maintainer rode take 82 and sent a self-test report and two screenshots. Everything
 below came from that, and the most important finding is one I could not have got
 from here.
 
@@ -4763,7 +4820,7 @@ Palette 18. Gate green.
 
 ## Take 82 — 2026-08-22 — Audit before testing, and the ledgers I broke
 
-No feature. Jacob asked for a full audit before he rides takes 76–81, and the
+No feature. The maintainer asked for a full audit before he rides takes 76–81, and the
 audit found real problems — several of them mine.
 
 ### The ledgers had re-accumulated, and I made it worse
@@ -4776,7 +4833,7 @@ Take 43 deduped these by hand and declared "no gaps, no duplicates". By take 81:
 | AGENDA | **A46** ×2, **A52** ×2 — and **A60**, **A72**, **A87** from me |
 | LANDMINES | **78** ×2, **85** ×2 |
 
-**A87 was twenty minutes old.** I added `## A87 — Jacob's machine` while the
+**A87 was twenty minutes old.** I added `## A87 — The maintainer's machine` while the
 backlog block I had landed already used A87 for topo contours. A60 and the A72
 precondition were the same mistake: appending a heading for an id that already
 existed.
@@ -4805,7 +4862,7 @@ Now: **81 takes, 82 agenda ids, 119 landmines, no duplicates, no gaps.**
 ### The clean run (PROTOCOL §6b)
 
 Take 76 changed three pipeline steps and no clean run had been done since. CI is
-always a fresh runner, so this is what Jacob's build actually does. From a
+always a fresh runner, so this is what the maintainer's build actually does. From a
 pristine unpack of the seed, nothing cached:
 
 ```
@@ -4827,7 +4884,7 @@ completes. `node tools/verify_palette.mjs` then runs at line 29, after chrome
 installs, and the gate re-runs it at line 31. `ci/apk.sh` references none of it —
 it builds from `www/`, correctly.
 
-### Recorded for Jacob
+### Recorded for the maintainer
 
 **A100 — his machine is a narrow dirt bike.** On the `bike` profile the take-81
 per-vehicle rules exclude **0 edges / 0.00 mi**. The 25-edge quad exclusion
@@ -5267,7 +5324,7 @@ stated once, and until now the app never stated it. Tier rows are not tappable
 harness need not model — landmine 62) and are exempt from the 36 px control
 minimum because they are not controls; verified in the browser.
 
-`LEGEND_EXEMPT` declares `minor` and `paved` — grey means road, and Jacob agreed
+`LEGEND_EXEMPT` declares `minor` and `paved` — grey means road, and the maintainer agreed
 directly. Declared in the app rather than left as a standing gate note, because
 a note that always lists three names carries no signal and a fourth would join
 it silently.
@@ -5351,7 +5408,7 @@ behaviour" in as many words. Landmine 56's corollary: assert the system's
   rather than from a `--expect-partial` flag someone must remember to pass. That
   is strictly stronger — it checks the honesty machinery in both directions.
 - The self-test check is now **`bundle-honest`**: state and named layers must
-  agree, whichever answer that is. *Jacob: this line is renamed in your report.*
+  agree, whichever answer that is. *the maintainer: this line is renamed in your report.*
 
 ### Measured
 
@@ -5410,15 +5467,15 @@ a corpse. Landmine 106.
 A74, the colour table — specced and measured, next take. The measurement already
 corrected my hypothesis: the designated tiers are fine, and the least legible
 class on satellite is **`fsroad` at dE 15.8 against median ground with no
-casing**. Statewide (A72) stays deferred behind the square, by Jacob's decision.
+casing**. Statewide (A72) stays deferred behind the square, by the maintainer's decision.
 A72–A98 are reserved in AGENDA for the document-F backlog and land next cycle;
-this take took **A99** so no number quoted to Jacob has to move.
+this take took **A99** so no number quoted to the maintainer has to move.
 
 ---
 
 ## Take 75 — 2026-08-22 — v1 capstone (documentation only)
 
-Jacob: **"I'd call v1 done!"** — on the strength of the take-73 field test
+The maintainer: **"I'd call v1 done!"** — on the strength of the take-73 field test
 (41/0 on-device, screenshots of filter, cards, labels and satellite behaving)
 and the take-74 label push.
 
@@ -5489,7 +5546,7 @@ distinction. Now *road* — search speaks the language the map draws.
 
 **`ci/RELEASE.md` is rewritten as a test script in ride order** — opening state,
 filter, search, labels, loops, cards, directions, dispatch, satellite — since
-Jacob tests from this build. Eleven checks, each one sentence, each answerable.
+The maintainer tests from this build. Eleven checks, each one sentence, each answerable.
 
 Disk filled a fourth time mid-verification; the failure-count-with-no-text tell
 from landmine 101's corollary named it in one step instead of a debugging
@@ -5674,7 +5731,7 @@ Verified at 360x800, the smallest phone in the matrix.
 ## Take 67 — 2026-08-22 — Filter by activity, which is also the legend
 
 Eight colours had accumulated with nothing anywhere telling a rider what any of
-them meant. Jacob asked for an activity filter and for the picker to say which
+them meant. The maintainer asked for an activity filter and for the picker to say which
 colour is which — the same control answers both, and that is the right shape:
 **a legend that can drift from the map is worse than none**, so the picker and
 the map read the same table.
@@ -5799,7 +5856,7 @@ sizes then report `c-base (vertical)`.
 
 Field report: **PASS 41 · FAIL 2**. Both failures were my checks, not the map.
 
-- **`trails 0 features`** — the check measured whatever viewport Jacob had left
+- **`trails 0 features`** — the check measured whatever viewport the maintainer had left
   the map in. He was parked over Brainard Springs, where there genuinely is no
   designated trail. Now an info line, not an assertion; `trail-names` jumps to a
   known site and is the real check.
@@ -5844,7 +5901,7 @@ has never been tested in tablet mode.
 
 ## Take 63 — 2026-08-22 — Relief hidden, not faded
 
-Jacob asked to confirm relief is off at open. It already was, as of take 62 —
+The maintainer asked to confirm relief is off at open. It already was, as of take 62 —
 verified by measurement rather than assertion: hillshade opacity 0, satellite
 off, Labels the only chip on, plain sand map with blue trail, brown two-track,
 grey roads and labels drawn.
@@ -5893,7 +5950,7 @@ family.** The distinction holds everywhere, not just at Wagner Lake.
 
 The 534 road-named tracks are the interesting case, and they are correct:
 *Bull Gap Road, Keeley Road, River Loop Road, Stoney Ridge Road* — 90 distinct
-names that are seasonal two-track in fact. Jacob's own words: "many roads up here
+names that are seasonal two-track in fact. The maintainer's own words: "many roads up here
 lead to trails." A road name does not mean maintained, and the source classifies
 these as vehicular trail.
 
@@ -5922,7 +5979,7 @@ source twice had not.
 
 ## Take 61 — 2026-08-22 — Three tiers, not two
 
-Jacob on take 59/60: "trails have color, but the trail color also bleeds into the
+The maintainer on take 59/60: "trails have color, but the trail color also bleeds into the
 main roads like E Wagner. E Wagner is brown and the trails that run off it is
 also brown."
 
@@ -5962,7 +6019,7 @@ the (i) still opens it, and the credits are in About too. 24 px wide now.
 
 ## Take 60 — 2026-08-22 — Why the rerun worked, and the trap under it
 
-Jacob: "I reran the workflow manually and it did work, so that's weird."
+The maintainer: "I reran the workflow manually and it did work, so that's weird."
 
 Not weird — the **cache**. CI caches `aoi.json`, and `fetch_osm` returns
 immediately when that file exists. His first run hit an Overpass outage, fell
@@ -6035,7 +6092,7 @@ The check was right and my probe was too strict.
 
 ## Take 58 — 2026-08-22 — Half the network was styled as "not for you"
 
-Jacob: "a lot of trail colors are missing. Alot of trails I'd ride with my
+The maintainer: "a lot of trail colors are missing. Alot of trails I'd ride with my
 dirtbike have no color." His two place cards proved the *data* was right —
 "M-33 Bull Gap Trailhead · USFS · LEGAL · Moto open" and "Ogemaw Hills Route ·
 DNR · LEGAL". The trails were there and known legal. They just did not look it.
@@ -6099,7 +6156,7 @@ The self-test then reported something I did not like:
 a third of the area. MapLibre places symbols against the viewport it has, so
 every label-density figure I have quoted was optimistic. Set to 411x960 at dpr
 2.625, the harness immediately reproduced the device: **4 names for 86
-segments**, against Jacob's 3 for 85.
+segments**, against the maintainer's 3 for 85.
 
 Swept the parameters at the real size rather than guessing: 75/100/pad2 → 4,
 85/60/pad1 → 5, and with slightly smaller text → **6**. Past that it flattens.
@@ -6107,7 +6164,7 @@ Swept the parameters at the real size rather than guessing: 75/100/pad2 → 4,
 ### Then two bugs the sweep exposed
 
 **Show-only labels outranked ridable ones.** `lbl-show` sat before `lbl-trail`,
-and MapLibre gives earlier symbol layers collision priority — so a path Jacob may
+and MapLibre gives earlier symbol layers collision priority — so a path the maintainer may
 NOT ride was named while the loop under his wheels was not. Moved after.
 
 **Satellite hid every trail name.** `LBL` was forced to `none` in Satellite mode,
@@ -6138,7 +6195,7 @@ Both downstream checkouts now pin `ref: ${{ github.ref_name }}`.
 
 `check_checkout_ref()` reported green — because it scans `ci/` and
 `.github/workflows/`, and **the generated `apex.yml` was in neither**. It is
-written to the outputs directory for Jacob to paste; my repo had an empty
+written to the outputs directory for the maintainer to paste; my repo had an empty
 `.github/workflows/`. So every workflow check has been validating `ci/build.yml`,
 which has no seed job, and reporting on a file nobody runs.
 
@@ -6228,7 +6285,7 @@ FAIL a job installs no Python deps it needs — each job is a fresh runner:
 
 The check was right about all three. But it exposed a design fault I had built in
 and not noticed: **`gate.py` validates the workflow file, and the workflow file
-is one Jacob pasted by hand that the seed job cannot update.** So a workflow one
+is one the maintainer pasted by hand that the seed job cannot update.** So a workflow one
 version behind fails the gate, the gate fails the seed, and the seed is the thing
 carrying the fix. A deadlock, with the fix on the wrong side of it.
 
@@ -6286,7 +6343,7 @@ removing pillow from the apk job alone.
 
 ### Pages
 
-`Failed to create deployment (status: 404)` — Pages was not enabled. Jacob has
+`Failed to create deployment (status: 404)` — Pages was not enabled. The maintainer has
 since set Source to GitHub Actions. The job is `continue-on-error: true`, so it
 never blocked the APK; it just looked alarming.
 
@@ -6302,7 +6359,7 @@ dependencies with transitive resolution, and vendored assets.
 ## Take 53 — 2026-08-21 — Stop finding these one CI run at a time
 
 The runner hit the same font error, because the fix was in my take-52 seed and
-Jacob's repo was still on take 51. Rather than just say "upload the new zip", I
+The maintainer's repo was still on take 51. Rather than just say "upload the new zip", I
 went looking for what would break NEXT.
 
 **`gate.py` imports `yaml`; CI installs `pillow numpy scipy`.** On the runner the
@@ -6374,7 +6431,7 @@ shape, gated clean at take 49, committed 48 files — and died on the last line:
 
 Landmine 46, from the other side. I had recorded that GITHUB_TOKEN cannot write
 `.github/workflows` and built the whole one-file installer around it — then
-handed Jacob a zip containing `.github/workflows/`, so the seeder tried to
+handed the maintainer a zip containing `.github/workflows/`, so the seeder tried to
 overwrite **the workflow that was running it**.
 
 Nothing was pushed. The repo stayed clean, which is what the gate-before-commit
@@ -6437,7 +6494,7 @@ two questions hid an invalid workflow for thirty takes.
 
 ## Take 49 — 2026-08-21 — Two workflow bugs, one of them mine
 
-Jacob pasted `apex.yml` back into the chat. Auditing it instead of glancing at
+The maintainer pasted `apex.yml` back into the chat. Auditing it instead of glancing at
 it found two failures, both of which would have hit on his first CI run.
 
 ### The release would have published with no APK
@@ -6484,7 +6541,7 @@ the half that silently broke. Landmine 54, ninth time.
 
 *Second entry under take 49, relabelled 49b at take 82 for the same reason.*
 
-Jacob got the repo created, pasted a workflow, uploaded a zip, and got a Node
+The maintainer got the repo created, pasted a workflow, uploaded a zip, and got a Node
 error that told him nothing. Three separate causes, all mine.
 
 1. **He pasted an older `build.yml`**, not the `apex.yml` I had just shipped.
@@ -6526,7 +6583,7 @@ four steps earlier and in a different language.
 
 ## Take 48 — 2026-08-21 — One file, one zip, one button
 
-Jacob, trying to get the repo onto GitHub from a phone: "There has got to be an
+The maintainer, trying to get the repo onto GitHub from a phone: "There has got to be an
 easier way. I don't want to be creating and editing files, I want to drop it
 into my GitHub." He was right and I had over-complicated it.
 
@@ -6552,7 +6609,7 @@ run afterwards skips straight past it. No release, no second file, no folders.
 Running the seed script verbatim against an empty directory holding only the zip
 showed `GATE FAILED (3)`: the gate read the hardcoded filename
 `.github/workflows/build.yml`, found nothing in the single-file layout, and
-failed three checks on a perfectly good seed — which would have blocked Jacob's
+failed three checks on a perfectly good seed — which would have blocked the maintainer's
 very first run. It now concatenates **every** workflow file it finds. Both
 layouts gate green.
 
@@ -6563,7 +6620,7 @@ job's own script against an empty folder.
 
 ## Take 47 — 2026-08-21 — Coverage reconciled against the agencies, exactly
 
-Before Jacob rides it for real: prove nothing ORV is missing, and that nothing
+Before the maintainer rides it for real: prove nothing ORV is missing, and that nothing
 ridable is drawn as un-ridable.
 
 ### State — exact match
@@ -6595,7 +6652,7 @@ is precisely why those 24 are `fsclosed` and unroutable. MVUM trails **46**, all
 A trail can be designated for several uses at once and the DNR publishes it in
 every matching layer — **"LP 9" is a motorcycle trail AND a hiking trail AND an
 equestrian trail**. Drawn naively that put a grey dashed *"not ridable"* line
-directly on top of a trail Jacob may legally ride.
+directly on top of a trail the maintainer may legally ride.
 
 That is worse than useless: it tells him to stay off something he is allowed on.
 **70 show-only copies of ridable trails are now dropped — the ridable
@@ -6606,7 +6663,7 @@ show-only classes remains NONE.
 
 ## Take 46 — 2026-08-21 — Difficulty colours, and the map gets the screen
 
-Jacob, with onX and AllTrails screenshots: "feels like a barebones test / cheap
+The maintainer, with onX and AllTrails screenshots: "feels like a barebones test / cheap
 clone." Fair. Two things were doing that.
 
 ### The trails were coloured by taxonomy, not difficulty
@@ -6659,7 +6716,7 @@ whether to push through.
 
 ## Take 45 — 2026-08-21 — Every route in the area, and the guards that keep it honest
 
-Jacob: "ensure no off-road trails are missed, even hiking trails or obscure
+The maintainer: "ensure no off-road trails are missed, even hiking trails or obscure
 ones — I need to know every route available." Rebuilt from the take-44 seed
 after the container died, then went looking. **648 → 1,027 routes.**
 
@@ -6746,7 +6803,7 @@ use it. Seeing a trail and being allowed to ride it stay separate facts.
 
 ## Take 44 — 2026-08-21 — Trail names, from almost none to eight
 
-Jacob's self-test had been quietly reporting `labels 1 at z13.6` for several
+The maintainer's self-test had been quietly reporting `labels 1 at z13.6` for several
 takes and I had read past it. Knowing WHICH trail you are on is the point of a
 trail map, so this was a real gap hiding in plain sight.
 
@@ -6806,7 +6863,7 @@ them**. Both patches anchored on `'route-line'`; the layer is called
 Every check written for them measured `setData` — the DATA, not the DRAWING —
 so take 35 reported "alternate lines drawn: 272" and take 39 reported "two legs,
 0.49 and 0.06 mi", both true and both about data nothing rendered. Worse, the
-alternates were themselves the *fix* for Jacob's "the line doesn't update"
+alternates were themselves the *fix* for the maintainer's "the line doesn't update"
 report, so that fix never actually reached him.
 
 Now: both layers exist and render (**66 alternates, 2 approach legs** measured),
@@ -6856,7 +6913,7 @@ byte-identical, bootstrap simulation exact.
 
 ## Take 42 — 2026-08-21 — Satellite imagery, 6.5x sharper
 
-Jacob: "I can almost count the pixels. I only use it without the map due to
+The maintainer: "I can almost count the pixels. I only use it without the map due to
 this." Measured before changing anything: the shipped mosaic was **22.1 m/px**.
 A two-track is about one metre wide. He was right to stop using it.
 
@@ -6884,7 +6941,7 @@ The single-file browser build keeps the 1500 px mosaic as a fallback — it cann
 carry 2,000 files — and the app picks tiles when the bundle has them. Both paths
 render-verified.
 
-The self-test now reports ground resolution, so the thing Jacob complained about
+The self-test now reports ground resolution, so the thing the maintainer complained about
 is a number in his own report rather than an opinion: `imagery tiles z12-z15 ·
 3.40 m/px · 2008 tiles, 45 MB`.
 
@@ -6977,13 +7034,13 @@ in a browser rather than by reading the diff. Verified after: 116 route features
 
 Loops are asserted in both harnesses — smoke checks the builder lands within 30%
 and under 40% repeat, and the on-device self-test reports actual loop quality so
-Jacob's phone tells me how it behaves on his data.
+The maintainer's phone tells me how it behaves on his data.
 
 ---
 
 ## Take 39 — 2026-08-21 — The route was right; the drawing was not
 
-**The action log earned itself on its first field report.** Jacob said two pins
+**The action log earned itself on its first field report.** the maintainer said two pins
 "didn't seem to connect or find a proper path". The trace gave me the exact
 inputs:
 
@@ -7049,7 +7106,7 @@ in place so a future reader does not "tidy" it.
 
 ## Take 37 — 2026-08-21 — Process, not features
 
-Jacob asked what could be improved given that he cannot help with APK work. The
+The maintainer asked what could be improved given that he cannot help with APK work. The
 honest bottleneck is not his skill: **three of his last four reports were
 interaction bugs my tests structurally could not see**, and several times my
 harness either hid a real bug or invented a fake one. Three fixes, aimed there.
@@ -7148,7 +7205,7 @@ acting on.
 
 ## Take 35 — 2026-08-21 — Four bugs in the route picker, measured not guessed
 
-Jacob reported three symptoms while planning a trip from home: the line did not
+The maintainer reported three symptoms while planning a trip from home: the line did not
 update, the map shifted randomly, and the option strip could not be scrolled so
 a fourth option would be invisible. Reproduced all of it in headless Chrome at
 his exact viewport (411x960 @2x) before changing anything — and one of my
@@ -7186,7 +7243,7 @@ cannot see.
 
 ## Take 34 — 2026-08-21 — Offline geocoding, both directions
 
-Jacob asked for an address on a pin, and to be able to type an address to set
+The maintainer asked for an address on a pin, and to be able to type an address to set
 home — with the explicit rule that **when there is no address, say nothing**.
 
 Live geocoding is a network service and this app does not get to depend on one
@@ -7231,7 +7288,7 @@ them would shift every later record's attributes.
 
 Take 32 drew Michigan from TIGERweb's **legal** state boundary, which runs far
 out into the Great Lakes — one 10,721-point ring wrapping both peninsulas and a
-great deal of water. Jacob: "the weirdest map of Michigan I've ever seen." He was
+great deal of water. The maintainer: "the weirdest map of Michigan I've ever seen." He was
 right, and the mistake was mine for shipping a shape I had never looked at.
 
 The **cartographic** boundary file (`cb_2023_us_state_20m`) is clipped to the
@@ -7306,7 +7363,7 @@ alone — one GC pause should not condemn a device, and a hundred should.
 ## Take 31 — 2026-08-20 — Michigan, and the startup fix that never fired
 
 Field report on take 29: **32 pass, 1 fail**, and the failure was the one that
-mattered — `posMode=none` meant the app still had no idea Jacob was 135 mi away.
+mattered — `posMode=none` meant the app still had no idea the maintainer was 135 mi away.
 
 ### Startup locate never worked
 
@@ -7320,7 +7377,7 @@ the test ran — the thing a rider actually experiences on opening the app.
 
 ### The orange box is gone; Michigan is there instead
 
-Jacob called the DOWNLOADED square distracting and ugly, and he was right — it
+The maintainer called the DOWNLOADED square distracting and ugly, and he was right — it
 shouted at the one part of the screen that was already obvious. Removed
 entirely. In its place, the **state outline** from US Census TIGERweb: a thin
 grey line below z9.6, fading out as you approach the data, 10,721 points
@@ -7349,7 +7406,7 @@ tolerance, and a reminder that the DEM re-fetches with the region.
 
 ## Take 30 — 2026-08-20 — Stop redrawing the logo, use the logo
 
-Takes 24 and 29 both tried to reproduce Jacob's APEX mark from primitives and
+Takes 24 and 29 both tried to reproduce the maintainer's APEX mark from primitives and
 both missed. His verdict on take 29 was "isn't even close", and he was right —
 the letterforms are specific and hand-plotting them was guesswork wearing an
 engineering costume. Three attempts at approximating something I had a pixel-
@@ -7388,9 +7445,9 @@ the master and is not a build dependency.
 
 ---
 
-## Take 29 — 2026-08-20 — Jacob's mark, and a full pre-test audit
+## Take 29 — 2026-08-20 — The maintainer's mark, and a full pre-test audit
 
-Icon replaced with the design Jacob supplied: A-frame outline open at the base,
+Icon replaced with the design the maintainer supplied: A-frame outline open at the base,
 APEX across the legs with a dark stroke separating wordmark from frame, red
 sliver hanging from the peak, red flick off the X, on charcoal. Drawn as
 geometry in `tools/icon.py` (Poppins-Bold for the wordmark) rather than
@@ -7473,7 +7530,7 @@ could have caught this because the harness stubs Capacitor.
   135 mi away is not a failure; it is Tuesday. Now informational, and the
   assertion is on the app's **response** (`posMode==='away'`).
 
-### What Jacob asked for, built
+### What the maintainer asked for, built
 
 - **The app now locates you at startup**, not only when you tap Ride. It knew
   nothing about position until a ride began, which is why it cheerfully showed a
@@ -7493,7 +7550,7 @@ could have caught this because the harness stubs Capacitor.
 
 ## Take 27 — 2026-08-20 — The app tests itself
 
-Jacob asked for a diagnostic he could run once instead of tapping through every
+The maintainer asked for a diagnostic he could run once instead of tapping through every
 feature, producing something I can actually work from. Built it, because the one
 class of bug I genuinely cannot reach from this container is device-specific
 WebView behaviour — and a report from the real thing is exactly that.
@@ -7509,7 +7566,7 @@ with clipboard fallback).
 
 **The design point:** `tools/render.mjs` calls the *same* `window.__selfTest()`
 headless in Chrome. So I hold a baseline for every check, and anything that
-differs in Jacob's report is device-specific **by construction**. That is the
+differs in the maintainer's report is device-specific **by construction**. That is the
 only comparison that can isolate a WebView problem.
 
 Every check reports what it **observed**, not just a verdict — "FAIL routing" is
@@ -7575,7 +7632,7 @@ against the shipped APK's own bytes.
 
 ## Take 25 — 2026-08-20 — Closing take 23 properly
 
-Jacob pointed out that I shipped take 23's fix and moved to the icon without
+The maintainer pointed out that I shipped take 23's fix and moved to the icon without
 finishing it. He was right. Five loose ends, all real:
 
 1. **`tools/render.mjs` could not run from the seed.** puppeteer was never a
@@ -7605,14 +7662,14 @@ colour share. Both builds verified: split and single-file each render 7,736
 features, 531 colours, busiest colour 39%.
 
 **Agenda:** A24, A25, A26 closed; A27 and A28 opened. A28 is the honest gap —
-Jacob's goal is plan / ride / **improvise**, and loop generation for an impromptu
+The maintainer's goal is plan / ride / **improvise**, and loop generation for an impromptu
 ride does not exist yet. Sequenced deliberately after A18.
 
 ---
 
 ## Take 24 — 2026-08-20 — An icon of its own
 
-Jacob found an APEX Capital logo he liked and asked to recolour it and drop the
+The maintainer found an APEX Capital logo he liked and asked to recolour it and drop the
 wordmark. Declined the trace — that is their brand mark — and drew an original
 from primitives instead, which costs nothing and is actually his. What he liked
 about it (peak geometry, a streak through the letter) is not anyone's property.
@@ -7733,7 +7790,7 @@ stubs, or the harness invents failures that do not exist.
 **Smoke is now five modes** — gps, sim, fatal-drill, dead-renderer, away — all
 run by the pipeline and all enforced by the gate, which previously ran only one.
 
-`--away` is Jacob's actual situation and it passes end to end: out-of-region fix
+`--away` is the maintainer's actual situation and it passes end to end: out-of-region fix
 reports the distance, stops tracking, labels the readout MAP CENTRE, dispatch
 refuses with no coordinate printed, a tap drops a planning start, a tap on a
 trail still identifies it, and Return Home routes 5 profiles from the planned
@@ -7780,7 +7837,7 @@ exactly why. Landmine 47.
 
 ### The more serious bug: a fabricated position
 
-The screen read **44.57072 -84.15770 · 1135 ft** while Jacob was a few hundred
+The screen read **44.57072 -84.15770 · 1135 ft** while the maintainer was a few hundred
 miles away. Precise, plausible, wrong — sitting on the same screen as the button
 that reads coordinates out to **dispatch**. That is the worst failure mode this
 app has shipped, and no render bug outranks it.
@@ -7795,7 +7852,7 @@ app has shipped, and no render bug outranks it.
   (test-double fidelity, take 16) but is **still refused** by dispatch, because
   those coordinates are invented. Smoke asserts both halves.
 
-### Planning mode — what Jacob actually asked for
+### Planning mode — what the maintainer actually asked for
 
 Tap anywhere to drop a planning start; **Return Home** and **Directions** route
 from it. Search, browse, elevation and the full graph all work hundreds of miles
@@ -7807,7 +7864,7 @@ away, which is where ride planning actually happens.
 
 ## Take 20 — 2026-08-19 — First live run: bootstrap green, build silent
 
-**Jacob ran it.** Bootstrap: checkout, seed download, unzip, `GATE PASSED —
+**the maintainer ran it.** Bootstrap: checkout, seed download, unzip, `GATE PASSED —
 take 19`, 38 files committed (43 zip entries less 5 directory entries — exact),
 pushed `602c83a..d147a6f`. Twenty seconds. Every local prediction held.
 
@@ -7852,13 +7909,13 @@ against the repo build and against the shipped take-18 APK's extracted bytes —
 both refuse correctly. The pipeline now runs smoke in **three** modes.
 Landmine 45.
 
-**DEFERRED:** unchanged. Jacob runs the setup next; A18 awaits four numbers.
+**DEFERRED:** unchanged. The maintainer runs the setup next; A18 awaits four numbers.
 
 ---
 
 ## Take 18 — 2026-08-19 — Full-stack pre-flight, and the second build was broken
 
-Jacob asked for a full-stack smoke before running the setup. Everything was
+The maintainer asked for a full-stack smoke before running the setup. Everything was
 verified from the **exact files he will download**, nothing from the warm tree:
 seed integrity and standalone gate; both pasted workflows parse, and the setup
 page's embedded copies are byte-identical to the real files; a clean pipeline
@@ -7891,7 +7948,7 @@ artifacts as happily as bad ones.
 
 ## Take 17 — 2026-08-19 — First-run experience, walked as the user
 
-Walked the RUNBOOK as Jacob would and found the first thing a new user sees is
+Walked the RUNBOOK as the maintainer would and found the first thing a new user sees is
 **two red failed runs**: pasting `build.yml` triggers a build on its own paste,
 and again on the bootstrap paste, both before any tools exist. Fixed with a
 push **paths filter** matching exactly what the seed delivers (BUILD, src/,
@@ -7923,8 +7980,8 @@ until the Fold speaks.
 ## Take 16 — 2026-08-19 — A real APK exists
 
 **Shipped:** `apex-offroad-take-16.apk` — 4.8 MB, release-signed
-(CN=APEX Off-road, O=SergeantSlabs, cert SHA-256 52f61c46…), package
-`com.sergeantslabs.apex`, with the entire neml-bullgap region verified inside
+(CN=APEX Off-road, O=the earlier vendor name, cert SHA-256 52f61c46…), package
+`the earlier vendor-flavoured application id`, with the entire neml-bullgap region verified inside
 `assets/public/` by unzip. Built **in the container**, not imagined in YAML.
 
 ### The apk job was the take-2 spike, in the workflow this time
@@ -8237,7 +8294,7 @@ vector tiles were building something nothing consumed.
   `style.json` that no longer exists, preserving landmine 4 and 30 coverage.
 
 **DEFERRED this cycle:** A14 3D terrain and slope. A17 voice. Resumable region
-download. The APK itself still needs Jacob's device — but for the first time the
+download. The APK itself still needs the maintainer's device — but for the first time the
 repo would actually build the right thing.
 
 ---
@@ -8319,7 +8376,7 @@ Voice for the turn list. Nothing toward the APK.
 **Shipped:** `apex-offroad-take10.html`, 3.16 MB. Satellite basemap, still zero
 runtime requests.
 
-### The protocol was wrong and Jacob caught it
+### The protocol was wrong and the maintainer caught it
 
 §8 said no shipped asset may reach a remote origin, full stop. That conflated two
 different phases and was quietly incoherent — every tile, DEM sample and agency
@@ -8672,7 +8729,7 @@ Imagery sizing. Nothing built for the APK path; take 5 is a viewer, not the app.
 
 **Named.** APEX Off-road. appId `com.apexoffroad.app`.
 
-**Reconnaissance — the point of this take.** Jacob can't build or test for a while,
+**Reconnaissance — the point of this take.** the maintainer can't build or test for a while,
 so the unblocked work is data. Went to the live Michigan DNR ArcGIS service and
 inspected it rather than reading about it.
 
@@ -8716,7 +8773,7 @@ the physical posts, not in the published GIS. ROADMAP 3.8 is therefore not a
 schema question, it is a digitising job. Rescoped and downgraded; still worth
 doing, but it is no longer nearly free.
 
-**Return Home added** at Jacob's request as ROADMAP 4.13–4.24, with fuel range
+**Return Home added** at the maintainer's request as ROADMAP 4.13–4.24, with fuel range
 and daylight awareness, which neither onX nor AllTrails does.
 
 **DEFERRED this cycle:** USFS MVUM reconnaissance (same treatment, next). No tiles
@@ -8736,12 +8793,12 @@ future reader to go look up context that has nothing to do with this app, and it
 made the protocol read as borrowed rather than owned.
 
 **ROADMAP rewritten as a full backlog.** Now carries an explicit feature-parity
-matrix against onX Offroad and AllTrails, since Jacob's stated bar is "if either
+matrix against onX Offroad and AllTrails, since the maintainer's stated bar is "if either
 of them has it, I probably want it." Phases grew from 6 to 9: basemaps/imagery
 and search/navigation were previously folded into other phases and were too big
 to sit there.
 
-**Reframed around the actual driver.** Jacob has been lost in these woods. Phase 4
+**Reframed around the actual driver.** the maintainer has been lost in these woods. Phase 4
 is renamed and expanded accordingly, and off-route alerting was promoted from
 "nice to have" to a named exit criterion.
 
@@ -8761,11 +8818,11 @@ estimated, not measured (landmine 18). No DNR or USFS data has been touched yet.
 **Shipped:** `bullgap-mio-rosecity.html`, 1.27 MB, fully self-contained.
 MapLibre, CSS, data and logic all inlined. Zero runtime requests.
 
-**Why:** Jacob has no laptop. Needed something testable on the phone today
+**Why:** the maintainer has no laptop. Needed something testable on the phone today
 without CI, sideloading or a server.
 
 **AOI settled at `-84.30, 44.42, -83.90, 44.72`.** First proposal was
-`-84.25,44.50,-83.85,44.75` (missed Rose City). Jacob's screenshot implied
+`-84.25,44.50,-83.85,44.75` (missed Rose City). The maintainer's screenshot implied
 `-84.40,44.27,-83.65,44.71`, which pulled 12,054 features — too big to inline.
 Landed on the same footprint as the original, nudged south. Covers Bull Gap,
 the Meadows, Mio, Luzerne, Mack Lake, the Pink Store, Rose City.
@@ -8781,7 +8838,7 @@ quantisation cut it to 21,640 coords. Delta-encoded ints -> 182 KB payload.
 **UNKNOWN, unchanged:** everything in Phase 0.2–0.5. No device numbers yet.
 
 **DEFERRED this cycle:** the APK path entirely. Labels. Any DNR or USFS data.
-The Fold inner-screen layout, by Jacob's explicit instruction.
+The Fold inner-screen layout, by the maintainer's explicit instruction.
 
 ---
 

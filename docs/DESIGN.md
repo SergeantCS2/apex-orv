@@ -1,12 +1,24 @@
 # DESIGN — the reference study · take 113 (study phase, no code yet)
 
-Jacob's brief, verbatim intent: **"a love child of onX Offroad and AllTrails,
+> **V3 addendum (take 177).** What this study became, as shipped in the
+> production baseline (take 176): five modes — Off-road · Outdoors · Hunt
+> · Water · Camp — each with its own pins, layers, machine and basemap;
+> distance-based pin stacking at every zoom (take 169); navigation —
+> follow camera, turn-by-turn with ETA and arrival, river guidance that
+> points downstream and calls dams first, hike guidance, feature-detected
+> voice, trip resume after a kill (takes 170–173); Camp with typed
+> campgrounds and the three national forests (174); and the unnamed-pin
+> rule — private docks dropped, duplicates dropped, launches and beaches
+> named for their lake, the rest stepped back outside Water (175). The
+> study below is history and is kept as written.
+
+The maintainer's brief, verbatim intent: **"a love child of onX Offroad and AllTrails,
 but Michigan only."** Hybrid/satellite should read like onX; the default light
 map should read like AllTrails; both must carry the same content — parks,
 beaches, lakes, forests, river put-ins and take-outs, campgrounds, and the ORV
 network that is already ours.
 
-Five reference screenshots studied on 2026-08-24 (Jacob's own phone: onX
+Five reference screenshots studied on 2026-08-24 (the maintainer's own phone: onX
 Offroad statewide satellite; AllTrails at four zooms including OUR ground —
 Mio, the Au Sable, Rose City, Huron NF). What follows is transcription, not
 invention. Where a value is sampled from a screenshot it is approximate but
@@ -110,7 +122,7 @@ Two named styles, one content set, one chrome:
 4. Type: bundle Barlow + Barlow Condensed (OFL); mono ONLY for coordinates.
 5. Icons: Lucide (ISC) replaces every hand-drawn path, including the tab bar.
 
-**Open decision for Jacob — the top chips row.** Neither reference has a
+**Open decision for the maintainer — the top chips row.** Neither reference has a
 permanent row of place pills. Options: (a) fold the quick-jumps into Search as
 suggestions, (b) collapse to one dark "Places" button, (c) keep but restyle
 dark and smaller. Default recommendation: (a).
@@ -134,7 +146,7 @@ hold; statewide will need the POI extraction generalised anyway.
 - **T4 Hybrid tuning:** imagery dim, overlay glow, halo swap.
 - **T5 Content parity:** beaches, park polygons, POI density, public-land tint.
 
-Checkpoints throughout; seal only when Jacob wants a build on the phone.
+Checkpoints throughout; seal only when the maintainer wants a build on the phone.
 
 ## 6 · Licence note (so it is written down once)
 
@@ -146,7 +158,7 @@ logos or names. Lucide is ISC; Barlow is SIL OFL; both bundle offline cleanly.
 
 ## 7 · Third reference incoming: onX Backcountry (take 115)
 
-Jacob: the target is now a love child of THREE — onX Offroad (motorised,
+The maintainer: the target is now a love child of THREE — onX Offroad (motorised,
 satellite), AllTrails (light map, general outdoors), and **onX Backcountry**
 (hiking/backcountry: topo emphasis, slope, waypoint-rich planning). Screenshots
 to come; this section reserves the slot so the study extends rather than

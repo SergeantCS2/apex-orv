@@ -2,7 +2,7 @@
 
 You're taking over APEX ORV — a free, offline-first Android trail-navigation
 app for northeastern Lower Michigan ORV riding — at the moment v1 was declared
-done (take 74, field-tested 41 PASS / 0 FAIL on-device). I'm Jacob; I work
+done (take 74, field-tested 41 PASS / 0 FAIL on-device). I'm the maintainer; I work
 entirely from a Samsung Galaxy Z Fold 7, no laptop, so everything ships
 through chat and a GitHub Actions pipeline. Your predecessor built v1 across
 74 sealed takes.

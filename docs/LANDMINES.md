@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 175.*
+*Current as of take 177.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -968,7 +968,7 @@ takes the header verbatim, injects the job, asserts the resulting job list and
 
 **Corollary — untested by the real consumer is untested.** Everything about this
 workflow was verified locally. The single check that mattered was letting GitHub
-parse it, and that only happened when Jacob pasted it in.
+parse it, and that only happened when the maintainer pasted it in.
 
 **80. An installer must not write the workflow that is running it.** The seed job
 unpacked a zip containing `.github/workflows/` and tried to push it. GitHub
@@ -1614,7 +1614,7 @@ one in front of you.
 
 **120. Name the thing that is actually broken.** Four takes shipped on the claim
 "OpenStreetMap is down", measured as 0/24 real responses across three Overpass
-mirrors. Jacob asked whether it was an outage or the build environment being
+mirrors. The maintainer asked whether it was an outage or the build environment being
 blocked. It was neither, quite:
 
 - `api.openstreetmap.org/api/0.6/map?bbox=` returns **200 with 660 KB of real
@@ -1645,7 +1645,7 @@ written to think about.** The self-test's safety drill calls `startRecording()`
 to exercise breadcrumb and retrace. It carefully saved and restored `TRUCK`,
 `crumbs`, `crumbMi`, `posMode`, `ME`, `RIDE` and `LASTRIDE` — and left the ride
 HUD switched on, over the place chips, showing no heading, for the life of the
-app. Jacob found it on the first real ride.
+app. The maintainer found it on the first real ride.
 
 The restore list was written when `startRecording()` had five side effects. A
 sixth was added at take 78 and nothing connected them. Save the VISIBLE state
@@ -1653,7 +1653,7 @@ too, or better, drive the drill through the same stop path a rider would.
 
 **122. My sandbox is not the build environment, and its failures are not the
 product's.** Four takes shipped saying "OpenStreetMap is down", measured at 0/24.
-Jacob's take-82 APK came back with **20,428 edges and a complete bundle** — the
+The maintainer's take-82 APK came back with **20,428 edges and a complete bundle** — the
 OSM profile, water and all. CI reached Overpass without difficulty the whole
 time. The release notes told him his build had no water; it did.
 
@@ -1664,7 +1664,7 @@ one the artifact is built on.
 
 **123. A control that renders nothing looks broken.** With no heading the
 compass ribbon drew its needle and no ticks — technically correct, and
-indistinguishable from a bug. Jacob's words were "it doesn't work whatever it
+indistinguishable from a bug. The maintainer's words were "it doesn't work whatever it
 is." Say what is missing: *"waiting for heading — start moving."* An empty state
 is a state, and it needs the same care as a full one.
 
@@ -2282,7 +2282,7 @@ and the next person to grep for the handler finds one.
 
 **175. Two functions with the same name, and the second silently wins.**
 `dispatch-scan` was added to `stLayout()` at take 93 and never emitted a line —
-not on Jacob's phone, not in the harness, for sixteen takes. There are TWO
+not on the maintainer's phone, not in the harness, for sixteen takes. There are TWO
 `function stLayout(){}` declarations in the file. JavaScript keeps the last one
 and discards the first without a word.
 
@@ -2387,7 +2387,7 @@ the mark small; never let the mark set the target.
 **185. Escapes are per-language, and markup is not JavaScript.**
 The drawer chevron was written as `\u25BE` in HTML. That escape exists in
 JavaScript strings; in markup it is six literal characters, which the app drew —
-and the folded state's `rotate(180deg)` mirrored them into gibberish. Jacob
+and the folded state's `rotate(180deg)` mirrored them into gibberish. The maintainer
 reported "a random string of test/error code" twice; both were this one span.
 
 A string moved between languages carries its escapes as freight, and nothing
@@ -2396,7 +2396,7 @@ character itself, and assert glyph LENGTH where a single symbol is meant.
 
 **186. Flex-stretch inside a clipped box squeezes children below their padding.**
 The pinned action row lives in the folded drawer (`max-height:0`, clipped).
-Jacob's self-test measured the buttons at 28 px there — flex default alignment
+The maintainer's self-test measured the buttons at 28 px there — flex default alignment
 sizes children against a container that has no height, and padding does not
 save them.
 
@@ -2434,14 +2434,14 @@ written at the wrong level.
 
 **190. Transcribe, don't invent.** Two takes of designing "premium" from first
 principles produced cream pills and a tan desert. One session of transcribing
-Jacob's reference screenshots — sampled colours, counted radii, named patterns
+The maintainer's reference screenshots — sampled colours, counted radii, named patterns
 in docs/DESIGN.md — produced the look he actually wanted. For visual work the
 reference IS the spec, and a written study of it survives context resets the
 way taste does not.
 
 **191. Verify the artifact the person can reach, not the copy you can see.**
 The take-113 seal zipped, byte-compared, gate-checked and listed the new seed —
-and the file Jacob later downloaded was take 112. The outputs directory had
+and the file the maintainer later downloaded was take 112. The outputs directory had
 reverted between sessions; the workspace survived, the deliverable did not, and
 the verification had proven a filesystem that did not persist.
 
@@ -2476,7 +2476,7 @@ structural fault (two entries misfiled out of order), now asserted by the gate.
 Take 114's bulk-mode patches were ast-checked and never run — their steps'
 payloads were already cached locally, so terrain and imagery never executed the
 new lines. Both referenced a ROOT those files never define. The clean CI runner
-executed them and the build died at terrain, blocking Jacob's install of two
+executed them and the build died at terrain, blocking the maintainer's install of two
 sealed takes.
 
 This is landmine 32 (the clean-checkout lesson) recurring in tool form, plus a
@@ -2537,7 +2537,7 @@ the seed makes.**
 Take 117's seed declared ALL OF MICHIGAN. The GitHub workflow — which the seed
 cannot update (landmine 46/84) — still carried `APEX_REGION: neml-bullgap`
 from the box era, and the env var outranks regions.json by design. CI shipped
-the test square wearing take 117: same speed, same size, full green. Jacob's
+the test square wearing take 117: same speed, same size, full green. The maintainer's
 own field eye ("I'd imagine all of Michigan would be 100 MB and take a while")
 was the only detector that fired.
 
@@ -2582,7 +2582,7 @@ described the missing job, which is how it was found. When replacing a file
 someone pastes by hand, diff it against the file it replaces, job by job.
 
 **203. Two seals under one take number.** Take 120 was sealed, then resealed
-an hour later with more in it. Jacob built the first one; his self-test said
+an hour later with more in it. The maintainer built the first one; his self-test said
 "Take 120" and the elevation fix was simply absent, which read as a CI cache
 bug and nearly cost a take chasing it. The take number is the only handle he
 has on what is on his phone. A reseal is a new take — bump BUILD, bump the
@@ -2603,7 +2603,7 @@ CI.** photos.py ran at ~59 lookups/min from the sandbox and printed nothing
 for the first 100; on GitHub Actions — cloud IPs Wikimedia rate-limits
 hard, with the tool's own 20-second back-off on 429 — a single lookup could
 take a minute, so builds #53 and #55 sat on "address:" until the 90-minute
-timeout, and Jacob read it as stuck. Measured on #55: 100 lookups in 1,251 s
+timeout, and the maintainer read it as stuck. Measured on #55: 100 lookups in 1,251 s
 — 12.5 s each against ~1 s here, a 12× throttle. The ledgers already knew the shape
 (landmine 199-era: "pipelines verified locally have twice failed in clean
 environments"). Rule: anything fetched from a public API is fetched HERE
@@ -2611,7 +2611,7 @@ and shipped in the seed; CI consumes, it does not fetch. `APEX_PHOTO_
 BUDGET_S=0` in ci/bundle.sh; photos/ + photos_index.json ride in the seed.
 
 **206. A constant typed from memory is a claim.** The "transparent 1×1 PNG"
-base64 in take 127 was blue at 50 % alpha; nothing decoded it until Jacob's
+base64 in take 127 was blue at 50 % alpha; nothing decoded it until the maintainer's
 Hybrid went blue. Generate such constants with a tool and assert the decoded
 value. Companion: a markup edit that searches for `  </div>` will match
 inside `    </div>`; count opens and closes after any edit to the DOM.
@@ -2704,3 +2704,21 @@ respawns the browser before the heavy tail, on a clean page — not a
 bigger swap, which only turns the crash into a protocol timeout. And the
 gate now keeps 700 characters of a failure: a stack you cannot read is
 not evidence.
+
+**213. "Died at the turn boundary" has two shapes, and only one of them
+is dead.** Sometimes the whole chain dies. Sometimes only the child
+(node) dies and the parent shell survives, advances to the NEXT command
+— for a render→gate chain, `python3 tools/gate.py` — and spawns a second
+render on a machine that cannot carry two (landmine 208). Renders that
+reappear seconds after being killed are this. Kill parent chains first
+(`ps -eo pid,args | grep "bash -c cd /home/claude/apex"`), then
+node/chrome, then confirm `ps` is quiet, then launch once.
+
+**214. One heavy stage per turn.** A render (~10 min) or a gate (~20 min)
+polled across a turn boundary is a coin toss; polled to its verdict
+inside one turn with `sleep 285` it is not. Launch at the top of the
+turn and give the stage the whole turn — and the gate now takes about
+23 minutes, so that is FIVE polls, not three; three lost take 177's
+gate twice. Do not launch a render without
+confirming the previous one has exited — the author did, once, and got
+zeros.

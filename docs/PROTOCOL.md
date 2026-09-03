@@ -1,6 +1,30 @@
-# PROTOCOL
+# PROTOCOL · V3
 
-*Revised 2026-08-19, take 175.*
+*Revised 2026-09-02, take 177. Take 176 is the production baseline.*
+
+## §0 — Production line rules (V3)
+
+1. **The gate is the last word, and CI's gate outranks the sandbox's.** A
+   seed is uploaded to GitHub only after the local gate passes; it goes
+   to Play only after CI's gate passes on that upload. A red CI run means
+   the AAB is not promoted, whatever the sandbox said.
+2. **Every field report is an agenda item** with a `Ruled out:` line and
+   a take, whether it comes from the maintainer or a stranger. Field
+   reports from testers carry the same weight as the maintainer's.
+3. **Audit before seal.** Read the take cold before sealing it. Three of
+   the navigation arc's real defects were found that way and none by the
+   original checks.
+4. **One heavy stage per turn** in the sandbox: render or gate, launched
+   and polled to its verdict inside the same turn. Kill parent shells
+   before children; confirm the machine is quiet before launching.
+5. **Two chats, one ledger.** Check the highest agenda and landmine
+   numbers before assigning one.
+6. **Nothing personal ships.** The shipped web assets carry no comments;
+   the ledgers refer to "the maintainer".
+7. **A document that disagrees with the code is the bug.** Code is the
+   truth; fix the document.
+
+
 
 The working rules for this project. The gate enforces the ones it can.
 
@@ -88,7 +112,7 @@ a fourth guess. Instead, in order:
    finding — the attempts were not producing information.
 2. Find something that already does the thing and works, and read its source.
 3. Add a readback diagnostic. Turn "it doesn't work" into a fact.
-4. Ask Jacob for a *differential test*, not another build. A test that isolates
+4. Ask the maintainer for a *differential test*, not another build. A test that isolates
    one variable is worth more than three builds that change several.
 5. If none of that produces a new fact, say so and offer to stop.
 
@@ -202,7 +226,7 @@ If a Phase 4 item can fail silently, it needs an indicator showing it is working
 - Is this my third failed attempt at the same symptom? (§5)
 - Did I write the HANDOFF entry FIRST? (§6)
 - Have I stated what I am DEFERRING this cycle? (§6)
-- Am I asking Jacob to test more than one thing at a time?
+- Am I asking the maintainer to test more than one thing at a time?
 - Would splitting this across two messages produce a more complete result?
 
 **Touched steps run before the seal.** If a take edits a pipeline tool, that

@@ -1,6 +1,6 @@
 # APEX ORV — State of v1
 
-Declared done by Jacob at take 74 (2026-08-22), on the strength of a live
+Declared done by the maintainer at take 74 (2026-08-22), on the strength of a live
 field test of take 73: **41 PASS / 0 FAIL** on-device (Galaxy Z Fold 7,
 SM-F966U1), GPS first fix 5.8 s at ±6 m, screenshots confirming filter, route
 cards, satellite legibility and labels in the wild.

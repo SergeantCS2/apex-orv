@@ -1,6 +1,45 @@
-# ROADMAP — APEX ORV
+# ROADMAP — APEX ORV · V3
 
-*Current as of take 175.*
+*Current as of take 177. Take 176 is the production baseline: on Google
+Play as com.apexoffroad.app, closed testing with real users from
+2026-09-02.*
+
+## V3 — public, and shaped by strangers
+
+V3 is the release and everything that comes from people other than the
+maintainer using it. What V2 built (below, as history) is on the phone;
+what V3 does is prove it on trails nobody on the project has ridden, and
+finish the arcs the design already committed to.
+
+**Now**
+- Tester feedback loop: every field report becomes an agenda item and a
+  take. The navigation arc (170–173), Camp (174) and the pin cleanup
+  (175) have never met a real trail. Most wanted: the self-test VOICE
+  line, the follow camera's feel at speed, arrival firing where expected.
+- A190 · HD download tiers — this view, this county, whole state one
+  level sharper (~430 MB clipped to land). Designed; needs the parallel
+  fetcher, wake-lock through the save, and USGS rate discipline.
+
+**Next**
+- A183 · R8 shrinking/obfuscation, once testers can device-verify the
+  native bridge. Mapping file into CI, android_check asserting it.
+- A189 · Road-hazards ("Security") mode — Flock ALPR cameras, speed
+  cameras, low bridges, rail crossings, cattle guards — all OpenStreetMap
+  tags the ingest can keep. Design first: name, membership, sixth mode or
+  a layer.
+- Production listing from closed testing when the tester round is clean.
+
+**Later, honestly scoped**
+- Background navigation with the screen off — needs a native foreground
+  service; out of scope until someone asks with the screen off.
+- Camping data beyond OSM: DNR's state forest campground list and USFS
+  recreation sites would type the other half of the campgrounds.
+- Live data that is a tap, never automatic: gauges exist; DNR closures
+  could join them on the same rule.
+
+---
+
+## V2 — history, as shipped
 
 APEX ORV. An offline-first Android app for off-road navigation in Michigan, built from
 public agency data. Sideloaded APK. No subscription, no account, no backend, and
@@ -9,7 +48,7 @@ no network required in the field.
 **The bar:** if onX Offroad or AllTrails has a feature worth having, it belongs on
 this list. The parity matrix below is the checklist.
 
-**The driver:** Jacob has been lost in these woods. Phase 4 exists so that does
+**The driver:** the maintainer has been lost in these woods. Phase 4 exists so that does
 not happen again, and per PROTOCOL §9 nothing in it gets cut for schedule.
 
 ---
@@ -249,7 +288,7 @@ Show it large, never default to DMS, and pair it with the junction number from 3
 
 ### Phase 4 · Return Home
 
-Jacob's feature. Tap once, get ranked ways back to a saved place with honest
+The maintainer's feature. Tap once, get ranked ways back to a saved place with honest
 tradeoffs — not one "best" route.
 
 | # | Task | Notes |

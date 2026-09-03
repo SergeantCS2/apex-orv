@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 175.* Ranked by blocking-ness, not by interest.
+*Current as of take 177.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -206,7 +206,7 @@ timeout.
 - **Ruled out:** renderer speed (A2), offline loading (NET CLEAN, 0 remote
   requests), style validity, glyph rendering, routing, the address index, and
   layout at 411x960.
-- **STAGE 1 STILL OPEN — and only Jacob can close it:** battery cost over a real
+- **STAGE 1 STILL OPEN — and only the maintainer can close it:** battery cost over a real
   ride with the screen held on, sunlight legibility, glove operation, the fold
   seam, GPS quality under jack pine canopy, and what happens when a fix drops
   out mid-ride. None of these can be measured from here.
@@ -302,14 +302,14 @@ ROADMAP 9.2. Two regions build from one definition with no code changes.
 
 - **Was:** puppeteer was never in `package.json`, and `tools/android.py`
   *overwrote* that file from a fixed template — so the check that found the
-  blank map could not run on Jacob's machine or in CI.
+  blank map could not run on the maintainer's machine or in CI.
 - **Now:** puppeteer is a declared devDependency and `android.py` merges rather
   than clobbers.
 - **Ruled out:** generating `package.json` from a template at all. A tool that
   rewrites a file it does not fully own will silently delete whatever it does
   not know about.
 
-## A27 — The CSP engine is belt-and-braces, not a proven fix · MEASURED take 97, Jacob's call
+## A27 — The CSP engine is belt-and-braces, not a proven fix · MEASURED take 97, the maintainer's call
 
 - **Honest status:** take 21 shipped the CSP build to fix a `blob:` worker
   problem that **take 23 disproved** — the real cause was style validation.
@@ -325,7 +325,7 @@ ROADMAP 9.2. Two regions build from one definition with no code changes.
 
 ## A28 — Impromptu rides · SHIPPED take 40
 
-Jacob's stated goal is three things: plan a trip, ride it, and **improvise** —
+The maintainer's stated goal is three things: plan a trip, ride it, and **improvise** —
 "a new impromptu trail ride" or getting out of trouble. The first two are built.
 The third is not:
 
@@ -344,7 +344,7 @@ The third is not:
   device report is diffable against a known-good baseline.
 - **PROVEN:** it found four bugs in its own first run (profile field name, lazy
   index, software-rasteriser fps verdict, SxS legality misread).
-- **Ruled out:** asking Jacob to tap through thirty features per build, and
+- **Ruled out:** asking the maintainer to tap through thirty features per build, and
   free-text bug reports — both cost him time and give me less.
 - **Open:** the report is text; a future version could attach the map screenshot
   and the last N GPS fixes for a track-quality view.
@@ -362,13 +362,13 @@ The third is not:
 
 ## A31 — Launcher icon · CLOSED take 30
 
-- **PROVEN:** `assets/logo-master.png` (Jacob's own artwork, cleaned) drives all
+- **PROVEN:** `assets/logo-master.png` (the maintainer's own artwork, cleaned) drives all
   18 icon resources through `tools/icon.py`; verified by extracting the adaptive
   foreground from the shipped APK.
 - **Ruled out:** redrawing the mark from primitives. Two takes tried, both
   missed, and the second was rejected outright — approximating an asset you
   already possess exactly is not engineering.
-- **Note:** a wordmark costs legibility below ~56 px. Jacob's design, knowingly
+- **Note:** a wordmark costs legibility below ~56 px. The maintainer's design, knowingly
   kept.
 
 ## A32 — State outline for orientation · REVISED take 33
@@ -414,7 +414,7 @@ The third is not:
   reachability, map share) — found 31 px chips immediately.
 - **PROVEN:** a 25-entry action log ships in the self-test report, turning a
   prose symptom into an ordered trace.
-- **Ruled out:** asking Jacob for more detailed prose. The information he cannot
+- **Ruled out:** asking the maintainer for more detailed prose. The information he cannot
   give is state and ordering, and the app already has both.
 
 ## A35 — Feedback loop for a non-developer tester · SHIPPED take 37
@@ -422,7 +422,7 @@ The third is not:
 - **PROVEN:** static stub-coverage gate (found 8 real gaps), on-device layout
   checks (catch the take-35 overflow by regression), and a 40-entry action log
   in the shared report.
-- **Ruled out:** asking Jacob to describe UI bugs more precisely. The cost was
+- **Ruled out:** asking the maintainer to describe UI bugs more precisely. The cost was
   never his description — it was that nothing on his device was measuring the
   thing he was describing.
 - **Open:** a screenshot attached to the report would remove the last manual
@@ -449,7 +449,7 @@ The third is not:
   ride says so; a 95-minute one reports 17.7%/hour.
 - **Ruled out:** quoting a battery rate from any sample. That was the first
   version and it produced "37 hours from full".
-- **Open until Jacob rides:** actual %/hour on the Fold with the screen on, and
+- **Open until the maintainer rides:** actual %/hour on the Fold with the screen on, and
   median accuracy under jack pine. Sunlight, gloves and the fold seam remain
   unmeasurable from here.
 
@@ -506,7 +506,7 @@ The third is not:
   and Frames/s off the navigation screen.
 - **Ruled out:** colouring by agency/class. It encoded who drew the line, not
   what riding it costs.
-- **Open, from Jacob's references:** trail detail card (name, difficulty, length,
+- **Open, from the maintainer's references:** trail detail card (name, difficulty, length,
   climb, surface, elevation profile) on tap; POI markers for trailheads and
   campgrounds — DNR layer 19 carries FacilityType/SiteName, so the data is there;
   land-ownership shading; a difficulty legend so the colours are learnable.
@@ -634,7 +634,7 @@ item above. Disambiguated at take 82, not renumbered.*
 ## A53 — Labels legible on the real screen · SHIPPED take 57
 
 - **PROVEN:** harness now runs at 411x960 dpr 2.625 and reproduces the device
-  (4 names vs Jacob's 3, where it used to claim 8). Swept params at that size:
+  (4 names vs the maintainer's 3, where it used to claim 8). Swept params at that size:
   6 names at z14.5.
 - **PROVEN:** ridable names outrank show-only ones, and survive Satellite —
   Map 3 · Satellite 3 · Hybrid 3, where Satellite was 0.
@@ -805,7 +805,7 @@ item above. Disambiguated at take 82, not renumbered.*
   below exact.
 - **PROVEN:** search types match the map's road/trail distinction.
 - **Ruled out:** exact-only matching for a rider in gloves.
-- **Open:** field test — the next report is Jacob's, against the eleven-item
+- **Open:** field test — the next report is the maintainer's, against the eleven-item
   script in ci/RELEASE.md.
 
 ## A70 — Labels at the 1 mi scale · SHIPPED take 74
@@ -816,7 +816,7 @@ item above. Disambiguated at take 82, not renumbered.*
 - **PROVEN:** forest-road numbers deliberately held to 3000 ft (11 at z12).
 - **Ruled out:** lowering fsroad to 1 mi as well — 4-digit IDs at that scale are
   noise where road names are signal.
-- **Open:** the field answer. Jacob is riding take 73; take 74 is the build that
+- **Open:** the field answer. The maintainer is riding take 73; take 74 is the build that
   should make the "zoomed out" complaint go away.
 
 ## A71 — v1 complete · take 75
@@ -894,7 +894,7 @@ file, that heading is the outcome and this bullet is the original proposal. Each
 blocking-ness; labels are PROVEN-need / INFERRED / UNKNOWN.
 
 - **A72 — statewide ORV coverage, two-tier.** PROVEN-need, deferred behind the
-  square by Jacob's decision. Measured take 75: DNR ORV 4,475 features
+  square by the maintainer's decision. Measured take 75: DNR ORV 4,475 features
   statewide, MVUM 9,523 roads + 3,480 trails; Michigan is 236× the Bull Gap AOI
   by area but only 18–26× by network. Agency vector statewide ≈ 8–15 MB.
   *Ruled out:* one statewide bundle; statewide imagery (8.6 GB at z15);
@@ -1074,7 +1074,7 @@ blocking-ness; labels are PROVEN-need / INFERRED / UNKNOWN.
   not an ORV restriction. My expectation was wrong, not the data.
 - **Blocked on:** A72, which is itself blocked behind the square being ridden.
 
-## A100 — Jacob's machine is a narrow dirt bike · NOTED take 82
+## A100 — The maintainer's machine is a narrow dirt bike · NOTED take 82
 
 Recorded so it is not re-derived, and so it is not mistaken for a null result.
 
@@ -1150,7 +1150,7 @@ It does not have to.
 
 ## A104 — Clear a route · SHIPPED take 83
 
-- **PROVEN, field:** Jacob closed the directions panel and the route line stayed
+- **PROVEN, field:** the maintainer closed the directions panel and the route line stayed
   on the map with no way to remove it.
 - **PROVEN:** `clearRoute()` has existed since take 33 and clears route,
   alternates and approach legs. It was bound only to side effects — machine
@@ -1211,7 +1211,7 @@ It does not have to.
   dependency, for a path exercised only on failure — and a refusal that never
   fires is a hope, not a safety property (landmine 45).
 - **Ruled out for now:** doing it silently as part of A107. It changes what CI
-  downloads and installs on every degraded build, and that is Jacob's call to
+  downloads and installs on every degraded build, and that is the maintainer's call to
   make rather than mine to slip in.
 
 ### A60 measured on real geometry · take 84 (see A60 above)
@@ -1230,7 +1230,7 @@ It does not have to.
 
 *Third time I have appended a `## ` heading for an id that already existed (A60 at take 78, A72 at take 82, A108 here). The ledger check caught it twice; the habit is mine and the fix is to grep the agenda for the id before writing the entry, not after the gate says no.*
 
-- **DECIDED by Jacob, take 85:** promote it. The chain is Overpass mirrors →
+- **DECIDED by the maintainer, take 85:** promote it. The chain is Overpass mirrors →
   Geofabrik extract → Census TIGER.
 - **PROVEN, clean run from a pristine unpack with Overpass down:** extract
   downloaded from scratch, `verify -> COMPLETE`, 20,222 edges / 12,236 nodes /
@@ -1333,7 +1333,7 @@ It does not have to.
 
 ## A110 — Places you can ride to · SHIPPED take 89
 
-Jacob, take 88: pins you can tap for more information, "almost like Google Maps".
+The maintainer, take 88: pins you can tap for more information, "almost like Google Maps".
 The immediate, no-architecture-required piece of A111 below.
 
 - **PROVEN, in the Geofabrik extract we already download — no new source, no new
@@ -1343,7 +1343,7 @@ The immediate, no-architecture-required piece of A111 below.
   2 day-use areas (Island Lake, Loon Lake), 2 viewpoints, 4 beaches.
 - **PROVEN:** this closes A78 for free — the trailhead markers wanted since
   take 43 are `amenity=parking` with a name, already in the data.
-- **PROVEN:** Jacob's Island Lake beach exists as an unnamed `natural=beach` at
+- **PROVEN:** the maintainer's Island Lake beach exists as an unnamed `natural=beach` at
   −84.1423,44.5083, **6 m** from the named `Island Lake Day Use Area`.
 - **Ruled out:** shipping every candidate. 205 parking areas and 135 camp
   pitches in-region would be clutter, not information. Named features and a
@@ -1361,7 +1361,7 @@ The immediate, no-architecture-required piece of A111 below.
 
 ## A111 — Modes that change the UI · PROPOSED take 89
 
-Jacob's idea, and it is the one that resolves the scope question rather than
+The maintainer's idea, and it is the one that resolves the scope question rather than
 dodging it: **APEX is not diluted by paddling if paddling is a MODE.**
 
 Each mode owns a network, a hazard model, a refusal rule and a filter set. The
@@ -1383,7 +1383,7 @@ saved routes, the ride HUD, breadcrumb and retrace.
 
 ## A112 — Paddle mode: the Au Sable corridor · PROPOSED take 89
 
-Jacob wants to run the whole Au Sable, Grayling to Lake Huron — 160 river miles.
+The maintainer wants to run the whole Au Sable, Grayling to Lake Huron — 160 river miles.
 
 - **PROVEN, and this is the reason the item exists:** every mainstem dam is in
   OSM **by name** — Mio, Alcona, Loud, Five Channels, Cooke, Foote — plus Van
@@ -1408,7 +1408,7 @@ Jacob wants to run the whole Au Sable, Grayling to Lake Huron — 160 river mile
 
 ## A113 — Bottom navigation · SHIPPED take 98 (proposed take 89)
 
-Jacob: "buttons in the bottom or something". onX uses five: Discover, Offline
+The maintainer: "buttons in the bottom or something". onX uses five: Discover, Offline
 Maps, My Content, Tools, Go & Track (documented at A92).
 
 - **Open:** this is probably the same decision as A111, not a separate one — a
@@ -1419,12 +1419,12 @@ Maps, My Content, Tools, Go & Track (documented at A92).
 
 ## A114 — Rebrand: APEX ORV -> APEX · DECIDED take 89: not happening
 
-*Jacob, take 89: "We'll always call it APEX ORV, at least for a long time,
+*the maintainer, take 89: "We'll always call it APEX ORV, at least for a long time,
 but rebranding in our minds." The modes are the real idea (A111); the name
 is not changing. Kept on the ledger so the consequences below are not
 rediscovered if it ever comes up again.*
 
-Jacob: "maybe we'll rebrand in the future to just APEX, do whatever outdoors".
+The maintainer: "maybe we'll rebrand in the future to just APEX, do whatever outdoors".
 
 - **Consequence that must not be discovered late:** the signing certificate reads
   `CN=APEX Off-road` and must keep reading it — a stable key is what lets take N
@@ -1444,7 +1444,7 @@ Jacob: "maybe we'll rebrand in the future to just APEX, do whatever outdoors".
 
 Every region is a rectangle. A river is a line that runs off the edge of one: the
 Au Sable enters the Bull Gap box at −84.3 and leaves at −83.9, and the trip
-Jacob wants runs −84.71 to −83.33.
+The maintainer wants runs −84.71 to −83.33.
 
 - **PROVEN:** the Geofabrik extract is statewide, so the full corridor geometry
   is already downloaded — extracting it needs no new fetch, only a different
@@ -1652,11 +1652,11 @@ Jacob wants runs −84.71 to −83.33.
 - **PROVEN:** the check failed on the real defect the moment it was written; it
   needed no manufactured control.
 - **Ruled out:** widening `sthelen`'s bbox to contain them. That changes what the
-  region downloads, which is a scope decision and Jacob's to make — the reasoning
+  region downloads, which is a scope decision and the maintainer's to make — the reasoning
   is recorded in the region's own note, not only here (landmine 150).
 - **Ruled out:** leaving them as low-zoom signposts. They are chips and search
   hits, not labels; both take you somewhere the app knows nothing about.
-- **Open:** if Jacob wants Houghton Lake and Roscommon, a wider `sthelen` bbox or
+- **Open:** if the maintainer wants Houghton Lake and Roscommon, a wider `sthelen` bbox or
   a third region is the answer, and either is one line in regions.json.
 
 ### A103 superseded at take 85 (see A103 above)
@@ -1717,7 +1717,7 @@ Jacob wants runs −84.71 to −83.33.
 
 ## A116 — Presentation, not architecture · MEASURED take 98
 
-Jacob asked whether the backend approach was wrong, because onX and AllTrails
+The maintainer asked whether the backend approach was wrong, because onX and AllTrails
 feel more premium.
 
 - **PROVEN, measured:** the gap is 14 chips in one row, 38 emoji as icons, **1**
@@ -1739,7 +1739,7 @@ feel more premium.
 
 ## A117 — Rivers, lakes and river access, properly · JACOB'S NEXT PRIORITY, after the overhaul
 
-Jacob, take 98: *"I'm making rivers and lakes a priority as well, where they're
+The maintainer, take 98: *"I'm making rivers and lakes a priority as well, where they're
 drawn on the map properly with all major drops/pickups or campgrounds"* — and,
 asked when: **after the UI overhaul is complete**, not interleaved with it.
 
@@ -1777,19 +1777,19 @@ asked when: **after the UI overhaul is complete**, not interleaved with it.
 
 ## A119 — Tools destination · PARTLY SHIPPED take 101, bucket still to fill
 
-Jacob, take 99: *"Do we have the tool bucket/tab?"*
+The maintainer, take 99: *"Do we have the tool bucket/tab?"*
 
 - **Honest status:** the destination exists (A113) and currently holds About,
   Self-test and Pan test. Those are diagnostics. It is the right container with
   the wrong contents.
-- **What belongs there**, from the onX study (A84) and Jacob's asks: measure a
+- **What belongs there**, from the onX study (A84) and the maintainer's asks: measure a
   line, mark my location, a standalone compass, area shape. Waypoints already
   shipped at take 92 but are reached by long-press, not from Tools.
 - **Ruled out:** filling it before the overhaul finishes. A tools palette built
   against a type scale and motion that are about to change is built twice.
 - **Ruled out:** moving the diagnostics out yet. About and Self-test have to live
   somewhere, and "More" is a fifth destination this app has not earned.
-- **Scheduled:** after A117 (rivers), which is Jacob's stated next priority.
+- **Scheduled:** after A117 (rivers), which is the maintainer's stated next priority.
 
 ## A120 — Type scale and motion · SHIPPED take 100
 
@@ -1829,7 +1829,7 @@ Jacob, take 99: *"Do we have the tool bucket/tab?"*
   points within 500 m: 83 rivers, 5,139 mi statewide (~3 MB). Near this region:
   **6 corridors, 390 river miles, 265 KB**.
 - **PROVEN:** the ranking is the state's canonical paddling list with nobody
-  choosing it — Huron 78, Au Sable 54, Manistee 51, Grand 44. Every river Jacob
+  choosing it — Huron 78, Au Sable 54, Manistee 51, Grand 44. Every river the maintainer
   named clears it: Rifle 6, Black 9, Pine 15 (landmine 160).
 - **PROVEN:** the Rifle River has **zero points inside the region bbox** and is
   fully carried, with launches at mile 0.2 and 8.7 and six campgrounds — a
@@ -1926,7 +1926,7 @@ Jacob, take 99: *"Do we have the tool bucket/tab?"*
 
 ## A123 — Michigan only, deliberately · DECIDED take 106
 
-Jacob: *"I'm abandoning all states or other countries. This app will essentially
+The maintainer: *"I'm abandoning all states or other countries. This app will essentially
 be the Michiganders dream, the one stop Michigan app."*
 
 - **Consequence:** the Geofabrik Michigan extract is the permanent OSM source,
@@ -1978,7 +1978,7 @@ be the Michiganders dream, the one stop Michigan app."*
 
 ## A127 — The details drawer · SHIPPED take 109
 
-Jacob's design, after the first real session: the rail was always on screen and
+The maintainer's design, after the first real session: the rail was always on screen and
 took nearly half of a map app.
 
 - **PROVEN, six behaviours:** folds to its resting state · tapping a place opens
@@ -1987,7 +1987,7 @@ took nearly half of a map app.
   scrolling body.
 - **PROVEN:** clean at all four device sizes; the map gains ~210 px at rest.
 - **Ruled out:** translating the rail off screen. It is a grid row, so a
-  transform leaves a hole the map does not fill — the "just disappears" Jacob
+  transform leaves a hole the map does not fill — the "just disappears" the maintainer
   did not want. Folding shrinks the row and the map grows into it.
 - **Ruled out:** opening from each card site. Every card goes through `show()`,
   so there is one hook and a new card cannot forget.
@@ -2011,7 +2011,7 @@ took nearly half of a map app.
 
 ## A129 — First-run guide · SHIPPED take 110
 
-Jacob: a short guide the first time the app opens, blurring the background,
+The maintainer: a short guide the first time the app opens, blurring the background,
 reachable afterwards from a How-to button in Tools.
 
 - **PROVEN, in a real browser:** opens on first run · blurs the map behind rather
@@ -2071,7 +2071,7 @@ reachable afterwards from a How-to button in Tools.
 
 - **FIXED, field-reported:** the chevron shipped as the literal six characters
   `\u25BE` — a JS escape pasted into markup — and the fold's rotation mirrored
-  it; both of Jacob's "random strings" were this one span (landmine 185).
+  it; both of the maintainer's "random strings" were this one span (landmine 185).
 - **FIXED, field-reported:** action buttons at 28 px inside the folded drawer —
   flex-stretch in a clipped box squeezes below padding height; `min-height:44px`
   on the control itself (landmine 186).
@@ -2086,11 +2086,11 @@ reachable afterwards from a How-to button in Tools.
   the fault was the default, not the layer.
 - **Ruled out:** special-casing show() with a flag for startup. Status is a
   different KIND of content, so it gets a named function, not a boolean.
-- **Open:** Jacob has more guide adjustments coming; the content will move.
+- **Open:** the maintainer has more guide adjustments coming; the content will move.
 
 ## A133 — Reference redesign T1–T3 · SHIPPED take 113
 
-Jacob's brief: onX hybrid, AllTrails light map, one app, Michigan only. Study
+The maintainer's brief: onX hybrid, AllTrails light map, one app, Michigan only. Study
 in docs/DESIGN.md; built as checkpoints, sealed once.
 
 - **PROVEN (T1):** Lucide icons, bundled Barlow, one dark control language,
@@ -2106,7 +2106,7 @@ in docs/DESIGN.md; built as checkpoints, sealed once.
   reference look in style JSON and canvas images with zero new dependencies.
 - **Ruled out:** importing icon paths into badges — at 8 px inside a 26 px
   circle a hand stroke sketch reads better than any scaled import.
-- **Open:** Jacob's real feedback pass on the finished direction — colours,
+- **Open:** the maintainer's real feedback pass on the finished direction — colours,
   badge glyphs and the trail palette on the light ground are his call now.
 - **Open:** street-name labels still carry the old dark halo weight; label
   typography pass (Barlow SDF glyphs for the MAP itself) is a candidate T4.
@@ -2142,22 +2142,22 @@ app, and re-tunes street-label halos for the light ground.
   statewide memory model proven by corridor.py in CI.
 - **Ruled out:** statewide Overpass (volunteer-service abuse); z13 statewide DEM
   (~38,000 tiles); z12+ statewide imagery pyramid (8.6 GB, take 75).
-- **Open:** the run itself — switch, measure, tune. Jacob's confirmed order
+- **Open:** the run itself — switch, measure, tune. The maintainer's confirmed order
   (take 116): Michigan as a whole → Great Lakes water polygons via the area
   handler → tuning. Multiple takes budgeted.
 
 ## A136 — onX Backcountry study · AWAITING REFERENCES take 115
 
 Third reference for the design synthesis. Slot reserved in docs/DESIGN.md §7.
-- **Ruled out:** designing from the app's reputation before Jacob's screenshots
+- **Ruled out:** designing from the app's reputation before the maintainer's screenshots
   arrive — transcribe, don't invent (landmine 190).
 - **Open:** everything, pending captures.
 
-## A137 — App modes: the multi-discipline vision · RECORDED take 117 (Jacob)
+## A137 — App modes: the multi-discipline vision · RECORDED take 117 (the maintainer)
 
-Jacob's direction, on the record: after the first Michigan draft, APEX splits
+The maintainer's direction, on the record: after the first Michigan draft, APEX splits
 into MODES — General Outdoors, ORV/Mountain Biking, Hunting/Fishing, potentially
-more. onX Hunt and onX Fish join the reference set (Jacob holds "tons of
+more. onX Hunt and onX Fish join the reference set (the maintainer holds "tons of
 screenshots", to be transcribed not invented, landmine 190). Implications noted
 now so statewide decisions don't fight it: per-mode legality/routing profiles
 (Return Home matters more cross-mode), per-mode POI emphasis, per-mode layer
@@ -2180,18 +2180,18 @@ route profiles at 84–102 ms, suites green (smoke 274+/5 modes, render 124).
 - **Ruled out:** keeping all residential (OOM at 3 GB) and dropping all
   residential (severed a third of the network) — the bridge subset is the
   proven middle.
-- **Open (Jacob's order):** ~~Great Lakes polygons~~ SHIPPED take 118 (738
+- **Open (the maintainer's order):** ~~Great Lakes polygons~~ SHIPPED take 118 (738
   relation-assembled water bodies via the landcover area handler) → tuning
   (Silver Lake riding area, summits OOM, 53.7 MB address, corridor box-prose,
   A96 typed arrays, residential display layer) → A136/A137 references and
   modes.
 
-## A139 — Great Lakes destination POI · RECORDED take 118 (Jacob)
+## A139 — Great Lakes destination POI · RECORDED take 118 (the maintainer)
 
 The big lakes are not rivers: no put-ins/take-outs, no float times — corridor
 treatment does not apply and never will. What they get instead, in a future
 data pass: the MAJOR destinations — principal boat launches, lighthouses,
-famous fishing grounds and hangouts (Jacob names Manistee's launch/lighthouse
+famous fishing grounds and hangouts (the maintainer names Manistee's launch/lighthouse
 as the archetype; there are thousands of such places around the state).
 - **Ruled out:** corridor float treatment on the Great Lakes.
 - **Ruled out:** importing every ramp — MAJOR is the word; curation or a
@@ -2201,7 +2201,7 @@ as the archetype; there are thousands of such places around the state).
 
 ## A140 — Riding areas: DNR scramble-area polygons · SHIPPED take 119
 
-Silver Lake is ground, not trail (Jacob, take 117). Source found at take 119:
+Silver Lake is ground, not trail (the maintainer, take 117). Source found at take 119:
 `DNR_ORV_Scramble_Areas` on ArcGIS Online — 8 designated areas statewide,
 server total = shipped.
 - **PROVEN:** 8 polygons in 9 KB; fill/outline/label draw in a real browser;
@@ -2212,7 +2212,7 @@ server total = shipped.
   the extract's tag set; the DNR layer is authoritative and complete.
 - **Ruled out:** importing ingest.query() — landmine 201.
 - **Open:** private motocross parks (Ogemaw Hills etc.) as a POI category in
-  the places pass, with a badge that says "private, fee" — Jacob wants them
+  the places pass, with a badge that says "private, fee" — The maintainer wants them
   drawn; they are businesses, not designated riding ground.
 - **Open:** routing awareness — Return Home and Directions still route to the
   nearest edge; inside a scramble area "ride anywhere" could mean a straight
@@ -2229,7 +2229,7 @@ Spatial grid SHIPPED for nearestEdge / nearestNode / nearestEdgeTo — exact
   are the next linear scans; the address index (53.7 MB) wants the same
   grid treatment and a size diet together.
 
-## Take-120 field report (Jacob, 2026-08-26) — everything, ranked
+## Take-120 field report (the maintainer, 2026-08-26) — everything, ranked
 
 Self-test on the Fold: PASS 46, dispatch 654 → 300 ms (grid), fps 117.
 Bundle hash `4d051023100b9aff` = t119's — CI restored cached payloads and
@@ -2238,19 +2238,19 @@ skipped terrain, so the riding-area patches never ran (Δ49 unchanged).
 ### A141 — WITHDRAWN, and the reason matters
 First read: "CI restored cached payloads and skipped terrain, landmine 196
 again." Checked instead of asserted: the local bundle carrying the terrain
-patches hashes 3509f18cb103eac3; Jacob's t120 build hashes 4d051023100b9aff,
+patches hashes 3509f18cb103eac3; the maintainer's t120 build hashes 4d051023100b9aff,
 byte-identical to his t119. Identical data is exactly what the FIRST t120
 zip (grid only, app-side) should produce — it was sealed before the patch
 work and resealed after. He built the pre-reseal zip. No cache bug; the
 patches have simply never run in CI yet. Landmine 203: two seals under one
-take number is a trap — the take number is the only handle Jacob has, so a
+take number is a trap — the take number is the only handle the maintainer has, so a
 reseal must bump the take, not reuse it.
 - **Do:** verify Δ on Bull Gap after the next build; if it is still 49 ft
   with a bundle hash of 3509f18c or later, THEN the cache is the suspect.
 
 ### A142 — the tan state wash covers the map · P1 · statewide visual
 At state/regional zoom the context land polygon draws OVER landcover: the
-whole peninsula reads as a flat tan sheet with a dark outline (Jacob's
+whole peninsula reads as a flat tan sheet with a dark outline (the maintainer's
 "tan overlay covers the map"). Move the land fill beneath the ground
 layers or fade it out by z8; keep the outline.
 
@@ -2288,12 +2288,12 @@ smoothing / stale-reading fallback to GPS course while moving.
 
 ### A149 — self-test drives the map to Bull Gap · P4 · box-era premise
 stRouting drills Bull Gap → Pink Store (hardcoded box anchors, landmine
-197) and leaves the map there; Jacob read it as the app "zeroing". Derive
+197) and leaves the map there; the maintainer read it as the app "zeroing". Derive
 the drill from the anchors nearest the rider and restore the view after.
 
 ### Ruled out (take 121)
 - **Ruled out:** a CI cache bug behind the unchanged Bull Gap elevation —
-  bundle hashes prove Jacob built the pre-reseal t120 (A141, landmine 203).
+  bundle hashes prove the maintainer built the pre-reseal t120 (A141, landmine 203).
 - **Ruled out:** one POI layer with zoom expressions for A143 — destinations
   and services need different minzooms, which a single layer cannot carry.
 - **Ruled out:** fading the state fill instead of restacking it (A142) — a
@@ -2306,11 +2306,11 @@ A142 (tan wash — the whole state reads wrong) → A144 (sheet overlaps the
 button row) → A145 (readout invisible on light) → A143 (POI tiers) →
 A146 (lake access data) → A149 (self-test hijacks the view) → A147/A148.
 
-## Take-121 field report (Jacob, 2026-08-26) — A150–A154
+## Take-121 field report (the maintainer, 2026-08-26) — A150–A154
 
 Full investigation in docs/DIAGNOSIS-t121.md (read that first; every cause
 below was proven from the tree or measured, not guessed). No code changed
-this cycle at Jacob's instruction.
+this cycle at the maintainer's instruction.
 
 Confirmed fixed on the phone: Bull Gap elevation Δ49 -> **Δ0** (riding-area
 z13 patches), map area 65% -> **81%** of screen, roads check names its view.
@@ -2321,14 +2321,14 @@ z13 patches), map area 65% -> **81%** of screen, roads check names its view.
   (24321, 24319); over the light map the pill shows and the cream text
   disappears into it (24325, 24317 — a ghost pill with no legible label).
   Unreadable only when ON, in opposite ways. A first pass at this claimed the
-  light map was fine; Jacob's crops disprove it.
-  - **Jacob asks: do we still need the cream tint?** No — delete the concept.
+  light map was fine; the maintainer's crops disprove it.
+  - **the maintainer asks: do we still need the cream tint?** No — delete the concept.
     The chip label ALREADY states the state ("Map"/"Satellite"/"Hybrid",
     "All routes"/"ORV / dirt bike"); the tint re-encodes that in the least
     legible channel available. Rule to adopt: every floating control is one
     opaque surface, state lives in the label, never in the background. ON =
     brighter border + an accent dot.
-  - Readout/scale: one treatment everywhere per Jacob — dark ink, white
+  - Readout/scale: one treatment everywhere per the maintainer — dark ink, white
     outline via four +/-1px shadows, not a blur (a blur is what made it read
     grey over imagery).
   - Add to verify_palette: floating-control background alpha >= 0.85 and text
@@ -2349,7 +2349,7 @@ z13 patches), map area 65% -> **81%** of screen, roads check names its view.
   split pins into two symbol layers that collide separately. Pair icon+text in
   ONE layer with text-optional:true, or prove it is fade churn first: park,
   count both layers, pan 200px, settle, count again at the same centre.
-- **A155 · P4 · guide rewrite for statewide** (Jacob's own ranking: lowest).
+- **A155 · P4 · guide rewrite for statewide** (the maintainer's own ranking: lowest).
   It still teaches Bull Gap and the Pink Store as the world. Do it after the
   pin work, or it documents pins that are about to change. Ship with the
   bumped GUIDEKEY from A147.
@@ -2370,7 +2370,7 @@ z13 patches), map area 65% -> **81%** of screen, roads check names its view.
 - **A154 · P2 · diag/compass panels overlap the Tools strip.** Both anchored
   `bottom:64px`; the strip is ~76 px since A144 added its bottom padding —
   take 121 made this worse. Publish the measured strip height as a CSS var.
-- **A148 · P3 · compass phasing.** Hypothesis only (Jacob's call): no
+- **A148 · P3 · compass phasing.** Hypothesis only (the maintainer's call): no
   smoothing and no hysteresis between magnetometer and GPS course. Needs a
   real ride to judge.
 
@@ -2381,7 +2381,7 @@ grid builds lazily so it may or may not fall inside the timed window. Report
 all six calls separately plus window.__gridMs (exposed at A96, never read)
 before optimising anything.
 
-### A156 · P1 · out-of-state bleed (Jacob, 24331) — DATA, do before A151
+### A156 · P1 · out-of-state bleed (the maintainer, 24331) — DATA, do before A151
 Agency layers are fetched with the region BBOX and never clipped to the state
 polygon. 7,413 of 474,047 edges sit outside every Michigan county: Lakeland
 ATV and Price County snowmobile trails (Wisconsin), Chequamegon-Nicolet forest
@@ -2390,7 +2390,7 @@ is why the foreign networks sit on bare white in the screenshot — two
 subsystems disagreeing about what the region is.
 - **Ruled out:** OSM. The Geofabrik extract is state-clipped and `track` shows
   almost no bleed; the USFS MVUM layers carry it (fstrail 11% out-of-state).
-- **Ruled out:** Ontario data. Jacob read "Canada"; the northernmost cluster
+- **Ruled out:** Ontario data. The maintainer read "Canada"; the northernmost cluster
   is Minnesota's Arrowhead at 48.0,-90.0. No Ontario features found.
 - **Fix:** clip at ingest against context.py's shoreline polygon (promote it
   to a shared artifact), keep boundary-crossers whole, report drops per layer.
@@ -2432,9 +2432,9 @@ Three modes as presets over tables that already exist: Ride (ORV/MTB),
 Outdoors (hike/camp/fish/hunt), Water (beach/kayak/tube/boat). Foot routes
 (69,628) and bike routes (2,949) are already in the bundle, show-only, never
 drawn by default. Build order: MODES table + chip → draw foot/bike → walk
-machine → water data (marina, DNR BAS, A139) → hunt/fish data after Jacob's
+machine → water data (marina, DNR BAS, A139) → hunt/fish data after the maintainer's
 onX screenshots are transcribed (landmine 190).
-- **Blocked on Jacob:** the onX Hunt / Fish screenshots, for step 5 only.
+- **Blocked on the maintainer:** the onX Hunt / Fish screenshots, for step 5 only.
 
 ### Take 125 — shipped
 A136/A137 step 1: MODES table + chip (Ride / Outdoors / Water), each a preset
@@ -2445,11 +2445,11 @@ assertions per mode from resolved style state.
   map (the place-tap check enforced it).
 - **Ruled out:** rebuilding the Layers panel while hidden — its opacity-0
   rows still count against the accent budget.
-- **Next (step 2):** Jacob's field verdict on 69,628 foot routes at state
+- **Next (step 2):** the maintainer's field verdict on 69,628 foot routes at state
   zoom; if hairball, a `pri` rank for show-only routes like the pins got.
 
 ### Take 126 — shipped
-Jacob's modes field pass: Outdoors relief OFF (hillshade also 850 → 4096 px
+The maintainer's modes field pass: Outdoors relief OFF (hillshade also 850 → 4096 px
 statewide); Ride drops launch/beach and demotes store/food/info to z13; Water
 boosts launch/beach to rank 0; minor roads on imagery fade in from z12,
 highways at 0.35; statewide mosaic 1500 → 4096 px (~464 → ~234 m/px); ON-dot
@@ -2478,7 +2478,7 @@ enters on foot and restores the rider's machine on exit). Four onX screens
 transcribed into DESIGN-modes.md; Hunt specified from them.
 - **Ruled out:** routing over the 69,628 foot routes now — they are
   show-only by graph design; adding them is a size/conflation decision for
-  Jacob, recorded as open.
+  the maintainer, recorded as open.
 - **Ruled out:** parcel owner names and wind-at-stand for Hunt — no free
   statewide source / needs weather; stated in the design rather than faked.
 
@@ -2488,7 +2488,7 @@ transcribed into DESIGN-modes.md; Hunt specified from them.
 Outdoors. 130: mode picker replaces the cycle.
 - **Ruled out:** one pin for statewide corridors (North Country Trail,
   Iron Belle) — a centroid of a 500-mile line is nowhere.
-- **Ruled out:** keeping the cycle with a long-press picker — Jacob asked
+- **Ruled out:** keeping the cycle with a long-press picker — The maintainer asked
   to choose, and a description beats a remembered order.
 
 ### Takes 131–132 — shipped
@@ -2540,7 +2540,7 @@ hiker's map; MTB systems draw a bicycle glyph.
 - **Ruled out:** z13 statewide imagery (400 MB). Field verdict 24493: z11
   still reads pixelated at 1 mi — the z12 base (+104 MB) is queued work.
 - **Ruled out:** hunting layers living inside Outdoors — the public-land
-  squares crowd the hiker's map (Jacob, 24280).
+  squares crowd the hiker's map (the maintainer, 24280).
 - 141 process note: first pass died proven-but-unsealed at a chat limit
   (landmine 207); replayed from the transcript onto the sealed t140 tree.
   First seal, so landmine 203 is satisfied.
@@ -2549,7 +2549,7 @@ hiker's map; MTB systems draw a bicycle glyph.
 Resort pins in Outdoors from `landuse=winter_sports`; run list with
 difficulty from `piste:type` ways inside the polygon; website link; photo
 and description from the Wikipedia pass; bike glyph in Ride for the
-summer-MTB hills. Nordic out. (Jacob, 24280.)
+summer-MTB hills. Nordic out. (the maintainer, 24280.)
 
 ### Take 142 — shipped
 36 ski/snowboard hills from `landuse=winter_sports` (ski kind, Outdoors),
@@ -2563,11 +2563,11 @@ Wikipedia photos; skier glyph verified at 3.4× and real size.
 ## A157 — Hybrid fidelity: z11+z12 statewide base pyramid · SHIPPED take 143
 Field report 24493: z11 base still pixelated at 1 mi. Base to z12 (10,573
 tiles / ~104 MB / 27 m/px); patches unchanged. Size accepted for now;
-WebP re-encode measurement queued separately (Jacob: "work backwards").
+WebP re-encode measurement queued separately (the maintainer: "work backwards").
 
 ### Take 143 — shipped
 Statewide base is a z11+z12 pyramid (14,058 tiles / 183 MB with patches):
-27 m/px under Jacob's 1-mi view, no regression band anywhere. Manifest
+27 m/px under the maintainer's 1-mi view, no regression band anywhere. Manifest
 carries "base"; app satbase maxzoom follows it; render check parametrized.
 - **Ruled out:** z12-only base — a raster source cannot underzoom, so
   z11-11.9 views would fall back to the mosaic. Worse than t140 in that
@@ -2587,13 +2587,13 @@ Decide re-encode vs keep-JPEG from numbers, not vibes.
 
 ## A159 — Field report 24542 (t143 APK, Flat Rock at ~1 mi) · DECIDED
 "Better but hard to tell — still extremely pixelated despite 230 MB."
-Verified from Jacob's own APK: all 10,573 z12 tiles aboard, manifest
+Verified from the maintainer's own APK: all 10,573 z12 tiles aboard, manifest
 base:12, and tile 12/1100/1519 (his exact spot) is crisp at its native
 28 m/px — the blur is arithmetic, not delivery. At 1 mi on the Fold the
 screen wants ~5 m/px; z12 leaves a ~5x stretch (t143 halved t140's ~10x).
 Sharp-at-1-mi needs z14–15: statewide that is 2.2–8.6 GB — no APK can
 carry it. Raising the base further is a dead end; the fix is structural.
-Options on the table for Jacob: (a) on-demand offline imagery downloads
+Options on the table for the maintainer: (a) on-demand offline imagery downloads
 per area/county (the onX model — z13–15 pulled from USGS to device
 storage for places he picks, ~50–150 MB per county); (b) online streaming
 Hybrid with cache-as-you-go, offline falls back to the z12 base;
@@ -2602,7 +2602,7 @@ Hybrid with cache-as-you-go, offline falls back to the z12 base;
   ~550 MB, z14 ~2.2 GB, z15 8.6 GB (take 75's measurement stands).
 
 ## A160 — HD imagery: manual streaming + area saves · IN PROGRESS (144 store+resolver · 145 chip+saves · streaming next)
-Jacob picked a hybrid of streaming and downloads with two hard rules:
+The maintainer picked a hybrid of streaming and downloads with two hard rules:
 NOTHING automatic, and one simple visible control. Design of record:
 - One **HD chip** top-right by the basemap control. OFF by default.
   First tap opens a two-choice sheet in plain words.
@@ -2612,19 +2612,19 @@ NOTHING automatic, and one simple visible control. Design of record:
   "HD · offline base".
 - **Save HD for this area**: the visible area / riding area / county,
   size quoted BEFORE fetch ("~85 MB"), progress in the chip exactly as
-  Jacob sketched ("HD 42%…"), pausable, deletable under Tools.
+  the maintainer sketched ("HD 42%…"), pausable, deletable under Tools.
 - Implementation: extend the apexsat:// resolver — bundle → saved store →
   (streaming on + online) fetch+cache → blank. Pipeline and CI untouched;
   same free USGS endpoint the pipeline uses. Est. 3–4 takes.
-- Size ledger that motivated it (from Jacob's t143 APK, 240 MB): z12 base
+- Size ledger that motivated it (from the maintainer's t143 APK, 240 MB): z12 base
   127.7 + z11 38.0 + patches 17.3 = imagery 183; photos only 9.8 (ski
   added ~2). The pyramid law: each level costs 4x for 2x sharpness.
-- **Ruled out:** automatic/background downloads of any kind (Jacob).
+- **Ruled out:** automatic/background downloads of any kind (the maintainer).
 - **Ruled out:** raising the in-APK base past z12 (A159 numbers stand).
 - A158 (WebP on the SHIPPED bundle) proceeds independently to shrink the
   APK itself.
 
-### Field report — t143 self-test on the Fold (PASS 50 · FAIL 2), and the FIRST EXTERNAL TESTER's notes (via Jacob)
+### Field report — t143 self-test on the Fold (PASS 50 · FAIL 2), and the FIRST EXTERNAL TESTER's notes (via the maintainer)
 
 ## A161 — self-test style-loaded reads a flickering flag · OPEN
 XX style-loaded false while 292 features drew, roads passed, 0 map
@@ -2674,13 +2674,13 @@ infrastructure, not shopping.
   spent on riding.
 
 ## A167 — Rename the Ride mode label to "Off-road" · take 146
-Jacob's direct call. Label and guide text only; the internal key 'ride'
+The maintainer's direct call. Label and guide text only; the internal key 'ride'
 and the "Ride it" recording verb stay — renaming keys breaks saved
 state, and "go for a ride" is the activity, not the mode.
 - **Ruled out:** renaming the k:'ride' key — persistence and harness
   hooks hang off it for zero rider-visible gain.
 
-### Field report — t145/t146 session two (Rifle River, via Jacob)
+### Field report — t145/t146 session two (Rifle River, via the maintainer)
 
 ## A168 — Rivers findable by name · SHIPPED take 152
 "rifle river" returned a STREET and three trails, never the river. Every
@@ -2691,7 +2691,7 @@ points at the run flow.
   is not a point, and the run flow is the destination.
 
 ## A169 — Missing river accesses · SHIPPED take 151 (with an honest limit)
-The Rifle's mapped 60.8 mi held TWO named OSM accesses; Jacob has stood
+The Rifle's mapped 60.8 mi held TWO named OSM accesses; the maintainer has stood
 on ramps we did not show. Root cause: OSM coverage, not the algorithm
 (verified — the only OSM "High Banks" launch is on the MANISTEE). Fix:
 the DNR's Michigan Boating Access Sites layer (1,325 sites, same host
@@ -2705,7 +2705,7 @@ corridor candidates, 120 m same-ramp dedupe, OSM's fuller names winning.
   coordinate typed from a screenshot is landmine-190 bait, and the next
   missing ramp would need the same favour.
 
-### Takes 147–152 — shipped (the tester batch, one seal — Jacob's call)
+### Takes 147–152 — shipped (the tester batch, one seal — The maintainer's call)
 Every mode plans something. 147: 36 liveries from real boat_rental ingest,
 in Water and Outdoors. 148: self-test settles the style flag (setTimeout
 chain — smoke pumps timers, not microtasks). 149: kayak/canoe/raft as
@@ -2716,7 +2716,7 @@ access sites into launches (+280) and corridors — the Rifle from 2 named
 accesses to 6, nameless OSM twins adopting DNR names. 152: rivers are
 search rows; a river hit fits the river.
 - **Ruled out:** shipping any of the live-network features as automatic —
-  every network touch is a tap (Jacob's law, twice stated).
+  every network touch is a tap (the maintainer's law, twice stated).
 - Verified: smoke 5 modes, render 195/0, self-test 42/0 non-render under
   stubs. Three explicit-map artifacts bit in one batch (manifest keys,
   IN_BUNDLE, the split loader) — each caught by a drill, each now carries
@@ -2733,17 +2733,17 @@ per-mode filters, so the honest version is per-kind and zoom-aware.
 - **Ruled out:** data-side collapse (an A151-style merge) — zoom-blind, it
   would hide genuinely distinct neighbours exactly when you zoom in to
   separate them.
-- **Ruled out:** letting it be — Jacob flagged it, and a pin hiding
+- **Ruled out:** letting it be — The maintainer flagged it, and a pin hiding
   another pin is a map lying by occlusion.
 
-### A170 design of record (Jacob 24507/24509 — the reference app's
+### A170 design of record (the maintainer 24507/24509 — the reference app's
 ### numbered clusters at low zoom, plain pins when you zoom in)
 
 Feasible, contained, and the trap is ONE thing: MapLibre clusters at the
 SOURCE, and this app selects pins by LAYER FILTER (`modeFilter` sets
 poi-dot / poi-dot-major). Stock `cluster:true` on the `poi` source would
 therefore count all 25,798 places — including the 17,544 fuel/food/store
-pins Jacob explicitly excludes and every kind the current mode hides. The
+pins the maintainer explicitly excludes and every kind the current mode hides. The
 badge would read a number no rider could ever reach. That is the failure
 this project exists to refuse, so:
 
@@ -2753,7 +2753,7 @@ this project exists to refuse, so:
   filter, so the count cannot lie.
 - **Clusterable = destinations only** (8,254 statewide): launch, camp,
   trailhead, system, mtb, ski, livery, beach, marina, lighthouse,
-  dayuse, view, shelter. **Never** fuel, food, store — Jacob's rule.
+  dayuse, view, shelter. **Never** fuel, food, store — The maintainer's rule.
 - `clusterProperties` carries per-kind counts, so a HOMOGENEOUS cluster
   draws its own glyph with ×N (his idea) and a mixed one draws a plain
   numbered circle (the reference app's behaviour).
@@ -2773,11 +2773,11 @@ this project exists to refuse, so:
 Same-kind pin stacks below z11.4: one badge, one kind, ×N, tap to open.
 12 clusterable destination kinds (POIKIND d:1); services never stack;
 the pool is the mode's own kinds so a count can only include reachable
-pins. Radius 38 px (Jacob's agreed starting point — it took the biggest
+pins. Radius 38 px (the maintainer's agreed starting point — it took the biggest
 statewide pile from ×150 to ×65).
 - **Ruled out:** MapLibre/supercluster clustering — it merges by
   proximity alone and cannot partition by property, so 20 of its first
-  23 piles were MIXED. Jacob's rule is "similar and major pins", so the
+  23 piles were MIXED. The maintainer's rule is "similar and major pins", so the
   bucketing is per-kind in JS: bin by kind + grid cell, stack only where
   2+ of one kind share a cell. Fewer layers than the supercluster
   version, not more.
@@ -2789,7 +2789,7 @@ statewide pile from ×150 to ×65).
   verified against t153's baseline of exactly 1 label at that camera.
 
 ### Take 155 — shipped
-Jacob asked whether stacks appear when FULLY zoomed out; the take-154
+The maintainer asked whether stacks appear when FULLY zoomed out; the take-154
 drill only proved z8.4. The harness now asserts at the map's own floor
 (minZoom 5.2). Documentation caught up: A170 marked shipped, landmines
 208 and 209 recorded.
@@ -2798,9 +2798,9 @@ drill only proved z8.4. The harness now asserts at the map's own floor
 
 ## A171 — Boot loading screen · SHIPPED take 156
 Cold start shows raw __IC_ tokens on a tan background until app.js runs
-(Jacob 24582). Static splash painted on first paint, real progress from
+(the maintainer 24582). Static splash painted on first paint, real progress from
 boot milestones, lifts into the guide/permission prompt.
-- **Ruled out:** the 10-second fixed timer Jacob offered as a shortcut —
+- **Ruled out:** the 10-second fixed timer the maintainer offered as a shortcut —
   it either wastes a fast phone's time or lifts before a slow one is
   ready, and a progress bar that does not track progress is an instrument
   that lies. The milestones are already countable.
@@ -2812,7 +2812,7 @@ boot milestones, lifts into the guide/permission prompt.
 __IC_*__ ships literal in index.html and app.js swaps it at boot, which
 is why a cold start reads broken. Build-time substitution would remove
 the failure mode entirely rather than covering it.
-- **Ruled out:** doing it inside take 156 — the splash is the fix Jacob
+- **Ruled out:** doing it inside take 156 — the splash is the fix the maintainer
   asked for and mixing a build-system change into it would put two risks
   in one take.
 
@@ -2845,7 +2845,7 @@ Knobs, all measured rather than guessed when the report arrives: cluster
 radius (38 px today — 46 was too greedy at ×150, 38 gives ×65), the
 z11.4 ceiling where stacks give way to pins, and the 12-kind clusterable
 set. What is NOT yet known is WHICH way it reads wrong on the Fold —
-too eager, too shy, wrong break zoom — so nothing moves until Jacob says
+too eager, too shy, wrong break zoom — so nothing moves until the maintainer says
 which.
 - **Ruled out:** tuning it blind on my own taste. The numbers already
   pass; the thing being tuned is how it FEELS at arm's length, and that
@@ -2853,12 +2853,12 @@ which.
 
 ## A175 — Splash timing · CLOSED (field-confirmed take 158)
 Lifting on the first idle frame is correct: "when it goes away,
-everything is mostly loaded" (Jacob, 24586). No change.
+everything is mostly loaded" (the maintainer, 24586). No change.
 - **Ruled out:** holding for full tile-settle — it would lengthen every
   cold start to fix a problem the field says does not exist.
 
 ## A176 — Overlapping pins at high zoom · SHIPPED take 160
-Take 154 stacks only below z11.4; at 1000 ft pins still overlap (Jacob,
+Take 154 stacks only below z11.4; at 1000 ft pins still overlap (the maintainer,
 24596). Collision pass above the ceiling: group rendered pins within a
 pin-width, hide all but the top-ranked, badge it xN, tap opens a
 scrollable tray of the members.
@@ -2874,7 +2874,7 @@ scrollable tray of the members.
 
 ## A177 — Google Play arc · IN PROGRESS (applied by play kit v1)
 Decisions of record, made against the LIVE Play pages (landmine 190):
-- **appId `com.sergeantslabs.apex`** (Jacob). Consequence: the Play build and
+- **appId `the earlier vendor-flavoured application id`** (the maintainer). Consequence: the Play build and
   a sideloaded take cannot coexist on one phone — different keys, same id.
   - **Ruled out:** a separate Play appId for side-by-side installs — a variant
     split in android.py for a convenience the 14-day test does not need.
@@ -2907,7 +2907,7 @@ the artifact. Source annotations are untouched.
   places in the map data.
 
 ## A180 — Application ID · DECIDED take 163: com.apexoffroad.app
-capacitor.config.json declares com.sergeantslabs.apex. Play fixes the
+capacitor.config.json declares the earlier vendor-flavoured application id. Play fixes the
 applicationId forever at the first upload, and it is visible in the store
 URL. If the name is to be neutral it must change BEFORE that upload, and
 a change means Play-installed and sideloaded builds can no longer update
@@ -2948,9 +2948,31 @@ declaration cannot silently become false.
   is about the merged manifest, which a future dependency can change.
 - **Ruled out:** adding `tools:node="remove"` for AD_ID pre-emptively. It
   would HIDE a dependency that wanted the permission; the check surfaces
-  it instead, which is the decision Jacob should get to make.
+  it instead, which is the decision the maintainer should get to make.
 
-## A183 — R8 / app optimization · DECLINED for the first release
+## A183 — R8 / app optimization · DECLINED for the first release · WHAT IT IS (2026-09-02)
+R8 is Android's compile-time code shrinker, optimiser and obfuscator (the
+successor to ProGuard). It works on the Java/Kotlin bytecode of the
+NATIVE shell — Capacitor, its plugins, AndroidX — and never touches the
+app's JavaScript, which ships plain inside the package regardless (hence
+the comment scrub). Three jobs: shrink (drop unused classes and methods),
+optimise (inline and simplify), obfuscate (rename classes to short
+meaningless names). Play's "App optimization: Low / obfuscation 1%" and
+"no deobfuscation file" warnings are both about it.
+Enabling it entails: minifyEnabled + shrinkResources on the release
+build type (android.py patches build.gradle), a proguard-rules.pro that
+KEEPS everything Capacitor reaches by reflection — the bridge
+(com.getcapacitor.**), every @CapacitorPlugin class, the WebView
+JavaScript interfaces — building, then uploading the generated
+mapping.txt with every AAB so Play can read crash stacks. The risk is
+the reason it waits: a keep rule missed strips a plugin that is only
+loaded by reflection, and Geolocation or Haptics silently fails at
+runtime. This harness runs the web layer and cannot see it; only a
+device can. The gain is 2–4 MB off a ~185 MB package and a harder-to-
+decompile shell. When it goes in: as its own take, mapping.txt wired
+into CI as an artifact, android_check asserting the mapping exists
+whenever minify is on, and a tester round on real devices before it
+ships.
 Play warns "App optimization: Low" and notes no deobfuscation file. Both
 are R8, and both are warnings, not blockers.
 - **Ruled out:** enabling R8 for the first release. classes.dex is ~7.6 MB of a ~185 MB
@@ -3009,7 +3031,7 @@ Everything else, briefly, so the record is honest about the whole span:
   county/whole-state download arc if it goes ahead.
 - Imagery pyramid (143) and shrink (159): CI-confirmed on a clean runner,
   183 -> 127 MB, SSIM 0.991. Sound.
-- Splash (156/158) and busy line (157): field-confirmed by Jacob and by a
+- Splash (156/158) and busy line (157): field-confirmed by the maintainer and by a
   47/0 self-test. Sound.
 - Release hardening (162–167): scrub vendored and proven with the package
   removed; appId set before it locked; AD_ID asserted on the built
@@ -3019,10 +3041,10 @@ Everything else, briefly, so the record is honest about the whole span:
 
 ### Take 169 — shipped
 One distance-based clusterer at every zoom replaces the two grid-bucketed
-passes; mixed stacks allowed (Jacob 2026-09-01); tap lists the pile and
+passes; mixed stacks allowed (the maintainer 2026-09-01); tap lists the pile and
 moves the map in. Invariant asserted: nothing visible within the radius
 of anything else.
-- **Ruled out:** keeping per-kind stacking at low zoom. Jacob: "combining
+- **Ruled out:** keeping per-kind stacking at low zoom. The maintainer: "combining
   beaches is fine" provided the tray lists everything, and per-kind is
   what left a beach, a launch and a camp overlapping on one lake.
 - **Ruled out:** a centroid badge. It lands in lakes; the badge sits on
@@ -3031,7 +3053,7 @@ of anything else.
   prominence order or the services rule, and its count is per-source.
 
 ## A186 — Camping mode · SHIPPED take 174
-Jacob's reference shots show campgrounds and national forests, "which I'd
+The maintainer's reference shots show campgrounds and national forests, "which I'd
 like under camping mode" — a fifth mode. Questions to settle first: what
 it shows (campgrounds by type — state forest, national forest, private,
 rustic vs modern; dispersed camping where data exists; national forest
@@ -3085,7 +3107,7 @@ Honest hard parts, stated up front:
   This is a camera and a banner on the map the rider already has.
 - **Ruled out:** re-routing on every fix. Only past the off-route
   threshold, debounced, or a noisy trail edge re-routes forever.
-Open questions for Jacob: (1) start trigger — Navigate on the route card,
+Open questions for the maintainer: (1) start trigger — Navigate on the route card,
 or automatic when Ride it starts with a route present; (2) voice wanted
 in v1 or later; (3) on arrival, stop recording or keep going; (4)
 north-up as a toggle or heading-up only.
@@ -3148,4 +3170,54 @@ dropped, 383 shadows dropped, 440 named for their lake; the remaining
   The card says it is borrowed.
 - **Ruled out:** dropping unnamed pins that shadow NOTHING. A launch on
   an unnamed pond is still a launch; it just waits for z13.5.
+
+## A189 — "Security" mode: cameras and road hazards · IDEA (the maintainer, 2026-09-02)
+A mode that marks Flock Safety automatic licence-plate readers and other
+potential hazards on the road. The data exists and is already in the
+app's main source: the DeFlock project maps Flock cameras into
+OpenStreetMap as man_made=surveillance + surveillance:type=ALPR (often
+manufacturer=Flock Safety); speed cameras are highway=speed_camera;
+railway crossings, low bridges (maxheight), weight limits and cattle
+guards are all OSM tags the ingest can keep. Every one of these is a
+public map fact, not a secret, and the app would be republishing OSM as
+it does for everything else. Design questions before a build: the name
+("Security" reads as the app guarding you; "Road" or "Hazards" reads as
+what it shows), which hazards belong (a low bridge matters to a truck
+towing a trailer; a cattle guard to a bike), what it plans (drive-to on
+the road network, by truck), and how it sits with the five modes rather
+than becoming a sixth thing to cycle past. Not built until designed.
+- **Ruled out:** guessing camera positions or types. OSM only, with the
+  same "shown by what the source says" honesty as every other pin.
+
+## A190 — HD download tiers: this view, this county, whole state at z13 · DESIGN (build starts take 177)
+The maintainer asked whether "download all of Michigan" is possible. Measured:
+z13–15 statewide is 877,182 tiles and ~22.8 GB — not offered. z13 alone
+is 41,904 tiles / ~860 MB over the bounding box, and clipping to the
+state outline the app already ships brings it to roughly 21,000 tiles /
+~430 MB: the whole state one level sharper than the shipped base.
+Tiers, each quoted in tiles and MB before anything moves, as the HD
+sheet already does:
+- This view (exists) — z13–15 over the visible box.
+- This county — z13–15 over the county polygon under the map centre
+  (context.json carries the 83 counties); 50–300 MB depending on county.
+- Whole state, one level sharper — z13 only, clipped to land; ~430 MB;
+  a deliberate, clearly-labelled choice, never a casual tap.
+What the downloader needs to earn it, and does not have today:
+- Parallel fetching — it is strictly sequential (one tile at a time);
+  21,000 tiles that way is over an hour. Six concurrent brings it to
+  about twelve minutes. Capped there on purpose.
+- The screen kept awake through the save (the navigation wake lock,
+  reused) — a save that dies when the screen locks feels broken even
+  though it resumes free.
+- Rate discipline toward USGS: a public service, not a CDN we pay for.
+  Concurrency capped, a short pause between batches, and the whole-state
+  option behind a second confirmation.
+- Progress that says which tier is running and lets Stop keep what it
+  has, as today.
+- **Ruled out:** full-sharpness statewide. 22.8 GB and hours of screen-on
+  downloading is not a phone feature.
+- **Ruled out:** unbounded concurrency for speed. Six is the ceiling;
+  hammering a government tile server is how an app gets blocked at the
+  source.
+- **Ruled out:** starting any tier without the quote on screen first.
 

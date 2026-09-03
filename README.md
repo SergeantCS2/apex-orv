@@ -1,15 +1,39 @@
-# APEX ORV v2
+# APEX ORV v3
 
-**Michigan's trails, rivers, public land and lakes — one app, fully offline.**
+**Michigan's trails, rivers, public land, lakes and campgrounds — one app,
+fully offline, and now it navigates.**
 
 Both peninsulas and Isle Royale. 122,000 miles of legal routing, 76 paddling
-rivers ordered downstream, 4.7 million acres of state land, 25,000 places —
-all of it on the phone, none of it needing a bar of signal. Free, no account,
-and nothing you do in it is sent anywhere.
+rivers ordered downstream, 4.7 million acres of state land, three national
+forests, 25,000 places — all of it on the phone, none of it needing a bar of
+signal. Free, no account, no ads, and nothing you do in it is sent anywhere.
 
-**Install:** grab the signed APK from the latest
-[Release](../../releases/latest). Android 8+, about 240 MB — the size is the
-map, not the app (satellite imagery for the whole state is most of it).
+**Install:** from Google Play (closed testing at the moment; ask for an
+invite), or the signed APK from the latest [Release](../../releases/latest).
+Android 8+, about 185 MB — the size is the map, not the app (satellite
+imagery for the whole state is most of it). The Play build and the sideloaded
+APK are different app identities and install side by side.
+
+## It navigates
+
+Tap **Ride it** and the map centres on you, turns to face the way you're
+going, tilts and follows — like a navigation app, on two-tracks.
+
+- **Turn by turn** on the route you planned: "In 400 ft · Turn left onto
+  Trail 7", remaining distance, a time from your own pace, **"You have
+  arrived"**, and a re-route from where you are when you're 40 m off.
+- **On the river**: plan a run, tap Navigate this run, and the map points
+  **downstream** — not where the phone thinks you're heading, because a
+  kayak drifts. Miles and minutes to the take-out for your boat, the river
+  mile you're on, and **"Dam in 1.2 mi — portage"** before anything else.
+- **On foot**: the same guidance at walking pace.
+- **Voice**, if your phone has one — the self-test tells you. Each turn is
+  spoken once as it becomes next and once close in. Off by default.
+- **If the app dies mid-ride** — force-stopped, phone dead — the next launch
+  offers **Resume your trip?** with your track, your clock and your
+  destination intact.
+- Pan to pause following; Re-centre or Locate to resume; N↑ for north-up.
+  The screen stays awake while it follows.
 
 > [!IMPORTANT]
 > **The map is not permission.** Trail designations come from the Michigan
@@ -31,7 +55,7 @@ map, not the app (satellite imagery for the whole state is most of it).
 
 ---
 
-## Four modes, one chip
+## Five modes, one chip
 
 The mode chip cycles the whole map — layers, pins, routing and the machine
 button all follow.
@@ -98,6 +122,28 @@ a road between two boat launches.
   conditions" on a river card and the current flow, stage and water
   temperature arrive from USGS, stamped with their time and their gauge.
   Live or absent — a reading from build time would be a lie, so none ship
+
+## Camp
+
+- **Campgrounds by type**, where the source records it: state forest (DNR),
+  national forest (USFS), county, private; rustic or modern; fee or free.
+  Where it doesn't, the card says "type not recorded" — never a guess.
+- **The land where dispersed camping is allowed**, shaded: state forest, and
+  the Ottawa, Hiawatha and Huron-Manistee national forests.
+- Supplies on the way in — fuel, stores, water, launches, trailheads —
+  appear as you zoom in, so the statewide view stays campgrounds and forest.
+
+## Pins that behave
+
+- Pins that would overlap **stack into one circle with a count**, at any
+  zoom. Tap it for the whole pile; tap a row for that place. Each mode
+  stacks only what it shows.
+- Unnamed boat launches and beaches — OpenStreetMap maps a lot of them
+  without names — no longer pile up: private docks are dropped, duplicates
+  beside a named place are dropped, 440 carry the name of the lake they're
+  on (the card says the name is borrowed), and the rest stay out of the way
+  until you're zoomed well in — except in Water mode, where a paddler wants
+  every launch.
 
 ## The imagery, honestly
 
