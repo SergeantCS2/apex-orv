@@ -172,6 +172,10 @@ routing, the machine button.
 - **HD chip** (top right): pick an area. The sheet should quote tiles and
   megabytes *before* offering the save. Run it, press **Stop** partway —
   it should keep what it got and resume later rather than start over.
+- While a save runs the screen should stay on by itself, and opening the
+  HD sheet should say what is downloading and how many tiles are done.
+  Does a save feel faster than it did? (It fetches six tiles at a time
+  now.)
 - Airplane mode, back to that area: saved HD must still draw.
 - **Tools → Saved HD imagery**: does deleting a save free the space?
 

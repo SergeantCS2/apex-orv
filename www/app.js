@@ -943,9 +943,32 @@ function _satResolve(params){
 }
 if(SPARSE)maplibregl.addProtocol('apexsat',_satResolve);
  
+var WAKE=(function(){
+  var held={},lock=null,pending=false;
+  function n(){return Object.keys(held).length}
+  function release(){var l=lock;lock=null;
+    if(l){try{var r=l.release();if(r&&r.catch)r.catch(function(){})}catch(e){}}}
+  function acquire(){
+    if(lock||pending||!n())return;
+    try{
+      if(!navigator.wakeLock)return;
+      pending=true;
+      navigator.wakeLock.request('screen').then(function(l){pending=false;lock=l;
+        try{l.addEventListener('release',function(){if(lock===l)lock=null})}catch(e){}
+        if(!n())release()}).catch(function(){pending=false});
+    }catch(e){pending=false}}
+  return {
+    hold:function(who){held[who]=1;acquire()},
+    drop:function(who){delete held[who];if(!n())release()},
+    holds:function(){return n()},active:function(){return !!lock},
+    resume:function(){if(n()&&!lock)acquire()}};
+})();
+ 
 var HDDL=(function(){
   var USGS='https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}';
-  var running=false,stopReq=false;
+  var LANES=6,BATCH=60,PAUSE=300;
+  var EST_Z={13:14.6*1024,14:17.7*1024,15:19.4*1024};
+  var running=false,stopReq=false,prog=null;
   function txy(lon,lat,z){var n=Math.pow(2,z),r=lat*Math.PI/180;
     return [Math.floor((lon+180)/360*n),
             Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n)]}
@@ -957,28 +980,53 @@ var HDDL=(function(){
         if(!inPatch(z,x,y))out.push([z,x,y]);
     }
     return out}
+  function estimate(tiles){var s=0;
+    for(var i=0;i<tiles.length;i++)s+=EST_Z[tiles[i][0]]||22*1024;return s}
   function fetchTile(z,x,y){
     return fetch(USGS.replace('{z}',z).replace('{y}',y).replace('{x}',x))
       .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer()})}
-  function save(b,onp){
+  function sleep(ms){return new Promise(function(r){setTimeout(r,ms)})}
+  function save(what,onp,label){
     if(running)return Promise.resolve(null);
     running=true;stopReq=false;
-    var tiles=plan(b),i=0,done=0,skipped=0,bytes=0;
-    function fin(err){running=false;
-      return {error:err,done:done,skipped:skipped,bytes:bytes,
-              total:tiles.length,stopped:stopReq}}
-    function next(){
-      if(stopReq||i>=tiles.length)return fin(null);
-      var t=tiles[i++];
+    var tiles=(what&&what.length&&Array.isArray(what[0]))?what:plan(what||[]);
+    var done=0,skipped=0,bytes=0,inflight=0,peak=0,retries=0,pauses=0,err=null;
+    label=label||'this view';
+    prog={label:label,done:0,skipped:0,total:tiles.length};
+    WAKE.hold('hd');
+    function report(){prog.done=done;prog.skipped=skipped;
+      if(onp)onp(done+skipped,tiles.length,label)}
+    function one(t){
       return HD.get(t[0],t[1],t[2]).then(function(have){
         if(have){skipped++;return}
-        return M.fetchTile(t[0],t[1],t[2]).then(function(buf){
-          return HD.put(t[0],t[1],t[2],buf).then(function(){
-            done++;bytes+=buf.byteLength})})})
-        .then(function(){if(onp)onp(i,tiles.length);return next()})
-        .catch(function(e){return fin(String(e))})}
-    return Promise.resolve().then(next)}
-  var M={plan:plan,save:save,fetchTile:fetchTile,EST:22*1024,
+        return M.fetchTile(t[0],t[1],t[2])
+          .catch(function(){retries++;
+            return sleep(PAUSE).then(function(){return M.fetchTile(t[0],t[1],t[2])})})
+          .then(function(buf){return HD.put(t[0],t[1],t[2],buf)
+            .then(function(){done++;bytes+=buf.byteLength})})})}
+    function batch(start,end){
+      var j=start;
+      function lane(){
+        if(stopReq||err||j>=end)return Promise.resolve();
+        var t=tiles[j++];inflight++;if(inflight>peak)peak=inflight;
+        return one(t).then(function(){inflight--;report()},
+                           function(e){inflight--;err=String((e&&e.message)||e)})
+          .then(lane)}
+      var lanes=[];for(var k=0;k<LANES;k++)lanes.push(lane());
+      return Promise.all(lanes)}
+    function batches(start){
+      if(stopReq||err||start>=tiles.length)return Promise.resolve();
+      var end=Math.min(start+BATCH,tiles.length);
+      return batch(start,end).then(function(){
+        if(stopReq||err||end>=tiles.length)return;
+        pauses++;return sleep(PAUSE)}).then(function(){return batches(end)})}
+    return batches(0).then(function(){
+      running=false;prog=null;WAKE.drop('hd');
+      return {error:err,done:done,skipped:skipped,bytes:bytes,total:tiles.length,
+              stopped:stopReq,peak:peak,retries:retries,pauses:pauses,label:label}})}
+  var M={plan:plan,save:save,fetchTile:fetchTile,estimate:estimate,EST_Z:EST_Z,
+    LANES:LANES,BATCH:BATCH,PAUSE:PAUSE,
+    progress:function(){return prog},
     stop:function(){stopReq=true},busy:function(){return running}};
   return M;
 })();
@@ -2978,13 +3026,8 @@ function navChip(){
   el('nav-north').className=NAV.northUp?'on':'';
   var vb=el('nav-voice');if(vb){vb.hidden=!VOICE.ok;vb.className=VOICE.on?'on':''}
   el('nav-center').hidden=NAV.follow}
-function navWake(on){
-  try{
-    if(on&&navigator.wakeLock&&!NAV.lock)navigator.wakeLock.request('screen')
-      .then(function(l){NAV.lock=l;l.addEventListener('release',function(){NAV.lock=null})})
-      .catch(function(){});
-    if(!on&&NAV.lock){NAV.lock.release().catch(function(){});NAV.lock=null}
-  }catch(e){}}
+ 
+function navWake(on){try{if(on)WAKE.hold('nav');else WAKE.drop('nav')}catch(e){}}
 function navStart(){NAV.on=true;NAV.follow=true;NAV.lastAt=null;navWake(true);navChip()}
 function navStop(){NAV.on=false;navWake(false);navChip();navGuideClear();navSay('',true)}
 
@@ -3176,7 +3219,7 @@ function navGuide(at,acc,mps){
   g.innerHTML=line1+'<span class="eta">'+navFmt(remain)+' remaining \u00b7 ~'+
     (etaMin<1?'1':etaMin)+' min'+(pr.off>40?' \u00b7 '+Math.round(pr.off)+' m off the line':'')+'</span>'}
 document.addEventListener('visibilitychange',function(){
-  if(document.visibilityState==='visible'&&NAV.on)navWake(true)});
+  if(document.visibilityState==='visible')WAKE.resume()});
  
 var posMode='none',awayMi=0;
 function inRegion(at){var b=BUNDLE.bbox;if(!b)return true;
@@ -3393,16 +3436,20 @@ function refreshSat(){try{var sc=(map.style.sourceCaches||{})['satpatch'];
   if(sc){sc.clearTiles();map.triggerRepaint()}}catch(e){}}
 function startHDSave(b){
   hdChipTxt('HD 0%');
-  HDDL.save(b,function(d,t){hdChipTxt('HD '+Math.round(d/Math.max(1,t)*100)+'%')})
+  HDDL.save(b,function(d,t){hdChipTxt('HD '+Math.round(d/Math.max(1,t)*100)+'%')},'this view')
     .then(function(r){hdChip();refreshSat();
       if(r&&r.error)show('<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
         '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');})}
 function hdCard(){
   var v=map.getBounds(),b=[v.getWest(),v.getSouth(),v.getEast(),v.getNorth()];
   HD.stats().then(function(st){
-    var n=HDDL.plan(b).length,mb=n*HDDL.EST/1048576,big=mb>500;
+    var pl=HDDL.plan(b),n=pl.length,mb=HDDL.estimate(pl)/1048576,big=mb>500,pr=HDDL.progress();
     var h='<b>HD imagery</b>'+
       '<div class="sub">Sharper satellite for places you choose. Nothing downloads on its own.</div>'+
+       
+      (pr?'<div class="k">DOWNLOADING '+String(pr.label).toUpperCase()+'</div><div class="sub">'+
+        (pr.done+pr.skipped).toLocaleString()+' of '+pr.total.toLocaleString()+
+        ' tiles'+(WAKE.active()?' · the screen stays on until it finishes':'')+'</div>':'')+
       '<div class="k">THIS VIEW</div><div class="sub">'+n.toLocaleString()+' tiles · about '+
         (mb<1?'under 1':Math.round(mb))+' MB'+(big?' — zoom in to a smaller area to save':'')+'</div>'+
       (HDDL.busy()?'<button class="chip" id="hd-stop">'+ic('alert')+'<span>Stop downloading</span></button>':
@@ -3863,7 +3910,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.__sat={tiles:TILES,sparse:SPARSE,inPatch:inPatch,blank:Array.from(BLANK_PNG),resolve:_satResolve};
     window.__hd=HD;
      
-    window.HDDL=HDDL;window.__hdChip=hdChip;
+    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__wake=WAKE;
     window.__ph={index:PHOTOS,html:photoHTML};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};

@@ -66,6 +66,7 @@ button all follow.
 | **Outdoors** | The hiker's map — trail systems with mileage, MTB systems, named hills from regional zoom, rivers, camps, and every ski & snowboard hill in the state |
 | **Hunt** | 4.7M acres of state land with boundaries and game areas, county lines, and the waypoints a hunter marks: stand, camera, sign, water, gate |
 | **Water** | Launches, liveries, beaches, marinas and lighthouses; rivers you can plan a float on; live USGS conditions on a tap |
+| **Camp** | Campgrounds typed where the source records it, the state and national forest land where dispersed camping is allowed, and the supplies on the way in |
 
 **Every mode plans something.** A dirt-bike ride, a hike, an MTB loop, a
 kayak run — the plan system follows the mode, so Water never walks you down
@@ -155,7 +156,8 @@ would be an 8.6 GB app, and that trade is stated here instead of hidden.
 So sharpness is **yours to place**: the **HD chip** (top right) saves full
 z13–15 imagery for any area you choose — the sheet quotes tiles and
 megabytes *before* a save button exists, the chip counts progress
-("HD 42%"), Stop keeps what landed, and the same save later resumes free.
+("HD 42%"), the screen stays on while it saves, Stop keeps what landed,
+and the same save later resumes free.
 Saved HD draws on top of the base and works in airplane mode, because it is
 on the phone. **Nothing downloads on its own. Ever.**
 
@@ -209,8 +211,8 @@ is named there as excluded.
 record of every take since the first; `docs/LANDMINES.md` numbers 200+
 known failure modes so they are stepped around instead of rediscovered;
 `docs/AGENDA.md` carries every decision with what was *ruled out* and why.
-The build gates on all of it: ~280 smoke assertions across five modes,
-~195 rendered-pixel checks in a real browser, and a final gate that has
+The build gates on all of it: ~300 smoke assertions across six modes,
+260 rendered-pixel checks in a real browser, and a final gate that has
 refused seals for a stale document stamp, a missing ruled-out line, and a
 URL that hadn't been declared — each time correctly.
 

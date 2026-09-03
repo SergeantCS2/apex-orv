@@ -10,7 +10,12 @@ import os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
-PAT = re.compile(r"^(\*(?:Current as of|Revised [0-9-]+,) take )(\d+)(\.\*)", re.M)
+# take 178: the stamp line may carry a sentence after the number (ROADMAP and
+# PROTOCOL do since 177: "*Current as of take 177. Take 176 is the production
+# baseline…*"). The old pattern demanded ".*" right after the number, printed
+# "no stamp line" for both, and left them for the gate to refuse — a tool
+# that skips is landmine 53's shape. Match what gate.check_stamps reads.
+PAT = re.compile(r"^(\*(?:Current as of|Revised [0-9-]+,) take )(\d+)(?=[.,])", re.M)
 
 
 def take():
@@ -27,7 +32,7 @@ def main():
             continue
         p = os.path.join(DOCS, fn)
         s = open(p).read()
-        new, hits = PAT.subn(lambda m: f"{m.group(1)}{n}{m.group(3)}", s)
+        new, hits = PAT.subn(lambda m: f"{m.group(1)}{n}", s)
         if hits == 0:
             print(f"  {fn}: no stamp line")
         elif new != s:

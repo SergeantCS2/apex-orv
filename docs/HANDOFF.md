@@ -1,4 +1,99 @@
-# HANDOFF — through Take 177 · V3
+# HANDOFF — through Take 178 · V3
+
+## Take 178 — 2026-09-03 — A190 H1: the downloader earns the tiers
+
+First take of V3. No tester field report has arrived, so by the
+maintainer's default order A190 is next — split as the navigation arc
+was: this take is the machinery, take 179 is the tiers.
+
+What the code had, read rather than remembered: HDDL.save() chained one
+tile at a time; plan() was a z13–15 bbox; the only screen wake lock was
+navigation's; no pause between fetches; the sheet's one tier was "this
+view". A190's diagnosis matched the code line for line.
+
+What changes:
+- SIX LANES. save() runs a pool of up to six fetches in flight through
+  the same fetchTile seam the harness owns. After every 60 tiles the
+  pool drains and waits 300 ms — rate discipline toward USGS, a public
+  service and not a CDN we pay for.
+- ONE RETRY. A tile that fails waits the same pause and is fetched once
+  more; a second failure stops the run and says so, keeping every tile
+  that landed. Before, one 5xx on tile 1,000 of 3,000 ended the save.
+- THE SCREEN STAYS ON. WAKE is a ref-counted holder: navigation and the
+  HD save each hold a token; the lock is requested when the first token
+  arrives, released when the last leaves, and re-acquired on return to
+  the foreground for whoever still holds one. navWake() is a caller of
+  it now, not an owner.
+- PROGRESS NAMES THE TIER. HDDL.progress() reports done, skipped, total
+  and the tier; the chip keeps "HD 42%"; the sheet opened mid-save reads
+  "Downloading THIS VIEW · 1,234 of 2,900 tiles" over its Stop button.
+- save() accepts a prepared tile list as well as a bbox — the seam the
+  county and whole-state tiers plug into in 179.
+
+Measured before deciding, on the bundle rebuilt in this sandbox: the
+shipped z13 tiles average 14.6 KB (63 tiles), z14 17.7 KB, z15 19.4 KB.
+EST=22 KB was measured over the whole z13–15 patch set and is right for
+a this-view save; for a z13-only tier it is 50% high. EST is per zoom
+from this take, so 179's whole-state quote is a measurement, not an
+inheritance. And the outline that clip will test against is 6 rings /
+368 points in context.json.
+
+Proven in the harness, no network, through the seam: the pool reaches at
+least two and never more than six fetches in flight; a Stop mid-run
+keeps what landed and the same save re-run skips exactly those tiles;
+one failure is retried and the run completes; two failures on one tile
+stop the run with the landed tiles kept; the wake lock is requested
+once at the start of a save and released once at the end, through a
+navigator.wakeLock stub the harness did not have before — navWake()
+had been try/catch'd and unexercised since take 170 (landmine 62's
+shape); the sheet names the tier and the count while a save runs.
+
+Environment, for the record: the workspace was gone and the statewide
+bundle was rebuilt cold from the t177 seed — 733,622 OSM elements,
+25,318 places, 415,273 nodes / 573,797 edges, 76 corridors, 323 summits,
+770,097 address segments, 14,058 imagery tiles, manifest bytes 118.9
+MiB: the take-175 record within OSM drift, and address/context exactly.
+Smoke 6 modes and render 252/0 on it. Swap vanished between turns
+mid-render (landmine 215). The take-177 parity gate was NOT run — the
+maintainer's call on cycles, and this take's gate is the same gate on
+the same tree plus this change.
+
+Paperwork carried in this take: README's mode table gains its Camp row
+and the harness counts are corrected; LANDMINES §0 loses its tripled
+rows 63–101 and gains rows for 207–215; AGENTS.md says "the maintainer"
+and the real counts; gate.py loses a duplicated check_ledger_order
+(identical copies — landmine 211's shape from a kit append); stamp.py's
+pattern demanded ".*" straight after the take number, so ROADMAP's and
+PROTOCOL's stamp lines — which carry a sentence since 177 — printed "no
+stamp line" and were left for the gate to refuse; it now matches what
+check_stamps reads (landmine 53's shape: a tool that skips). NOT fixed:
+osm_local.py's stale "0 touching the region" print in stream mode —
+misleading, harmless, and a touched pipeline step must run before its
+seal, so it waits for a take that re-runs ingest.
+
+Two refusals on the first render, both the harness and both mine:
+`navigator.wakeLock = stub` was silently ignored — it is a read-only
+accessor on Navigator.prototype, so the REAL API answered and the check
+read 0/0 (landmine 216; Object.defineProperty installs it); and the
+"one tile fails twice" selector matched a whole z15 row, four tiles, and
+counted four retries for one. Second render 260/0.
+
+AUDIT, the take read cold before sealing (PROTOCOL §0.3): the mid-save
+line said "the screen stays on until it finishes" unconditionally, and
+on a phone with no wakeLock that is a lie on the card — it now appears
+only while WAKE actually holds the lock. Noted and left: a Stop that
+lands during a retry's pause lets that one retry fire (one tile, no
+correctness cost); an HD.put rejection — a quota error — stops the run
+and names it, which is the behaviour the 179 quota check sits in front
+of. The take-177 parity gate is closed as moot: this gate ran on the
+same tree plus this change and passed at 40 checks.
+
+SEAL: gate PASSED, 40 checks (smoke 300 across 5 modes and render 260/0
+inside it), on the audited build. Three renders and three gates this
+take: one render refused two harness defects (fixed), one render and
+one gate died across turn boundaries with no verdict (landmine 214 —
+a heavy stage launched late in a turn does not survive; launch first,
+poll to the end). apex-seed-t178.zip sealed (sha256 in chat).
 
 ## Take 177 — 2026-09-02 — V3: take 176 locked as production
 

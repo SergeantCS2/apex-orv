@@ -1,11 +1,11 @@
 # Working in this repo
 
-APEX ORV is an offline-first Android trail map for ORV riding in north-east
-lower Michigan. It is built for one rider, Jacob, on a Samsung Galaxy Z Fold 7,
+APEX ORV is an offline-first Android trail map for Michigan — both
+peninsulas and Isle Royale. It is built for one rider — the maintainer — on a Samsung Galaxy Z Fold,
 with no laptop in the loop. Everything below exists because getting it wrong
 once cost a day.
 
-**Read `docs/PROTOCOL.md` first, then `docs/LANDMINES.md`.** Seventy-six entries,
+**Read `docs/PROTOCOL.md` first, then `docs/LANDMINES.md` §0.** Over two hundred entries,
 every one of them something that already went wrong here. Skimming them is the
 cheapest hour you will spend.
 
@@ -57,7 +57,7 @@ You change `src/app.html` and `tools/*.py`; everything else is generated.
 
 ```bash
 python3 tools/pipeline.py          # full build: ingest → … → smoke → render
-node tools/smoke.mjs               # executes the SHIPPED app, 5 modes
+node tools/smoke.mjs               # executes the SHIPPED app, 6 modes
 node tools/render.mjs              # real Chrome, real GPU-less renderer
 python3 tools/gate.py              # the contract
 ```

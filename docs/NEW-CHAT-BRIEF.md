@@ -58,7 +58,11 @@ What the app is at 176:
 ## The environment (hard-won facts — read LANDMINES 200–214)
 
 - Build sandbox: **4 GB RAM, one worker, no GPU.** Swap lives at
-  `/tmp/sw` (2 GB; `swapon /tmp/sw` before heavy work). The disk quota
+  `/tmp/sw` (2 GB) and is silently dropped when the VM cycles between
+  turns while the file survives: `swapon --show | grep -q sw || swapon
+  /tmp/sw` before EVERY heavy launch (landmine 215). `www/vendor/` is
+  not in the seed; curl the three MapLibre files as ci/bundle.sh does
+  before the first render — smoke passes without them, render cannot. The disk quota
   shrinks under you: clear `/tmp/puppeteer_dev_chrome_profile-*` and
   `/tmp/apex-fatal-*` before every heavy run; `df -h /` before blaming
   anything else. ENOSPC kills a process before it writes one line.

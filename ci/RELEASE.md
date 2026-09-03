@@ -1,9 +1,13 @@
-**Take 177 — V3 baseline.**
+**Take 178 — HD saves: faster, awake, honest about progress.**
 
-No change to the app: this build is identical to 176, which is the
-production release now in closed testing on Google Play. What changed is
-the paperwork — the README, roadmap, protocol, design notes and tester
-guide now describe the app as it actually is: five modes, navigation on
-land and water, Camp, and the cleaner map.
+The first change since the production baseline. Saving HD imagery now
+fetches six tiles at a time instead of one, pauses briefly between
+batches so the USGS server is treated politely, retries a tile once
+before giving up, keeps the screen on for the whole save, and the HD
+sheet opened mid-save says which area is downloading and how many tiles
+are done. Stop still keeps what landed; the same save still resumes free.
 
-Nothing to check on the phone beyond what 176 asked for.
+On the phone: open the HD chip over an area, save it, and lock nothing —
+the screen should stay on until it finishes. Press Stop partway, reopen
+the sheet: it should say how far it got. Then run the same save again
+and watch it skip ahead. Nothing else changed.

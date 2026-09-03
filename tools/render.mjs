@@ -886,6 +886,98 @@ if (zoomed.trails === 0) {
        `the chip tells the truth before and after delete ("${hdl.label}" -> "${hdl.label0}")`);
   }
 
+  /* Take 178 · A190 H1 · the downloader earns the tiers. Same seam, same
+     bbox rule as take 145 (the target tile comes from the bundle's own box
+     list, landmine 197). A wakeLock STUB is installed first — navWake() had
+     been try/catch'd and unexercised since take 170, which is landmine 62's
+     shape: an API the app calls that the harness never modelled. */
+  const h1 = await page.evaluate(async () => {
+    const S = window.__sat, H = window.__hd, D = window.HDDL, W = window.__wake;
+    if (!S || !H || !D || !W || !window.__hdCard) return { missing: true };
+    const wl = { req: 0, rel: 0 };
+    /* navigator.wakeLock is a read-only accessor on Navigator.prototype; a
+       plain assignment is silently ignored and the REAL API answers (the
+       first run of this check read 0/0 for that reason). Define it. */
+    Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: {
+      request: () => { wl.req++; return Promise.resolve({
+        release: () => { wl.rel++; return Promise.resolve(); }, addEventListener() {} }); } } });
+    const boxes = (S.tiles.boxes || []).filter((b) => b[0] === 13);
+    const b13 = boxes[0] || [13, 4000, 3000, 4001, 3001];
+    let ox = b13[3] + 9, oy = b13[2], guard = 0;
+    while (S.inPatch(13, ox, oy) && guard++ < 200) ox += 11;
+    const n = 8192, inv = (x, y) => [x / n * 360 - 180,
+      Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI];
+    const a = inv(ox + 0.05, oy + 0.05), c = inv(ox + 0.95, oy + 0.95);
+    const bbox = [a[0], c[1], c[0], a[1]];
+    const wait = (ms) => new Promise((z) => setTimeout(z, ms));
+    const slow = (ms) => () => wait(ms).then(() => new ArrayBuffer(500));
+    await H.clear();
+    /* 1 · lanes + wake lock around one clean save */
+    D.fetchTile = slow(12);
+    const r1 = await D.save(bbox, null, 'this view');
+    const wl1 = { req: wl.req, rel: wl.rel, holds: W.holds() };
+    /* 2 · Stop mid-run keeps what landed; 3 · the same save skips exactly those */
+    await H.clear();
+    D.fetchTile = slow(15);
+    let seen = 0;
+    const r2 = await D.save(bbox, (d) => { seen = d; if (d === 5) D.stop(); });
+    const st2 = await H.stats();
+    D.fetchTile = slow(1);
+    const r3 = await D.save(bbox);
+    const st3 = await H.stats();
+    /* 4 · one failure is retried and the run completes */
+    await H.clear();
+    let calls = 0;
+    D.fetchTile = () => (++calls === 3 ? Promise.reject(new Error('HTTP 503')) : Promise.resolve(new ArrayBuffer(500)));
+    const r4 = await D.save(bbox);
+    /* 5 · two failures on one tile stop the run, landed tiles kept */
+    await H.clear();
+    /* ONE tile: the first run matched a whole z15 row (four tiles) and read
+       four retries for what was meant to be one. */
+    D.fetchTile = (z, x, y) => (z === 15 && x === ox * 4 + 3 && y === oy * 4 + 3 ? Promise.reject(new Error('HTTP 503')) : Promise.resolve(new ArrayBuffer(500)));
+    const r5 = await D.save(bbox);
+    const st5 = await H.stats();
+    /* 6 · a prepared LIST drives the batch pause (130 tiles = two drains) */
+    await H.clear();
+    const list = []; for (let k = 0; k < 130; k++) list.push([13, ox + 40 + k, oy]);
+    D.fetchTile = () => Promise.resolve(new ArrayBuffer(100));
+    const t0 = performance.now();
+    const r6 = await D.save(list, null, 'a list');
+    const dt6 = performance.now() - t0;
+    /* 7 · the sheet names the tier and the count while a save runs */
+    await H.clear();
+    D.fetchTile = slow(90);
+    const p7 = D.save(bbox, null, 'this view');
+    await wait(120);
+    window.__hdCard(); await wait(150);
+    const card = (document.getElementById('panel') || document.body).textContent || '';
+    const pr = D.progress();
+    const r7 = await p7;
+    await H.clear(); window.__hdChip();
+    return { r1, wl1, r2, seen, st2: st2.tiles, r3, st3: st3.tiles, r4, r5, st5: st5.tiles, r6, dt6,
+             card, pr, r7, wlEnd: { req: wl.req, rel: wl.rel, holds: W.holds() }, lanes: D.LANES, pause: D.PAUSE };
+  });
+  if (h1.missing) ok(false, "take-178 HD downloader hooks missing (HDDL / __wake / __hdCard)");
+  else {
+    ok(h1.r1 && !h1.r1.error && h1.r1.done === 21 && h1.r1.peak >= 2 && h1.r1.peak <= h1.lanes,
+       `the pool runs ${h1.r1 && h1.r1.peak} fetches in flight at peak — at least 2, never more than ${h1.lanes}`);
+    ok(h1.wl1.req === 1 && h1.wl1.rel === 1 && h1.wl1.holds === 0,
+       `the screen lock is requested once at the start of a save and released once at the end (${h1.wl1.req}/${h1.wl1.rel})`);
+    ok(h1.r2 && h1.r2.stopped && h1.r2.done > 0 && h1.r2.done < 21 && h1.st2 === h1.r2.done,
+       `Stop mid-run keeps exactly what landed (${h1.r2 && h1.r2.done} of 21 tiles, store holds ${h1.st2})`);
+    ok(h1.r3 && h1.r3.skipped === (h1.r2 && h1.r2.done) && h1.r3.done === 21 - (h1.r2 && h1.r2.done) && h1.st3 === 21,
+       `the same save re-run skips the ${h1.r3 && h1.r3.skipped} landed tiles and finishes the rest (${h1.r3 && h1.r3.done})`);
+    ok(h1.r4 && !h1.r4.error && h1.r4.retries === 1 && h1.r4.done === 21,
+       `one failed fetch is retried once and the save completes (${h1.r4 && h1.r4.retries} retry, ${h1.r4 && h1.r4.done} done)`);
+    ok(h1.r5 && h1.r5.error && /503/.test(h1.r5.error) && h1.r5.retries === 1 && h1.r5.done < 21 && h1.st5 === h1.r5.done,
+       `a tile that fails twice stops the run and says why ("${h1.r5 && h1.r5.error}"), keeping the ${h1.r5 && h1.r5.done} that landed`);
+    ok(h1.r6 && !h1.r6.error && h1.r6.done === 130 && h1.r6.pauses === 2 && h1.dt6 >= 2 * h1.pause && h1.r6.label === 'a list',
+       `a prepared tile list drives the loop: 130 tiles, two ${h1.pause} ms drains between batches of 60 (${h1.r6 && h1.r6.pauses} pauses, ${Math.round(h1.dt6)} ms)`);
+    ok(/DOWNLOADING THIS VIEW/.test(h1.card) && /of 21 tiles/.test(h1.card) && h1.pr && h1.pr.label === 'this view' && h1.r7 && h1.r7.done === 21
+       && h1.wlEnd.holds === 0,
+       `the sheet opened mid-save names the tier and the count (${h1.pr && (h1.pr.done + h1.pr.skipped)} of ${h1.pr && h1.pr.total} at the read), and nothing holds the screen afterwards`);
+  }
+
   /* Takes 147–150 · the tester batch (A163–A166): liveries in Water, boats
      as Water's machine, the run flow reachable and craft-paced, gauges in
      the bundle with live values behind a seam. Every target comes from the

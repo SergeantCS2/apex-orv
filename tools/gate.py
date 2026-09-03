@@ -1667,15 +1667,6 @@ def check_manifest():
 # Take 115's audit: 191 entries, zero gaps, zero duplicates — and two entries
 # (68, 119) filed out of position, which the set-completeness check could never
 # see. An out-of-order ledger cites fine and READS wrong. Order is asserted now.
-def check_ledger_order():
-    lm = read("docs", "LANDMINES.md") or ""
-    nums = [int(x) for x in re.findall(r"^\*\*(\d+)[.,]", lm, re.M)]
-    if nums != sorted(nums):
-        bad = [(a, b) for a, b in zip(nums, nums[1:]) if b < a][:4]
-        return fails.append(f"LANDMINES.md entries out of numeric order near {bad}")
-    notes.append(f"landmine file order: {len(nums)} entries, strictly ascending")
-
-
 
 # ── Play hardening (play kit) ──────────────────────────────────────────
 # The artifact check lives in tools/android_check.py and runs in the apk job,

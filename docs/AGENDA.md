@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 177.* Ranked by blocking-ness, not by interest.
+*Current as of take 178.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -3189,7 +3189,7 @@ than becoming a sixth thing to cycle past. Not built until designed.
 - **Ruled out:** guessing camera positions or types. OSM only, with the
   same "shown by what the source says" honesty as every other pin.
 
-## A190 — HD download tiers: this view, this county, whole state at z13 · DESIGN (build starts take 177)
+## A190 — HD download tiers: this view, this county, whole state at z13 · BUILDING (H1 shipped take 178 · H2 the tiers, next)
 The maintainer asked whether "download all of Michigan" is possible. Measured:
 z13–15 statewide is 877,182 tiles and ~22.8 GB — not offered. z13 alone
 is 41,904 tiles / ~860 MB over the bounding box, and clipping to the
@@ -3220,4 +3220,27 @@ What the downloader needs to earn it, and does not have today:
   hammering a government tile server is how an app gets blocked at the
   source.
 - **Ruled out:** starting any tier without the quote on screen first.
+- **Before H2 offers the state tier (added take 178):** the app never
+  calls navigator.storage.estimate(), and whether Samsung's WebView
+  grants IndexedDB ~430 MB is UNKNOWN — the harness cannot see a phone's
+  quota. The quote must be checked against the quota before the state
+  button exists, and say so when it does not fit.
+- **Measured take 178:** shipped z13 tiles average 14.6 KB, z14 17.7,
+  z15 19.4 — EST=22 KB was a z13–15 average and overstates a z13-only
+  tier by half. Per-zoom from 178.
+
+### Take 178 — shipped (A190 H1: the downloader)
+Six-lane pool through the fetchTile seam, 300 ms drain after every 60
+tiles, one retry per tile, a ref-counted screen wake lock shared with
+navigation, progress that names the tier, and save() taking a prepared
+tile list as well as a bbox.
+- **Ruled out:** a Web Worker for the fetcher. fetch() is already
+  asynchronous; the problem was scheduling one-at-a-time, not the thread.
+- **Ruled out:** a native Filesystem plugin for the coming state tier. A
+  new native surface nobody can device-verify yet; IndexedDB is proven
+  since take 145 and its quota is measurable.
+- **Ruled out:** retry until it works. One retry after the pause, then
+  stop and say so — a tile server that is refusing is not to be hammered.
+- **Ruled out:** adaptive concurrency (ramping lanes up while responses
+  are fast). Six is the ceiling by design, not a starting point.
 

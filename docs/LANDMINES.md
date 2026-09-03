@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 177.*
+*Current as of take 178.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -109,47 +109,6 @@ Start here. Do not read top to bottom.
 | Call sites written, definition never landed | 65 |
 | A rate extrapolated from a sample too small | 66 |
 | Downloaded detail thrown away before shipping | 67 |
-| Stub omits an API the app calls | 62 |
-| Source has data but no layer draws it | 69 |
-| Optional source down, whole build dead | 70 |
-| Line labels vanish on a routing graph | 71 |
-| Server returns fewer rows than it has | 72 |
-| Fetched data silently unmapped | 73 |
-| HTTP 200 with an empty body | 74 |
-| www stale, version stamp current | 75 |
-| Multi-use trail drawn as un-ridable | 76 |
-| Checking for a hardcoded filename | 77 |
-| Failure surfaces far from its cause | 78 |
-| Permissive parser mistaken for a validator | 79 |
-| Installer overwrites the workflow running it | 80 |
-| Asset borrowed from the build machine | 81 |
-| Import CI never installs | 82 |
-| Dependency installed in the wrong job | 83 |
-| Gate blocks the seed carrying its own fix | 84 |
-| checkout lands on the triggering commit | 85 |
-| Volunteer service on the critical path | 86 |
-| Harness viewport is not the device | 87 |
-| Styling contradicts legality | 88 |
-| Filtered whole ways instead of clipping | 89 |
-| Cached fallback becomes permanent | 90 |
-| Shared casing swamps a thinner line | 91 |
-| className assignment discards a style class | 92 |
-| Opacity 0 is not off | 93 |
-| Assertion on a user-controlled viewport | 94 |
-| Tuned to one screen size | 95 |
-| User-facing text inside the workflow | 96 |
-| Short feature cannot fit a line label | 97 |
-| Legend drifts from the map | 98 |
-| Failed assert silently drops the whole patch | 99 |
-| Refusing when a weaker true answer exists | 100 |
-| Class label presented as a name | 101 |
-| checkout takes the triggering commit | 85 |
-| Unresolved workflow reference is empty, not an error | 78 |
-| Rename works everywhere but the home screen | 63 |
-| Told but not shown | 64 |
-| Call sites written, definition never landed | 65 |
-| A rate extrapolated from a sample too small | 66 |
-| Downloaded detail thrown away before shipping | 67 |
 | One upstream 503 fails the build | 57 |
 | OOM in a step that "only" samples points | 200 |
 | Importing a tool runs the whole pipeline step | 201 |
@@ -159,6 +118,13 @@ Start here. Do not read top to bottom.
 | A layer or control vanishes on the phone but not in headless | 206 |
 | An idempotent patch says "current" but holds the OLD version | 211 |
 | The Play bundle is dev-key signed although the secrets are set | 211 |
+| A detached job is simply gone at the next turn, no exit line | 207, 213 |
+| Render log reads all zeros from a healthy app | 208 |
+| Badges/symbols draw but every label vanishes | 209 |
+| Empty log and no process after the full expected runtime | 210 |
+| Render dies at the same check every run, process gone | 212 |
+| A render or gate polled across a turn boundary dies | 214 |
+| swapon --show is empty though /tmp/sw exists | 215 |
 
 ---
 
@@ -2722,3 +2688,28 @@ turn and give the stage the whole turn — and the gate now takes about
 gate twice. Do not launch a render without
 confirming the previous one has exited — the author did, once, and got
 zeros.
+
+**215. Swap does not survive the sandbox; the file does.** Mid-way through
+the first render of the V3 session `free -m` read Swap 0/0 with 91 MB
+free and three Chromes up — `/tmp/sw` was still on disk, 2 GB, but no
+longer enabled. The VM had cycled between turns (the brief's "VM reboots
+dropping swap") and nothing re-armed it. Re-enabling it mid-run saved
+that render (777 MB in swap by the end); without it that was landmine
+212 at check 234. Rule: swap is checked before EVERY heavy launch, not
+once per session — `swapon --show | grep -q sw || swapon /tmp/sw` sits
+beside the /tmp clear in the pre-launch sequence. Companion, same
+session: `www/vendor/` is not in the seed and smoke passes without it
+(it runs a stub); render needs the real MapLibre, which ci/bundle.sh
+fetches from unpkg AFTER the pipeline — a fresh sandbox must do the
+same three curls before its first render.
+
+**216. A stub assigned to a browser accessor is not installed.**
+`navigator.wakeLock = stub` inside page.evaluate did nothing — wakeLock
+is a read-only accessor on Navigator.prototype, so the assignment was
+silently dropped in sloppy mode and the REAL API answered; the check
+read 0 requests / 0 releases and pointed at the app. Same shape for
+geolocation, storage, mediaDevices, connection. Rule: install a stub on
+a platform object with `Object.defineProperty(navigator, name,
+{configurable: true, value: stub})`, and prove the stub is the thing
+answering (count a call) before trusting what the check says about the
+app.
