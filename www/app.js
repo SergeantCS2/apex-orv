@@ -1767,6 +1767,70 @@ function guideClose(mark){
   if(mark&&svAvailable()){try{localStorage.setItem(GUIDEKEY,'1')}catch(e){}}
   logAct('act  guide close');}
 
+ 
+var TOURKEY='apex.tour.v1',TOUR={on:false,i:0,steps:[]};
+var TOUR_STEPS=[
+  {id:'c-mode',   tab:null,   t:'What are you doing today?',
+   s:'Off-road, Outdoors, Hunt, Water or Camp. A mode sets the pins, the lines and the routing for that kind of day — and everything it sets stays one tap away.'},
+  {id:'c-act',    tab:'map',  t:'Which lines',
+   s:'ORV, two-track, hiking, or all of them. The colours are the legend: green, blue and black by difficulty; red is closed.'},
+  {id:'c-layers', tab:'map',  t:'Layers',
+   s:'Map, satellite or hybrid; public land, rivers, contours, county lines. Done closes it.'},
+  {id:'c-search', tab:'map',  t:'Search',
+   s:'A trail code like H58, a town, a river or a street address — all of it offline.'},
+  {id:'c-hd',     tab:null,   t:'Sharper satellite',
+   s:'Save HD imagery for this view, your county, or the whole state, on wifi. Nothing downloads on its own.'},
+  {id:'c-ride',   tab:'ride', t:'Ride',
+   s:'Start recording: the truck pins where you started, the map follows you, and Retrace leads you back on your own track.'}];
+function tourSeen(){if(!svAvailable())return false;try{return localStorage.getItem(TOURKEY)==='1'}catch(e){return false}}
+function tourMark(){if(svAvailable()){try{localStorage.setItem(TOURKEY,'1')}catch(e){}}}
+function tourReset(){if(svAvailable()){try{localStorage.removeItem(TOURKEY)}catch(e){}}}
+function tourVisible(id){var c=el(id);if(!c||typeof c.getBoundingClientRect!=='function')return false;
+  if(c.hidden)return false;var r=c.getBoundingClientRect();return r.width>1&&r.height>1}
+function tourStart(){
+  var t=el('tour');if(!t)return false;
+  TOUR.steps=TOUR_STEPS.slice();TOUR.i=-1;TOUR.on=true;t.hidden=false;
+  TOUR.tab0=(typeof TAB==='string')?TAB:null;    
+  logAct('act  tour start');
+  return tourNext()}
+function tourNext(){
+  if(!TOUR.on)return false;
+  for(var i=TOUR.i+1;i<TOUR.steps.length;i++){
+    var st=TOUR.steps[i];
+    try{if(st.tab&&typeof showTab==='function')showTab(st.tab)}catch(e){}
+    if(!tourVisible(st.id)){logAct('tour skip '+st.id+' (hidden)');continue}
+    TOUR.i=i;tourPaint();return true}
+  return tourClose('done')}
+function tourPaint(){
+  var st=TOUR.steps[TOUR.i],c=el(st.id),ring=el('tour-ring'),card=el('tour-card');
+  if(!c||!ring||!card)return;
+  var r=c.getBoundingClientRect(),pad=6,vh=window.innerHeight||900;
+  ring.style.left=(r.left-pad)+'px';ring.style.top=(r.top-pad)+'px';
+  ring.style.width=(r.width+pad*2)+'px';ring.style.height=(r.height+pad*2)+'px';
+  var last=TOUR.i>=TOUR.steps.length-1;
+  card.innerHTML='<button id="tour-x" aria-label="Not now">'+ic('close',18)+'</button>'+
+    '<b>'+st.t+'</b><div class="sub">'+st.s+'</div>'+
+    '<div id="tour-btns">'+
+      '<button class="chip" id="tour-next"><span>'+(last?'Done':'Next')+'</span></button>'+
+      '<button class="chip quiet" id="tour-notnow"><span>Not now</span></button>'+
+      '<button class="chip quiet" id="tour-never"><span>Don\u2019t show again</span></button>'+
+      '<span id="tour-n">'+(TOUR.i+1)+' of '+TOUR.steps.length+'</span></div>';
+   
+  if(r.top<vh/2){card.style.top=(r.bottom+pad+12)+'px';card.style.bottom='auto'}
+  else{card.style.bottom=(vh-r.top+pad+12)+'px';card.style.top='auto'}
+  el('tour-next').addEventListener('click',function(){tourNext()});
+  el('tour-notnow').addEventListener('click',function(){tourClose('notnow')});
+  el('tour-x').addEventListener('click',function(){tourClose('notnow')});
+  el('tour-never').addEventListener('click',function(){tourClose('never')});}
+function tourClose(how){
+  var t=el('tour');if(t)t.hidden=true;
+  TOUR.on=false;
+  try{if(TOUR.tab0&&typeof showTab==='function'&&TAB!==TOUR.tab0)showTab(TOUR.tab0)}catch(e){}
+  if(how==='done'||how==='never')tourMark();
+  logAct('act  tour close '+how);
+  return how}
+try{window.addEventListener('resize',function(){if(TOUR.on)tourPaint()})}catch(e){}
+
 function wpLoad(){
   if(!svAvailable())return [];
   try{var a=JSON.parse(localStorage.getItem(WPKEY)||'[]');
@@ -3442,7 +3506,11 @@ function buildLyrPanel(){
        '<span class="sw" style="background-color:'+(on?'#E2570F':'transparent')+
        ';border:1px solid rgba(255,255,255,.5)"></span>'+
        '<span>'+g.h+'</span></button>'});
+   
+  h+='<button class="actrow" data-lyrdone="1"><span class="sw" style="background-color:transparent"></span><span>Done</span></button>';
   p.innerHTML=h;
+  var dn=p.querySelector('[data-lyrdone]');
+  if(dn)dn.addEventListener('click',function(){p.hidden=true;logAct('tap  layers done')});
   Array.prototype.forEach.call(p.querySelectorAll('[data-bm]'),function(b){
     b.addEventListener('click',function(){
       if(b.disabled)return;
@@ -3539,6 +3607,8 @@ var SOURCES=[
    'https://waterdata.usgs.gov'],
   ['OpenStreetMap contributors','Roads, places and context, under ODbL',
    'https://www.openstreetmap.org/copyright']];
+ 
+var PRIVACY_URL='https://sergeantcs2.github.io/apex-orv/privacy.html';
 function sourcesCard(){
   logAct('tap  data sources');
   show('<b>Where the data comes from</b>'+
@@ -3554,6 +3624,8 @@ function sourcesCard(){
       return '<b>'+r[0]+'</b><br>'+r[1]+'<br><a href="'+r[2]+
         '" target="_blank" rel="noopener" style="color:#D98E32">'+r[2]+'</a>'
       }).join('<br><br>')+'</div>'+
+    (PRIVACY_URL?'<div class="k">PRIVACY</div><div class="sub"><a href="'+PRIVACY_URL+'" target="_blank" rel="noopener">Privacy policy</a> — '+
+      'nothing you do in this app is sent anywhere; the policy says so in full.</div>':'')+
     '<div class="sub">Links open in your browser and need a connection. '+
     'The map itself does not.</div>','');
 }
@@ -3572,6 +3644,49 @@ function buildModePanel(){
 el('c-mode').addEventListener('click',function(){
   var p=el('modepanel');buildModePanel();p.hidden=!p.hidden;
   try{el('actpanel').hidden=true;el('lyrpanel').hidden=true}catch(e){}});
+
+ 
+ 
+var PICKERS=['modepanel','actpanel','lyrpanel'];
+var PANELS=PICKERS.concat(['diagpanel','cmppanel']);
+var PANEL_CHIP={modepanel:'c-mode',actpanel:'c-act',lyrpanel:'c-layers',diagpanel:'c-diag',cmppanel:'c-compass'};
+function panelOpen(list){list=list||PANELS;for(var i=0;i<list.length;i++){var p=el(list[i]);if(p&&!p.hidden)return list[i]}return null}
+function panelsClose(list){list=list||PANELS;var n=0;list.forEach(function(id){var p=el(id);if(p&&!p.hidden){p.hidden=true;n++;
+  if(id==='cmppanel')CMP_ON=false}});return n}
+function within(t,node){while(t){if(t===node)return true;t=t.parentNode}return false}
+try{document.addEventListener('click',function(e){
+  if(!panelOpen(PICKERS))return;
+  var t=e.target;if(!t)return;
+  for(var i=0;i<PICKERS.length;i++){var p=el(PICKERS[i]);if(p&&within(t,p))return}
+  for(var k in PANEL_CHIP){var c=el(PANEL_CHIP[k]);if(c&&within(t,c))return}
+  panelsClose(PICKERS);logAct('tap  outside — pickers closed')},true)}catch(e){}
+
+var BACK={armed:false,t:null,toast:null};
+function toast(msg,ms){var t=el('toast');if(!t)return;t.textContent=msg;t.hidden=false;
+  clearTimeout(BACK.toast);BACK.toast=setTimeout(function(){t.hidden=true},ms||2000)}
+function backPush(){try{if(!history.state||!history.state.apex)history.pushState({apex:1},'')}catch(e){}}
+ 
+function backOpen(){
+  if(TOUR.on)return 'tour';
+  if(panelOpen())return 'panel';
+  var g=el('guide');if(g&&!g.hidden)return 'guide';
+  var sr=el('srch');if(sr&&String(sr.className).indexOf('on')>=0)return 'search';
+  var r=el('rail');if(r&&r.className!=='folded')return 'rail';
+  return null}
+function backClose(w){
+  if(w==='tour')return tourClose('notnow');
+  if(w==='panel')return panelsClose();
+  if(w==='guide')return guideClose(true);
+  if(w==='search'){el('srch').className='';el('c-search').className='chip';return}
+  if(w==='rail'){RAIL_MANUAL=true;railSet(false)}}
+function onBack(){
+  var w=backOpen();
+  if(w){backClose(w);backPush();logAct('back closed '+w);return 'closed:'+w}
+  if(BACK.armed){BACK.armed=false;clearTimeout(BACK.t);logAct('back exit');return 'exit'}
+  BACK.armed=true;toast('Back again to exit',2000);
+  clearTimeout(BACK.t);BACK.t=setTimeout(function(){BACK.armed=false;backPush()},2000);
+  logAct('back armed');return 'armed'}
+try{window.addEventListener('popstate',function(){onBack()});backPush()}catch(e){}
  
 function stripH(){try{var t=el('tools');if(t)document.documentElement.style
   .setProperty('--strip-h',t.offsetHeight+'px')}catch(e){}}
@@ -3597,6 +3712,7 @@ Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'),function(b)
   b.addEventListener('click',function(){showTab(b.dataset.go)})});
 
 el('c-howto').addEventListener('click',function(){guideShow()});
+el('c-tour').addEventListener('click',function(){logAct('tap  c-tour');tourStart()});
 el('guide-go').addEventListener('click',function(){guideClose(true)});
  
 el('guide').addEventListener('click',function(e){
@@ -3971,7 +4087,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.__sat={tiles:TILES,sparse:SPARSE,inPatch:inPatch,blank:Array.from(BLANK_PNG),resolve:_satResolve};
     window.__hd=HD;
      
-    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};
+    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};window.__back={onBack:onBack,open:backOpen,panelOpen:panelOpen,state:function(){return BACK}};window.__privacy=function(u){var o=PRIVACY_URL;if(u!==undefined)PRIVACY_URL=u;return o};window.__tour={start:tourStart,next:tourNext,close:tourClose,seen:tourSeen,reset:tourReset,state:function(){return TOUR},steps:TOUR_STEPS};
     window.__ph={index:PHOTOS,html:photoHTML};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};
@@ -4796,7 +4912,8 @@ map.on('load',function(){makeBadges();setBasemap(0);wpDraw();showTab('map');
    
   try{map.setLayoutProperty('hillshade','visibility','none')}catch(e){}
    
-  if(!guideSeen())setTimeout(guideShow,450);
+   
+  if(!tourSeen())setTimeout(tourStart,650);
    
   railSet(false);buildActPanel();actLabel();
   setTimeout(renderHealth,1800);

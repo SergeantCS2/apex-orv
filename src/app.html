@@ -52,6 +52,31 @@
     -webkit-backdrop-filter:blur(9px);
     animation:guideIn 220ms var(--m-ease)}
   #guide[hidden]{display:none}
+  /* take 182 · the tour: a ring around the real chip, the rest dimmed by the
+     ring's own shadow, and a card beside it. Border and shadow only — the
+     accent budget counts surfaces, and the tour spends none. */
+  #tour{position:fixed;inset:0;z-index:70}
+  #tour[hidden]{display:none}
+  #tour-ring{position:absolute;border:3px solid #E2570F;border-radius:14px;
+    box-shadow:0 0 0 9999px rgba(20,18,15,.58);pointer-events:none;
+    transition:top var(--m-base) var(--m-ease),left var(--m-base) var(--m-ease),
+      width var(--m-base) var(--m-ease),height var(--m-base) var(--m-ease)}
+  #tour-card{position:absolute;left:12px;right:12px;background:#1C1A16;color:#F5EFE2;
+    border-radius:14px;padding:12px 44px 12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.45);
+    font:400 14px/1.4 system-ui,sans-serif}
+  #tour-card b{display:block;font-size:15px;margin-bottom:3px}
+  #tour-card .sub{opacity:.9}
+  #tour-x{position:absolute;top:6px;right:6px;width:34px;height:34px;border:0;border-radius:17px;
+    background:rgba(245,239,226,.12);color:#F5EFE2;display:flex;align-items:center;justify-content:center;padding:0}
+  #tour-x svg{width:18px;height:18px}
+  #tour-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+  #tour-btns .chip{margin:0}
+  #tour-btns .quiet{background:transparent;border:1px solid rgba(245,239,226,.35)}
+  #tour-n{margin-left:auto;font-size:12px;opacity:.7}
+  #toast{position:fixed;left:50%;bottom:calc(var(--strip-h,72px) + 18px);transform:translateX(-50%);
+    background:rgba(20,18,15,.92);color:#F5EFE2;font:600 13px/1.3 system-ui,sans-serif;
+    padding:9px 14px;border-radius:20px;z-index:60;pointer-events:none;white-space:nowrap}
+  #toast[hidden]{display:none}
   @keyframes guideIn{from{opacity:0}to{opacity:1}}
   #guide-card{max-width:min(430px,94vw);max-height:88vh;overflow-y:auto;
     background:rgba(26,24,20,.97);border:1px solid rgba(255,255,255,.16);
@@ -580,7 +605,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 180</span>
+    <span id="title"><b>APEX</b> ORV · Take 182</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -610,6 +635,8 @@
          ride actions, and the 59 places added at take 89 had no toggle at all.
          Layers belong together and ride actions belong together. -->
     <div id="lyrpanel" hidden></div>
+    <div id="toast" hidden></div>
+    <div id="tour" hidden><div id="tour-ring"></div><div id="tour-card"></div></div>
     <!-- The diagnostics sub-menu. The three buttons keep their ids and their
          handlers and simply live in here now, so everything that clicks them —
          the smoke harness included — is unaffected. -->
@@ -643,6 +670,7 @@
       <!-- A119 · Tools became a real bucket at take 101. About, Self-test and
            Pan test are DIAGNOSTICS, not tools — they went behind one entry so
            the tab has room for the things a rider actually reaches for. -->
+      <button class="chip" data-tab="tools" id="c-tour">__IC_play__<span>Take the tour</span></button>
       <button class="chip" data-tab="tools" id="c-howto">__IC_info__<span>How to use</span></button>
       <button class="chip" data-tab="tools" id="c-compass">__IC_locate__<span>Compass</span></button>
       <button class="chip" data-tab="tools" id="c-markme">__IC_pin__<span>Mark this spot</span></button>
@@ -3163,6 +3191,83 @@ function guideClose(mark){
   if(mark&&svAvailable()){try{localStorage.setItem(GUIDEKEY,'1')}catch(e){}}
   logAct('act  guide close');}
 
+/* ══ THE TOUR (take 182 · A194) ═══════════════════════════════════════════
+   The friend on the production build: "the sheer amount of info is a bit
+   overwhelming … a 'what are you looking to do today' type intro". The
+   maintainer: the written guide is too long; walk people through
+   directly, with a way to skip it, stop it, or never see it again until
+   re-enabled under Tools.
+   Six steps. Each rings the REAL chip on the real screen and says one
+   sentence — never a page of pictures. The tab the chip lives on is shown
+   first, so the ring always has something to ring; a hidden chip's step
+   is skipped, not faked. Every step has the same exits: NEXT (Done on the
+   last), NOT NOW (and ×: close now, offer again next launch), DON'T SHOW
+   AGAIN (close and set the flag), and the hardware back (Not now). Done
+   sets the flag too. Tools → Take the tour replays it regardless.
+   Storage unavailable → it shows every launch, the guide's rule. */
+var TOURKEY='apex.tour.v1',TOUR={on:false,i:0,steps:[]};
+var TOUR_STEPS=[
+  {id:'c-mode',   tab:null,   t:'What are you doing today?',
+   s:'Off-road, Outdoors, Hunt, Water or Camp. A mode sets the pins, the lines and the routing for that kind of day — and everything it sets stays one tap away.'},
+  {id:'c-act',    tab:'map',  t:'Which lines',
+   s:'ORV, two-track, hiking, or all of them. The colours are the legend: green, blue and black by difficulty; red is closed.'},
+  {id:'c-layers', tab:'map',  t:'Layers',
+   s:'Map, satellite or hybrid; public land, rivers, contours, county lines. Done closes it.'},
+  {id:'c-search', tab:'map',  t:'Search',
+   s:'A trail code like H58, a town, a river or a street address — all of it offline.'},
+  {id:'c-hd',     tab:null,   t:'Sharper satellite',
+   s:'Save HD imagery for this view, your county, or the whole state, on wifi. Nothing downloads on its own.'},
+  {id:'c-ride',   tab:'ride', t:'Ride',
+   s:'Start recording: the truck pins where you started, the map follows you, and Retrace leads you back on your own track.'}];
+function tourSeen(){if(!svAvailable())return false;try{return localStorage.getItem(TOURKEY)==='1'}catch(e){return false}}
+function tourMark(){if(svAvailable()){try{localStorage.setItem(TOURKEY,'1')}catch(e){}}}
+function tourReset(){if(svAvailable()){try{localStorage.removeItem(TOURKEY)}catch(e){}}}
+function tourVisible(id){var c=el(id);if(!c||typeof c.getBoundingClientRect!=='function')return false;
+  if(c.hidden)return false;var r=c.getBoundingClientRect();return r.width>1&&r.height>1}
+function tourStart(){
+  var t=el('tour');if(!t)return false;
+  TOUR.steps=TOUR_STEPS.slice();TOUR.i=-1;TOUR.on=true;t.hidden=false;
+  TOUR.tab0=(typeof TAB==='string')?TAB:null;   /* hand back the tab it started on */
+  logAct('act  tour start');
+  return tourNext()}
+function tourNext(){
+  if(!TOUR.on)return false;
+  for(var i=TOUR.i+1;i<TOUR.steps.length;i++){
+    var st=TOUR.steps[i];
+    try{if(st.tab&&typeof showTab==='function')showTab(st.tab)}catch(e){}
+    if(!tourVisible(st.id)){logAct('tour skip '+st.id+' (hidden)');continue}
+    TOUR.i=i;tourPaint();return true}
+  return tourClose('done')}
+function tourPaint(){
+  var st=TOUR.steps[TOUR.i],c=el(st.id),ring=el('tour-ring'),card=el('tour-card');
+  if(!c||!ring||!card)return;
+  var r=c.getBoundingClientRect(),pad=6,vh=window.innerHeight||900;
+  ring.style.left=(r.left-pad)+'px';ring.style.top=(r.top-pad)+'px';
+  ring.style.width=(r.width+pad*2)+'px';ring.style.height=(r.height+pad*2)+'px';
+  var last=TOUR.i>=TOUR.steps.length-1;
+  card.innerHTML='<button id="tour-x" aria-label="Not now">'+ic('close',18)+'</button>'+
+    '<b>'+st.t+'</b><div class="sub">'+st.s+'</div>'+
+    '<div id="tour-btns">'+
+      '<button class="chip" id="tour-next"><span>'+(last?'Done':'Next')+'</span></button>'+
+      '<button class="chip quiet" id="tour-notnow"><span>Not now</span></button>'+
+      '<button class="chip quiet" id="tour-never"><span>Don\u2019t show again</span></button>'+
+      '<span id="tour-n">'+(TOUR.i+1)+' of '+TOUR.steps.length+'</span></div>';
+  /* below the chip when it sits in the top half, above it otherwise */
+  if(r.top<vh/2){card.style.top=(r.bottom+pad+12)+'px';card.style.bottom='auto'}
+  else{card.style.bottom=(vh-r.top+pad+12)+'px';card.style.top='auto'}
+  el('tour-next').addEventListener('click',function(){tourNext()});
+  el('tour-notnow').addEventListener('click',function(){tourClose('notnow')});
+  el('tour-x').addEventListener('click',function(){tourClose('notnow')});
+  el('tour-never').addEventListener('click',function(){tourClose('never')});}
+function tourClose(how){
+  var t=el('tour');if(t)t.hidden=true;
+  TOUR.on=false;
+  try{if(TOUR.tab0&&typeof showTab==='function'&&TAB!==TOUR.tab0)showTab(TOUR.tab0)}catch(e){}
+  if(how==='done'||how==='never')tourMark();
+  logAct('act  tour close '+how);
+  return how}
+try{window.addEventListener('resize',function(){if(TOUR.on)tourPaint()})}catch(e){}
+
 function wpLoad(){
   if(!svAvailable())return [];
   try{var a=JSON.parse(localStorage.getItem(WPKEY)||'[]');
@@ -5203,7 +5308,12 @@ function buildLyrPanel(){
        '<span class="sw" style="background-color:'+(on?'#E2570F':'transparent')+
        ';border:1px solid rgba(255,255,255,.5)"></span>'+
        '<span>'+g.h+'</span></button>'});
+  /* take 181 · A192 · a way out that a first-time user can see (field report:
+     "I couldn't figure out how to close the layers one") */
+  h+='<button class="actrow" data-lyrdone="1"><span class="sw" style="background-color:transparent"></span><span>Done</span></button>';
   p.innerHTML=h;
+  var dn=p.querySelector('[data-lyrdone]');
+  if(dn)dn.addEventListener('click',function(){p.hidden=true;logAct('tap  layers done')});
   Array.prototype.forEach.call(p.querySelectorAll('[data-bm]'),function(b){
     b.addEventListener('click',function(){
       if(b.disabled)return;
@@ -5315,6 +5425,10 @@ var SOURCES=[
    'https://waterdata.usgs.gov'],
   ['OpenStreetMap contributors','Roads, places and context, under ODbL',
    'https://www.openstreetmap.org/copyright']];
+/* take 181 · A195 · the policy Play requires inside the app as well as on the
+   listing. The Pages URL is the maintainer's to give; the row draws only
+   when this is set. */
+var PRIVACY_URL='https://sergeantcs2.github.io/apex-orv/privacy.html';
 function sourcesCard(){
   logAct('tap  data sources');
   show('<b>Where the data comes from</b>'+
@@ -5330,6 +5444,8 @@ function sourcesCard(){
       return '<b>'+r[0]+'</b><br>'+r[1]+'<br><a href="'+r[2]+
         '" target="_blank" rel="noopener" style="color:#D98E32">'+r[2]+'</a>'
       }).join('<br><br>')+'</div>'+
+    (PRIVACY_URL?'<div class="k">PRIVACY</div><div class="sub"><a href="'+PRIVACY_URL+'" target="_blank" rel="noopener">Privacy policy</a> — '+
+      'nothing you do in this app is sent anywhere; the policy says so in full.</div>':'')+
     '<div class="sub">Links open in your browser and need a connection. '+
     'The map itself does not.</div>','');
 }
@@ -5348,6 +5464,71 @@ function buildModePanel(){
 el('c-mode').addEventListener('click',function(){
   var p=el('modepanel');buildModePanel();p.hidden=!p.hidden;
   try{el('actpanel').hidden=true;el('lyrpanel').hidden=true}catch(e){}});
+
+/* ══ CLOSE WHAT IS OPEN (take 181 · A192 · A193) ══════════════════════════
+   The first field report from a stranger's phone: the pickers did not close
+   on a tap outside them, and Layers had no close at all. And the Android
+   back button — never handled — closed the whole app.
+
+   A192: ONE document-level listener. A tap that lands outside every panel
+   and off the chips that own them closes them all. The map canvas is in the
+   document, so a map tap counts, and the map still gets its own click — no
+   scrim, so a tap on a pin with a panel open both closes the panel and
+   identifies the pin, which is what every map app does.
+
+   A193: NO native plugin. Capacitor's activity goes back in WebView history
+   when it can and finishes when it cannot; the app never had history, so
+   back was exit. A SENTINEL entry is kept on the stack. Popping it fires
+   popstate here: something open → close it and restore the sentinel;
+   nothing open → a two-second "Back again to exit" toast and the sentinel
+   is NOT restored, so a second press inside two seconds reaches the
+   activity with no history and it exits as Android does — after two
+   seconds the sentinel returns. A trip survives an exit (173). */
+/* The PICKERS close on an outside tap. The Tools panels (compass, diagnostics)
+   do not: a rider marks a spot with the compass open to read the new bearing,
+   and the harness's compass block does exactly that — the first version of
+   this listener closed the compass under it. They close by their chip, the
+   tab, or back. */
+var PICKERS=['modepanel','actpanel','lyrpanel'];
+var PANELS=PICKERS.concat(['diagpanel','cmppanel']);
+var PANEL_CHIP={modepanel:'c-mode',actpanel:'c-act',lyrpanel:'c-layers',diagpanel:'c-diag',cmppanel:'c-compass'};
+function panelOpen(list){list=list||PANELS;for(var i=0;i<list.length;i++){var p=el(list[i]);if(p&&!p.hidden)return list[i]}return null}
+function panelsClose(list){list=list||PANELS;var n=0;list.forEach(function(id){var p=el(id);if(p&&!p.hidden){p.hidden=true;n++;
+  if(id==='cmppanel')CMP_ON=false}});return n}
+function within(t,node){while(t){if(t===node)return true;t=t.parentNode}return false}
+try{document.addEventListener('click',function(e){
+  if(!panelOpen(PICKERS))return;
+  var t=e.target;if(!t)return;
+  for(var i=0;i<PICKERS.length;i++){var p=el(PICKERS[i]);if(p&&within(t,p))return}
+  for(var k in PANEL_CHIP){var c=el(PANEL_CHIP[k]);if(c&&within(t,c))return}
+  panelsClose(PICKERS);logAct('tap  outside — pickers closed')},true)}catch(e){}
+
+var BACK={armed:false,t:null,toast:null};
+function toast(msg,ms){var t=el('toast');if(!t)return;t.textContent=msg;t.hidden=false;
+  clearTimeout(BACK.toast);BACK.toast=setTimeout(function(){t.hidden=true},ms||2000)}
+function backPush(){try{if(!history.state||!history.state.apex)history.pushState({apex:1},'')}catch(e){}}
+/* what a back press would close, in the order a rider would expect */
+function backOpen(){
+  if(TOUR.on)return 'tour';
+  if(panelOpen())return 'panel';
+  var g=el('guide');if(g&&!g.hidden)return 'guide';
+  var sr=el('srch');if(sr&&String(sr.className).indexOf('on')>=0)return 'search';
+  var r=el('rail');if(r&&r.className!=='folded')return 'rail';
+  return null}
+function backClose(w){
+  if(w==='tour')return tourClose('notnow');
+  if(w==='panel')return panelsClose();
+  if(w==='guide')return guideClose(true);
+  if(w==='search'){el('srch').className='';el('c-search').className='chip';return}
+  if(w==='rail'){RAIL_MANUAL=true;railSet(false)}}
+function onBack(){
+  var w=backOpen();
+  if(w){backClose(w);backPush();logAct('back closed '+w);return 'closed:'+w}
+  if(BACK.armed){BACK.armed=false;clearTimeout(BACK.t);logAct('back exit');return 'exit'}
+  BACK.armed=true;toast('Back again to exit',2000);
+  clearTimeout(BACK.t);BACK.t=setTimeout(function(){BACK.armed=false;backPush()},2000);
+  logAct('back armed');return 'armed'}
+try{window.addEventListener('popstate',function(){onBack()});backPush()}catch(e){}
 /* A154 · the Tools strip tells the panels how tall it is. Measured, not
    assumed: chip height follows the type scale and the safe-area inset. */
 function stripH(){try{var t=el('tools');if(t)document.documentElement.style
@@ -5384,6 +5565,7 @@ Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'),function(b)
   b.addEventListener('click',function(){showTab(b.dataset.go)})});
 
 el('c-howto').addEventListener('click',function(){guideShow()});
+el('c-tour').addEventListener('click',function(){logAct('tap  c-tour');tourStart()});
 el('guide-go').addEventListener('click',function(){guideClose(true)});
 /* Tapping the blurred background closes it too — the same gesture as tapping
    empty map to put the drawer away. */
@@ -5837,7 +6019,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     /* take 145 · app.js is wrapped (the take-127 lesson): nothing reaches
        window unless placed there. The drill drives the save loop through
        these. */
-    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};
+    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};window.__back={onBack:onBack,open:backOpen,panelOpen:panelOpen,state:function(){return BACK}};window.__privacy=function(u){var o=PRIVACY_URL;if(u!==undefined)PRIVACY_URL=u;return o};window.__tour={start:tourStart,next:tourNext,close:tourClose,seen:tourSeen,reset:tourReset,state:function(){return TOUR},steps:TOUR_STEPS};
     window.__ph={index:PHOTOS,html:photoHTML};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};
@@ -6859,7 +7041,8 @@ map.on('load',function(){makeBadges();setBasemap(0);wpDraw();showTab('map');
      Layers rather than being removed (take 112, field report). */
   try{map.setLayoutProperty('hillshade','visibility','none')}catch(e){}
   /* First open only. Waits for the map so the blur has something behind it. */
-  if(!guideSeen())setTimeout(guideShow,450);
+  /* take 182 · first run shows the TOUR; the written guide waits under Tools */
+  if(!tourSeen())setTimeout(tourStart,650);
   /* The map is the product; the rail is a drawer. Opens the moment you touch
      something (A127). */
   railSet(false);buildActPanel();actLabel();

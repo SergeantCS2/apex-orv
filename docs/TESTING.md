@@ -176,6 +176,18 @@ routing, the machine button.
   HD sheet should say what is downloading and how many tiles are done.
   Does a save feel faster than it did? (It fetches six tiles at a time
   now.)
+- **The tour** (take 182): on first open after this update a six-step
+  tour should appear on its own, ringing the real buttons. Does each
+  ring sit on the right button on your screen? Does Not now bring it
+  back next launch, and Don't show again stop it? Tools → Take the tour
+  replays it.
+- **The back button** (take 181): open Layers, press back — it should
+  close. Press back on the bare map — "Back again to exit" should show,
+  and a second press should exit the app. If the first press on the
+  bare map exits, say so: it means the phone's WebView ignores the
+  history entry the app keeps, which nothing off a phone can test.
+- A tap outside the Mode, Activity or Layers panel should close it, and
+  Layers now has a Done row.
 - The sheet offers three sizes: THIS VIEW, your county by name, and THE
   WHOLE STATE (~179 MB). Does the county named match where the map is
   centred? Save your county on wifi. After sixty tiles the sheet should

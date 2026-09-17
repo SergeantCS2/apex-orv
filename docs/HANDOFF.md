@@ -1,4 +1,137 @@
-# HANDOFF — through Take 180 · V3
+# HANDOFF — through Take 182 · V3
+
+## Take 182 — 2026-09-16 — A194: the tour, on the real screen
+
+The friend: the sheer amount of info is overwhelming; something like
+"what are you looking to do today". The maintainer: the written guide
+is too long; an interactive walk-through, with a way to skip it, stop
+it, or never see it again until re-enabled under Tools.
+
+What ships: TOUR — six steps, each a ring around the REAL chip on the
+real screen with one sentence beside it, never a page of pictures. The
+mode chip first ("What are you doing today?"), then the activity chip,
+Layers, Search, the HD chip (skipped when the bundle has no patches and
+the chip is hidden), and Ride. The tour switches to the tab the chip
+lives on before it points. Every step carries the same four exits:
+NEXT (Done on the last), NOT NOW (× does the same — closes, and the
+tour offers itself again next launch), DON'T SHOW AGAIN (closes and
+sets the flag; nothing automatic afterwards), and the hardware back
+(Not now). Done sets the flag too. Tools → "Take the tour" replays it
+any time, flag or no flag; Tools → "How to use" keeps the written guide
+for the reader who wants it. First run shows the tour, not the guide.
+
+Flag: apex.tour.v1 in the same localStorage the guide's flag lives in
+(versioned for the same reason — A155). Storage unavailable → the tour
+shows every launch rather than never, the guide's rule.
+
+Proven in the harness: the tour opens on a clean flag and rings the mode
+chip with the question; Next moves the ring to the activity chip and
+switches the tab it lives on; a hidden chip's step is skipped; Not now
+leaves the flag clear and the tour comes back; Don't show again sets it
+and the Tools chip still starts it; back closes it; Done sets it. The
+ring is a border and a shadow, never a background — the accent budget
+counts one surface per screen and the tour spends none.
+
+What the build taught: the × was the ✕ glyph and the harness refused it
+— controls are Lucide since 113, and the rule held because it is
+enforced; ic('close') now. Two refusals were the checks: the ring
+animates into place and the check measured it the instant the tour
+switched on (450 ms settle now); and the first-run check computed
+"visible" inside its return literal, two lines AFTER it had called
+close — the tour was visible, the test asked once it had shut it.
+Three renders and one gate died at turn boundaries.
+
+AUDIT (§0.3): the last Next falls through to Done; a chip on an unshown
+tab is revealed by showTab before the visibility test and a
+display:none HD chip is skipped; each step's sentence names something
+the app does. Nothing changed.
+
+SEAL: gate PASSED, 41 checks (smoke 300 across 5 modes, render 281/0
+inside it). apex-seed-t182.zip sealed (sha256 in chat). Field: does
+each ring sit on the right button on the Fold; does Not now return
+next launch and Don't show again stop it.
+
+## Take 181 — 2026-09-16 — the first field reports: close what is open (A192, A193), privacy link (A195)
+
+Two field reports arrived 2026-09-16: a friend of the maintainer who used
+the app (real, specific, one bug) and a Testers Community pair of
+documents (mostly template with the app's name substituted in, an ASO
+score, and two items that hold). What held, checked against the code:
+
+A192 — the friend: "clicking outside of them doesn't close them … I
+couldn't figure out how to close the layers one." PROVEN in code: the
+mode, activity and layers panels toggled from their own chips and closed
+only when ANOTHER chip opened or the Tools tab changed; map.on('click')
+never touched them. Layers had no close at all beyond re-tapping the
+Layers chip, which nobody finds. Now: one document-level tap listener —
+a tap that lands outside every panel and off the chips closes them all
+(the map is in the document, so a map tap counts); Layers gains a Done
+row; the mode and activity pickers already close on selection.
+
+A193 — the testers: "the app closes immediately when users press the
+back button." PROVEN: no popstate, no backButton, nothing — Capacitor's
+activity finishes when the WebView has no history. Now, with NO native
+plugin: a sentinel history entry is kept on the stack; the hardware
+back pops it and fires popstate here. Something open (a panel, the
+guide, search, the card rail) → it closes and the sentinel goes back.
+Nothing open → a two-second "Back again to exit" toast and the sentinel
+is NOT restored, so a second press inside two seconds reaches the
+activity with no history and it exits, as Android does; if the two
+seconds pass, the sentinel is restored. A trip survives an exit (173)
+and offers Resume. INFERRED, to be device-verified in one sideload:
+that Capacitor's BridgeActivity reads WebView.canGoBack() before
+finishing, which a pushState entry satisfies — the harness proves the
+page half (state transitions and the toast), the phone proves the
+native half.
+
+A195 — the testers: "missing a privacy policy." Half right: the policy
+exists (the play kit writes privacy.html, Pages serves it, the listing
+links it) but nothing in the app linked it, and Play's User Data policy
+wants the link inside the app too. A "Privacy policy" row on the Data
+sources card, behind one PRIVACY_URL constant — the Pages URL is a
+<user> placeholder in the tree and was asked for, not guessed; the row
+draws only when the constant is set.
+
+Set aside from the same documents, with reasons in the items: a
+walkthrough tutorial (A194 — designed instead as a short interactive
+tour the maintainer asked for, take 182), a rate-the-app prompt (a nag;
+impossible in closed testing anyway), terms of service (not required,
+no accounts), localisation, a community forum, em dashes in card text
+(typography, not a bug — but out of the STORE copy). The ASO and
+listing work is the maintainer's, in another chat; tools/play_assets.py
+is where the copy lives and must be sealed into a seed when it changes.
+
+What the build taught, in order. Chrome for Testing 152 hangs on the
+rebuilt sandbox VM (landmine 218; pinned to 138 in ci/bundle.sh). The
+outside-tap rule first covered the compass and diagnostics panels too,
+and the harness's compass block — mark a spot with the compass open,
+read the new bearing — caught it closing the compass under the rider's
+finger; scoped to the three pickers. The accent-budget check counted
+three orange ON-swatches inside a HIDDEN Layers panel: hidden pickers
+keep their layout (display:block, opacity 0, visibility hidden) so they
+can rise, and the check reasoned from rects; it skips visibility:hidden
+now. The back check's first version asked for "nothing open" while an
+earlier block's card rail was open — back correctly closed the rail;
+the check folds it first and says what was open. The gate refused the
+privacy URL as an undeclared remote origin (§8) — declared as the
+seventh citation-only host in gate ALLOW, manifest.py and PROVISION,
+and the same URL replaces the <user> placeholder in the listing line —
+and its inner render timed out at 1200 s (274 checks take ~19–20 min
+here; 1800 now). Three renders and one gate died at turn boundaries;
+two renders launched on an unedited harness because the edit script
+asserted before writing — verify the write before anything launches.
+
+AUDIT (§0.3): the privacy anchor is the same form as the six agency
+links device-verified at 167 (target=_blank rel=noopener). The armed
+exit path clears the restore timer and leaves no sentinel, which is
+what the activity needs to finish; if the native half does not, the
+next press finishes it anyway — consistent either way.
+
+SEAL: gate PASSED, 41 checks (smoke 300 across 5 modes, render 274/0
+inside it, 22 hosts declared and reached). apex-seed-t181.zip sealed
+(sha256 in chat). Device-verify on the Fold: back with Layers open
+closes it; back on the bare map shows "Back again to exit"; a second
+press exits.
 
 ## Take 180 — 2026-09-03 — paperwork and small fixes: A189 designed, A160 closed, the brief at 179
 

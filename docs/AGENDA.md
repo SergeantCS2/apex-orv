@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 180.* Ranked by blocking-ness, not by interest.
+*Current as of take 182.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -3349,3 +3349,76 @@ the fallback the way it asserts the OSM chain.
   inventory — it would never be refreshed.
 - **Ruled out:** retry-until-it-works — a server that is refusing is not
   to be hammered by a build.
+
+## A192 — Mode, Activity and Layers panels do not close on an outside tap; Layers has no close · SHIPPED take 181
+Field report, 2026-09-16, a friend of the maintainer on the production
+build: "clicking outside of them doesn't close them … I couldn't figure
+out how to close the layers one." PROVEN in code: the three panels
+toggled from their chips and closed only when another chip opened or the
+Tools tab changed. Fix: one document-level tap listener closes every
+panel when the tap lands outside them and off the chips (a map tap is a
+document tap); Layers gains a Done row; the pickers already close on
+selection.
+- **Ruled out:** a scrim behind the panels (an overlay that eats the tap
+  would stop the map tap doing what it does — a map tap should both
+  close the panel and identify what was tapped, the way every map app
+  works).
+- **Ruled out:** closing panels on map MOVE. Panning while Layers is
+  open to see the effect of a toggle is the reason the panel exists.
+
+## A193 — the Android back button closes the app instantly · SHIPPED take 181
+Testers Community report, 2026-09-16: "The app closes immediately when
+users press the back button on the home screen, without any
+confirmation." PROVEN: no back handling of any kind; Capacitor finishes
+the activity when the WebView has no history. Fix, web-only: a sentinel
+history entry; popstate closes what is open (panels, guide, search, the
+card rail) and restores the sentinel; with nothing open, a two-second
+"Back again to exit" toast and NO sentinel, so the next press inside two
+seconds exits as Android does; after two seconds the sentinel returns.
+- **Ruled out:** a confirmation dialog on exit — not how Android apps
+  behave, and an active trip already survives an exit (173) with Resume.
+- **Ruled out:** the @capacitor/app plugin for the backButton event — a
+  new native surface with no device verification yet; the sentinel needs
+  none. If the native half fails on the Fold (canGoBack() not honouring
+  pushState — INFERRED, unverified), the plugin is the fallback.
+- **Ruled out:** minimising instead of exiting — the same accidental
+  press, one step less honest about what happened.
+
+## A194 — a first-run tour instead of a wall of text · SHIPPED take 182
+The friend: "I'm not sure if there was a bit more of a 'what are you
+looking to do today' type intro to pare down the amount of visible
+clusters." The testers: "no dynamic walkthrough." The maintainer: "we
+have the intro tutorial, but maybe it's too long and there should be an
+interactive mode that walks you through directly, with an x or 'close
+tour' option." The guide is one scrolling card of ~350 words with a
+single Let's go. Take 182 designs and builds a tour: five or six steps,
+each pointing at the real chip on the real screen (the mode chip first —
+"What are you doing today?" — then the activity chip, Layers, the
+search, the HD chip, Ride), one sentence each, Next / Skip on every
+step, a close on every step, shown once, always available under Tools
+beside the written guide, which stays for the reader who wants it.
+- **Ruled out:** a multi-page carousel of illustrations before the map —
+  the map is the product; the tour happens on it.
+- **Ruled out:** removing the written guide — some people read.
+- **Built (take 182):** six steps ringing the real chips — mode
+  ("What are you doing today?"), activity, Layers, Search, HD (skipped
+  when hidden), Ride — one sentence each; NEXT/Done, NOT NOW (and ×),
+  DON'T SHOW AGAIN, and back; Tools → "Take the tour" replays it; first
+  run shows the tour, the guide stays under "How to use".
+- **Ruled out:** a "never" that cannot be undone — Tools replays it.
+- **Ruled out:** making Done and Not now the same thing. Finishing the
+  tour is a reason not to see it again; closing it halfway is not.
+- **Ruled out:** a coach-mark that blocks the map for the whole tour —
+  the ring dims everything but the chip and the card, and the tour ends
+  the moment any exit is tapped.
+
+## A195 — the privacy policy is not linked inside the app · SHIPPED take 181
+Testers Community: "missing a privacy policy." Half right: privacy.html
+exists (play kit → Pages) and is on the listing; nothing in the app
+linked it, and Play's User Data policy asks for the link in-app as well.
+A "Privacy policy" row on the Data sources card, behind one PRIVACY_URL
+constant; the Pages URL was asked of the maintainer, not guessed.
+- **Ruled out:** a terms-of-service page — not a Play requirement, and
+  the app has no accounts and no user content to govern.
+- **Ruled out:** a rate-the-app prompt (a nag; impossible in closed
+  testing); a link under Tools can come with the production listing.

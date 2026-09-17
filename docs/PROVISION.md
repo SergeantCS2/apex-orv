@@ -194,7 +194,10 @@ Play's Misleading Claims policy requires an app that presents government
 information to link the official source. Six hosts therefore appear in the
 store listing and in the app's Tools -> Data sources panel:
 `www.michigan.gov`, `gis-midnr.opendata.arcgis.com`, `data.fs.usda.gov`,
-`apps.nationalmap.gov`, `waterdata.usgs.gov`, `www.openstreetmap.org`.
+`apps.nationalmap.gov`, `waterdata.usgs.gov`, `www.openstreetmap.org` —
+and, since take 181 (A195), a seventh: `sergeantcs2.github.io`, the app's
+own Pages site, for the privacy policy Play's User Data policy wants
+reachable from inside the app as well as from the listing.
 
 - **Fetched by** nobody. They are printed as text and links a rider may
   follow in their own browser; no tool requests them and the app never

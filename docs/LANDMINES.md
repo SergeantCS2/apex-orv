@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 180.*
+*Current as of take 182.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -2732,3 +2732,19 @@ take: landmine 204 applies to pkill -f exactly as to grep — `pkill -f
 those words kills the caller first and the target never. Kill by exact
 process name (`pkill -x node; pkill -x chrome`) or by a PID read from
 ps; never by a pattern the calling shell also carries.
+
+**218. "Install chrome" is not a version, and Chrome for Testing 152 hangs
+on the sandbox's kernel.** Thirteen days after the last render, the VM had
+been rebuilt (kernel 6.18.44, Firecracker) and every render died at
+Puppeteer's 30 s launch timeout. Chrome 152 — the same binary that had
+rendered 267 checks the session before — brought up its whole process
+tree (browser, two zygotes, GPU, utility, six renderers), every thread
+idle in futex/poll, and never returned the DOM of a data: URL: not the
+network (a resolver cut changed nothing), not the sandbox flags, not
+pkeys, not the headless shell. Chrome 138 on the same box rendered it in
+under a second. Rule: ci/bundle.sh pins the Chrome version and exports
+PUPPETEER_EXECUTABLE_PATH; the sandbox does the same; a bump is a
+deliberate change with a render behind it. When a render dies before
+its first check, probe Chrome by hand with `--dump-dom
+"data:text/html,<p>hi</p>"` and a 30 s timeout before blaming the
+harness or the app.

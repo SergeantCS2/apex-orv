@@ -81,7 +81,12 @@ ALLOW = re.compile(r"openstreetmap\.org|maplibre\.org|github\.com/maplibre"
                    # network, not to stop it citing anyone.
                    r"|michigan\.gov|gis-midnr\.opendata\.arcgis\.com"
                    r"|data\.fs\.usda\.gov|apps\.nationalmap\.gov"
-                   r"|waterdata\.usgs\.gov")
+                   r"|waterdata\.usgs\.gov"
+                   # take 181 · A195: the privacy policy link on the same card —
+                   # the app's own Pages site. Displayed, never fetched; Play's
+                   # User Data policy wants the policy reachable from inside
+                   # the app, not just the listing.
+                   r"|sergeantcs2\.github\.io")
 
 
 def check_scrub():
@@ -1322,7 +1327,10 @@ def check_render():
     # Take 117: the statewide render suite settles-then-measures (landmine
     # 198) and legitimately runs ~7 minutes; 300 s was box-era. The suite must
     # still PASS — only the stopwatch grew with the state.
-    r = subprocess.run(["node", rm], capture_output=True, text=True, timeout=1200)
+    # take 181: 274 checks on the pinned Chrome take ~19-20 min in the build
+    # sandbox, which sat exactly at the old 1200 s; the limit exists to catch
+    # a HUNG render, and 30 min still does that. CI is faster.
+    r = subprocess.run(["node", rm], capture_output=True, text=True, timeout=1800)
     if r.returncode:
         bad = [l.strip() for l in r.stdout.splitlines() if "FAIL" in l][:2]
         fails.append("render failed: " + ("; ".join(bad) or r.stderr[-700:]))

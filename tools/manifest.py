@@ -40,6 +40,16 @@ SOURCES = [
         "refresh": "re-check the link still resolves before each submission",
     },
     {
+        # take 181 · A195: the privacy policy Play wants linked INSIDE the app.
+        "host": "sergeantcs2.github.io",
+        "name": "APEX ORV privacy policy (citation)",
+        "what": "the app's own Pages site: privacy.html, written by play_assets.py and deployed by the pages job",
+        "licence": "n/a — cited, not fetched",
+        "tool": "the app's Data sources panel (PRIVACY_URL)",
+        "phase": "citation (displayed to the rider; never requested)",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
         "host": "gis-midnr.opendata.arcgis.com",
         "name": "Michigan DNR open data (citation)",
         "what": "public portal for the GIS layers the pipeline ingests",

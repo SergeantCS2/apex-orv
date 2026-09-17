@@ -1,11 +1,15 @@
-**Take 180 — small fixes; the road-hazards layer is designed, not built.**
+**Take 182 — a tour instead of a wall of text.**
 
-Three small fixes from the last two audits: the whole-state HD save asks
-its confirmation every time (it could skip the ask if you had dismissed
-the sheet mid-question); a Stop pressed during a retry pause no longer
-lets one more tile fetch; a misleading line in the build log is gone.
+The first time the app opens it now walks you through six things on
+the real screen — the mode chip ("What are you doing today?"), the
+activity chip, Layers, Search, HD imagery and Ride — one sentence
+each, with a ring around the actual button. Every step has Next (Done
+on the last), Not now, Don't show again, and an ×; the back button
+closes it too. Not now brings it back next launch; Done or Don't show
+again do not. Tools → Take the tour replays it any time, and Tools →
+How to use still has the written guide.
 
-Nothing else changed on the phone. The paperwork carries the design for
-a "Road hazards" layer — plate-reader cameras, low bridges, fords, rail
-crossings and toll booths from OpenStreetMap, labelled only by what the
-map says — measured on the real data and waiting for a go-ahead.
+On the phone: on the first open after this update the tour should
+appear on its own. Does each ring sit on the right button? Is any step
+covering something you needed? Tap Not now once, reopen the app — it
+should return; tap Don't show again — it should not.

@@ -100,7 +100,9 @@ The workspace at /home/claude/apex may be gone at session start. Restore
 from the newest seed named in HANDOFF's SEAL line. Then:
 1. `fallocate -l 2G /tmp/sw && mkswap /tmp/sw && swapon /tmp/sw`;
    `pip install --break-system-packages osmium shapely`; `npm ci`;
-   `npx puppeteer browsers install chrome`.
+   `npx puppeteer browsers install chrome@138.0.7204.183` and export
+   `PUPPETEER_EXECUTABLE_PATH` to that binary — Chrome 152 hangs on this
+   VM's kernel (landmine 218); ci/bundle.sh carries the pin.
 2. `www/vendor/` is NOT in the seed and smoke passes without it (a
    stub); render cannot. Curl the three MapLibre 5 files from unpkg as
    ci/bundle.sh does.

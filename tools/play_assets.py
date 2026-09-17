@@ -233,7 +233,7 @@ def listing(t):
 - **Short description** (80 max, {len(short)} used): {short}
 - **Category**: Maps & Navigation · **Tags**: navigation, outdoors, offline
 - **Contact email**: {CONTACT}
-- **Privacy policy URL**: https://<user>.github.io/<repo>/privacy.html
+- **Privacy policy URL**: https://sergeantcs2.github.io/apex-orv/privacy.html (take 181: also linked inside the app under Tools > Data sources)
 - **Content rating**: questionnaire — no violence, no user content, no ads,
   no purchases; expect Everyone.
 

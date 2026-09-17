@@ -50,7 +50,7 @@ Applying twice is safe — the second run reports `changed 0`.
 4. **Play Console**: create the app, accept Play App Signing, keep the
    applicationId `com.apexoffroad.app` — permanent from the first upload.
 5. **Enable GitHub Pages** (Settings → Pages → Source: GitHub Actions) so the
-   privacy policy is live at `https://<user>.github.io/<repo>/privacy.html`.
+   privacy policy is live at `https://sergeantcs2.github.io/apex-orv/privacy.html` (and linked in-app since take 181).
    That URL goes in the console; Play requires a working one.
 6. **Set the contact email** in `tools/play_assets.py` (`CONTACT`).
 

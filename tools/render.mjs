@@ -173,6 +173,34 @@ const ready = await page.evaluate(async () => {
 });
 await new Promise((r) => setTimeout(r, 3000));
 
+/* Take 182 · A194 · the FIRST-RUN TOUR. On a clean profile it opens itself
+   after the map loads and rings the mode chip with the question the friend
+   asked for. Checked here, where first run happens, then closed with Not
+   now so the rest of the run sees the screen a returning rider sees. */
+const fr0 = await page.evaluate(async () => {
+  const wait = (ms) => new Promise((z) => setTimeout(z, ms));
+  const T = window.__tour; if (!T) return { missing: true };
+  for (let i = 0; i < 40 && !T.state().on; i++) await wait(100);
+  await wait(450);   /* the ring animates into place over the motion duration; measure it settled */
+  const on = T.state().on, tour = document.getElementById('tour'), ring = document.getElementById('tour-ring');
+  const visible = !!tour && !tour.hidden;   /* read BEFORE the close below — the first version read it in the return, after */
+  const chip = document.getElementById('c-mode');
+  const rr = ring ? ring.getBoundingClientRect() : null, cr = chip ? chip.getBoundingClientRect() : null;
+  const rings = !!(rr && cr) && rr.left <= cr.left && rr.top <= cr.top && rr.right >= cr.right && rr.bottom >= cr.bottom;
+  const txt = (document.getElementById('tour-card') || {}).textContent || '';
+  const seenBefore = T.seen();
+  const btns = ['tour-next', 'tour-notnow', 'tour-never', 'tour-x'].map((id) => !!document.getElementById(id));
+  const how = on ? T.close('notnow') : null;
+  return { on, visible, rings, rr: rr && [rr.left, rr.top, rr.width, rr.height].map(Math.round), cr: cr && [cr.left, cr.top, cr.width, cr.height].map(Math.round), txt: txt.slice(0, 60), seenBefore, btns, how, seenAfter: T.seen() };
+});
+if (fr0.missing) ok(false, "take-182 tour hooks missing (__tour)");
+else {
+  ok(fr0.on && fr0.visible && fr0.rings && /What are you doing today\?/.test(fr0.txt),
+     `first run: the tour opens itself after the map loads and rings the mode chip — "What are you doing today?" (ring ${fr0.rr} · chip ${fr0.cr} · on=${fr0.on} visible=${fr0.visible})`);
+  ok(fr0.btns.every(Boolean) && fr0.how === 'notnow' && !fr0.seenBefore && !fr0.seenAfter,
+     `every step carries Next, Not now, Don't show again and ×; Not now closes it and leaves the flag clear`);
+}
+
 const info = await page.evaluate(() => {
   const m = window.map;
   if (!m) return { route: -1, alt: -1, approach: -1, threw: "no map" };
@@ -1066,6 +1094,124 @@ if (zoomed.trails === 0) {
        `the state tier asks first, a reopened sheet asks again, "Not now" starts nothing, "Yes" starts a save labelled "the whole state" (Stop kept ${h2.stStop})`);
     ok(typeof h2.eta.eta === 'number' && /(min|minute) left/.test(h2.eta.txt) && /DOWNLOADING A LIST/.test(h2.eta.txt),
        `after 60 tiles the card shows a MEASURED time-left (${h2.eta.eta} s remaining at the read)`);
+  }
+
+  /* Take 181 · the first field reports. A192: panels close on an outside tap
+     and Layers has a Done. A193: the back button closes what is open, then
+     "Back again to exit" — the page half of it; the native half (canGoBack
+     honouring pushState) is the phone's to prove. A195: the privacy row. */
+  const fr = await page.evaluate(async () => {
+    const B = window.__back; if (!B) return { missing: true };
+    const wait = (ms) => new Promise((z) => setTimeout(z, ms));
+    const vis = (id) => { const e = document.getElementById(id); return !!e && !e.hidden; };
+    const click = (id) => { const e = document.getElementById(id); if (e) e.click(); return !!e; };
+    const tapAt = (el) => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    const popBack = () => new Promise((z) => { window.addEventListener('popstate', () => setTimeout(z, 30), { once: true }); history.back(); });
+    /* 1 · outside tap closes Layers and the mode picker */
+    click('c-layers'); await wait(50); const a1 = vis('lyrpanel');
+    tapAt(document.querySelector('.maplibregl-canvas') || document.getElementById('map')); await wait(50);
+    const a2 = vis('lyrpanel');
+    click('c-mode'); await wait(50); const a3 = vis('modepanel');
+    tapAt(document.getElementById('coords') || document.body); await wait(50);
+    const a4 = vis('modepanel');
+    /* 2 · a tap INSIDE the panel keeps it open; the chip still toggles it */
+    click('c-layers'); await wait(50);
+    const row = document.querySelector('#lyrpanel [data-lg="0"]'); if (row) row.click(); await wait(80);
+    const b1 = vis('lyrpanel');
+    click('c-layers'); await wait(50); const b2 = vis('lyrpanel');
+    /* 3 · Done */
+    click('c-layers'); await wait(50);
+    const done = document.querySelector('#lyrpanel [data-lyrdone]'); const c1 = !!done; if (done) done.click(); await wait(50);
+    const c2 = vis('lyrpanel');
+    /* 4 · back with a panel open closes it and restores the sentinel */
+    const s0 = history.state && history.state.apex === 1;
+    click('c-layers'); await wait(50);
+    await popBack(); const d1 = vis('lyrpanel'), d2 = history.state && history.state.apex === 1;
+    /* 5 · back with nothing open arms the toast and leaves no sentinel; two seconds later it is back.
+       "Nothing open" includes the card rail — a body click does not fold it (only a map tap does), and
+       the first run of this check found back correctly closing a rail left open by an earlier block. */
+    try { window.guideClose(true); } catch (e) { }
+    window.railSet(false); document.body.click(); await wait(80);
+    const e0 = B.open();
+    await popBack(); const e1 = B.state().armed, e2 = vis('toast'), e3 = (document.getElementById('toast') || {}).textContent, e4 = history.state;
+    await wait(2200); const e5 = B.state().armed, e6 = history.state && history.state.apex === 1;
+    /* 6 · a second press inside the window is the exit path (the page's side of it) */
+    await popBack(); const f1 = B.state().armed; const f2 = B.onBack(); const f3 = history.state;
+    await wait(2200);
+    /* 7 · the privacy row draws only with a URL */
+    const orig = window.__privacy(''); click('c-sources'); await wait(80);
+    const g1 = /Privacy policy/.test((document.getElementById('panel') || {}).textContent || '');
+    window.__privacy('https://example.invalid/privacy.html'); click('c-sources'); await wait(80);
+    const g2 = /Privacy policy/.test((document.getElementById('panel') || {}).textContent || '')
+      && !!document.querySelector('#panel a[href="https://example.invalid/privacy.html"]');
+    window.__privacy(orig); click('c-sources'); await wait(80);
+    const g3 = /^https:\/\/.+privacy\.html$/.test(orig) && !!document.querySelector('#panel a[href="' + orig + '"]');
+    return { orig, g3, a1, a2, a3, a4, b1, b2, c1, c2, s0, d1, d2, e0, e1, e2, e3, e4, e5, e6, f1, f2, f3, g1, g2 };
+  });
+  if (fr.missing) ok(false, "take-181 hooks missing (__back)");
+  else {
+    ok(fr.a1 && !fr.a2 && fr.a3 && !fr.a4, `a tap outside closes Layers and the mode picker (field report A192)`);
+    ok(fr.b1 && !fr.b2, `a tap inside Layers keeps it open; its own chip still closes it`);
+    ok(fr.c1 && !fr.c2, `Layers has a Done row and it closes the panel`);
+    ok(fr.s0 && !fr.d1 && fr.d2, `back with a panel open closes the panel and keeps the sentinel entry`);
+    ok(fr.e0 === null && fr.e1 && fr.e2 && /Back again to exit/.test(fr.e3) && fr.e4 === null && !fr.e5 && fr.e6,
+       `back with nothing open shows "Back again to exit" and drops the sentinel for two seconds, then restores it (open before: ${fr.e0})`);
+    ok(fr.f1 && fr.f2 === 'exit' && fr.f3 === null, `a second press inside the window is the exit path (page side; the native finish is the phone's to prove)`);
+    ok(!fr.g1 && fr.g2 && fr.g3, `the Data sources card shows a Privacy policy link only with a URL, and the shipped build carries one (${fr.orig})`);
+  }
+
+  /* Take 182 · A194 · the tour's exits and its pointing. */
+  const tr = await page.evaluate(async () => {
+    const T = window.__tour; if (!T) return { missing: true };
+    const wait = (ms) => new Promise((z) => setTimeout(z, ms));
+    const click = (id) => { const e = document.getElementById(id); if (e) e.click(); return !!e; };
+    const tab = () => { const t = document.querySelector('#tabs .tab.on'); return t ? t.dataset.go : null; };
+    const encloses = (id) => { const r = document.getElementById('tour-ring').getBoundingClientRect(), c = document.getElementById(id).getBoundingClientRect();
+      return r.left <= c.left && r.top <= c.top && r.right >= c.right && r.bottom >= c.bottom; };
+    /* 3 · Next moves the ring to the activity chip and shows its tab */
+    T.reset(); T.start(); await wait(120);
+    click('tour-next'); await wait(320);
+    const n1 = { i: T.state().i, id: T.state().steps[T.state().i].id, rings: encloses('c-act'), tab: tab() };
+    T.close('notnow');
+    /* 4 · a hidden chip's step is skipped, not faked */
+    const hd = document.getElementById('c-hd'); const was = hd.style.display; hd.style.display = 'none';
+    T.reset(); T.start(); await wait(60);
+    for (let k = 0; k < 3; k++) { click('tour-next'); await wait(60); }
+    const before = T.state().steps[T.state().i].id;
+    click('tour-next'); await wait(120);
+    const after = { id: T.state().steps[T.state().i].id, i: T.state().i, on: T.state().on };
+    T.close('notnow'); hd.style.display = was;
+    /* 5 · Don't show again sets the flag; Tools still starts it */
+    T.reset(); T.start(); await wait(60); click('tour-never'); await wait(60);
+    const never = { on: T.state().on, seen: T.seen() };
+    click('c-tour'); await wait(120);
+    const replay = { on: T.state().on, i: T.state().i };
+    T.close('notnow');
+    /* 6 · back closes it */
+    T.reset(); T.start(); await wait(60);
+    const backR = window.__back.onBack(); await wait(60);
+    const back = { r: backR, on: T.state().on, seen: T.seen() };
+    /* 7 · Done sets the flag and hands back the tab it started on */
+    document.querySelector('#tabs .tab[data-go="plan"]').click(); await wait(80);
+    const tab0 = tab();
+    T.reset(); T.start(); await wait(60);
+    let guard = 0, last = null;
+    while (T.state().on && guard++ < 12) { click('tour-next'); await wait(60); }
+    const done = { on: T.state().on, seen: T.seen(), tab: tab(), tab0 };
+    document.querySelector('#tabs .tab[data-go="map"]').click(); await wait(80);
+    return { n1, before, after, never, replay, back, done, nSteps: T.steps.length };
+  });
+  if (tr.missing) ok(false, "take-182 tour hooks missing");
+  else {
+    ok(tr.n1.i === 1 && tr.n1.id === 'c-act' && tr.n1.rings && tr.n1.tab === 'map',
+       `Next moves the ring to the activity chip and shows the tab it lives on (${tr.n1.tab})`);
+    ok(tr.before === 'c-search' && tr.after.id === 'c-ride' && tr.after.on,
+       `a hidden chip's step is skipped, not faked (after ${tr.before}: ${tr.after.id}, HD hidden)`);
+    ok(!tr.never.on && tr.never.seen && tr.replay.on && tr.replay.i === 0,
+       `Don't show again closes it and sets the flag; Tools → Take the tour still starts it`);
+    ok(tr.back.r === 'closed:tour' && !tr.back.on && !tr.back.seen, `the back button closes the tour as Not now`);
+    ok(!tr.done.on && tr.done.seen && tr.done.tab === tr.done.tab0 && tr.done.tab0 === 'plan',
+       `Done sets the flag and hands back the tab the tour started on (${tr.done.tab0})`);
   }
 
   /* Takes 147–150 · the tester batch (A163–A166): liveries in Water, boats
@@ -2167,7 +2313,13 @@ if (zoomed.trails === 0) {
     for (const el of document.querySelectorAll("body *")) {
       const r = el.getBoundingClientRect();
       if (r.width < 2 || r.height < 2) continue;
-      const bg = getComputedStyle(el).backgroundColor;
+      const cs = getComputedStyle(el);
+      /* take 181: a hidden picker keeps its layout (display:block, opacity 0,
+         visibility hidden) so it can rise when opened — its ON-swatches have a
+         rect and an orange background and are NOT on screen. Visibility is
+         inherited, so the swatch itself reports hidden. */
+      if (cs.visibility === "hidden") continue;
+      const bg = cs.backgroundColor;
       if (/226,\s*87,\s*15/.test(bg) && !/0\.[012]\d*\)$/.test(bg))
         hit.push(el.id || el.className || el.tagName);
     }
@@ -2485,6 +2637,7 @@ if (zoomed.trails === 0) {
   await page.evaluate(async () => {
     const s = (ms) => new Promise((r) => setTimeout(r, ms));
     try { window.guideClose(true); } catch (e) { }
+    try { if (window.__tour && window.__tour.state().on) window.__tour.close('notnow'); } catch (e) { }
     document.querySelector('#tabs .tab[data-go="map"]').click(); await s(200);
     const m = window.map, c = m.getCenter();
     const px = m.project([c.lng + 0.02, c.lat + 0.005]);

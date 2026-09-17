@@ -32,7 +32,14 @@ test -s www/vendor/maplibre-gl-csp-worker.js
 # The render check found a map that had drawn nothing for 14 takes. Without a
 # browser the gate merely NOTES that it skipped (landmine 53).
 npm ci --no-audit --no-fund || npm install --no-audit --no-fund
-npx puppeteer browsers install chrome
+# take 181 · landmine 218: a PINNED Chrome. "chrome" alone means whatever is
+# newest, and Chrome for Testing 152 hangs on the build sandbox's kernel
+# (every process up, every thread idle, a data: URL never renders); 138
+# renders it in under a second. Bump this deliberately, never by default.
+CHROME_PIN="138.0.7204.183"
+npx puppeteer browsers install "chrome@$CHROME_PIN"
+export PUPPETEER_EXECUTABLE_PATH="$(ls -d ~/.cache/puppeteer/chrome/linux-$CHROME_PIN/chrome-linux64/chrome)"
+echo "chrome pinned: $PUPPETEER_EXECUTABLE_PATH"
 node tools/render.mjs
 # The pipeline has a palette step, but the pipeline runs ABOVE this line —
 # before npm ci — so it finds no puppeteer and skips. Run it here, where chrome
