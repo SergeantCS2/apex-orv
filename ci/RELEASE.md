@@ -1,16 +1,14 @@
-**Take 183 — the native shell is now R8-minified; the app itself is unchanged.**
+**Take 184 — every county's addresses, or no build at all.**
 
-Nothing on the map or in the app's behaviour changed from take 182. What
-changed is how the Android shell is built: it is shrunk and obfuscated by
-R8, with rules that keep everything the app reaches by name. The harness
-proved those names survive in the built package; only a phone can prove
-they answer.
+The address index the dispatch card and search use was missing 39 of
+Michigan's 83 counties in the builds from take 182 onward: a county whose
+download failed was silently skipped. This build refuses to exist unless
+all 83 are present, and the index moves to the Census's 2024 vintage
+(769,698 road segments statewide).
 
-On the phone, one pass: install this take, open Tools → Diagnostics →
-Self-test and confirm the location and haptics lines report working; long-
-press a spot and confirm Share opens the system sheet; confirm the
-diagnostics card names your phone. If any of those fails on this take and
-worked on 182, say so — it is the whole point of this build.
+On the phone: open the dispatch card or search an address somewhere the
+previous build showed nothing — Kent, Macomb, Marquette, Livingston,
+Jackson, Berrien, Allegan, Mecosta among them. An address should appear
+where the map has a road with house numbers.
 
-The first take built on the maintainer's workstation rather than the
-sandbox; the seal is the commit, not a zip.
+Nothing else changed from take 183. The R8 device check is still open.

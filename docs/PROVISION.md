@@ -118,7 +118,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### US Census TIGER address ranges (ADDRFEAT)
 
 - **Host** `www2.census.gov`
-- **Provides** per-county house-number ranges per road segment, for the offline geocoder. Counties are chosen by overlap with the region box, then clipped to it.
+- **Provides** per-county house-number ranges per road segment, for the offline geocoder. Counties are chosen by overlap with the region box, then clipped to it. TIGER 2024 since take 184; each county's file is cached under auth_cache/addrfeat/ and a county that cannot be fetched refuses the build (A196).
 - **Licence** US Government work, public domain
 - **Fetched by** `address.py`
 - **Refresh** annual — TIGER vintages are yearly

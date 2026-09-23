@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 183.* Ranked by blocking-ness, not by interest.
+*Current as of take 184.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -3448,7 +3448,7 @@ constant; the Pages URL was asked of the maintainer, not guessed.
 - **Ruled out:** a rate-the-app prompt (a nag; impossible in closed
   testing); a link under Tools can come with the production listing.
 
-## A196 — The address index ships partial at full green: 39 of 83 counties missing from the take-182 build · FOUND take 183 (fix: take 184, on approval)
+## A196 — The address index ships partial at full green: 39 of 83 counties missing from the take-182 build · FOUND take 183 · BUILDING take 184
 Found in take 183's audit by comparing the take-182 APK from the release
 with a cold build of the same tree on the workstation: 448,918 address
 segments and 712 ZIP codes in the shipped index against 763,825 and 1,075
@@ -3491,3 +3491,163 @@ one gate check:
 - **Ruled out:** trusting "fixed" without the count — the source total is
   the sum of rows across 83 county files, printed by the step, and the
   shipped `n` must equal it.
+
+## A197 — Pins: density, mode relevance, stability across zoom · DESIGNED take 184 on measurement (P1 take 185 · P2 186 · P3 187 if needed)
+The maintainer, 2026-09-23, with five desktop screenshots in Camp at the
+2-, 3- and 5-mile scales: "every zoom, the pins change, every zoom the pins
+shift … a ton of pins, many of which aren't important to the mode we're
+in … water/camp/hunt/outdoors having gas — they shouldn't. Restaurants
+should be off by default … a pin selector so even under camp, I can open a
+menu and select what pins I want under this mode for a custom filter." A
+claude.ai brief ("Pins brief t183") proposed five levers; this item records
+what the code and a measurement say, and the order that follows from it.
+
+PROVEN in src/app.html (take 183): restack() pools every kind in the mode's
+list, excludes only fuel/store/food below z11.4, ignores the mode's demote
+and unnamed-launch rules that the pin layers obey, runs on every moveend,
+and has no minzoom while the pin layers start at z9.2. Camp and Water list
+fuel; Camp lists store and food (demoted to z13, so pooled from z11.4 and
+drawn from z13). The record: 25,358 places, 69% of them food (7,197),
+store (6,192) and fuel (4,203); info 1,467, launches 2,047, campgrounds
+918, trailheads 737. Marina is priority 3 in poi.py although POIKIND flags
+it a destination.
+
+MEASURED (tools/pins_probe.py, to be committed with P1): an instrument that
+replicates restack() and both pin-layer filters over the built poi.json,
+validated against the screenshots (at z8.8–9.0 it gives 150–163 badges
+with counts to 38 in a 1908×880 Camp view around Grayling; at z10.4 a dozen
+stacks plus lone pins — the images). The screenshots are a desktop viewport,
+4.5× the phone's 412×915. On the phone, Camp, mean of five centres
+(Grayling, Traverse City, Houghton Lake, Marquette, Mio):
+- z9: 30 badges, 0 lone pins, 0% of badge members drawable — every badge is
+  a ghost (the layers draw nothing below 9.2, the clusterer draws 30).
+- z10: 13 badges + 4 pins, 30% drawable (info, launches, beaches are 167 of
+  251 members and none is drawn at z10).
+- z12: 14 badges + 2 pins, 6% drawable — food 184, store 54, fuel 34 of 331
+  members: pooled from z11.4, demoted to z13. z13: 96%.
+- Pan stability: 0% of badges lose their anchor on a 20% pan at z9, 10, 11.
+  The shifting is between ZOOMS, driven by the 9.2/10.5/11.4/13 thresholds
+  and the radius change: z9→10 16% of badges re-partition, z11→12 83%.
+- Lever B alone (pool = what the layers would draw; clusterer off below
+  9.2): Camp z9 0 markers, z10 12, z11 7, z12 4, z13 16; worst single view
+  27 at z13; re-partition z10→11 0%, z11→12 33%; the two big jumps left are
+  kind arrivals at 9.2 and 13, which no clusterer can remove.
+Design, in the order the measurement dictates:
+- P1 (take 185): restack() pools exactly what the two pin layers would draw
+  at the current zoom, through the same mode filter, and nothing below 9.2 —
+  the count equals what the map would draw, by construction; the pile card
+  still lists everything. Badge shows the dominant kind's existing glyph
+  beside the count in the kind's colour, neutral fill when mixed. Mode
+  defaults with no UI: fuel out of Water and Camp, food and store off by
+  default in Off-road and Camp (Q1/Q2 below). Marina to priority 0 in
+  poi.py. pins_probe.py committed with its calibration; harness asserts at
+  z9–13 over the five centres: every stack member drawable, no badge below
+  9.2, the marker count per view.
+- P2 (take 186): the manifest per mode — on / available / absent — replacing
+  `kinds` and `demote`; "Pins in <Mode>" in the Layers panel with one row
+  per available kind, per-mode memory (`apex.pins.<mode>.v1`), a reset row;
+  absent kinds not offered. The per-kind minzooms retuned in the same table,
+  measured with the probe and judged on the Fold.
+- P3 (take 187, only on P1's field verdict): if persisting badges still
+  re-partition between zooms, a hierarchical (top-down consistent)
+  clusterer; else animation on kind arrival. The marker budget N set from
+  the Fold's real viewport.
+- **Ruled out:** grid bucketing (A169's earlier mistake).
+- **Ruled out:** hiding everything below a zoom — A143 wants destinations
+  from z≈9, which the layers' 9.2 already implements.
+- **Ruled out:** counting the whole record in the badge (A169's literal
+  honesty): honest about the record, wrong about the map — measured 0%
+  drawable at z9.
+- **Ruled out:** hierarchical clustering before P1 is measured on the phone
+  — two of the three remaining jumps are kind arrivals it cannot touch.
+- **Ruled out:** new art; importance from ratings; a global "everything" mode.
+- **Open (the maintainer):** Q1 fuel in Water — absent, or available-off
+  with marina fuel only. Q2 store in Camp — available-off or on. Q3 the
+  Fold's inner-screen CSS viewport (from the diagnostics card) so N and the
+  harness viewport are measured, not guessed. Q4 any manifest row to flip.
+
+## A198 — CI wipes its restored cache every run; the A191 fallback is unreachable there · FOUND take 183 · fix: tools only, on the maintainer's word
+PROVEN from CI run 84's bundle log and tools/region.py: actions/cache
+restored the 892 MB region-michigan-v3 snapshot ("Cache hit … not saving
+cache" — an exact-key hit is never re-saved), then ensure_workspace() saw no
+`.region` marker (gitignored, not in the cache path list), took the run for
+a region switch, and deleted every restored *_payload.json, aoi.json, the
+imagery intermediates and imagery_tiles/ before the first step. Every CI
+build since the marker existed has rebuilt the whole state from the input
+caches — 55 minutes — and the workflow's "cached ~10–15 min" comment has
+never been true. The A191 gauges fallback ("the previous build's payload in
+CI's cache") is deleted before gauges.py runs and cannot fire on CI.
+Design: ensure_workspace() accepts region_stamp.json (cached, written by
+ingest, records the region) as the marker when `.region` is absent — a
+foreign cache still wipes, a same-region cache survives. A negative control
+(a stamp naming another region must still wipe). Measure the CI wall time
+after.
+- **Ruled out:** adding `.region` to the cache path list — a workflow edit
+  for what one line in the tool fixes, and the stamp already exists for
+  exactly this purpose (take 118).
+- **Ruled out:** disabling the wipe on CI — a foreign cache shipped the
+  wrong state once (landmine 199); the wipe must stay for a real switch.
+
+## A199 — First open: the panel says "You're at Bull Gap, home is the Pink Store" · FOUND take 184 (fix: with A200)
+The maintainer, 2026-09-23: "When the app first opens and you open the
+navigation bar, it says you're at Bull Gap." PROVEN: src/app.html line 716,
+the initial `#panel` text is a hardcoded sentence from the Bull Gap era
+("You're at Bull Gap, home is the Pink Store. Tap Return home …"), shown
+until the first readout replaces it. A confident wrong answer on the first
+screen. Fix with A200, since both are the first-open planning flow: the
+panel's first text states what is true — no fix yet, no home set — and what
+to do.
+- **Ruled out:** leaving it until the UI overhaul (A203) — a wrong place
+  name on first open is exactly the kind of answer this app must not give.
+
+## A200 — Setting home is hard to find and slow · OPEN (design first)
+The maintainer, 2026-09-23: "I wanted to plan a ride, I had to long press
+my location, set it as a home, then press a location, and click return
+home. It was awful … make it a button — such as set current location to
+home, or set address as home. Or make it a button with a dropdown on how
+you want." Design questions before a build: where the button lives (Tools
+row, the compass chip, the first-open panel), the three sources (current
+fix, an address via the offline geocoder, a tap on the map), what "plan a
+ride" from a fresh open should take (target: two taps), and whether home
+should be remembered per mode.
+- **Ruled out:** building before the maintainer approves a design; this is
+  the front door of planning and it will be judged on the Fold.
+
+## A201 — Compass "works kinda but still jumpy/glitchy" · OPEN (needs a differential test)
+The maintainer, 2026-09-23. UNKNOWN whether it is the sensor (device
+orientation events on the Fold), the smoothing, or the heading-up camera.
+Next: a readback diagnostic in the self-test — raw heading, smoothed
+heading, update rate over ten seconds — before any change (PROTOCOL §5.3).
+- **Ruled out:** tuning the filter blind; the number comes first.
+
+## A202 — Hybrid looks cheap: the colour scheme of roads and pins over imagery · OPEN (design first)
+The maintainer, 2026-09-23: "not due to low res, just the color scheme of
+roads/pins and more." The road casings, trail colours and pin badges were
+tuned on the Map basemap; over imagery they need their own palette pass
+(halos, casing widths, badge contrast) — a design with reference shots
+before a build, judged on the Fold.
+- **Ruled out:** touching the Map basemap's palette in the same change; the
+  legend-vs-map palette check (gate) holds each basemap separately.
+
+## A203 — UI overhaul: easier, better looking, more premium, same features and more · LATER (umbrella)
+The maintainer, 2026-09-23: "At some point I would like to do what I did
+with pins and do a UI overhaul of some kind." An umbrella for A197, A200
+and A202 and whatever the tester round adds; not a take of its own until a
+design exists.
+- **Ruled out:** starting it before the pins arc and the first-open flow
+  have landed — those are the overhaul's first two pieces and they will
+  teach the rest.
+
+## A204 — docs/PROVISION.md no longer regenerates from tools/manifest.py · FOUND take 184 · small
+PROVEN at take 184: `python3 tools/manifest.py` rewrites docs/PROVISION.md
+without the NWIS in-app section, the citation-only hosts, the acorn and
+USFS-boundary sections and the in-app roles on the imagery and DNR entries
+— all appended by hand over takes 145–181 to a file whose header says
+"Generated … Do not hand-edit" — and adds a bundletool section the file
+never had. PROTOCOL §8 condition 1 ("declared in docs/PROVISION.md with an
+in-app role") rests on text manifest.py cannot reproduce. Take 184 edited
+the one ADDRFEAT line by hand and did not regenerate. Fix: move every
+hand-added section into manifest.py's tables so the render is faithful,
+then regenerate and diff to empty; gate: render() must equal the file.
+- **Ruled out:** regenerating in take 184 — it would have deleted the
+  in-app declarations the gate's §8 allowlist cites.

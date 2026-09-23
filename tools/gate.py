@@ -1770,6 +1770,43 @@ def check_play():
                      "patches present; R8 on with artifact assertions (A183)")
 
 
+# ── take 184 · A196: the address index covers every county, or the build is not green ──
+# Take 182 on Play carried 44 of 83 counties at full green (landmine 219).
+# address.py now refuses a missing county and records its coverage in the
+# payload; this holds the BUILT index to the region's declared county count,
+# so a stale or older payload (no coverage keys) is refused too.
+def check_address_coverage():
+    import json as _json
+    sys.path.insert(0, HERE)
+    from region import R
+    cand = [os.path.join(ROOT, "bundles", R.id, "address.json"),
+            os.path.join(ROOT, "address_payload.json")]
+    p = next((c for c in cand if os.path.exists(c)), None)
+    if not p:
+        return notes.append("address index not built yet (CI builds it)")
+    d = _json.load(open(p, encoding="utf-8"))
+    cov, exp = d.get("counties"), d.get("counties_expected")
+    rel = os.path.relpath(p, ROOT)
+    if not isinstance(cov, dict) or not exp:
+        return fails.append(f"{rel} carries no county coverage — built by an address.py "
+                            f"older than take 184; a partial index shipped green once (A196)")
+    declared = _json.load(open(os.path.join(ROOT, "regions.json")))["regions"][R.id].get("counties")
+    if declared and exp != declared:
+        fails.append(f"{rel}: address.py found {exp} counties, regions.json declares "
+                     f"{declared} for {R.id}")
+    if len(cov) != exp:
+        fails.append(f"{rel} covers {len(cov)} of {exp} counties (A196)")
+    if sum(cov.values()) != d.get("n"):
+        fails.append(f"{rel}: per-county counts sum to {sum(cov.values()):,}, n is {d.get('n'):,}")
+    empty = sorted(f for f, n in cov.items() if not n)
+    if empty:
+        fails.append(f"{rel}: counties with zero segments: {', '.join(empty)}")
+    if not any("A196" in f or rel in f for f in fails):
+        notes.append(f"address index: {len(cov)}/{exp} counties, {d['n']:,} segments "
+                     f"(TIGER{d.get('vintage', '?')})")
+
+
+
 # ── Ledger entries file in numeric order ────────────────────────────────────
 # Take 115's audit: 191 entries, zero gaps, zero duplicates — and two entries
 # (68, 119) filed out of position, which the set-completeness check could never
@@ -1798,6 +1835,7 @@ for fn in (check_handoff, check_stamps, check_offline, check_splash, check_scrub
            check_provision,
            check_regions, check_bundles, check_empty_artifacts,
            check_input_integrity, check_region_polygon,
+           check_address_coverage,
            check_tools,
            check_manifest, check_play):
     try:

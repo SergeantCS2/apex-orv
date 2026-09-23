@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 183.*
+*Current as of take 184.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -129,6 +129,7 @@ Start here. Do not read top to bottom.
 | Render ends with a stack trace instead of a verdict | 217 |
 | pkill/grep -f finds or kills your own shell | 204 |
 | A feature works in some counties and is silently blank in others | 219 |
+| CI rebuilds everything every run although the cache reports a hit | 220 |
 
 ---
 
@@ -2765,3 +2766,18 @@ build cannot fetch is a build that does not pass — retry once, then
 refuse; and a multi-part input records which parts it covers so the gate
 can assert coverage against the source's own count. "The payload exists"
 is landmine 53's shape one level down.
+
+**220. A cache the consumer deletes on sight is not a cache.** CI's region
+cache restored 892 MB every run and ensure_workspace() deleted the restored
+payloads before the first step, because its marker file (`.region`) was
+gitignored and not in the cache path list, so every run looked like a
+region switch. Every CI build since take 118 rebuilt the whole state — 55
+minutes — while the workflow comment promised "cached ~10–15 min", and
+the A191 fallback that "falls back to the previous build's payload in CI's
+cache" could never find one. Nobody saw it because the run was green and
+the time was normal for that machine. Companion, PROVEN from the same
+log: actions/cache never re-saves after an exact-key hit, so a cache
+learns nothing after its first save until the key changes. Rule: a cache
+is verified by what the CONSUMER sees after restore (an `ls` and a "skipping
+fetch" line in the log), never by the restore step's own success; and a
+marker that decides whether cached work survives must itself be cached.

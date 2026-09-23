@@ -223,7 +223,9 @@ SOURCES = [
         "name": "US Census TIGER address ranges (ADDRFEAT)",
         "what": "per-county house-number ranges per road segment, for the "
                 "offline geocoder. Counties are chosen by overlap with the "
-                "region box, then clipped to it.",
+                "region box, then clipped to it. TIGER 2024 since take 184; "
+                "each county's file is cached under auth_cache/addrfeat/ and "
+                "a county that cannot be fetched refuses the build (A196).",
         "licence": "US Government work, public domain",
         "tool": "address.py",
         "phase": "provision",

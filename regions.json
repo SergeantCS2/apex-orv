@@ -109,6 +109,7 @@
    ],
    "state": "Michigan",
    "bulk": true,
+   "counties": 83,
    "note": "The whole state, both peninsulas and Isle Royale \u2014 Jacob's call at take 114: 'the one-stop Michigan app'. bulk:true means the pipeline reads the Geofabrik extract directly (a statewide Overpass query would abuse a volunteer service), skips contours and z12+ imagery tiles (measured impossible at take 75: 8.6 GB), and raises landcover thresholds so the ground wash carries shape, not slivers. Centre sits in Mio/Luzerne trail country, not the geographic middle: the state's legal network is archipelagos, and the default spawn must stand on an island, not in the farmland between them (take 117).",
    "anchors": [
     [

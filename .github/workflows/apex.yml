@@ -10,6 +10,9 @@ name: build
 on:
   workflow_dispatch:
   push:
+    # take 184: main only. A pushed branch or tag used to build, publish a
+    # release and deploy Pages; path filters are not evaluated for tag pushes.
+    branches: [main]
     paths:
       # The seed zip is what Jacob uploads; without it here an upload does
       # not even start a run (take 119, landmine 202).
@@ -42,7 +45,9 @@ env:
   # Now: regions.json's `default` decides, a step below derives the cache key
   # from it, and ci/bundle.sh (seed-updated) verifies the built bundle names
   # the declared region. NEVER add APEX_REGION back here.
-  DATA_V: v3   # bump only to force a clean data pull
+  DATA_V: v4   # bump only to force a clean data pull (v4: take 184 — the
+               # cache must learn auth_cache/addrfeat; an exact-key hit is never
+               # re-saved, so nothing new reaches it without a bump; A196/A198)
 
 jobs:
   # ── Stage -1: unpack the seed ───────────────────────────────────────────

@@ -1,4 +1,92 @@
-# HANDOFF — through Take 183 · V3
+# HANDOFF — through Take 184 · V3
+
+## Take 184 — 2026-09-23 — A196: the address index covers every county or the build refuses
+
+Take 183 sealed: commit 55cf44a, CI run 84 green, release take-84 (APK,
+upload-key AAB, play-assets with the mapping); tagged t183 locally. The
+tag is NOT pushed: GitHub does not evaluate path filters for tag pushes
+and the workflow at that commit has no branch filter, so pushing it would
+rebuild 183 and publish a duplicate release. `branches: [main]` lands in
+this take's workflow edit, so t184 onward can be pushed.
+
+A196, the audit finding of take 183, built as designed in the item:
+- tools/address.py caches each county's ADDRFEAT zip under
+  auth_cache/addrfeat/ (fetched once, carried by CI's region cache), treats
+  a body that is not a zip as a failure (Census answers the 2023 Mecosta
+  URL with HTTP 200 and an HTML "Request Rejected" page — landmine 74),
+  retries once after 20 s, paces 0.5 s between fetches, and REFUSES the
+  build if any county is still missing. Vintage TIGER 2024: the paced HEAD
+  probe of take 183 found 2023 serves 82 of 83 counties and 2024 all 83.
+  The payload gains `counties` (fips → segments), `counties_expected` and
+  `vintage`; the app's decoder reads only the keys it names, so the phone
+  ignores them.
+- regions.json declares `counties: 83` for michigan; gate
+  check_address_coverage holds the BUILT index to it: coverage keys present,
+  every county present with segments, per-county counts summing to n. An
+  older payload with no coverage keys is refused, which is what turns CI's
+  cached partial index from a silent regression into a red run.
+- ci/build.yml and the live workflow: DATA_V v3 → v4 (the cache must learn
+  auth_cache/addrfeat; an exact-key hit is never re-saved, PROVEN in run
+  84's post-step line) and `branches: [main]` on the push trigger (tags and
+  branches stop building and publishing releases).
+- PROVISION.md: the ADDRFEAT line edited by hand to match manifest.py.
+  Regenerating it deleted hand-appended sections the gate's §8 allowlist
+  cites (NWIS in-app, citation hosts, acorn, USFS boundaries) — filed as
+  A204; not regenerated this take.
+
+Source total (rule 7): TIGER 2024 ADDRFEAT, Michigan, 769,698 rows across
+83 counties, measured 2026-09-23 from this machine in 59 s with zero
+failures. The take-178 record of 770,097 was 2023.
+
+MEASURED:
+- The touched step executed its changed path before the seal: two cached
+  county files removed, `pipeline.py address` fetched them and rebuilt the
+  index in 14.6 s — 769,698 segments across 83 of 83 counties, TIGER 2024,
+  per-county counts summing to n, smallest county 721 segments. Negative
+  control on the tool: a county whose body is an HTML page at HTTP 200
+  fails twice (one retry) and main() refuses with the county named; no
+  .part file is left behind. Negative controls on the gate check, in
+  isolation: a payload with no coverage keys, one with 82 of 83 counties,
+  one whose expected count disagrees with regions.json, and one with a
+  zero county are each refused; the real payload passes.
+- Pipeline tail on this tree (bundle → palette): 455 s; smoke 5 passes,
+  render 281/0 in 384 s. www/app.js byte-identical to take 183's;
+  www/index.html differs by the take number only.
+- CI: the first run after this take is a cold cache (v4) and will fetch the
+  83 county files from Census — paced, with one retry each; a refusal is
+  the intended outcome of a throttled run, not a regression.
+
+AUDIT (§0.3), the diff read cold: the missing-county branch continues to
+the next county and the refusal comes after the loop, so every failure is
+named in one line rather than the first only. Per-county counts are taken
+at the county loop level and nothing removes segments afterwards, so the
+gate's sum check is exact. The gate's `from region import R` follows two
+precedents in the file. `branches: [main]` rides with the DATA_V bump —
+two lines in the same trigger block, both about what CI builds — because
+without it the approved t183 tag push would have rebuilt 183 and published
+a duplicate release (GitHub: path filters are not evaluated for tag
+pushes). The regenerated PROVISION.md was reverted: manifest.py's render
+drops hand-appended sections the §8 allowlist cites (A204).
+
+What the gate taught: its first run on this tree refused the take-183
+APK still on disk from last night's local apk job — android_check holds
+versionCode to BUILD, and BUILD had moved. The check is right (landmine
+54: verified before believed); the remedy was to rebuild the artifact for
+184, which is also this take's own artifact proof. A stale local artifact
+from the previous take is a rebuild, never a reason to weaken the check.
+
+SEAL: gate PASSED, 41 checks plus the new address coverage check (smoke
+300 across 5 modes, render 281/0 inside it), the address step executed on
+its changed path, and ci/apk.sh green here on the 184 artifacts. Sealed as
+a commit on main on the maintainer's go; t184 tagged and pushed once CI is
+green — the first pushed tag, now that main-only is on the trigger. Not
+promoted to Play: the A183 device check is open; this build is the Play
+candidate once it passes. Field: the dispatch card and address search in a
+county the 182/183 builds left blank (Kent, Macomb, Marquette, Livingston,
+Jackson, Berrien, Allegan, Mecosta). DEFERRED: A197 P1 (take 185); A198;
+A199/A200 design; A201's readback diagnostic; A202; A204; the NEW-CHAT-
+BRIEF rewrite; PROTOCOL §0.4/§0.5 wording; the README/TESTING/A180
+identity claim; the root apex.yml; DEV_CN by fingerprint; probe.mjs's path.
 
 ## Take 183 — 2026-09-23 — A183: R8 on, proven on the artifact · the first take built on the workstation
 
