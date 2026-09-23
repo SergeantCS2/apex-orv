@@ -447,13 +447,15 @@ var PIN_FLOOR=9.2;
 function pinDrawable(p,m,z){
   var k=p.k;
   if((m.kinds||[]).indexOf(k)<0)return false;
-  if(m.demote&&m.demote.indexOf(k)>=0&&z<13)return false;
-  if((k==='launch'||k==='beach')&&!p.named&&z<(m.k==='water'?12:13.5))return false;
-  if(p.d===1){
-    if(z<PIN_FLOOR)return false;
-    if(m.boost&&m.boost.indexOf(k)>=0)return true;
-    return p.pri<=0||(z>=10.5&&p.pri<=1)||z>=11.4}
-  return z>=11.4}
+   
+  var T=Math.floor(z);
+  if((k==='launch'||k==='beach')&&!p.named&&T<(m.k==='water'?12:13.5))return false;
+  if(p.d===1&&z<PIN_FLOOR)return false;
+  if(p.d!==1&&z<11.4)return false;
+  var kz=(m.z||{})[k];if(kz==null&&POIKIND[k])kz=POIKIND[k].z;
+  if(kz!=null)return T>=kz;
+  if(p.d===1)return p.pri<=0||(T>=10.5&&p.pri<=1)||T>=11.4;
+  return true}
 var poif=((POIS&&POIS.p)||[]).map(function(r,i){
   var k=POIKIND[r.k]||{c:'#4A443B',h:r.k,r:7};
   return {type:'Feature',
@@ -1095,6 +1097,10 @@ function bootEase(at){
   if(_booted||_userDrove)return;_booted=true;
   try{map.easeTo({center:at,zoom:Math.max(map.getZoom(),10.2),duration:900,
     essential:true})}catch(e){}}
+ 
+var HOMEKEY='apex.home.v1',HOME=null;
+try{var _h=JSON.parse(localStorage.getItem(HOMEKEY)||'null');
+    if(_h&&_h.length===2)HOME=_h}catch(e){}
 var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
   sources:{
      
@@ -1583,9 +1589,7 @@ function anchorOf(kind,skip){
     if(!skip||p[0]!==skip)return [p[1],p[2]]}
   return CTR}
  
-var HOMEKEY='apex.home.v1',HOME=null;
-try{var _h=JSON.parse(localStorage.getItem(HOMEKEY)||'null');
-    if(_h&&_h.length===2)HOME=_h}catch(e){}
+ 
 function homeSave(){try{HOME?localStorage.setItem(HOMEKEY,JSON.stringify(HOME))
                         :localStorage.removeItem(HOMEKEY)}catch(e){}}
  
@@ -1596,13 +1600,44 @@ homeMark();
 var mM=new maplibregl.Marker({element:mk('me','◎')}).setLngLat(ME).addTo(map);
 var arm=null;
 
+ 
+function homeCard(prefix){
+  var h=(prefix||'')+'<b>Set home</b> — the truck, the cabin, the trailhead you start from.'+
+    '<div style="margin-top:8px">'+
+    '<button class="chip" id="hc-me">Use my location</button> '+
+    '<button class="chip" id="hc-addr">Type an address</button> '+
+    '<button class="chip" id="hc-tap">Tap the map</button>'+
+    (HOME?' <button class="chip" id="hc-clear">Clear home</button>':'')+
+    '</div><div class="sub" style="margin-top:6px">Then press and hold where you want to go and tap '+
+    '<b>Directions here</b>; <b>Return home</b> routes back from wherever you are.</div>';
+  show(h,'');
+   
+  ['me','addr','tap','clear'].forEach(function(w){var b=el('hc-'+w);if(!b)return;
+    b.addEventListener('click',function(){
+      logAct('act  set home '+w);
+      if(w==='tap'){arm='home';syncArm();return show('Tap the map to place <b>home</b>.','')}
+      if(w==='clear'){HOME=null;homeSave();homeMark();clearRoute();syncSafety();
+        return show('<b>Home cleared.</b>','')}
+      if(w==='addr'){arm='homeaddr';syncArm();
+        try{el('srch').className='on';el('c-search').className='chip on';el('q').value='';el('q').focus()}catch(e){}
+        return show('Type the address — a number and a street, like <b>4952 S Branch Rd</b>. '+
+          'The hit you tap becomes home.','')}
+       
+      show('Waiting for a GPS fix…','');
+      locateOnce(function(at,why){
+        if(!at)return show(why==='none'
+          ?'<b>This phone reports no GPS receiver.</b> Set home by address or by a tap on the map.'
+          :'<b>No GPS fix in 25 s.</b> Try outside, or set home another way.','');
+        HOME=at.slice();homeSave();homeMark();clearRoute();syncSafety();
+        show('<b>Home is where you are.</b> Press and hold where you want to go and tap '+
+          '<b>Directions here</b>.','')})})})}
 el('c-home').addEventListener('click',function(){
-  arm=arm==='home'?null:'home';syncArm();
-  show(arm?'Tap the map to place <b>home</b>.':'Cancelled.','')});
+  if(arm==='home'||arm==='homeaddr'){arm=null;syncArm();return show('Cancelled.','')}
+  homeCard('')});
 el('c-me').addEventListener('click',function(){
   arm=arm==='me'?null:'me';syncArm();
   show(arm?"Tap the map to place <b>where you are</b>.":'Cancelled.','')});
-function syncArm(){el('c-home').className='chip'+(arm==='home'?' arm':'');
+function syncArm(){el('c-home').className='chip'+((arm==='home'||arm==='homeaddr')?' arm':'');
   el('c-me').className='chip'+(arm==='me'?' arm':'')}
 
 el('c-saved').addEventListener('click',function(){
@@ -1806,7 +1841,7 @@ var TOUR_STEPS=[
   {id:'c-act',    tab:'map',  t:'Which lines',
    s:'ORV, two-track, hiking, or all of them. The colours are the legend: green, blue and black by difficulty; red is closed.'},
   {id:'c-layers', tab:'map',  t:'Layers',
-   s:'Map, satellite or hybrid; public land, rivers, contours, county lines. Done closes it.'},
+   s:'Map, satellite or hybrid; public land, rivers, contours, county lines; which pins this mode shows. Done closes it.'},
   {id:'c-search', tab:'map',  t:'Search',
    s:'A trail code like H58, a town, a river or a street address — all of it offline.'},
   {id:'c-hd',     tab:null,   t:'Sharper satellite',
@@ -2153,8 +2188,7 @@ function buildLoops(startNode,targetMi){
                       na:startNode,nb:startNode,repeat:best.L.repeat})});
   return out}
 el('btn-home').addEventListener('click',function(){
-  if(!HOME)return show('<b>No home set.</b> Tap a place and choose '+
-    '“Make this home”, or press and hold the map and pick Set home.','');
+  if(!HOME)return homeCard('<b>No home set.</b> ');    
   routeToPoint(HOME,'the ⌂ pin')});
 
 function renderRoutes(out){
@@ -2387,6 +2421,13 @@ function renderHits(list){
             'in Water mode a launch pin works too.</span>','');
         }
         return}
+       
+      if(arm==='homeaddr'){
+        HOME=r.c.slice();homeSave();homeMark();arm=null;syncArm();clearRoute();syncSafety();
+        map.easeTo({center:r.c,zoom:13.2,duration:800});
+        logAct('act  home from address');
+        return show('<b>Home set</b> at '+r.t+'. Press and hold where you want to go and tap '+
+          '<b>Directions here</b>; <b>Return home</b> routes back from wherever you are.','')}
       map.easeTo({center:r.c,zoom:r.k==='place'?13.2:14.6,duration:800});
        
       dropPin(r.c.slice());
@@ -2560,18 +2601,19 @@ function buildActPanel(){
       logAct('tap','activity '+act)})})}
 
  
+ 
 var MODES=[
    
    
   {k:'ride',     h:'Off-road', s:'ORV, dirt bike, side-by-side, MTB — trails, riding areas, fuel', act:'ride',
    kinds:['trailhead','camp','fuel','dayuse','view','info','water','toilet','shelter','store','food','mtb'],
-   demote:['store','food','info'],
+   off:['store','food'], z:{store:13,food:13,info:13},
    groups:{areas:true,peaks:false,contour:false,relief:false,paddle:false,places:true,county:false,public:false,forest:false},
    basemap:'Map', zoom:9},
    
   {k:'outdoors', h:'Outdoors', s:'Hike, fish, explore — on foot, with trail systems, hills and rivers', act:'foot', machine:'walk',
    kinds:['trailhead','camp','shelter','water','toilet','view','launch','beach','dayuse','info','system','mtb','ski','lighthouse','livery'],
-   demote:['camp'],
+   z:{camp:13},
    peaksFrom:9,
     
    groups:{areas:false,peaks:true,contour:true,relief:false,paddle:true,places:true,county:false,public:false,forest:false},
@@ -2585,13 +2627,13 @@ var MODES=[
   {k:'water',    h:'Water',    s:'Beach, kayak, tube, boat — launches and rivers, no trail lines', act:'none', machine:'kayak',
     
    kinds:['livery','launch','beach','camp','dayuse','info','toilet','lighthouse','marina'],
-   boost:['launch','beach','lighthouse'],
+   z:{launch:9,beach:9,lighthouse:9},
    groups:{areas:false,peaks:false,contour:false,relief:false,paddle:true,places:true,county:false,public:false,forest:false},
    basemap:'Hybrid', zoom:10},
    
   {k:'camp',     h:'Camp',     s:'Campgrounds by type, national and state forest, supplies', act:'ride',
    kinds:['camp','dayuse','shelter','trailhead','launch','beach','water','toilet','store','food','info'],
-   boost:['camp'], demote:['info','launch','beach','store','food'],
+   off:['store','food'], z:{camp:9,info:13,launch:13,beach:13,store:13,food:13},
    groups:{areas:false,peaks:false,contour:false,relief:false,paddle:false,places:true,county:false,public:true,forest:true},
    basemap:'Map', zoom:10}
 ];
@@ -2599,20 +2641,60 @@ var MODES=[
 var mode='ride', POI_BASE={}, POI_MODEF={}, STACKED={};
 function modeOf(k){return MODES.filter(function(m){return m.k===k})[0]||MODES[0]}
  
+var PINS={};
+function pinsKey(k){return 'apex.pins.'+k+'.v1'}
+function pinsLoad(k){
+  if(PINS[k])return PINS[k];
+  var o={};
+  try{if(svAvailable()){var v=JSON.parse(localStorage.getItem(pinsKey(k))||'{}');
+    if(v&&typeof v==='object')for(var x in v)if(POIKIND[x]&&typeof v[x]==='boolean')o[x]=v[x]}}catch(e){o={}}
+  PINS[k]=o;return o}
+function pinsSave(k){try{var o=PINS[k]||{};
+  if(Object.keys(o).length)localStorage.setItem(pinsKey(k),JSON.stringify(o));
+  else localStorage.removeItem(pinsKey(k))}catch(e){}}
+function pinsDefault(m,k){return (m.kinds||[]).indexOf(k)>=0&&(m.off||[]).indexOf(k)<0}
+function pinsOn(m,k){var o=pinsLoad(m.k);return (k in o)?o[k]:pinsDefault(m,k)}
+function pinsEff(m){return (m.kinds||[]).filter(function(k){return pinsOn(m,k)})}
+function pinsSet(mk,k,on){var m=modeOf(mk),o=pinsLoad(mk);
+  if(on===pinsDefault(m,k))delete o[k];else o[k]=!!on;
+  pinsSave(mk);logAct('act  pins '+mk+' '+k+' '+(on?'on':'off'));
+  if(mk===mode)repin()}
+function pinsReset(mk){PINS[mk]={};pinsSave(mk);logAct('act  pins '+mk+' reset');if(mk===mode)repin()}
+function modeNow(){var m=modeOf(mode),n={};for(var f in m)n[f]=m[f];n.kinds=pinsEff(m);return n}
+ 
+function repin(){
+  var m=modeNow();
+  ['poi-dot','poi-dot-major'].forEach(function(id){
+    try{
+      if(!POI_BASE[id]&&!Object.keys(STACKED).length)POI_BASE[id]=map.getFilter(id)||true;
+       
+      POI_MODEF[id]=modeFilter(POI_BASE[id]||true,m,id);
+      map.setFilter(id,POI_MODEF[id]);
+    }catch(e){}});
+  STACKED={};STACKSIG='';setTimeout(function(){try{restack()}catch(e){}},60)}
+ 
 function modeFilter(base,m,id){
   var inK=['in',['get','k'],['literal',m.kinds]];
    
-  if(m.demote&&m.demote.length)
-    inK=['all',inK,['step',['zoom'],['!',['in',['get','k'],['literal',m.demote]]],13,true]];
+  var zt=m.z||{},zk=(m.kinds||[]).filter(function(k){return zt[k]!=null}),zStep=null;
+  if(zk.length){
+    var stops=[];zk.forEach(function(k){if(zt[k]>9&&stops.indexOf(zt[k])<0)stops.push(zt[k])});
+    stops.sort(function(a,b){return a-b});
+    var upTo=function(s){return ['in',['get','k'],['literal',zk.filter(function(k){return zt[k]<=s})]]};
+     
+    if(stops.length){zStep=['step',['zoom'],upTo(9)];
+      stops.forEach(function(st){zStep.push(st);zStep.push(upTo(st))})}
+    else zStep=upTo(9)}
+  var dTest=(id==='poi-dot-major')?['==',['get','d'],1]:['!=',['get','d'],1];
    
   var unZ=(m.k==='water')?12:13.5;
   inK=['all',inK,['any',['==',['get','named'],1],
     ['!',['in',['get','k'],['literal',['launch','beach']]]],
     ['step',['zoom'],false,unZ,true]]];
   var wrap=function(br){
-    var f=['all',inK,(m.boost&&id==='poi-dot-major')
-      ?['any',['in',['get','k'],['literal',m.boost]],br]:br];
-    return f};
+    if(!zStep)return ['all',inK,br];
+    return ['all',inK,['any',['all',['in',['get','k'],['literal',zk]],dTest,zStep],
+                             ['all',['!',['in',['get','k'],['literal',zk]]],br]]]};
   if(Array.isArray(base)&&base[0]==='step'){
     var out=['step',base[1],wrap(base[2])];
     for(var i=3;i<base.length;i+=2){out.push(base[i]);out.push(wrap(base[i+1]))}
@@ -2626,14 +2708,7 @@ function applyMode(k,opts){
    
   if(ACTS.some(function(a){return a.k===m.act})){act=m.act;applyAct()}
    
-  ['poi-dot','poi-dot-major'].forEach(function(id){
-    try{
-      if(!POI_BASE[id])POI_BASE[id]=map.getFilter(id)||true;
-       
-      POI_MODEF[id]=modeFilter(POI_BASE[id],m,id);
-      map.setFilter(id,POI_MODEF[id]);
-      STACKED={};
-    }catch(e){}});
+  repin();
    
   try{
      
@@ -2650,7 +2725,6 @@ function applyMode(k,opts){
     applyMachine();
   }catch(e){}
    
-  STACKED={};STACKSIG='';setTimeout(function(){try{restack()}catch(e){}},60);
    
   LYRGROUPS.forEach(function(g){if(g.k in m.groups)lyrSet(g,m.groups[g.k])});
    
@@ -3356,9 +3430,9 @@ function classifyFix(at){
   posMode='away';awayMi=mi(at,CTR);
   show('<b>You are about '+Math.round(awayMi)+' mi from '+
     (BUNDLE.name||'this region')+'.</b><br>Planning mode — everything except live '+
-    'tracking works. <b>Tap open ground</b> to drop your planning start, or use '+
-    '<b>⌂ Set home</b> to place the truck, then <b>Return Home</b> and '+
-    '<b>Directions</b> route between them. Search and elevation work too.'+
+    'tracking works. <b>Set home</b> (Plan) — an address, a tap on the map — then '+
+    'press and hold where you want to go and tap <b>Directions here</b>; '+
+    '<b>Start here</b> on any pin moves the ◎ start. Search and elevation work too.'+
     '<br><br>Live tracking and the dispatch card stay off until you are in the '+
     'region — they must never report a position you are not standing at.','')}
 function gpsStart(onFix,onFail){
@@ -3483,7 +3557,8 @@ function startSim(){
  
 var LYRGROUPS=[
   {k:'places', h:'Places',      s:'campgrounds, fuel, launches, trailheads',
-   ids:['poi-dot','poi-dot-major']},
+    
+   ids:['poi-dot','poi-dot-major','poi-stack-bg','poi-stack']},
   {k:'water',  h:'Lakes & rivers', s:'water and its names',
    ids:['water','wway','lbl-lake','lbl-stream']},
   {k:'contour',h:'Contours',    s:'40 ft, labelled every 200 ft',
@@ -3540,6 +3615,16 @@ function buildLyrPanel(){
        ';border:1px solid rgba(255,255,255,.5)"></span>'+
        '<span>'+g.h+'</span></button>'});
    
+  var pm=modeOf(mode);
+  h+='<div class="sect">Pins in '+pm.h+'</div>';
+  (pm.kinds||[]).forEach(function(k){
+    var kd=POIKIND[k]||{h:k,c:'#8B857A'},on=pinsOn(pm,k);
+    h+='<button class="actrow'+(on?' on':'')+'" data-pk="'+k+'">'+
+       '<span class="sw" style="background-color:'+(on?kd.c:'transparent')+
+       ';border:1px solid rgba(255,255,255,.5)"></span>'+
+       '<span>'+kd.h+'</span></button>'});
+  h+='<button class="actrow" data-pkreset="1"><span class="sw" style="background-color:transparent"></span><span>Reset to '+pm.h+' defaults</span></button>';
+   
   h+='<button class="actrow" data-lyrdone="1"><span class="sw" style="background-color:transparent"></span><span>Done</span></button>';
   p.innerHTML=h;
   var dn=p.querySelector('[data-lyrdone]');
@@ -3553,7 +3638,12 @@ function buildLyrPanel(){
     b.addEventListener('click',function(){
       var g=LYRGROUPS[+b.dataset.lg],on=!lyrOn(g);
       lyrSet(g,on);logAct('act  layer '+g.k+' '+(on?'on':'off'));
-      buildLyrPanel()})})}
+      buildLyrPanel()})});
+  Array.prototype.forEach.call(p.querySelectorAll('[data-pk]'),function(b){
+    b.addEventListener('click',function(){
+      var k=b.dataset.pk,m=modeOf(mode);pinsSet(m.k,k,!pinsOn(m,k));buildLyrPanel()})});
+  var rs=p.querySelector('[data-pkreset]');
+  if(rs)rs.addEventListener('click',function(){pinsReset(modeOf(mode).k);buildLyrPanel()})}
 
  
 el('c-base').addEventListener('click',function(){setBasemap(bmi+1)});
@@ -3729,6 +3819,8 @@ try{window.addEventListener('resize',stripH)}catch(e){}
 var TAB='map';
 function showTab(t){
   TAB=t;
+   
+  if(arm&&arm!=='homeaddr'){arm=null;syncArm()}
   Array.prototype.forEach.call(document.querySelectorAll('.chip[data-tab]'),function(c){
     c.hidden=(c.dataset.tab!==t)});
   Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'),function(b){
@@ -4029,7 +4121,8 @@ function placeCard(at,kind,title){
     show('<b>Home is here now.</b> The ⌂ pin holds this spot — '+
       'press and hold anywhere for a new pin.','')});
   on('pc-start',function(){logAct('act  start from here');
-    if(posMode==='gps')return show('A live GPS fix is driving your position — '+
+     
+    if(posMode==='gps'&&watchId!==null)return show('A live GPS fix is driving your position — '+
       'the start pin follows you and cannot be moved by hand.','');
     ME=at.slice();mM.setLngLat(ME);paint();syncSafety();clearRoute();
     if(kind==='drop')clearDrop();
@@ -4115,7 +4208,11 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
                     get ME(){return ME}};
      
     window.__areas={card:areaCard,groups:LYRGROUPS};
-    window.__mode={apply:applyMode,get:function(){return mode},MODES:MODES};
+    window.__mode={apply:applyMode,get:function(){return mode},MODES:MODES,now:modeNow};
+     
+    window.__pins={eff:function(k){return pinsEff(modeOf(k))},set:pinsSet,reset:pinsReset,
+      key:pinsKey,forget:function(){PINS={}},
+      defaults:function(k){var m=modeOf(k);return (m.kinds||[]).filter(function(x){return pinsDefault(m,x)})}};
      
     window.__sat={tiles:TILES,sparse:SPARSE,inPatch:inPatch,blank:Array.from(BLANK_PNG),resolve:_satResolve};
     window.__hd=HD;
@@ -4149,7 +4246,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
          
         floor:PIN_FLOOR,
         drawable:function(i,z){var f=poif[i];if(!f)return null;
-          var m=MODES.filter(function(x){return x.k===mode})[0]||MODES[0];
+          var m=modeNow();
           return pinDrawable(f.properties,m,z==null?map.getZoom():z)},
         card:stackCard};
     }catch(e){}
@@ -4629,6 +4726,12 @@ function stRide(){
 }
 
  
+ 
+function stPins(){
+  var parts=MODES.map(function(m){var o=pinsLoad(m.k),n=Object.keys(o).length;
+    return m.h+' '+(n?n+' switched ('+Object.keys(o).map(function(k){return k+(o[k]?' on':' off')}).join(', ')+')':'defaults')});
+  stInfo('PINS','choices',parts.join(' · '))}
+
 function stCompass(){
   var n=MAGLOG.length;
   if(!n){stInfo('COMPASS','sensor',MAG_OK===null?'not started — open the compass, wait 3 s, re-run':
@@ -4747,7 +4850,7 @@ function selfTest(opts,done){
   stEnv();stLoad();
    
   stRender(function(){
-  stLayout();stData();stRouting();stSafety();stRide();stHaptics();stCompass();
+  stLayout();stData();stRouting();stSafety();stRide();stHaptics();stCompass();stPins();
   var finish=function(){var rep=stReport();
     try{window.__selfTestReport=rep}catch(e){}
     if(done)done(rep);return rep};
@@ -4840,7 +4943,7 @@ function restack(){
   var src;try{src=map.getSource('poistack')}catch(e){return}
   if(!src)return;
   var z=map.getZoom(),R=stackRadius(z);
-  var m=MODES.filter(function(x){return x.k===mode})[0]||MODES[0];
+  var m=modeNow();
   var cw=map.getCanvas().clientWidth,ch=map.getCanvas().clientHeight,pad=R+8;
    
   if(z<PIN_FLOOR){
@@ -4978,7 +5081,7 @@ map.on('load',function(){makeBadges();setBasemap(0);wpDraw();showTab('map');
 
  
 var YOU=null,youM=null;
-function locateOnce(){
+function locateOnce(cb){
    
   var handle=function(at,acc){
     YOU=at.slice();
@@ -4986,23 +5089,25 @@ function locateOnce(){
     else youM.setLngLat(YOU);
     classifyFix(at);
     if(posMode==='away')showAway(acc); else{posMode='gps';ME=at.slice();mM.setLngLat(ME);paint();syncSafety()}
-    drawCoverage()};
+    drawCoverage();
+    if(cb)try{cb(at)}catch(e){}};
   var done=false,saveWatch=watchId;
   var mode=gpsStart(function(at){
     if(done)return; done=true;
     handle(at,null);
     gpsStop(); watchId=saveWatch;           
-  },function(){ if(!done){done=true; gpsStop(); watchId=saveWatch} });
-  if(!mode)return;
+  },function(){ if(!done){done=true; gpsStop(); watchId=saveWatch; if(cb)try{cb(null,'error')}catch(e){}} });
+  if(!mode){if(cb)try{cb(null,'none')}catch(e){};return}    
    
   setTimeout(function(){ if(!done){done=true; gpsStop(); watchId=saveWatch;
-    stInfo&&0; } },25000);}
+    if(cb)try{cb(null,'timeout')}catch(e){} } },25000);}
 
 function showAway(acc){
   showQuiet('<b>You are about '+Math.round(awayMi)+' mi from '+(BUNDLE.name||'this region')+
     '.</b><br>This download only covers the boxed area — everywhere else is '+
     'deliberately blank, not broken. <b>Planning mode</b> is on: browse, search, '+
-    'tap open ground to set a start, then <b>Return Home</b> or <b>Directions</b>.'+
+    'press and hold a spot for <b>Start here</b> or <b>Directions here</b>, '+
+    'and <b>Set home</b> on the Plan tab.'+
     '<br><br>Tap <b>◉ Locate</b> to jump to your real position, or a chip above to '+
     'jump to the riding area.',
     Math.round(awayMi)+' mi away \u00b7 planning mode')}

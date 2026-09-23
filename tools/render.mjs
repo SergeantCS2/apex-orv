@@ -1431,11 +1431,24 @@ if (zoomed.trails === 0) {
         const services = badges.filter((b) => (S.services || []).includes(b.properties.k)).length;
         /* take 185 · A197 P1 · every stacked place must be one the map would
            draw at this zoom — asked of the app's own gate, per member */
-        let undraw = 0;
+        let undraw = 0; const hiddenIds = new Set();
         badges.forEach((b) => String(b.properties.ids || "").split(",").filter(Boolean)
-          .forEach((id) => { if (S.drawable && S.drawable(+id, zoom) === false) undraw++; }));
+          .forEach((id) => { hiddenIds.add(+id); if (S.drawable && S.drawable(+id, zoom) === false) undraw++; }));
+        /* take 186 · A197 P2 · the other direction too: every place the gate
+           calls drawable is on screen as a pin or inside a badge (missing),
+           and nothing renders that the gate would refuse (extra). Measured
+           on the 185 build before the tile-zoom fix: missing 1 at z11.6, 3 at
+           z13.7, 0 at every integer zoom. */
+        const renderedIds = new Set(pins.map((f) => +f.properties.i));
+        const cvW = m.getCanvas().clientWidth, cvH = m.getCanvas().clientHeight;
+        let missing = 0, extra = 0;
+        (window.POIS ? window.POIS.p : []).forEach((rec, i) => {
+          const q = m.project(rec.p); if (q.x < 40 || q.y < 40 || q.x > cvW - 40 || q.y > cvH - 40) return;
+          const d = S.drawable ? S.drawable(i, zoom) : null; if (d === null) return;
+          if (d && !hiddenIds.has(i) && !renderedIds.has(i)) missing++;
+          if (!d && renderedIds.has(i)) extra++; });
         return { R, badges: badges.length, pins: pins.length, worst: isFinite(worst) ? +worst.toFixed(1) : null,
-                 pairs, biggest, mixed, hidden: S.hidden(), services, undraw,
+                 pairs, biggest, mixed, hidden: S.hidden(), services, undraw, missing, extra,
                  glyph: badges.length ? badges.every((b) => m.hasImage("stk-" + b.properties.k)) : null };
       };
       const floor = await probe([-85.5, 44.8], m.getMinZoom());
@@ -1448,9 +1461,15 @@ if (zoomed.trails === 0) {
       const c10 = await probe([-84.714, 44.661], 10.0);
       const c11 = await probe([-84.714, 44.661], 11.0);
       const c12 = await probe([-84.714, 44.661], 12.0);
+      /* take 186 · the fractional zooms where the gate and the layers used to
+         disagree: a step in a filter takes effect at the next integer */
+      const f107 = await probe([-84.714, 44.661], 10.7);
+      M.apply("outdoors", { silent: true }); await s(300);
+      const f116 = await probe([-84.714, 44.661], 11.6);
+      const f137 = await probe([-83.36, 42.61], 13.7);
       M.apply(was, { silent: true });
       m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
-      return { floor, under, seam, town, c10, c11, c12, minz: m.getMinZoom(), pinFloor: S.floor };
+      return { floor, under, seam, town, c10, c11, c12, f107, f116, f137, minz: m.getMinZoom(), pinFloor: S.floor };
     });
     if (cz.missing) ok(false, "stack hook missing");
     else {
@@ -1471,6 +1490,11 @@ if (zoomed.trails === 0) {
         if (x.badges) ok(x.glyph === true, `every badge at ${z} has its kind's glyph sprite`);
       });
       ok(f.services === 0 && u.services === 0, "services never stack at statewide zoom (Jacob's rule)");
+      [["Camp over Grayling z10.7", cz.f107], ["Outdoors over Grayling z11.6", cz.f116], ["Outdoors over Cass Lake z13.7", cz.f137],
+       ["Camp over Grayling z10", cz.c10], ["Camp over Grayling z11", cz.c11], ["Camp over Grayling z12", cz.c12]].forEach(([w, x]) => {
+        ok(x.undraw === 0 && x.missing === 0 && x.extra === 0,
+           `${w}: the clusterer's gate and the pin layers agree on every place in view (${x.badges} badges, ${x.pins} pins, ${x.undraw} undrawable stacked, ${x.missing} drawable but absent, ${x.extra} drawn but refused)`);
+      });
       ok(e.pairs === 0,
          `at the old z11.4 seam there is no seam: ${e.badges} badges, ${e.pins} lone pins, closest ${e.worst} px, ${e.pairs} violations`);
       ok(t.pairs === 0 && (t.badges + t.pins) >= 4,
@@ -1486,7 +1510,8 @@ if (zoomed.trails === 0) {
       const m = window.map, S = window.__stack, M = window.__mode,
             s = (ms) => new Promise((r) => setTimeout(r, ms));
       const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
-      const kindsOf = (k) => (M.MODES.find((x) => x.k === k) || {}).kinds || [];
+      const kindsOf = (k) => (window.__pins ? window.__pins.eff(k) : null)
+        || (M.MODES.find((x) => x.k === k) || {}).kinds || [];   /* take 186: effective pins */
       const stacksIn = async (mode) => {
         M.apply(mode, { silent: true }); await s(250);
         /* take 185: z10 — below the layers' floor nothing stacks any more */
@@ -1564,6 +1589,75 @@ if (zoomed.trails === 0) {
          `tapping a stack of ${tr.n} lists all ${tr.rows} in a scrollable tray`);
       ok(tr.z1 > tr.z0,
          `and the map moves in toward them (z${tr.z0} -> z${tr.z1}; fitBounds maxZoom ${tr.fitCalled}; trace ${tr.trace})`);
+    }
+  }
+  /* take 186 · A197 P2 · the Pins selector: per mode, remembered, reset. The
+     block resets every mode's choices first and last — the checks above and
+     below assume defaults. */
+  {
+    const p2 = await page.evaluate(async () => {
+      const m = window.map, M = window.__mode, S = window.__stack, P = window.__pins,
+            s = (ms) => new Promise((r) => setTimeout(r, ms));
+      if (!P) return { missing: true };
+      const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
+      const modes = M.MODES.map((x) => x.k); modes.forEach((k) => P.reset(k));
+      const ftxt = (id) => { try { return JSON.stringify(m.getFilter(id)); } catch (e) { return ""; } };
+      const table = M.MODES.every((x) => (x.off || []).every((k) => x.kinds.includes(k))
+        && Object.keys(x.z || {}).every((k) => x.kinds.includes(k) && Number.isInteger(x.z[k]))
+        && !("demote" in x) && !("boost" in x));
+      const effRide = P.eff("ride"), effCamp = P.eff("camp"), effWater = P.eff("water");
+      M.apply("camp", { silent: true }); await s(300);
+      document.getElementById("c-layers").click(); await s(400);
+      const panel = document.getElementById("lyrpanel");
+      /* innerText honours text-transform: the section reads PINS IN CAMP */
+      const sect = /Pins in Camp/i.test(panel.innerText);
+      const rows = [...panel.querySelectorAll("[data-pk]")];
+      const labels = rows.map((r) => r.innerText.trim());
+      const offRows = rows.filter((r) => /Food|Store/.test(r.innerText)).map((r) => r.className.includes(" on"));
+      const accentSw = rows.filter((r) => /226,\s*87,\s*15/.test(getComputedStyle(r.querySelector(".sw")).backgroundColor)).length;
+      const hasReset = !!panel.querySelector("[data-pkreset]");
+      const foodBefore = /"food"/.test(ftxt("poi-dot"));
+      /* toggle Toilets off */
+      const toiletRow = rows.find((r) => r.dataset.pk === "toilet"); if (toiletRow) toiletRow.click(); await s(400);
+      const toiletGone = !/"toilet"/.test(ftxt("poi-dot")) && !P.eff("camp").includes("toilet");
+      const toiletIdx = (window.POIS.p || []).findIndex((r) => r.k === "toilet");
+      const drawableOff = toiletIdx >= 0 ? S.drawable(toiletIdx, 14) : null;
+      let stored = null; try { stored = localStorage.getItem(P.key("camp")); } catch (e) {}
+      P.forget(); const survives = !P.eff("camp").includes("toilet");
+      const outdoorsKeeps = P.eff("outdoors").includes("toilet");
+      /* reset */
+      panel.querySelector("[data-pkreset]").click(); await s(400);
+      const toiletBack = /"toilet"/.test(ftxt("poi-dot")) && P.eff("camp").includes("toilet");
+      let storedAfter = "gone"; try { storedAfter = localStorage.getItem(P.key("camp")); } catch (e) {}
+      /* food on by a tap, and it draws at street zoom over the dense town */
+      const foodRow = [...panel.querySelectorAll("[data-pk]")].find((r) => r.dataset.pk === "food"); if (foodRow) foodRow.click(); await s(400);
+      const foodAfter = /"food"/.test(ftxt("poi-dot"));
+      document.getElementById("c-layers").click(); await s(200);
+      m.jumpTo({ center: [-83.35, 42.66], zoom: 13.4 }); await s(400); S.run();
+      for (let w = 0; w < 40; w++) { if (m.areTilesLoaded()) break; await s(300); }
+      await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]); await s(300);
+      let foodPins = 0; try { foodPins = m.queryRenderedFeatures({ layers: ["poi-dot"] }).filter((f) => f.properties.k === "food").length; } catch (e) {}
+      modes.forEach((k) => P.reset(k));
+      M.apply(was, { silent: true }); m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
+      return { table, effRide, effCamp, effWater, sect, rows: rows.length, campKinds: M.MODES.find((x) => x.k === "camp").kinds.length,
+               labels, offRows, accentSw, hasReset, foodBefore, toiletGone, drawableOff, stored, survives, outdoorsKeeps, toiletBack, storedAfter, foodAfter, foodPins };
+    });
+    if (p2.missing) ok(false, "pins hook missing");
+    else {
+      ok(p2.table, "MODES table: every off/z key is a listed kind, z values are integers, demote and boost are gone");
+      ok(!p2.effRide.includes("food") && !p2.effRide.includes("store") && !p2.effCamp.includes("food") && !p2.effCamp.includes("store"),
+         "food and store are off by default in Off-road and Camp (the maintainer's rule)");
+      ok(p2.effWater.includes("launch") && !p2.effWater.includes("fuel"), "Water's effective pins include launches and never fuel");
+      ok(p2.sect && p2.rows === p2.campKinds && !p2.labels.some((l) => /Fuel/.test(l)),
+         `Layers lists "Pins in Camp": ${p2.rows} rows for ${p2.campKinds} kinds, no Fuel row`);
+      ok(p2.offRows.length === 2 && p2.offRows.every((x) => x === false), "Food and Store rows start off");
+      ok(p2.accentSw === 0 && p2.hasReset, "no pin swatch wears the accent, and a Reset row exists");
+      ok(!p2.foodBefore && p2.toiletGone && p2.drawableOff === false,
+         "switching Toilets off removes toilets from the layer filter, the effective pins and the stack gate");
+      ok(p2.stored === '{"toilet":false}', `the choice is stored as an override (${p2.stored})`);
+      ok(p2.survives && p2.outdoorsKeeps, "the choice survives a kill and is per mode (Outdoors keeps toilets)");
+      ok(p2.toiletBack && p2.storedAfter === null, "Reset restores the defaults and removes the key");
+      ok(p2.foodAfter && p2.foodPins > 0, `Food switched on enters the filter and draws at street zoom (${p2.foodPins} over the dense town)`);
     }
   }
   /* Take 170 · A187 N1 · the follow camera and trip persistence, driven by
@@ -2871,7 +2965,8 @@ if (zoomed.trails === 0) {
     // toggle Places off
     panel.querySelector('[data-lg="0"]').click();
     await sleep(400);
-    const afterPoi = { dot: vis("poi-dot"), label: vis("poi-dot-major") };
+    const afterPoi = { dot: vis("poi-dot"), label: vis("poi-dot-major"),
+                       stack: vis("poi-stack-bg"), stackLbl: vis("poi-stack") };   /* take 186 */
     panel.querySelector('[data-lg="0"]').click();
     await sleep(300);
     // toggle All labels off — must reach the layers the old chip missed
@@ -2887,8 +2982,9 @@ if (zoomed.trails === 0) {
   });
   ok(lyr.opened && lyr.rows >= 4 && lyr.bms === 3,
      `layers panel opens with ${lyr.bms} basemaps and ${lyr.rows} layer groups`);
-  ok(lyr.afterPoi.dot === false && lyr.afterPoi.label === false,
-     "turning Places off hides both the pins and their labels");
+  ok(lyr.afterPoi.dot === false && lyr.afterPoi.label === false
+     && lyr.afterPoi.stack === false && lyr.afterPoi.stackLbl === false,
+     "turning Places off hides the pins, their labels and the stack badges (take 186)");
   ok(lyr.afterLabels.ref === false && lyr.afterLabels.lake === false
      && lyr.afterLabels.poi === false && lyr.afterLabels.trail === false,
      "All labels reaches route numbers, water names and place names — the six "

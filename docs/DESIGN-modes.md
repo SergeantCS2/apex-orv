@@ -24,7 +24,7 @@ table in the app:
 | the mode sets | today's table | mode = a preset over it |
 |---|---|---|
 | which lines draw | `ACTS` (activity selector: orv / dirt / foot / horse / snow / nfs) | a default `act`, plus a whitelist of show-only classes |
-| which pins draw | `POIKIND` (13 kinds) + `pri` rank (take 123) | a kind whitelist and a per-mode rank override |
+| which pins draw | `POIKIND` (19 kinds) + `pri` rank (take 123) | `kinds` the mode can show, `off` off by default, `z` a per-kind tile zoom; the rider's own choices per mode in `apex.pins.<mode>.v1` (take 186, A197 P2) |
 | which layer groups are on | `LYRGROUPS` (places, water, contour, peaks, areas, paddle, relief, labels) | a default on/off set |
 | which basemap | `BASEMAPS` | Map or Hybrid |
 | what the router optimises | six profiles + `MACHINE` | a default profile and machine |

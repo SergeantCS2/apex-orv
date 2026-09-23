@@ -19,6 +19,7 @@ truth this instrument is checked against each take.
   python3 tools/pins_probe.py table        today's rule vs the take-185 rule, five centres
   python3 tools/pins_probe.py calib        the screenshot calibration
   python3 tools/pins_probe.py --rule draw  only the take-185 rule
+  python3 tools/pins_probe.py --off toilet --on food   a rider's choices (take 186)
 """
 import json, math, os, subprocess, sys
 
@@ -57,8 +58,13 @@ process.stdout.write(JSON.stringify({modes:MODES,kinds:POIKIND}));
     out = subprocess.run(["node", "-e", js, os.path.join(ROOT, "src", "app.html")],
                          capture_output=True, text=True, check=True).stdout
     d = json.loads(out)
-    modes = {m["k"]: (m.get("kinds", []), m.get("demote", []), m.get("boost", [])) for m in d["modes"]}
-    kinds = {k: (v.get("r", 9), 1 if v.get("d") else 0) for k, v in d["kinds"].items()}
+    modes = {}
+    for m in d["modes"]:
+        kinds, off, z = m.get("kinds", []), m.get("off", []), m.get("z", {})
+        assert all(k in kinds for k in off), f"{m['k']}: off lists a kind not in kinds"
+        assert all(k in kinds and float(z[k]).is_integer() for k in z), f"{m['k']}: z must name listed kinds with integer zooms"
+        modes[m["k"]] = (kinds, off, z)
+    kinds = {k: (v.get("r", 9), 1 if v.get("d") else 0, v.get("z")) for k, v in d["kinds"].items()}
     return modes, kinds
 
 
@@ -78,33 +84,45 @@ def project(lon, lat, z):
     return x, y
 
 
+ON, OFF = set(), set()   # a rider's choices, from --on / --off (applied to every mode)
+
+
+def effective(mode):
+    kinds, off, z = MODES[mode]
+    return [k for k in kinds if (k in ON) or (k not in off and k not in OFF)]
+
+
 def drawable(rec, mode, z):
-    """Would the pin layers draw this place at zoom z? (modeFilter + base filters)"""
-    kinds, demote, boost = MODES[mode]
+    """Would the pin layers draw this place at zoom z? A transcription of
+    pinDrawable() (take 186): steps in a filter are evaluated at the TILE zoom
+    T = floor(z); the two layer minzooms at the fractional zoom."""
+    kinds, off, ztab = MODES[mode]
     k = rec["k"]
-    if k not in kinds:
+    if k not in effective(mode):
         return False
-    if k in demote and z < 13:
-        return False
+    T = math.floor(z)
     unz = 12 if mode == "water" else 13.5
-    if k in ("launch", "beach") and not rec.get("n") and z < unz:
+    if k in ("launch", "beach") and not rec.get("n") and T < unz:
         return False
-    r, d = POIKIND.get(k, (9, 0))
+    r, d, kz_default = POIKIND.get(k, (9, 0, None))
+    if d and z < PIN_FLOOR:
+        return False
+    if not d and z < 11.4:
+        return False
+    kz = ztab.get(k, kz_default)
+    if kz is not None:
+        return T >= kz
     pri = rec.get("pri", 3)
     if d:
-        if z < PIN_FLOOR:
-            return False
-        if k in boost:
-            return True
-        return pri <= 0 or (z >= 10.5 and pri <= 1) or z >= 11.4
-    return z >= 11.4
+        return pri <= 0 or (T >= 10.5 and pri <= 1) or T >= 11.4
+    return True
 
 
 def restack(mode, z, centre, cw, ch, rule="draw"):
     """rule='kinds': the pre-185 pool (every kind the mode lists, services out
     below 11.4). rule='draw': the take-185 pool (what the layers would draw,
     nothing below the floor)."""
-    kinds, demote, boost = MODES[mode]
+    kinds, off, ztab = MODES[mode]
     R = stack_radius(z)
     cx, cy = project(centre[0], centre[1], z)
     pad = R + 8
@@ -124,7 +142,7 @@ def restack(mode, z, centre, cw, ch, rule="draw"):
             if x < -pad or y < -pad or x > cw + pad or y > ch + pad:
                 continue
             pts.append({"id": i, "x": x, "y": y, "k": k,
-                        "r": POIKIND.get(k, (9, 0))[0] * 10 + rec.get("pri", 3), "rec": rec})
+                        "r": POIKIND.get(k, (9, 0, None))[0] * 10 + rec.get("pri", 3), "rec": rec})
     pts.sort(key=lambda q: q["r"])          # JS sort is stable; ties keep array order
     grid, stacks = {}, []
     for q in pts:
@@ -154,8 +172,9 @@ def restack(mode, z, centre, cw, ch, rule="draw"):
             "maxn": max([len(b["m"]) for b in badges] or [0]), "_badges": badges}
 
 
-def table(rule, modes=("camp", "ride", "water", "outdoors", "hunt"), zooms=(9, 10, 11, 12, 13), cw=412, ch=915):
-    print(f"rule={rule}  viewport {cw}x{ch}, mean over {len(CENTRES)} centres")
+def table(rule, modes=("camp", "ride", "water", "outdoors", "hunt"), zooms=(9, 10, 10.7, 11, 11.6, 12, 13, 13.7), cw=412, ch=915):
+    eff = ", ".join(f"{m}:{len(effective(m))}/{len(MODES[m][0])}" for m in modes)
+    print(f"rule={rule}  viewport {cw}x{ch}, mean over {len(CENTRES)} centres; effective pins {eff}")
     print(f"{'mode':9}{'z':>4} {'pool':>6} {'badges':>7} {'lone':>5} {'markers':>8} {'drawn%':>7} {'ghost':>6} {'maxn':>5}")
     for mode in modes:
         for z in zooms:
@@ -177,7 +196,10 @@ def calib():
 if __name__ == "__main__":
     args = sys.argv[1:]
     rule = args[args.index("--rule") + 1] if "--rule" in args else None
-    what = [a for a in args if not a.startswith("--") and a != rule][:1] or ["table"]
+    if "--on" in args: ON = set(args[args.index("--on") + 1].split(","))
+    if "--off" in args: OFF = set(args[args.index("--off") + 1].split(","))
+    skip = {rule} | (ON or set()) | (OFF or set())
+    what = [a for a in args if not a.startswith("--") and a not in skip and "," not in a][:1] or ["table"]
     if what[0] == "calib":
         calib()
     else:

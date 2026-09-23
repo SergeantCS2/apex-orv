@@ -658,6 +658,62 @@ grab("btn-home").fire("click");
 flushTimeouts();
 ok(/No home set/i.test(grab("panel")._html || ""),
    "Return Home with no home says so instead of routing to a phantom");
+/* take 186 · A200 · one button, three ways. Return home with no home opened
+   the chooser above; each way is executed here, and the block ends with
+   Clear so the older path below starts from no home, as it always did. */
+{
+  const c = manifest.centre || [anchors[0][1], anchors[0][2]];
+  const ls = sandbox.window.localStorage;
+  const home = () => { try { return JSON.parse(ls.getItem("apex.home.v1") || "null"); } catch (e) { return null; } };
+  ok(/hc-me/.test(grab("panel")._html) && /hc-addr/.test(grab("panel")._html) && /hc-tap/.test(grab("panel")._html)
+     && !/hc-clear/.test(grab("panel")._html),
+     "the chooser offers my location, an address and a map tap — and no Clear while there is no home");
+  /* tap the map */
+  grab("hc-tap").fire("click"); flushTimeouts();
+  ok(/Tap the map to place/.test(grab("panel")._html), "Tap the map arms the next map tap");
+  theMap.fire("click", { lngLat: { lng: c[0] + 0.011, lat: c[1] + 0.004 }, point: { x: 300, y: 700 } });
+  flushTimeouts();
+  const h1 = home();
+  ok(!!h1 && Math.abs(h1[0] - (c[0] + 0.011)) < 1e-9 && /Placed/.test(grab("panel")._html),
+     `an armed map tap places home and stores it (${h1 ? h1.map((v) => v.toFixed(3)).join(",") : "null"})`);
+  /* my location, through the same watch a ride uses */
+  grab("c-home").fire("click"); flushTimeouts();
+  ok(/hc-clear/.test(grab("panel")._html), "with a home set the chooser offers Clear home");
+  grab("hc-me").fire("click"); flushTimeouts();
+  if (NO_GPS) {
+    /* the simulator path has no receiver: the card must say THAT, not "no fix" */
+    ok(/no GPS receiver/.test(grab("panel")._html) && home() !== null && Math.abs(home()[0] - (c[0] + 0.011)) < 1e-9,
+       "with no receiver, Use my location says so and leaves home as it was");
+  } else {
+    ok(/Waiting for a GPS fix/.test(grab("panel")._html) && typeof geo.cb === "function",
+       "Use my location asks the receiver and says it is waiting");
+    geo.cb && geo.cb({ coords: { longitude: c[0] + 0.02, latitude: c[1] - 0.01, accuracy: 6 } });
+    flushTimeouts();
+    const h2 = home();
+    ok(!!h2 && Math.abs(h2[0] - (c[0] + 0.02)) < 1e-9 && /Home is where you are/.test(grab("panel")._html),
+       "the first fix becomes home and the card says so");
+  }
+  /* an address, through the offline geocoder */
+  const g = sandbox.window.__geo;
+  const seg = g && g.ADDR ? (g.ADDR.segs.find((x) => x[0] === 0) || g.ADDR.segs[0]) : null;
+  const rev = seg ? g.addressAt([(seg[1] + seg[3]) / 2, (seg[2] + seg[4]) / 2]) : null;
+  if (rev) {
+    grab("c-home").fire("click"); flushTimeouts();
+    grab("hc-addr").fire("click"); flushTimeouts();
+    ok(/Type the address/.test(grab("panel")._html), "Type an address opens the search armed for home");
+    const q2 = grab("q"); q2.value = rev.n + " " + rev.street; q2.fire("input"); flushTimeouts();
+    const hits = documentStub.querySelectorAll(".hit");
+    ok(hits.length > 0, `the typed address returns ${hits.length} hit(s)`);
+    if (hits.length) { hits[0].fire("click"); flushTimeouts(); }
+    const h3 = home();
+    ok(!!h3 && /Home set/.test(grab("panel")._html) && !/Dropped pin/.test(grab("panel")._html),
+       `the tapped hit becomes home, and no pin is dropped (${h3 ? h3.map((v) => v.toFixed(3)).join(",") : "null"})`);
+  } else ok(false, "no address in the index to set home by");
+  /* clear */
+  grab("c-home").fire("click"); flushTimeouts();
+  grab("hc-clear").fire("click"); flushTimeouts();
+  ok(home() === null && /Home cleared/.test(grab("panel")._html), "Clear home removes it from storage and says so");
+}
 {
   /* the rider's path: press-and-hold a spot a few km out, "Make this home" */
   const c = manifest.centre || [anchors[0][1], anchors[0][2]];

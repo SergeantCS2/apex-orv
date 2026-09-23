@@ -188,6 +188,13 @@ routing, the machine button.
   history entry the app keeps, which nothing off a phone can test.
 - A tap outside the Mode, Activity or Layers panel should close it, and
   Layers now has a Done row.
+- **Pins you choose** (take 186): Layers → "Pins in <mode>". Restaurants
+  and stores start off in Off-road and Camp; switch Toilets off, kill the
+  app, reopen — still off? Reset restores the mode's defaults. Water's
+  list has no Fuel row. Switch Restaurants on: they appear at street zoom.
+- **Set home** (take 186): Plan → Set home offers Use my location, Type an
+  address, Tap the map, and Clear home once set. Try each. Kill and reopen:
+  does the map open at home? Return home with no home opens the chooser.
 - The sheet offers three sizes: THIS VIEW, your county by name, and THE
   WHOLE STATE (~179 MB). Does the county named match where the map is
   centred? Save your county on wifi. After sixty tiles the sheet should

@@ -9,6 +9,14 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 
 ## Downloaded to the device
 
+### USFS forest boundaries (Camp mode, take 174 · A186)
+
+- **Host** `apps.fs.usda.gov`
+- **Provides** administrative boundaries of Michigan's three national forests (Ottawa, Hiawatha, Huron-Manistee) from the Enterprise Data Warehouse layer `EDW_ForestSystemBoundaries_01/MapServer/0`, generalised to ~60 m — 23 KB; build time, cached as nf_cache.json
+- **Licence** US federal government work, public domain
+- **Fetched by** `nf.py`
+- **Refresh** rarely; forest boundaries do not move
+
 ### Geofabrik OpenStreetMap extract
 
 - **Host** `download.geofabrik.de`
@@ -52,10 +60,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### Michigan DNR ORV Scramble Areas
 
 - **Host** `services3.arcgis.com`
-- **Also provides (take 151, A169)** `DNR_State_Sponsored_Developed_
-  Boating_Access_Sites_Public_View` — 1,325 in-state boat ramps, fetched
-  by `bas.py`, merged into launches and corridor accesses. State-sponsored
-  only; county/township ramps are in neither this layer nor OSM.
+- **Also provides (take 151, A169)** `DNR_State_Sponsored_Developed_Boating_Access_Sites_Public_View` — 1,325 in-state boat ramps, fetched by `bas.py`, merged into launches and corridor accesses. State-sponsored only; county/township ramps are in neither this layer nor OSM.
 - **Provides** Designated open-riding area polygons (Silver Lake, St. Helen, Holly Oaks, The Mounds, Bull Gap Hill Climb…) — the DNR publishes these on ArcGIS Online, not in its trails MapServer
 - **Licence** Public domain (State of Michigan open data)
 - **Fetched by** `areas.py`
@@ -90,21 +95,16 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 - **Host** `basemap.nationalmap.gov`
 - **Provides** Satellite basemap. NAIP-derived
 - **Licence** Public domain (US Government work)
-- **Fetched by** `imagery.py` (pipeline) and **in-app** by the HD save
-  flow (take 145, A160) — user tap only, never at boot or idle
+- **Fetched by** `imagery.py` (pipeline) and **in-app** by the HD save flow (take 145, A160) — user tap only, never at boot or idle
 - **Refresh** when NAIP re-flies, every 2-3 years
 - **Note** Landmine 22 — Esri, Google, Bing and Mapbox imagery are licensed and may NOT be redistributed offline. This one may.
 
 ### USGS Water Services (NWIS)
 
 - **Host** `waterservices.usgs.gov`
-- **Provides** Gauge site inventory at build (241 MI surface-water sites,
-  22 KB) and LIVE instantaneous values (flow 00060, stage 00065, water
-  temp 00010) fetched **in-app** on a user tap (take 150, A164)
+- **Provides** Gauge site inventory at build (241 MI surface-water sites, 22 KB) and LIVE instantaneous values (flow 00060, stage 00065, water temp 00010) fetched **in-app** on a user tap (take 150, A164)
 - **Licence** Public domain (US Government work)
-- **Fetched by** `gauges.py` (inventory) and the river card's conditions
-  button — §8 in-app rules: tap only, never at boot or idle, never
-  load-bearing; stale values are never shipped (ruled out in AGENDA)
+- **Fetched by** `gauges.py` (inventory) and the river card's conditions button — §8 in-app rules: tap only, never at boot or idle, never load-bearing; stale values are never shipped (ruled out in AGENDA)
 - **Refresh** inventory each build; values are always live or absent
 
 ### US Census cartographic boundary files
@@ -146,49 +146,28 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 - **Host** `unpkg.com`
 - **Provides** Renderer, vendored into the bundle at build time
 - **Licence** BSD 3-Clause
-- **Fetched by** `.github/workflows/build.yml`
+- **Fetched by** `ci/bundle.sh`
 - **Refresh** on version bump
 
-## Imagery size budget — measured
+### bundletool (google/bundletool releases)
 
-Per-region download sizes, measured at take 10 over the
-1,060 km2 Bull Gap / Mio / Rose City AOI. Statewide figures extrapolate by area
-and are shown to rule statewide OUT, not to plan for it.
+- **Host** `github.com`
+- **Provides** Google's app-bundle tool: validates the Play AAB and derives the universal APK android_check audits. Pinned by version and sha256 in ci/apk.sh; runs on the CI runner only (take 154).
+- **Licence** Apache 2.0
+- **Fetched by** `ci/apk.sh`
+- **Refresh** on version bump (BT_VER in ci/apk.sh)
 
-| zoom | m/px | tiles | AOI | statewide |
-|---|---|---|---|---|
-| z12 | 27.02 | 10,573 | 104 MB | 0.1 GB |
-| z13 | 13.51 | 41,904 | 400 MB | 0.2 GB |
-| z14 | 6.75 | 167,228 | 1834 MB | 0.9 GB |
-| z15 | 3.38 | 668,050 | 10024 MB | 4.9 GB |
-| z16 | 1.69 | 2,667,378 | 38344 MB | 18.9 GB |
-
-**z16 (1.7 m/px) is the useful ceiling: 159 MB for a riding area.**
-That is one wifi download the night before. Statewide at the same
-zoom is 36.6 GB, which settles it — imagery is per-region, always.
-z12-13 are cheap enough to ship with the app as a fallback.
-
-## The invariant
-
-After provisioning completes and verifies, the app must be **provably**
-complete. The test is a cold start in airplane mode: every layer the
-region claims to have renders, and the NET badge stays green.
-
-Nothing in the field may wait on a network call — not a font, not a
-glyph range, not a tile, not a licence check.
+## Vendored — committed, never fetched
 
 ### acorn (vendored, not fetched)
 
 - **File** `tools/vendor/acorn.mjs` — one generated ESM build, unmodified
-- **Provides** the JavaScript parser tools/scrub.mjs uses to remove
-  comments from the release artifact without mistaking a regex literal
-  for a division (take 164, A181)
+- **Provides** the JavaScript parser tools/scrub.mjs uses to remove comments from the release artifact without mistaking a regex literal for a division (take 164, A181)
 - **Licence** MIT, text retained at the head of the vendored file
-- **Fetched by** nobody at build time — it is committed, because the data
-  pipeline runs before `npm ci` and must not depend on it
+- **Fetched by** nobody at build time — it is committed, because the data pipeline runs before `npm ci` and must not depend on it
 - **Refresh** only if the parser needs updating; it is a pinned copy
 
-### Citation-only hosts (displayed, never fetched)
+## Citation-only hosts (displayed, never fetched)
 
 Play's Misleading Claims policy requires an app that presents government
 information to link the official source. Six hosts therefore appear in the
@@ -208,13 +187,31 @@ reachable from inside the app as well as from the listing.
   www.usgs.gov answers 503 to automated requests, which is why the USGS
   citations use apps.nationalmap.gov and waterdata.usgs.gov.
 
-### USFS forest boundaries (Camp mode, take 174 · A186)
+## Imagery size budget — measured
 
-- **Host** `apps.fs.usda.gov` — Enterprise Data Warehouse, layer
-  `EDW_ForestSystemBoundaries_01/MapServer/0`
-- **Fetched by** `tools/nf.py`, build time, cached as `nf_cache.json`
-- **What** administrative boundaries of Michigan's three national forests
-  (Ottawa, Hiawatha, Huron-Manistee), generalised to ~60 m — 23 KB
-- **Licence** US federal government work, public domain
-- **Refresh** rarely; forest boundaries do not move
+Per-region download sizes, measured at take 10 over the
+1,060 km2 Bull Gap / Mio / Rose City AOI. Statewide figures extrapolate by area
+and are shown to rule statewide OUT, not to plan for it.
 
+| zoom | m/px | tiles | AOI | statewide |
+|---|---|---|---|---|
+| z12 | 27.02 | 10,573 | 104 MB | 0.1 GB |
+| z13 | 13.51 | 41,904 | 400 MB | 0.2 GB |
+| z14 | 6.75 | 167,228 | 1834 MB | 0.9 GB |
+| z15 | 3.38 | 668,050 | 10024 MB | 4.9 GB |
+| z16 | 1.69 | 2,667,378 | 38344 MB | 18.9 GB |
+
+**Measured at take 10, before the state was the region.** The rows say
+what a riding-area box costs per zoom; z16 over that one AOI is 38 GB,
+which settled it — full-sharpness imagery is per area, on a rider's own
+tap (the HD saves, A160/A190), never shipped. The statewide bundle
+carries z10–12 with z13–15 patches over the riding areas.
+
+## The invariant
+
+After provisioning completes and verifies, the app must be **provably**
+complete. The test is a cold start in airplane mode: every layer the
+region claims to have renders, and the NET badge stays green.
+
+Nothing in the field may wait on a network call — not a font, not a
+glyph range, not a tile, not a licence check.

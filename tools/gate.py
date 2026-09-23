@@ -900,6 +900,24 @@ def check_provision():
                      ", ".join(f"{h} in {sorted(found[h])[0]}" for h in undeclared))
     if not os.path.exists(os.path.join(ROOT, "docs", "PROVISION.md")):
         fails.append("docs/PROVISION.md missing — run tools/manifest.py")
+    else:
+        # take 186 · A204: the document IS the render. Hand-appended sections
+        # had drifted from manifest.py for ~40 takes and a regeneration would
+        # have deleted the in-app declarations §8's allowlist cites.
+        try:
+            want = m.render()
+            have = open(os.path.join(ROOT, "docs", "PROVISION.md"), encoding="utf-8").read()
+            if want != have:
+                wl, hl = want.splitlines(), have.splitlines()
+                i = next((n for n in range(max(len(wl), len(hl)))
+                          if n >= len(wl) or n >= len(hl) or wl[n] != hl[n]), 0)
+                fails.append(f"docs/PROVISION.md is not manifest.py's render (first difference at "
+                             f"line {i + 1}: {(hl[i] if i < len(hl) else '<end>')[:60]!r} vs "
+                             f"{(wl[i] if i < len(wl) else '<end>')[:60]!r}) — run tools/manifest.py (A204)")
+            else:
+                notes.append("PROVISION.md equals manifest.py's render (A204)")
+        except Exception as e:
+            fails.append(f"manifest.render() failed: {e}")
     # A source declared but never reached means a pipeline step disappeared.
     # This exact signal showed up at take 12 (hosts fell 6 -> 5) and was read
     # past; take 13 found the cause was a silently reverted fetch. Now it fails.

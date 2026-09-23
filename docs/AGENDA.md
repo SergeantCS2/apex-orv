@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 185.* Ranked by blocking-ness, not by interest.
+*Current as of take 186.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -3492,7 +3492,7 @@ one gate check:
   the sum of rows across 83 county files, printed by the step, and the
   shipped `n` must equal it.
 
-## A197 — Pins: density, mode relevance, stability across zoom · DESIGNED take 184 on measurement · P1 BUILT take 185 (P2 186 · P3 187 if needed)
+## A197 — Pins: density, mode relevance, stability across zoom · DESIGNED take 184 on measurement · P1 BUILT take 185 · P2 BUILDING take 186 (P3 187 if needed)
 The maintainer, 2026-09-23, with five desktop screenshots in Camp at the
 2-, 3- and 5-mile scales: "every zoom, the pins change, every zoom the pins
 shift … a ton of pins, many of which aren't important to the mode we're
@@ -3566,7 +3566,7 @@ Design, in the order the measurement dictates:
   Fold's inner-screen CSS viewport (from the diagnostics card) so N and the
   harness viewport are measured, not guessed. Q4 any manifest row to flip.
 
-## A198 — CI wipes its restored cache every run; the A191 fallback is unreachable there · FOUND take 183 · SHIPPED take 185
+## A198 — CI wipes its restored cache every run; the A191 fallback is unreachable there · FOUND take 183 · SHIPPED take 185 · MEASURED run 86
 PROVEN from CI run 84's bundle log and tools/region.py: actions/cache
 restored the 892 MB region-michigan-v3 snapshot ("Cache hit … not saving
 cache" — an exact-key hit is never re-saved), then ensure_workspace() saw no
@@ -3600,7 +3600,7 @@ to do.
 - **Ruled out:** leaving it until the UI overhaul (A203) — a wrong place
   name on first open is exactly the kind of answer this app must not give.
 
-## A200 — Setting home is hard to find and slow · OPEN (design first)
+## A200 — Setting home is hard to find and slow · DESIGNED 2026-09-23 · BUILDING take 186
 The maintainer, 2026-09-23: "I wanted to plan a ride, I had to long press
 my location, set it as a home, then press a location, and click return
 home. It was awful … make it a button — such as set current location to
@@ -3638,7 +3638,7 @@ design exists.
   have landed — those are the overhaul's first two pieces and they will
   teach the rest.
 
-## A204 — docs/PROVISION.md no longer regenerates from tools/manifest.py · FOUND take 184 · small
+## A204 — docs/PROVISION.md no longer regenerates from tools/manifest.py · FOUND take 184 · BUILDING take 186
 PROVEN at take 184: `python3 tools/manifest.py` rewrites docs/PROVISION.md
 without the NWIS in-app section, the citation-only hosts, the acorn and
 USFS-boundary sections and the in-app roles on the imagery and DNR entries
@@ -3664,3 +3664,38 @@ false. Fix: every mode names forest, as every mode already named public.
 The check now prints its three values (landmine 55).
 - **Ruled out:** treating an unnamed group as off — Lakes & rivers and
   Labels are unnamed on purpose and follow the rider's toggle.
+
+## A206 — A visual QA loop the builder runs before a take is sealed · BUILT take 186
+The maintainer, 2026-09-23: "add a way for you to directly test these new
+features and bug fixes … screenshot testing and browser testing. I will
+look at your findings directly in screenshots and in app." What ships:
+`node tools/probe.mjs take` walks the scenes a take changed — the
+first-open card, Camp at the 5-, 3- and 2-mile scales over the Grayling
+anchor, Layers → Pins in <Mode>, the Set home card — on the harness's
+phone viewport (412×915 at 2×), writes PNGs to `$APEX_SHOTS` or
+`~/apex-shots/t<take>/` (outside the repo; the old sandbox path is gone),
+and the builder sends them into the chat before the seal. Each take adds
+the scenes it changed. Not a check: the harness asserts, the probe shows.
+- **Ruled out:** an Android emulator as the first step — the Windows SDK
+  has one and adb can drive it, but the browser loop is minutes per take
+  and catches what the maintainer's five screenshots showed; the emulator
+  is the second phase, for the WebView-only questions (A183, A193).
+- **Ruled out:** screenshots inside the repo or the gate — they are for
+  eyes, not for diffing; a pixel assertion would be landmine 54's shape.
+
+## A207 — CI's bundle job still rebuilds the state every run: the compute steps never skip · FOUND take 186 (run 86) · OPEN, design first
+After A198, run 86 (take 185) restored the v4 cache, recognised the
+workspace from region_stamp.json and skipped the ingest stream (392 s →
+17.5 s, PROVEN in the log) — and the bundle job still took 47 min (55
+before): graph 414 s, corridor 328 s, landcover 92 s, poi 78 s, pack 76 s,
+contour 61 s run on every build because no step skips when its payload is
+present. The workflow's "cached ~10–15 min" comment has never been true
+for the same reason. Design questions: which steps may skip on a cache
+hit, and on what evidence — a payload that exists is exactly what hides a
+broken producer (landmine 32, PROTOCOL §6b), so a skip must key on an
+input hash (the extract's date, the tool's own source, regions.json), not
+on existence; and CI's cache is never re-saved after a hit (landmine 220),
+so a per-step stamp only helps once the key changes.
+- **Ruled out:** skipping on "payload exists" — the clean-run rule exists
+  because artifacts on disk hid four broken steps at take 13.
+- **Ruled out:** doing it inside take 186 — three items are already in it.

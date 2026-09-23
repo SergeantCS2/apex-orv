@@ -215,6 +215,8 @@
     max-height:70vh;overflow-y:auto}
   #lyrpanel[hidden]{display:none}
   
+  #lyrpanel [data-lyrdone]{position:sticky;bottom:-6px;background:rgba(24,22,18,.98)}
+  
   
   #cmppanel{position:absolute;left:11px;right:11px;bottom:calc(var(--strip-h,64px) + 8px);z-index:6;
     background:rgba(24,22,18,.96);border:1px solid rgba(255,255,255,.22);
@@ -477,7 +479,7 @@
 <div id="shell">
   
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 185</span>
+    <span id="title"><b>APEX</b> ORV · Take 186</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -553,7 +555,7 @@
       <div id="hits"></div>
     </div>
     
-    <div id="panel">Waiting for a GPS fix. To plan a ride: <b>Set home</b> (Plan) and tap the map to place the truck; then tap where you'll start and <b>Return home</b>.</div>
+    <div id="panel">Waiting for a GPS fix. To plan a ride: <b>Set home</b> (Plan) — your location, an address, or a tap on the map; then press and hold where you want to go and tap <b>Directions here</b>.</div>
     <div id="grid">
       <div class="cell"><div class="k">To truck</div><div class="v" id="v-truck">—</div></div>
       <div class="cell"><div class="k">Recorded</div><div class="v" id="v-rec">—</div></div>

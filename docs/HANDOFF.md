@@ -1,4 +1,163 @@
-# HANDOFF — through Take 185 · V3
+# HANDOFF — through Take 186 · V3
+
+## Take 186 — 2026-09-23 — the Pins selector (A197 P2), Set home in one button (A200), PROVISION regenerates faithfully (A204)
+
+Takes 184 and 185 sealed: 184 = commit 8cee217, CI run 85 green on the cold
+v4 cache (bundle 64 min; all 83 counties fetched on GitHub's IP with no
+retry; "Cache saved with key: region-michigan-v4"), tagged t184 and pushed
+— the first pushed tag, and it started no run (branches: [main] holds,
+PROVEN). 185 = commit 9b27efb, pushed as run 86. Run 86's bundle job PROVED A198:
+"Cache hit for region-michigan-v4", "workspace michigan recognised from
+region_stamp.json (A198)", "osm: aoi.json present, skipping fetch", ingest
+392 s → 17.5 s — and the job still took 47 min (55 before), because graph
+(414 s), corridor (328 s), landcover, poi, pack and contour rebuild on
+every run; no step skips on a cached payload, and must not without an
+input hash (landmine 32). Filed as A207. Run 86's verdict and the t185
+tag are at this take's seal.
+
+A197 P2 — the Pins selector. The maintainer's decisions: stores off by
+default in Off-road and Camp, as restaurants; a switched-on kind draws
+from where it draws today (z13); one button, three choices, for home.
+What ships: MODES keeps `kinds` (what a mode CAN show, in selector order)
+and gains `off` (off by default) and `z` (a per-kind TILE zoom that
+replaces demote and boost — boost is z:9, demote z:13); the rider's
+choices are OVERRIDES per mode under apex.pins.<mode>.v1 (defaults reach
+everyone who never touched a kind; storage unavailable → defaults every
+launch); modeNow() is the mode with those choices applied and is what
+modeFilter, the clusterer and the harness hook read; repin() is the one
+re-apply for a mode change and a pin switch. Layers → "Pins in <Mode>":
+one row per listed kind, the swatch in the KIND's colour (never the
+accent), Food and Store hollow by default, "Reset to <Mode> defaults",
+Done sticky at the bottom of a panel that is long now. Absent kinds are
+not offered — Water lists no Fuel. Places off now hides the stack badges
+too. The tour's Layers step names it; the self-test's PINS line says what
+this rider has switched.
+
+The finding under it, PROVEN before the change: MapLibre evaluates filter
+STEPS per tile at the integer zoom (www/vendor: covering zoom floor(z),
+worker filters with the tile zoom) while a layer's minzoom is fractional
+— so a step at 10.5 acts at 11, 11.4 at 12, 13.5 at 14 — and pinDrawable
+compared the fractional zoom. Measured on the 185 build with a
+differential driver: at z11.6 in Outdoors the clusterer counted a livery
+the layer did not draw; at z13.7 three unnamed launches and a beach; 0 at
+every integer zoom. pinDrawable now uses T = floor(z) for every step
+comparison and the fractional zoom for the two layer minzooms; the harness
+probes z10.7, 11.6 and 13.7 and asserts, per place in view, undrawable
+stacked = 0, drawable-but-absent = 0, drawn-but-refused = 0. The
+landmine-52 comment above modeFilter was wrong (52 is a property-
+expression rule; nested filter steps have shipped since 174) — corrected.
+Per-kind z values are whole numbers for the same reason.
+
+A200 — Set home. One button on the Plan tab opens a card: Use my location
+(the one-shot locate, with a callback that says WHY when it cannot — no
+receiver, no fix in 25 s, error), Type an address (the search is armed:
+the hit you tap becomes home, no pin drops), Tap the map (the arm, with
+its highlight now cleared by a tab change), and Clear home once one is
+set (HOME=null paths that existed and were never reachable). Return home
+with no home opens the same card. Found and fixed on the way: HOME was
+declared seven hundred lines after the map constructor that reads it, so
+a saved home never opened the map (hoisted undefined); it is loaded
+before the map now. Three false texts corrected: the first-open card,
+classifyFix's away banner and showAway all told the rider to "tap open
+ground" to set a start — an open-ground tap folds the drawer (take 36);
+they name the controls that exist. pc-start refused to move the start
+whenever posMode was gps, even after the one-shot locate had stopped
+watching; it refuses only while a watch is live. The chips carry ids so
+the smoke harness presses them: every path executes headlessly, and the
+simulator pass caught the "no fix in 25 s" wording on a phone that has
+no receiver at all (fixed: it says that).
+
+A204 — PROVISION regenerates faithfully. manifest.py's SOURCES gained
+`also` (the DNR ArcGIS boating-access note), `inapp` (the imagery and
+NWIS in-app roles §8's allowlist cites), `file`/`filenote` for the
+vendored acorn (no host; declared_hosts skips it), plain phase names
+(provision / build / vendored / citation), and the citation hosts render
+as one section from CITATION_NOTE. The budget table is frozen in the file
+(imagery_budget.json is gitignored and rewritten per run, so a render
+that read it changed with the workspace) and its closing sentence no
+longer contradicts its own rows. Corrected on the record: NWIS is 241
+sites (HANDOFF 150/179), not the sourceless 1,332 the table carried;
+MapLibre is fetched by ci/bundle.sh, not a workflow file that does not
+exist. The regenerated document differs from the hand-kept one only in
+reflowed bullets, the NWIS and USFS-boundary entries moving into the
+provision section, the bundletool section (the file was the stale side),
+and the vendored/citation sections becoming their own headings. Gate:
+check_provision now fails unless render() equals the file (control: a
+hand-added line is refused with its line number).
+
+A206 — the visual QA loop the maintainer asked for this take: `node
+tools/probe.mjs take` shoots the scenes a take changed on the harness's
+phone viewport into ~/apex-shots/t<take>/, and the builder sends them into
+the chat before the seal. Its first run caught its own defect: the
+first-open scene shot a folded drawer (a peek click toggles whatever it
+finds); it unfolds through the app's rail hook now.
+
+MEASURED:
+- Smoke 319 across 5 passes (300 + the Set home paths; the simulator pass
+  refused two lines on the first run — right — and 0 after the fix).
+- tools/pins_probe.py on the 186 tables (phone, five anchor centres, the
+  rider at defaults): Camp z9 0 markers, z10 10.4, z10.7 6.6, z11 6.4,
+  z11.6 3.8, z12 3.8, z13 4.2, z13.7 2.2 — 100% drawable, 0 ghosts at
+  every row; Off-road z10 11.6 … z13 6.8. With Food switched on: Camp z13
+  4.2 → 10.4, Off-road 6.8 → 11.4 — the switch is visible and bounded.
+- The fractional control on the 185 build (before the fix): missing 0 /
+  0 / 0 at z11, 12, 14; 1 at z11.6 (a livery), 3 at z13.7 (two unnamed
+  launches, a beach); extra 0 everywhere. After the fix the harness asserts
+  0/0/0 at those zooms (its lines are in the render log).
+- Render 306/0 (second pass, after the Water filter fix); gate 43/0 in
+  426 s. ci/apk.sh green on the 186 artifacts
+  (versionCode 186, kept classes 7/7, mapping ok, alignment verified).
+- Visual QA (A206): six scenes — first-open card, Camp at 5/3/2 mi over
+  Grayling, Layers → Pins in Camp, the Set home card — sent to the
+  maintainer before the seal. Camp at 5 mi is a quiet map; at 3 mi four
+  glyph badges and a dozen pins; at 2 mi two badges.
+
+AUDIT (§0.3), the diff read cold, and what the harness refused first:
+- The first render refused four lines. Three were one defect: Water's
+  three z-kinds all sit at 9, so the per-kind step I built had no stops —
+  an invalid expression MapLibre refuses whole ("filter[2][2][1][3]:
+  Expected at least 4 arguments"), read verbatim off the self-test's
+  no-map-errors line; setFilter threw inside its try, the layer kept the
+  previous mode's filter, the stack exclusion never applied — 19 overlaps
+  at the seam and no unnamed launch for the paddler. No stops → the plain
+  membership test. The fourth was the harness's own: innerText honours
+  text-transform, and the section reads PINS IN CAMP. The second render:
+  seam 0 violations at 185's numbers, 13 unnamed launches in Water.
+- Read in the diff before any run: the address path opened the search
+  box with class `open` while the toggle uses `on` (the smoke stub sees no
+  CSS, so only a reader catches it) — fixed. The simulator pass caught the
+  "no fix in 25 s" wording on a phone with no receiver — the callback
+  says why, the card says that.
+- pinDrawable and modeFilter mirror each other in the same order (kinds →
+  unnamed → floors → z → tiers); the harness asks both directions per
+  place at three fractional and three integer zooms, so a divergence is
+  a red line, not a suspicion. repin() captures the base filter only
+  while no stack pass has hidden members. Food/Store rows are hollow by
+  default and the swatch is the kind's colour; no row wears the accent.
+  HOME is read before the map; the four A200 chips carry ids so the smoke
+  harness presses them. manifest.py's declared set is unchanged (22
+  hosts, all reached); the gate compares the render to the file.
+- Left as found, recorded: "All labels off" hides the stack count but
+  leaves the badge circle (labelLayers is every symbol layer; pre-existing
+  since 169). The Places toggle now hides the badges, which is the case
+  that mattered.
+
+SEAL: gate PASSED, 43 checks — the 42 plus PROVISION-equals-render — with
+smoke 319 across 5 passes and render 306/0 inside it (426 s); ci/apk.sh
+green on the 186 artifacts; six visual-QA scenes sent to the maintainer
+before this line was written. Take 185: CI run 86 green, release take-86,
+tagged t185 and pushed (no run started). Sealed as a commit on main on
+the maintainer's go; t186 tagged and pushed once CI is green. Not
+promoted to Play: the A183 device check is open; this build is the Play
+candidate once it passes. Field: Layers → Pins in Camp (Toilets off, kill,
+reopen, Reset; Restaurants on at street zoom; no Fuel row in Water); Set
+home each of the three ways and Clear; kill and reopen — the map opens at
+home; plan a ride in two actions. DEFERRED: A197 P3 and the per-kind zoom
+retune (after the field verdict); A207 (CI compute steps never skip);
+A201's fix once the COMPASS number is in; A202; the "All labels" badge
+circle; the NEW-CHAT-BRIEF rewrite; PROTOCOL §0.4/§0.5 wording; README/
+TESTING/A180 identity claim; root apex.yml; DEV_CN by fingerprint; the
+A183 device check.
 
 ## Take 185 — 2026-09-23 — the first bundled take: pins P1 (A197), CI keeps its cache (A198), the first-open text (A199), a compass readback (A201)
 

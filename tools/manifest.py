@@ -7,7 +7,7 @@ wifi on and dies at Mack Lake.
 
 The gate refuses any host appearing in tools/ that is not declared here.
 """
-import json, os, re, sys
+import os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -15,11 +15,14 @@ ROOT = os.path.dirname(HERE)
 SOURCES = [
     {
         "host": "apps.fs.usda.gov",
-        "name": "USFS Enterprise Data Warehouse — forest boundaries",
-        "what": "administrative boundaries of the three Michigan national forests (Ottawa, Hiawatha, Huron-Manistee)",
-        "licence": "US federal government work — public domain",
+        "name": "USFS forest boundaries (Camp mode, take 174 · A186)",
+        "what": "administrative boundaries of Michigan's three national forests "
+                "(Ottawa, Hiawatha, Huron-Manistee) from the Enterprise Data "
+                "Warehouse layer `EDW_ForestSystemBoundaries_01/MapServer/0`, "
+                "generalised to ~60 m — 23 KB; build time, cached as nf_cache.json",
+        "licence": "US federal government work, public domain",
         "tool": "nf.py",
-        "phase": "provision (build-time fetch, cached as nf_cache.json)",
+        "phase": "provision",
         "refresh": "rarely; forest boundaries do not move",
     },
     # take 167 · A184 · CITATION-ONLY hosts. Play's Misleading Claims policy
@@ -36,7 +39,52 @@ SOURCES = [
         "what": "official agency page for the trail, closure, state-land and boating-access data",
         "licence": "n/a — cited, not fetched",
         "tool": "play_assets.py listing and the app's Data sources panel",
-        "phase": "citation (displayed to the rider; never requested)",
+        "phase": "citation",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
+        "host": "gis-midnr.opendata.arcgis.com",
+        "name": "Michigan DNR open data (citation)",
+        "what": "public portal for the GIS layers the pipeline ingests",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
+        "host": "data.fs.usda.gov",
+        "name": "USDA Forest Service geodata (citation)",
+        "what": "official source for national forest roads and trails",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
+        "host": "apps.nationalmap.gov",
+        "name": "USGS The National Map (citation)",
+        "what": "official source for satellite imagery and elevation",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
+        "host": "waterdata.usgs.gov",
+        "name": "USGS water data (citation)",
+        "what": "official source for the live river gauge readings",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
+        "host": "www.openstreetmap.org",
+        "name": "OpenStreetMap copyright page (citation)",
+        "what": "licence and attribution for OSM-derived roads, places and context",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation",
         "refresh": "re-check the link still resolves before each submission",
     },
     {
@@ -46,67 +94,8 @@ SOURCES = [
         "what": "the app's own Pages site: privacy.html, written by play_assets.py and deployed by the pages job",
         "licence": "n/a — cited, not fetched",
         "tool": "the app's Data sources panel (PRIVACY_URL)",
-        "phase": "citation (displayed to the rider; never requested)",
+        "phase": "citation",
         "refresh": "re-check the link still resolves before each submission",
-    },
-    {
-        "host": "gis-midnr.opendata.arcgis.com",
-        "name": "Michigan DNR open data (citation)",
-        "what": "public portal for the GIS layers the pipeline ingests",
-        "licence": "n/a — cited, not fetched",
-        "tool": "play_assets.py listing and the app's Data sources panel",
-        "phase": "citation (displayed to the rider; never requested)",
-        "refresh": "re-check the link still resolves before each submission",
-    },
-    {
-        "host": "data.fs.usda.gov",
-        "name": "USDA Forest Service geodata (citation)",
-        "what": "official source for national forest roads and trails",
-        "licence": "n/a — cited, not fetched",
-        "tool": "play_assets.py listing and the app's Data sources panel",
-        "phase": "citation (displayed to the rider; never requested)",
-        "refresh": "re-check the link still resolves before each submission",
-    },
-    {
-        "host": "apps.nationalmap.gov",
-        "name": "USGS The National Map (citation)",
-        "what": "official source for satellite imagery and elevation",
-        "licence": "n/a — cited, not fetched",
-        "tool": "play_assets.py listing and the app's Data sources panel",
-        "phase": "citation (displayed to the rider; never requested)",
-        "refresh": "re-check the link still resolves before each submission",
-    },
-    {
-        "host": "waterdata.usgs.gov",
-        "name": "USGS water data (citation)",
-        "what": "official source for the live river gauge readings",
-        "licence": "n/a — cited, not fetched",
-        "tool": "play_assets.py listing and the app's Data sources panel",
-        "phase": "citation (displayed to the rider; never requested)",
-        "refresh": "re-check the link still resolves before each submission",
-    },
-    {
-        "host": "www.openstreetmap.org",
-        "name": "OpenStreetMap copyright page (citation)",
-        "what": "licence and attribution for OSM-derived roads, places and context",
-        "licence": "n/a — cited, not fetched",
-        "tool": "play_assets.py listing and the app's Data sources panel",
-        "phase": "citation (displayed to the rider; never requested)",
-        "refresh": "re-check the link still resolves before each submission",
-    },
-    {
-        # take 150 · A164: the one source with TWO phases — the site
-        # inventory at build, and LIVE values fetched in-app on a user tap
-        # (PROTOCOL §8 in-app rules, second entry on the runtime allowlist).
-        "host": "waterservices.usgs.gov",
-        "name": "USGS Water Services (NWIS)",
-        "what": "Gauge site inventory (1,332 MI surface-water sites) at "
-                "build; live flow/stage/water-temp on a river-card tap",
-        "licence": "Public domain (US Government work)",
-        "tool": "gauges.py + the app's conditions button",
-        "phase": "provision + in-app (user tap only, never load-bearing)",
-        "refresh": "inventory each build; values are always live or absent — "
-                   "a level from build time is worse than none (A164)",
     },
     {
         "host": "download.geofabrik.de",
@@ -161,6 +150,10 @@ SOURCES = [
     {
         "host": "services3.arcgis.com",
         "name": "Michigan DNR ORV Scramble Areas",
+        "also": "**Also provides (take 151, A169)** `DNR_State_Sponsored_Developed_"
+                "Boating_Access_Sites_Public_View` — 1,325 in-state boat ramps, fetched "
+                "by `bas.py`, merged into launches and corridor accesses. State-sponsored "
+                "only; county/township ramps are in neither this layer nor OSM.",
         "what": "Designated open-riding area polygons (Silver Lake, St. Helen, "
                 "Holly Oaks, The Mounds, Bull Gap Hill Climb…) — the DNR "
                 "publishes these on ArcGIS Online, not in its trails MapServer",
@@ -202,10 +195,31 @@ SOURCES = [
         "what": "Satellite basemap. NAIP-derived",
         "licence": "Public domain (US Government work)",
         "tool": "imagery.py",
+        "inapp": " (pipeline) and **in-app** by the HD save flow (take 145, A160) "
+                 "— user tap only, never at boot or idle",
         "phase": "provision",
         "refresh": "when NAIP re-flies, every 2-3 years",
         "note": "Landmine 22 — Esri, Google, Bing and Mapbox imagery are licensed "
                 "and may NOT be redistributed offline. This one may.",
+    },
+    {
+        # take 150 · A164: the one source with TWO phases — the site
+        # inventory at build, and LIVE values fetched in-app on a user tap
+        # (PROTOCOL §8 in-app rules, second entry on the runtime allowlist).
+        # The count is the record's (241 sites, HANDOFF takes 150/179), not
+        # the 1,332 this entry carried with no source (A204, take 186).
+        "host": "waterservices.usgs.gov",
+        "name": "USGS Water Services (NWIS)",
+        "what": "Gauge site inventory at build (241 MI surface-water sites, "
+                "22 KB) and LIVE instantaneous values (flow 00060, stage 00065, "
+                "water temp 00010) fetched **in-app** on a user tap (take 150, A164)",
+        "licence": "Public domain (US Government work)",
+        "tool": "gauges.py",
+        "inapp": " (inventory) and the river card's conditions button — §8 "
+                 "in-app rules: tap only, never at boot or idle, never "
+                 "load-bearing; stale values are never shipped (ruled out in AGENDA)",
+        "phase": "provision",
+        "refresh": "inventory each build; values are always live or absent",
     },
     {
         "host": "www2.census.gov",
@@ -255,7 +269,7 @@ SOURCES = [
         "name": "MapLibre GL JS",
         "what": "Renderer, vendored into the bundle at build time",
         "licence": "BSD 3-Clause",
-        "tool": ".github/workflows/build.yml",
+        "tool": "ci/bundle.sh",
         "phase": "build",
         "refresh": "on version bump",
     },
@@ -270,7 +284,48 @@ SOURCES = [
         "phase": "build",
         "refresh": "on version bump (BT_VER in ci/apk.sh)",
     },
+    {
+        # take 164 · A181 · vendored, never fetched: no host, a file.
+        "file": "tools/vendor/acorn.mjs",
+        "filenote": "one generated ESM build, unmodified",
+        "name": "acorn (vendored, not fetched)",
+        "what": "the JavaScript parser tools/scrub.mjs uses to remove comments "
+                "from the release artifact without mistaking a regex literal "
+                "for a division (take 164, A181)",
+        "licence": "MIT, text retained at the head of the vendored file",
+        "tool": "nobody at build time — it is committed, because the data "
+                "pipeline runs before `npm ci` and must not depend on it",
+        "phase": "vendored",
+        "refresh": "only if the parser needs updating; it is a pinned copy",
+    },
 ]
+
+# take 167 · A184 / take 181 · A195 · the citation-only hosts render as one
+# section; the entries above keep them on the declared list for the gate.
+CITATION_NOTE = """Play's Misleading Claims policy requires an app that presents government
+information to link the official source. Six hosts therefore appear in the
+store listing and in the app's Tools -> Data sources panel:
+`www.michigan.gov`, `gis-midnr.opendata.arcgis.com`, `data.fs.usda.gov`,
+`apps.nationalmap.gov`, `waterdata.usgs.gov`, `www.openstreetmap.org` —
+and, since take 181 (A195), a seventh: `sergeantcs2.github.io`, the app's
+own Pages site, for the privacy policy Play's User Data policy wants
+reachable from inside the app as well as from the listing.
+
+- **Fetched by** nobody. They are printed as text and links a rider may
+  follow in their own browser; no tool requests them and the app never
+  does. Declared in manifest.py under the `citation` phase (take 167,
+  A184) so the claim is on the record rather than assumed.
+- **Refresh** re-check each link resolves before every store submission —
+  Play requires them to be valid and functional, and note that
+  www.usgs.gov answers 503 to automated requests, which is why the USGS
+  citations use apps.nationalmap.gov and waterdata.usgs.gov."""
+
+# The imagery budget, measured at take 10 and frozen here (take 186, A204):
+# imagery_budget.json is gitignored and rewritten by every pipeline run for
+# the current region, so a render that read it changed with the workspace.
+BUDGET_ROWS = [(12, 27.02, 10573, 104, 0.1), (13, 13.51, 41904, 400, 0.2),
+               (14, 6.75, 167228, 1834, 0.9), (15, 3.38, 668050, 10024, 4.9),
+               (16, 1.69, 2667378, 38344, 18.9)]
 
 # measured, not estimated — see imagery.py and the take 10 handoff
 BUDGET_NOTE = """Per-region download sizes, measured at take 10 over the
@@ -279,7 +334,7 @@ and are shown to rule statewide OUT, not to plan for it."""
 
 
 def declared_hosts():
-    return {s["host"] for s in SOURCES}
+    return {s["host"] for s in SOURCES if s.get("host")}
 
 
 # XML namespace identifiers. They look like URLs and are never fetched — the
@@ -317,11 +372,6 @@ def scan_hosts():
 
 
 def render():
-    budget = {}
-    bp = os.path.join(ROOT, "imagery_budget.json")
-    if os.path.exists(bp):
-        budget = json.load(open(bp))
-
     out = ["# PROVISION — what APEX downloads, and when", "",
            "*Generated by `tools/manifest.py`. Do not hand-edit.*", "",
            "PROTOCOL §8: **provisioning may use the network, the field may not.**",
@@ -330,36 +380,43 @@ def render():
            "bench and dies at Mack Lake — the gate refuses any host not listed here.",
            ""]
 
-    for phase, title in (("provision", "Downloaded to the device"),
-                         ("build", "Build machine only — never reaches a phone")):
-        rows = [s for s in SOURCES if s["phase"] == phase]
-        out += [f"## {title}", ""]
-        for s in rows:
-            out += [f"### {s['name']}", "",
-                    f"- **Host** `{s['host']}`",
-                    f"- **Provides** {s['what']}",
-                    f"- **Licence** {s['licence']}",
-                    f"- **Fetched by** `{s['tool']}`",
-                    f"- **Refresh** {s['refresh']}"]
-            if s.get("note"):
-                out += [f"- **Note** {s['note']}"]
-            out += [""]
+    def entry(e):
+        rows = [f"### {e['name']}", ""]
+        if e.get("file"):
+            rows.append(f"- **File** `{e['file']}`" + (f" — {e['filenote']}" if e.get("filenote") else ""))
+        else:
+            rows.append(f"- **Host** `{e['host']}`")
+        if e.get("also"):
+            rows.append(f"- {e['also']}")
+        rows += [f"- **Provides** {e['what']}",
+                 f"- **Licence** {e['licence']}",
+                 (f"- **Fetched by** {e['tool']}" if e.get("file")
+                  else f"- **Fetched by** `{e['tool']}`{e.get('inapp', '')}"),
+                 f"- **Refresh** {e['refresh']}"]
+        if e.get("note"):
+            rows.append(f"- **Note** {e['note']}")
+        return rows + [""]
 
-    if budget:
-        out += ["## Imagery size budget — measured", "", BUDGET_NOTE, "",
-                "| zoom | m/px | tiles | AOI | statewide |",
-                "|---|---|---|---|---|"]
-        for z in sorted(budget, key=int):
-            b = budget[z]
-            if not b["tiles"] or not b["aoi_mb"]:
-                continue
-            out.append(f"| z{z} | {b['mpp']} | {b['tiles']:,} | "
-                       f"{b['aoi_mb']:.0f} MB | {b['state_gb']:.1f} GB |")
-        out += ["",
-                "**z16 (1.7 m/px) is the useful ceiling: 159 MB for a riding area.**",
-                "That is one wifi download the night before. Statewide at the same",
-                "zoom is 36.6 GB, which settles it — imagery is per-region, always.",
-                "z12-13 are cheap enough to ship with the app as a fallback.", ""]
+    for phase, title in (("provision", "Downloaded to the device"),
+                         ("build", "Build machine only — never reaches a phone"),
+                         ("vendored", "Vendored — committed, never fetched")):
+        out += [f"## {title}", ""]
+        for e in [x for x in SOURCES if x["phase"] == phase]:
+            out += entry(e)
+
+    out += ["## Citation-only hosts (displayed, never fetched)", "", CITATION_NOTE, ""]
+
+    out += ["## Imagery size budget — measured", "", BUDGET_NOTE, "",
+            "| zoom | m/px | tiles | AOI | statewide |",
+            "|---|---|---|---|---|"]
+    for z, mpp, tiles, aoi_mb, state_gb in BUDGET_ROWS:
+        out.append(f"| z{z} | {mpp} | {tiles:,} | {aoi_mb} MB | {state_gb} GB |")
+    out += ["",
+            "**Measured at take 10, before the state was the region.** The rows say",
+            "what a riding-area box costs per zoom; z16 over that one AOI is 38 GB,",
+            "which settled it — full-sharpness imagery is per area, on a rider's own",
+            "tap (the HD saves, A160/A190), never shipped. The statewide bundle",
+            "carries z10–12 with z13–15 patches over the riding areas.", ""]
 
     out += ["## The invariant", "",
             "After provisioning completes and verifies, the app must be **provably**",

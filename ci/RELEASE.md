@@ -1,18 +1,15 @@
-**Take 185 — pins that count what you can see; a quieter first open.**
+**Take 186 — choose your pins; set home in one button.**
 
-Stack badges now count only the places the map would draw at that zoom,
-and nothing stacks at all until you are within about ten miles across:
-at the five-mile scale the map is quiet instead of a wall of numbers, and
-each badge carries the glyph of what it holds. No fuel pins in Water or
-Camp. Tap a badge: the list is exactly what it counted.
+Layers now has a "Pins in <Mode>" section: one row per kind the mode can
+show, the mode's defaults pre-set (restaurants and stores off in Off-road
+and Camp), remembered per mode, with a Reset row. Water lists no fuel.
 
-On the phone: in Camp, zoom from the whole state in one step at a time.
-Do badges appear only once you are near, split into things you can see,
-and never pop from nowhere except at street zoom where stores and food
-arrive? Is anything you relied on gone?
+Set home is one button with three choices — use my location, type an
+address, or tap the map — and Clear home when one is set. Return home
+with no home opens the same chooser. The map opens at home on launch.
 
-Also: leaving Camp no longer leaves the green national-forest wash on the
-other modes; the first-open card no longer claims you are at Bull Gap; Tools →
-Diagnostics → Self-test has a COMPASS line — please send it, it is how
-the jumpy compass gets fixed. The address fix from take 184 and the R8
-device check from 183 still want your report.
+On the phone: Layers → Pins in Camp — switch Toilets off, kill the app,
+reopen: still off? Reset restores? Switch Restaurants on: they appear at
+street zoom? Set home each of the three ways; kill and reopen: does the
+map open at home? Plan a ride in two actions: Set home → my location,
+then press and hold a destination → Directions here.
