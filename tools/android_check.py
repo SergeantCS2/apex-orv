@@ -7,10 +7,14 @@ the same tool Play's own pre-review uses — and fails loudly on:
 
   targetSdk < 36        versionCode != OFFROAD_TAKE     debuggable=true
   usesCleartextTraffic  any component without exported   allowBackup absent
+  a bridge or plugin class missing from the dex (R8 keep rule missed — A183)
+  no mapping.txt, or one that renamed nothing         launcher icon/label gone
 
-Usage:  python3 tools/android_check.py [--play] path/to/app.apk
-  --play  the artifact is bound for Play: refuse the committed dev key (take 155)
-  an .aab path checks the bundle's signer only; an .apk path checks the manifest
+Usage:  python3 tools/android_check.py [--play] [--mapping PATH] path/to/app.apk
+  --play     the artifact is bound for Play: refuse the committed dev key (take 155)
+  --mapping  R8's mapping.txt; defaults to android/app/build/outputs/mapping/release/
+  an .aab path checks the bundle's signer and its dex; an .apk path checks
+  the manifest, the dex and the mapping
 Needs ANDROID_HOME (aapt2 in build-tools) — true on ubuntu-latest and here.
 """
 import glob, os, re, subprocess, sys
@@ -68,7 +72,24 @@ def selftest():
     bad = good.replace('            A: android:exported(0x01010010)=false', "")
     assert unexported(good) == (2, []), unexported(good)
     assert unexported(bad) == (2, ["provider:?"]), unexported(bad)
-    print("android_check selftest ok: exported audit refuses a bare component")
+    # A183 negative controls: a dex missing one kept name is refused, and a
+    # mapping that renames nothing is refused.
+    fake = b"\x00Lcom/getcapacitor/Bridge;\x00Lcom/apexoffroad/app/MainActivity;\x00"
+    got = dex_missing([fake], KEEP_CLASSES[:3])
+    assert got == ["Lcom/getcapacitor/BridgeActivity;"], got
+    assert dex_missing([fake, b"Lcom/getcapacitor/BridgeActivity;"], KEEP_CLASSES[:3]) == []
+    import tempfile
+    same = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
+    same.write("com.getcapacitor.Bridge -> com.getcapacitor.Bridge:\n    int x -> x\n"); same.close()
+    ren = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
+    ren.write("androidx.core.app.Foo -> a.b.c:\n"); ren.close()
+    try:
+        assert mapping_problem(None) and mapping_problem("/nonexistent/mapping.txt")
+        assert mapping_problem(same.name) and mapping_problem(ren.name) is None
+    finally:
+        os.unlink(same.name); os.unlink(ren.name)
+    print("android_check selftest ok: exported audit refuses a bare component; "
+          "dex audit refuses a stripped plugin; mapping audit refuses an unrenamed map")
 
 
 def signer_dn(artifact):
@@ -97,8 +118,56 @@ def check_aab_signer(aab, play):
 
 DEV_CN = "CN=APEX Off-road"   # the committed keystore's cert (tools/android.py)
 
+# take 183 · A183. R8 keeps by rule; the ARTIFACT is where a missed rule
+# shows. PluginManager loads every plugin with Class.forName() from
+# capacitor.plugins.json, so a plugin R8 renamed or stripped fails on the
+# phone and nowhere else. Its descriptor must therefore survive in the dex.
+KEEP_CLASSES = (
+    "Lcom/getcapacitor/Bridge;",
+    "Lcom/getcapacitor/BridgeActivity;",
+    "Lcom/apexoffroad/app/MainActivity;",
+    "Lcom/capacitorjs/plugins/geolocation/GeolocationPlugin;",
+    "Lcom/capacitorjs/plugins/haptics/HapticsPlugin;",
+    "Lcom/capacitorjs/plugins/share/SharePlugin;",
+    "Lcom/capacitorjs/plugins/device/DevicePlugin;",
+)
+MAPPING_DEFAULT = os.path.join(ROOT, "android", "app", "build", "outputs",
+                               "mapping", "release", "mapping.txt")
 
-def check(apk, play=False):
+
+def dex_missing(dexes, wanted=KEEP_CLASSES):
+    """Descriptors absent from every dex. A dex string table stores type
+    descriptors as MUTF-8 — plain ASCII for these names — so a byte search
+    is exact, and a name R8 renamed is simply not there."""
+    blob = b"\x00".join(dexes)
+    return [k for k in wanted if k.encode("ascii") not in blob]
+
+
+def artifact_dexes(path):
+    """Every classes*.dex in an APK (root) or an AAB (base/dex/)."""
+    import zipfile
+    with zipfile.ZipFile(path) as z:
+        names = sorted(n for n in z.namelist()
+                       if re.fullmatch(r"(?:base/dex/)?classes\d*\.dex", n))
+        return [z.read(n) for n in names]
+
+
+def mapping_problem(path):
+    """None when mapping.txt is present and R8 actually renamed something;
+    otherwise the reason. Play reads this file to symbolicate crashes."""
+    if not path or not os.path.exists(path):
+        return f"mapping.txt missing at {path} — R8 did not run, or minify is off (A183)"
+    renamed = 0
+    for line in open(path, encoding="utf-8", errors="replace"):
+        m = re.match(r"^(\S+) -> (\S+):$", line)
+        if m and m.group(1) != m.group(2):
+            renamed += 1
+    if renamed == 0:
+        return f"{path} renames no class — R8 did not obfuscate (A183)"
+    return None
+
+
+def check(apk, play=False, mapping=None):
     a = aapt2()
     badging = subprocess.run([a, "dump", "badging", apk], capture_output=True,
                              text=True, check=True).stdout
@@ -161,9 +230,28 @@ def check(apk, play=False):
                          "remove the dependency that added it or change the "
                          "declaration; do not ship the contradiction")
 
+    # take 183 · A183: R8 is on — prove on the ARTIFACT that the names the
+    # bridge loads by reflection are still in the dex, that the deobfuscation
+    # map exists and renamed something, and that shrinkResources left the
+    # launcher icon and label alone.
+    dexes = artifact_dexes(apk)
+    stripped = dex_missing(dexes)
+    if stripped:
+        fails.append("R8 stripped or renamed classes the bridge loads by name "
+                     "(A183 keep rule missing): " + ", ".join(stripped))
+    mp = mapping_problem(mapping or MAPPING_DEFAULT)
+    if mp:
+        fails.append(mp)
+    if "application-icon" not in badging or "application-label:'APEX ORV'" not in badging:
+        fails.append("badging lost the launcher icon or label — shrinkResources "
+                     "removed a resource the shell needs (A183)")
+
     print(f"android_check — {os.path.basename(apk)}")
     print(f"  package {pkg}  versionCode {vc}  versionName {vn}  "
           f"minSdk {msdk}  targetSdk {tsdk}")
+    print(f"  dex {len(dexes)} file(s) {sum(map(len, dexes)) / 1e6:.1f} MB; "
+          f"kept classes {len(KEEP_CLASSES) - len(stripped)}/{len(KEEP_CLASSES)} present; "
+          f"mapping {'ok' if not mp else 'MISSING'}")
     print(f"  components {ncomp} (all exported-declared: {not missing})  "
           f"permissions {len(perms)}: {', '.join(p.rsplit('.',1)[1] for p in perms)}")
     for f in fails:
@@ -177,9 +265,22 @@ if __name__ == "__main__":
         selftest(); sys.exit(0)
     play = "--play" in sys.argv
     args = [x for x in sys.argv[1:] if x != "--play"]
+    mapping = None
+    if "--mapping" in args:
+        i = args.index("--mapping")
+        if i + 1 >= len(args):
+            sys.exit("--mapping needs a path")
+        mapping = args[i + 1]
+        del args[i:i + 2]
     if len(args) != 1:
         sys.exit(__doc__)
     selftest()
     if args[0].endswith(".aab"):
+        # the bundle Play receives: its dex first, then its signer
+        stripped = dex_missing(artifact_dexes(args[0]))
+        if stripped:
+            print("  FAIL bundle dex lacks classes the bridge loads by name (A183): "
+                  + ", ".join(stripped)); sys.exit(1)
+        print(f"  dex: {len(KEEP_CLASSES)} kept classes present in the bundle (A183)")
         check_aab_signer(args[0], play); sys.exit(0)
-    check(args[0], play=play)
+    check(args[0], play=play, mapping=mapping)

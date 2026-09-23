@@ -62,10 +62,15 @@ The `apk` job publishes three things to the Releases tab:
 |---|---|
 | `apex-orv-take-N.apk` | sideload, committed key — installs over the last take |
 | `apex-orv-take-N.aab` | the Play upload, private upload key |
-| `play-assets-N.zip` | 512 icon, 1024×500 feature graphic, privacy.html, listing copy, data safety answers, release notes |
+| `play-assets-N.zip` | 512 icon, 1024×500 feature graphic, privacy.html, listing copy, data safety answers, release notes, and since take 183 `mapping-take-N.txt`, R8's deobfuscation map |
 
 Upload the **.aab** to the Play track. The listing text and images come from
 the zip. Screenshots are the only thing not generated — take them on the Fold.
+
+**Since take 183 (A183) the shell is R8-minified.** Upload `mapping-take-N.txt`
+from the zip beside the AAB (Play Console → the release → App bundle →
+*Upload deobfuscation file*), or crash stacks arrive unreadable. Each take has
+its own map; never upload an older one.
 
 **The Play build and a sideloaded take cannot coexist**: same applicationId,
 different signing keys. Uninstall one before installing the other.

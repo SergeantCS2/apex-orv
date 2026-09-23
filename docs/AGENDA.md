@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 182.* Ranked by blocking-ness, not by interest.
+*Current as of take 183.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2955,7 +2955,7 @@ declaration cannot silently become false.
   would HIDE a dependency that wanted the permission; the check surfaces
   it instead, which is the decision the maintainer should get to make.
 
-## A183 — R8 / app optimization · DECLINED for the first release · WHAT IT IS (2026-09-02)
+## A183 — R8 / app optimization · BUILT take 183, device check pending (DECLINED for the first release · WHAT IT IS, 2026-09-02)
 R8 is Android's compile-time code shrinker, optimiser and obfuscator (the
 successor to ProGuard). It works on the Java/Kotlin bytecode of the
 NATIVE shell — Capacitor, its plugins, AndroidX — and never touches the
@@ -2988,6 +2988,31 @@ are R8, and both are warnings, not blockers.
 - **Revisit when:** the app is in front of testers and a device-verified
   R8 pass can be proven before it ships, or if package size becomes the
   binding constraint (it is imagery, not code).
+
+### Take 183 — built (keep rules, artifact assertions, mapping hand-off)
+On the maintainer's standing order: gate everything but the device check.
+Upstream first: @capacitor/android 8.5.0 ships consumer rules for every
+@CapacitorPlugin and Plugin subclass; PluginManager loads plugins with
+Class.forName() from capacitor.plugins.json (read in node_modules, take
+183). android.py wires R8 on the release type under an `APEX-R8 v1`
+marker and writes app-side rules keeping the bridge and plugins by name;
+android_check reads the dex of the APK and the AAB for seven descriptors,
+demands a mapping that renamed something, and checks the icon and label
+survived shrinkResources; apk.sh ships mapping-take-N.txt inside
+play-assets-N.zip. Not promoted to Play until the device check passes.
+- **Ruled out:** trusting the build log ("R8 ran") — the dex is read.
+- **Ruled out:** obfuscating the bridge and plugins for its own sake.
+  Capacitor is open source; keeping them by name is what makes the
+  artifact assertion deterministic and the reflection loader safe.
+- **Ruled out:** a separate CI artifact for the mapping — that is a
+  workflow edit; the play-assets zip already reaches the maintainer.
+- **Ruled out:** R8 on the debug build type — nobody ships it.
+- **Ruled out:** promoting the take-183 AAB before a phone has run the
+  self-test, shared a spot and opened device info on this build.
+- **Device check (open):** install apex-orv-take-183.apk; Tools →
+  Diagnostics → Self-test must show location and haptics working; long-press
+  a spot → Share must open the sheet; the diagnostics card must name the
+  phone. Any one failing is a keep rule missed, and R8 comes off.
 
 ## A184 — Play rejection: government source links · SHIPPED take 167
 Misleading Claims policy — an app presenting government information must
@@ -3422,3 +3447,47 @@ constant; the Pages URL was asked of the maintainer, not guessed.
   the app has no accounts and no user content to govern.
 - **Ruled out:** a rate-the-app prompt (a nag; impossible in closed
   testing); a link under Tools can come with the production listing.
+
+## A196 — The address index ships partial at full green: 39 of 83 counties missing from the take-182 build · FOUND take 183 (fix: take 184, on approval)
+Found in take 183's audit by comparing the take-182 APK from the release
+with a cold build of the same tree on the workstation: 448,918 address
+segments and 712 ZIP codes in the shipped index against 763,825 and 1,075
+here; the take-178 record is 770,097 (this machine lost one county,
+Mecosta). CI run 83's log: 38 counties `unavailable (HTTPError) — skipped`
+and one `BadZipFile`; `tools/address.py:84-88` catches any fetch failure,
+prints, and continues; the step exits 0, the manifest carries no count and
+the gate asserts only that the payload is non-empty. Census throttles
+cloud IPs (landmine 205's mechanism) and answers TIGER2023's Mecosta URL
+with an HTTP 200 "Request Rejected" HTML page from anywhere (landmine 74's);
+a paced HEAD probe of all 83 counties (take 183): TIGER2023 serves 82,
+TIGER2024 serves 83. On Play today the dispatch card's nearest address and
+address search are blank across Kent, Macomb, Marquette, Livingston,
+Jackson, Berrien, Allegan and 32 more counties, and the app's honest "show
+nothing" means no tester would report it.
+
+Design, to build as take 184 on the maintainer's approval — one file and
+one gate check:
+- address.py caches each county's zip under auth_cache/ (fetched once,
+  carried by CI's region cache, the DNR layers' pattern), treats a body
+  that is not a zip as a failure, retries once after a pause (A191's
+  shape), and then REFUSES the build if any county is still missing. A
+  partial index does not ship green.
+- The payload gains a `counties` list of FIPS codes covered. The app's
+  decoder reads only the keys it names (f, n, p, zips, names — src/app.html
+  around the ADDR loader), so the extra key is ignored on the phone.
+- The gate asserts `counties` equals the region's county list (83 for
+  michigan) and that `n` stays above a floor derived from the source total,
+  with a negative control.
+- Vintage to TIGER2024 for ADDRFEAT, the county list unchanged.
+- **Ruled out:** keeping the previous build's payload as a fallback (the
+  gauges' pattern) — CI's cached payload IS the partial one.
+- **Ruled out:** a "partial" flag on the dispatch card — the index is
+  provisioning data, not a live service; it can and must be complete
+  before a build is green.
+- **Ruled out:** fixing it inside take 183 — one issue per take, and R8's
+  device check must not be entangled with a data fix.
+- **Ruled out:** retry-until-it-works against Census — a refusing server is
+  not to be hammered; once, then refuse.
+- **Ruled out:** trusting "fixed" without the count — the source total is
+  the sum of rows across 83 county files, printed by the step, and the
+  shipped `n` must equal it.

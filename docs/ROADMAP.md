@@ -1,6 +1,6 @@
 # ROADMAP — APEX ORV · V3
 
-*Current as of take 182. Take 176 is the production baseline: on Google
+*Current as of take 183. Take 176 is the production baseline: on Google
 Play as com.apexoffroad.app, closed testing with real users from
 2026-09-02.*
 
@@ -24,8 +24,9 @@ finish the arcs the design already committed to.
   checked against the phone's storage quota first. Field verdict pending.
 
 **Next**
-- A183 · R8 shrinking/obfuscation, once testers can device-verify the
-  native bridge. Mapping file into CI, android_check asserting it.
+- A183 · R8 shrinking/obfuscation — BUILT take 183: keep rules, the dex
+  and mapping asserted on the artifact, mapping in the play-assets zip.
+  Open: the device check before the AAB is promoted.
 - A189 · "Road hazards" LAYER — DESIGNED take 180, measured on the extract
   (3,675 plate readers, 1,938 low bridges, 694 fords, 0 speed cameras);
   build after A183 on approval. A160 streaming CLOSED: nothing downloads

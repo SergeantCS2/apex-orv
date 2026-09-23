@@ -1707,6 +1707,20 @@ def check_play():
                  "versionCode {t}", "TARGET_SDK = 36", "MIN_SDK = 26"):
         if need not in a:
             fails.append(f"tools/android.py lost the Play patch: {need}")
+    # take 183 · A183: R8 is on, versioned, and proven on the artifact — the
+    # patch, the artifact assertions and the mapping hand-off must all exist.
+    for need in ("def patch_r8", "APEX-R8 v1", "minifyEnabled true", "shrinkResources true",
+                 "@android.webkit.JavascriptInterface <methods>"):
+        if need not in a:
+            fails.append(f"tools/android.py lost the R8 patch (A183): {need}")
+    ac = read("tools", "android_check.py") or ""
+    for need in ("def dex_missing", "def mapping_problem",
+                 "Lcom/capacitorjs/plugins/geolocation/GeolocationPlugin;"):
+        if need not in ac:
+            fails.append(f"tools/android_check.py lost the R8 assertion (A183): {need}")
+    for need in ('--mapping "$MAP"', 'play/mapping-take-$T.txt'):
+        if need not in sh:
+            fails.append(f"ci/apk.sh does not carry the R8 mapping through (A183): {need}")
     pkg = read("package.json") or ""
     if '"@capacitor/android": "^8' not in pkg:
         fails.append("package.json is not on @capacitor/android ^8 — targetSdk 36 "
@@ -1750,8 +1764,10 @@ def check_play():
             fails.append("built APK fails android_check: " + r.stdout.strip()[-300:])
         else:
             notes.append("built APK passes android_check (versionCode=take, targetSdk 36)")
-    if not any("Play" in f or "android_check" in f or "capacitor" in f.lower() for f in fails):
-        notes.append("play hardening wired: apk.sh -> android_check.py; android.py patches present")
+    if not any("Play" in f or "android_check" in f or "capacitor" in f.lower()
+               or "R8" in f for f in fails):
+        notes.append("play hardening wired: apk.sh -> android_check.py; android.py "
+                     "patches present; R8 on with artifact assertions (A183)")
 
 
 # ── Ledger entries file in numeric order ────────────────────────────────────

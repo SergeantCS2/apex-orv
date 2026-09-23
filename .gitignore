@@ -27,3 +27,18 @@ mlg.css
 imagery_tiles/
 imagery_tiles.json
 osm_cache/
+# Claude Code — local only
+CLAUDE.local.md
+.claude/settings.local.json
+# pipeline scratch found unignored at the take-183 setup
+auth_cache/
+region_stamp.json
+nf.json
+nf_cache.json
+*.part
+play/
+play-assets-*.zip
+*.apk
+*.aab
+www/privacy.html
+www/testing.html

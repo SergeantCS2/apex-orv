@@ -1,15 +1,16 @@
-**Take 182 — a tour instead of a wall of text.**
+**Take 183 — the native shell is now R8-minified; the app itself is unchanged.**
 
-The first time the app opens it now walks you through six things on
-the real screen — the mode chip ("What are you doing today?"), the
-activity chip, Layers, Search, HD imagery and Ride — one sentence
-each, with a ring around the actual button. Every step has Next (Done
-on the last), Not now, Don't show again, and an ×; the back button
-closes it too. Not now brings it back next launch; Done or Don't show
-again do not. Tools → Take the tour replays it any time, and Tools →
-How to use still has the written guide.
+Nothing on the map or in the app's behaviour changed from take 182. What
+changed is how the Android shell is built: it is shrunk and obfuscated by
+R8, with rules that keep everything the app reaches by name. The harness
+proved those names survive in the built package; only a phone can prove
+they answer.
 
-On the phone: on the first open after this update the tour should
-appear on its own. Does each ring sit on the right button? Is any step
-covering something you needed? Tap Not now once, reopen the app — it
-should return; tap Don't show again — it should not.
+On the phone, one pass: install this take, open Tools → Diagnostics →
+Self-test and confirm the location and haptics lines report working; long-
+press a spot and confirm Share opens the system sheet; confirm the
+diagnostics card names your phone. If any of those fails on this take and
+worked on 182, say so — it is the whole point of this build.
+
+The first take built on the maintainer's workstation rather than the
+sandbox; the seal is the commit, not a zip.

@@ -1,4 +1,109 @@
-# HANDOFF — through Take 182 · V3
+# HANDOFF — through Take 183 · V3
+
+## Take 183 — 2026-09-23 — A183: R8 on, proven on the artifact · the first take built on the workstation
+
+The first take built outside the claude.ai sandbox: a WSL2 clone on the
+maintainer's workstation (12 CPUs, 15 GiB, a 4 GiB swap partition, no disk
+quota), the repo head as the workspace, an ordinary commit as the seal.
+What that changes is written in CLAUDE.md this take; the sandbox-only rules
+(landmines 207, 208, 210, 213–215) stay as history. The gate no longer has a
+seed to read — the commit hash is the seal, `git ls-files` the manifest.
+
+A183, on the maintainer's standing order: write the keep rules and the
+android_check assertions and gate them now, leaving only the device check.
+Checked upstream first (PROTOCOL §3): @capacitor/android 8.5.0 ships
+consumer ProGuard rules that keep every @CapacitorPlugin class and everything
+extending Plugin, and PluginManager loads each plugin with Class.forName()
+from capacitor.plugins.json — which is exactly why a stripped plugin fails on
+the phone and nowhere else, and why the assertion has to read the artifact.
+
+What ships:
+- tools/android.py patch_r8(): an `APEX-R8 v1` block on the release build
+  type — minifyEnabled, shrinkResources, the optimize default file — and
+  app/proguard-rules.pro keeping com.getcapacitor.** and
+  com.capacitorjs.plugins.** by name, @JavascriptInterface members, and
+  SourceFile/LineNumberTable so a Play crash stack resolves through the
+  mapping. Versioned marker; an older block is replaced, not skipped
+  (landmine 211); the release block is refused if it ends up with two
+  minifyEnabled lines.
+- tools/android_check.py: reads every classes*.dex out of the APK or the
+  AAB and refuses the artifact if any of seven descriptors — Bridge,
+  BridgeActivity, MainActivity, Geolocation, Haptics, Share, Device — is
+  absent; demands mapping.txt and that it renamed at least one class;
+  checks the launcher icon and label survived shrinkResources. The
+  selftest carries the negative controls (a dex missing one name, a map
+  that renames nothing) and the gate runs it.
+- ci/apk.sh passes the mapping path to both APK checks and copies
+  mapping-take-N.txt into play/ so it rides in play-assets-N.zip. No
+  workflow edit, so the hand-pasted file and the seed job are untouched.
+- gate check_play asserts all three files carry it.
+
+What the harness can prove: the patched build.gradle and proguard-rules.pro
+(android.py runs end to end here — `cap add` needs only Node), and, with a
+JDK and SDK installed on the workstation this take, the release APK and AAB
+built here and read back by android_check. What only a phone can prove:
+that the kept plugins answer — the self-test's location and haptics lines,
+a share sheet, device info on the diagnostics card.
+
+MEASURED on this machine, cold (no caches, photos frozen at budget 0):
+- Pipeline 2,054 s wall, every stage green: ingest 428 s (the 297 MB
+  extract included), graph + emit_graph 267 s, imagery 408 s (14,058 USGS
+  tiles), corridor 160 s, publicland 90 s, the five smoke passes 31 s, render
+  350 s (281/0), palette 24 s. The sandbox needed ~10 min for ingest alone
+  and ~20 min for a render.
+- Gate 385 s, 41 checks, smoke 300 across 5 modes and render 281/0 inside
+  it — against ~23 min in the sandbox, and it found the locally built APK
+  and ran android_check on it.
+- The apk job (ci/apk.sh, run here unchanged with ANDROID_HOME, JAVA_HOME
+  and PIP_BREAK_SYSTEM_PACKAGES=1 exported): 114 s including gradle's own
+  download; APK, universal APK from the bundle and AAB all pass
+  android_check; 16 KB alignment verified; mapping-take-183.txt inside
+  play-assets-183.zip.
+- R8: classes.dex 8,192,928 -> 1,208,212 bytes; mapping 7.7 MB, 1,700
+  classes, 1,455 renamed, the five reflection-loaded names unrenamed.
+  Controls on the real take-182 APK from the release: the dex audit finds
+  all seven names in the unminified build; without a mapping the check
+  refuses on exactly the mapping line.
+- Reproducibility: after the cold pipeline, www/app.js is byte-identical to
+  the committed take-182 build and www/index.html differs only by the take
+  number. The workstation reproduces the sandbox's sealed app exactly.
+
+AUDIT (§0.3), the take read cold against the diff: android.py's docstring
+quoted the ledger's "~7.6 MB" for the dex where the measurement is 8.19 MB
+— corrected to the numbers above. The mapping that ships is the bundle
+build's; assembleRelease's own map is overwritten by bundleRelease at the
+same path, the same R8 run on the same inputs (INFERRED identical; the
+sideload has no crash reporting to resolve anyway). The AAB branch of
+android_check reads the dex before the signer, so a stripped plugin fails
+the Play artifact and not only the sideload. Nothing else changed.
+
+The audit's real finding is not in this take. Comparing the take-182 APK
+from the release with this machine's build of the same tree, section by
+section: every imagery tile identical, the graph within a few KB — and the
+address index 448,918 segments / 712 ZIPs shipped against 763,825 / 1,075
+here (the record is 770,097). CI run 83's log says why: 39 of 83 counties
+"unavailable — skipped" (38 HTTPError, one BadZipFile), address.py
+continues past a failed county, and nothing asserts coverage. The
+production build's dispatch address is blank across 39 counties. Filed as
+A196 with a design and landmine 219; the fix is its own take (184) on the
+maintainer's approval, because one issue per take is the rule and the R8
+device check must not be entangled with a data fix. Also from the same
+log, PROVEN: run 83 was a cache MISS ("Cache not found for input keys:
+region-michigan-v3"; saved at the end) — the immutable-key theory for the
+09-03 re-stream is still untested.
+
+SEAL: gate PASSED, 41 checks (smoke 300 across 5 modes, render 281/0
+inside it), and the apk job green here on the real artifacts. Sealed as an
+ordinary commit on main on the maintainer's go — the first take with no
+seed zip; tagged t183 once CI is green. Not promoted to Play: the A183
+device check is open, and the next Play candidate should carry the A196
+fix. Field: install apex-orv-take-183.apk; Tools → Diagnostics → Self-test
+(location and haptics lines), long-press → Share, the diagnostics card's
+device line. DEFERRED: A196 (take 184); NEW-CHAT-BRIEF rewritten for this
+environment; PROTOCOL §0.4/§0.5 wording; the README/TESTING/A180 identity
+claim; `branches: [main]` in the workflow; a gate check that ci/build.yml
+equals the live workflow; the root apex.yml; DEV_CN by fingerprint;
+probe.mjs's sandbox path; Play screenshots; the listing copy question.
 
 ## Take 182 — 2026-09-16 — A194: the tour, on the real screen
 

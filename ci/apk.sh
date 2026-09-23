@@ -14,11 +14,17 @@ python3 -m pip install --quiet pillow
 python3 tools/android.py
 npx cap sync android
 
+# take 183 · A183: R8 is on (tools/android.py patch_r8). Its deobfuscation map
+# is written here by every release build; android_check demands it and reads
+# the dex for the bridge and plugin names the keep rules must preserve.
+MAP=android/app/build/outputs/mapping/release/mapping.txt
+
 # ── 1. sideload APK, committed key ─────────────────────────────────────────
 ( cd android && ./gradlew assembleRelease --no-daemon -q )
 # Refuse the ARTIFACT if a Play requirement regressed (targetSdk 36,
-# versionCode = take, no cleartext, no debuggable, exported declared).
-python3 tools/android_check.py android/app/build/outputs/apk/release/app-release.apk
+# versionCode = take, no cleartext, no debuggable, exported declared,
+# kept classes in the dex, mapping present — A183).
+python3 tools/android_check.py --mapping "$MAP" android/app/build/outputs/apk/release/app-release.apk
 
 T=$(grep -oP 'OFFROAD_TAKE=\K[0-9]+' BUILD)
 cp android/app/build/outputs/apk/release/app-release.apk "apex-orv-take-$T.apk"
@@ -52,7 +58,7 @@ java -jar /tmp/bundletool.jar validate --bundle="$AAB" > /dev/null && echo "bund
 rm -rf /tmp/bt && java -jar /tmp/bundletool.jar build-apks --bundle="$AAB" \
   --output=/tmp/bt/u.apks --mode=universal
 ( cd /tmp/bt && unzip -q u.apks )
-python3 tools/android_check.py /tmp/bt/universal.apk          # manifest, from the bundle
+python3 tools/android_check.py --mapping "$MAP" /tmp/bt/universal.apk   # manifest + dex, from the bundle
 if [ "$PLAY" = 1 ]; then python3 tools/android_check.py --play "$AAB"   # signer, from the bundle
 else                     python3 tools/android_check.py        "$AAB"; fi
 # 16 KB page alignment: the shell carries no native libs (proven take 154),
@@ -63,6 +69,10 @@ ZA=$(ls -d "$ANDROID_HOME"/build-tools/*/zipalign | sort | tail -1)
 # ── 4. everything else Play asks for (icon, feature graphic, policy,
 #      listing copy, data safety answers, release notes) ───────────────────
 python3 tools/play_assets.py
+# take 183 · A183: the deobfuscation map rides with the listing assets, so it
+# is uploaded beside the AAB (Play Console → release → deobfuscation file)
+# and crash stacks read as source. Same zip, no workflow edit.
+cp "$MAP" "play/mapping-take-$T.txt"
 ASSETS="play-assets-$T.zip"
 ( cd play && zip -qr "../$ASSETS" . )
 
@@ -72,4 +82,4 @@ ASSETS="play-assets-$T.zip"
   echo "aab=$AAB"
   echo "assets=$ASSETS"
 } >> "${GITHUB_OUTPUT:-/dev/null}"
-echo "built apex-orv-take-$T.apk, $AAB, $ASSETS"
+echo "built apex-orv-take-$T.apk, $AAB, $ASSETS (mapping-take-$T.txt inside)"

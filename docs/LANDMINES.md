@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 182.*
+*Current as of take 183.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -128,6 +128,7 @@ Start here. Do not read top to bottom.
 | A stub is assigned but the real browser API keeps answering | 216 |
 | Render ends with a stack trace instead of a verdict | 217 |
 | pkill/grep -f finds or kills your own shell | 204 |
+| A feature works in some counties and is silently blank in others | 219 |
 
 ---
 
@@ -2748,3 +2749,19 @@ deliberate change with a render behind it. When a render dies before
 its first check, probe Chrome by hand with `--dump-dom
 "data:text/html,<p>hi</p>"` and a 30 s timeout before blaming the
 harness or the app.
+
+**219. A step that skips a failed input ships a smaller product at full
+green.** Take 182 on Play carries the address index for 44 of Michigan's
+83 counties. address.py caught every failed county download, printed
+"unavailable — skipped", and exited 0; the gate checked the payload was
+non-empty and the manifest carried no count. Census throttled 38 requests
+from CI's cloud IP (landmine 205's mechanism) and answers one 2023 county
+URL with an HTTP 200 HTML "Request Rejected" page from anywhere (landmine
+74's) — a BadZipFile, skipped the same way. Found only by comparing the
+shipped artifact with a cold build of the same tree on the workstation
+(take 183), section by section, which is the audit that finds this shape
+and is cheap now that a full build takes 35 minutes here. Rule: an input a
+build cannot fetch is a build that does not pass — retry once, then
+refuse; and a multi-part input records which parts it covers so the gate
+can assert coverage against the source's own count. "The payload exists"
+is landmine 53's shape one level down.
