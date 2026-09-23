@@ -1,14 +1,18 @@
-**Take 184 — every county's addresses, or no build at all.**
+**Take 185 — pins that count what you can see; a quieter first open.**
 
-The address index the dispatch card and search use was missing 39 of
-Michigan's 83 counties in the builds from take 182 onward: a county whose
-download failed was silently skipped. This build refuses to exist unless
-all 83 are present, and the index moves to the Census's 2024 vintage
-(769,698 road segments statewide).
+Stack badges now count only the places the map would draw at that zoom,
+and nothing stacks at all until you are within about ten miles across:
+at the five-mile scale the map is quiet instead of a wall of numbers, and
+each badge carries the glyph of what it holds. No fuel pins in Water or
+Camp. Tap a badge: the list is exactly what it counted.
 
-On the phone: open the dispatch card or search an address somewhere the
-previous build showed nothing — Kent, Macomb, Marquette, Livingston,
-Jackson, Berrien, Allegan, Mecosta among them. An address should appear
-where the map has a road with house numbers.
+On the phone: in Camp, zoom from the whole state in one step at a time.
+Do badges appear only once you are near, split into things you can see,
+and never pop from nowhere except at street zoom where stores and food
+arrive? Is anything you relied on gone?
 
-Nothing else changed from take 183. The R8 device check is still open.
+Also: leaving Camp no longer leaves the green national-forest wash on the
+other modes; the first-open card no longer claims you are at Bull Gap; Tools →
+Diagnostics → Self-test has a COMPASS line — please send it, it is how
+the jumpy compass gets fixed. The address fix from take 184 and the R8
+device check from 183 still want your report.

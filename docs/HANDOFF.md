@@ -1,4 +1,114 @@
-# HANDOFF — through Take 184 · V3
+# HANDOFF — through Take 185 · V3
+
+## Take 185 — 2026-09-23 — the first bundled take: pins P1 (A197), CI keeps its cache (A198), the first-open text (A199), a compass readback (A201)
+
+Take 184 sealed: commit 8cee217; CI run 85 on the cold v4 cache — its
+verdict and the t184 tag are recorded at this take's seal. From here a
+take carries every ready fix (the maintainer, 2026-09-23): one build,
+one gate, one CI cycle; each fix keeps its own item and its own paragraph.
+
+A197 P1 — the clusterer counts what the map draws. PROVEN before the
+change (tools/pins_probe.py, calibrated against the maintainer's
+screenshots): restack() pooled every kind the mode lists regardless of
+what the pin layers would draw at that zoom, and ran with no floor while
+the layers start at z9.2 — at z9 100% of every badge on screen was places
+no layer drew; at z12 in Camp 94% of badge members were services pooled
+from z11.4 and demoted to z13. What ships: pinDrawable() applies the pin
+layers' own gate (kinds, demote, the unnamed-launch rule, boost, the
+prominence tiers, the 11.4 floor for non-destinations) to each place, and
+restack() pools only those, and nothing below PIN_FLOOR 9.2. Badges carry
+the anchor kind's glyph over the count (a glyph-only sprite per kind from
+the same drawing functions, no new art); mixed stacks keep the neutral
+fill. Fuel leaves Water and Camp (the maintainer: "water/camp/hunt/
+outdoors having gas — they shouldn't"); food and store keep today's z13
+behaviour until P2's selector makes them off-by-default with a switch.
+The harness's stack checks move with the rule: the statewide floor now
+asserts NO badge and NO pin; the per-mode and tap probes move from z9.0
+to z10.0; new checks assert every stack member is drawable at z10/11/12
+in Camp over Grayling and hold the marker count under a ceiling.
+
+A198 — ensure_workspace() accepts region_stamp.json (cached, written by
+ingest) as the workspace marker when `.region` is absent; a stamp for
+another region still wipes; a cold tree still wipes. Proven on temp
+workspaces with four scenarios before the change was trusted. Expected
+on CI: ingest skips the stream and the payload-bearing steps skip, so the
+bundle job falls from ~55 min — measured on run 86 and recorded here.
+
+A199 — the initial #panel text no longer says "You're at Bull Gap, home
+is the Pink Store" (a hardcoded sentence from the Bull Gap era, take ~2).
+It now states what is true on a first open and how to plan a ride with
+the controls that exist (Set home on the Plan tab, then Return home). A200
+redesigns the flow itself.
+
+A201 — the compass handler painted every raw magnetometer event with no
+smoothing (magStart, take 109). Before changing anything, a readback: the
+self-test gains a COMPASS line — events in the last three seconds, the
+rate, the circular spread of raw headings, and which event type answered
+— so "jumpy" becomes a number from the Fold (PROTOCOL §5.3).
+
+What the build taught. The first render refused one check: "national
+forest and state land draw in Camp and stay off in Off-road". The check was
+right (landmine 54): my new probe enters Camp mid-run, and applyMode() sets
+a layer group only when the mode names it — `forest` was named only by
+Camp since take 174, so every other mode inherited Camp's forest fill. On
+the phone: switch Camp → Off-road and the green national-forest wash stays.
+Differential test on the built app, old vs fixed: Off-road after Camp
+true → false. Fixed in this take (A205): every mode names forest, as every
+mode already named public; the check prints its three values now.
+
+Two more refusals, both the gate's and both right: the APK on disk was
+184's (rebuilt, as 184 taught), and tools/pins_probe.py carried five
+centres as typed coordinates — the gate forbids geography in tools
+(landmine 197); the probe reads the region's anchors from regions.json
+now and its calibration reproduces. And one mistake of mine: a gate
+launched with `setsid nohup` was "stopped" by `$!`, which names a parent
+that has already exited; it ran on while a second gate started beside it
+(landmine 221). The wrapper now writes its own PID into the log.
+
+MEASURED (tools/pins_probe.py on the take-185 tables, phone 412×915, mean
+of five centres; the harness's own counts over Grayling in Camp beside):
+- Camp, pre-185 pool → 185 pool: z9 30 badges → 0; z10 16 markers → 12
+  (harness: 3 badges + 9 pins); z11 11 → 7 (0 + 5); z12 15 → 4 (1 + 1);
+  z13 16 → 16. Badge members the map would draw: 0% / 30% / 28% / 6% → 100%
+  at every zoom; ghost badges 30 / 4 / 3 / 11 → 0.
+- Water: z12 pool 26 → 17 with fuel gone; drawable 100% from z12 either way.
+- The per-mode probe at z10 over the southeast: Water 100, Off-road 92,
+  Hunt 67 stacked places, no strays; a stack of 22 lists all 22.
+- Smoke 300 across 5 modes on the patched build (twice: before and after
+  the forest fix). Render: first pass 289 checks with the one refusal;
+  second pass recorded at seal.
+- A198 on temp workspaces: same-region stamp keeps the restored work,
+  foreign stamp wipes, cold tree wipes, marker wins. CI's own number comes
+  with run 86.
+
+AUDIT (§0.3), the diff read cold: pinDrawable() reads the feature
+properties the pin layers read (k, d, pri, named) and mirrors modeFilter's
+order — kinds, demote, the unnamed rule, then boost, then the tiers — so
+the two cannot disagree unless one is edited alone; the harness asks the
+app's own gate per stacked member, and the probe is a second, independent
+transcription. restack() no longer references the kinds list or the
+services seam; CLUSTER_MAXZ and SERVICES stay for the hook and history.
+The glyph sprite is the lone pin's own drawing in white; a kind with no
+sprite would only lose the glyph, never the badge. Fuel's removal touched
+kinds and demote in Camp and kinds in Water, nothing else. The first-open
+text names controls that exist (Set home on the Plan tab, Return home).
+The compass log is capped at three seconds and read only by the self-test.
+
+SEAL: gate PASSED (smoke 300 across 5 modes, render 289/0 inside it —
+the render on the fixed build after the forest refusal), the address step
+untouched, ci/apk.sh green here on the 185 artifacts (the gate holds the
+APK on disk to BUILD, so the artifacts are rebuilt every take now).
+Sealed as a commit on main on the maintainer's go; t185 tagged and pushed
+once CI is green. Not promoted to Play: the A183 device check is open.
+Field: Camp at the five-mile scale is quiet; badges appear near ten miles
+across, each with a glyph, and split into things you can see; no fuel in
+Water or Camp; a badge's list equals its count; Camp → Off-road drops the
+forest wash; the first-open card reads honestly; send the COMPASS line.
+DEFERRED: A197 P2 (take 186: the Pins selector, food/store off by
+default, the minzoom retune); A200 design; A201's fix once the number is
+in; A202; A204; the NEW-CHAT-BRIEF rewrite; PROTOCOL §0.4/§0.5 wording;
+README/TESTING/A180 identity claim; root apex.yml; DEV_CN by fingerprint;
+probe.mjs's path; the A183 device check.
 
 ## Take 184 — 2026-09-23 — A196: the address index covers every county or the build refuses
 

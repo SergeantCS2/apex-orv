@@ -1429,25 +1429,48 @@ if (zoomed.trails === 0) {
         const biggest = badges.reduce((mx, b) => Math.max(mx, +b.properties.n), 0);
         const mixed = badges.filter((b) => b.properties.mixed === true || b.properties.mixed === "true").length;
         const services = badges.filter((b) => (S.services || []).includes(b.properties.k)).length;
+        /* take 185 · A197 P1 · every stacked place must be one the map would
+           draw at this zoom — asked of the app's own gate, per member */
+        let undraw = 0;
+        badges.forEach((b) => String(b.properties.ids || "").split(",").filter(Boolean)
+          .forEach((id) => { if (S.drawable && S.drawable(+id, zoom) === false) undraw++; }));
         return { R, badges: badges.length, pins: pins.length, worst: isFinite(worst) ? +worst.toFixed(1) : null,
-                 pairs, biggest, mixed, hidden: S.hidden(), services };
+                 pairs, biggest, mixed, hidden: S.hidden(), services, undraw,
+                 glyph: badges.length ? badges.every((b) => m.hasImage("stk-" + b.properties.k)) : null };
       };
       const floor = await probe([-85.5, 44.8], m.getMinZoom());
+      const under = await probe([-85.5, 44.8], 9.0);      /* just under the layers' floor */
       const seam = await probe([-83.5, 42.6], 11.2);
       M.apply("ride", { silent: true }); await s(300);   /* the mode with the most pins */
       const town = await probe([-83.35, 42.66], 13.4);
+      /* Camp over Grayling at the three zooms the take-184 measurement used */
+      M.apply("camp", { silent: true }); await s(300);
+      const c10 = await probe([-84.714, 44.661], 10.0);
+      const c11 = await probe([-84.714, 44.661], 11.0);
+      const c12 = await probe([-84.714, 44.661], 12.0);
       M.apply(was, { silent: true });
       m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
-      return { floor, seam, town, minz: m.getMinZoom() };
+      return { floor, under, seam, town, c10, c11, c12, minz: m.getMinZoom(), pinFloor: S.floor };
     });
     if (cz.missing) ok(false, "stack hook missing");
     else {
-      const f = cz.floor, e = cz.seam, t = cz.town;
-      ok(f.badges > 0 && f.biggest > 1,
-         `fully zoomed out (z${cz.minz}) the state stacks — ${f.badges} badges, biggest ${f.biggest}, ${f.hidden} pins folded in`);
-      ok(f.pairs === 0,
-         `and NOTHING overlaps there: closest two visible things are ${f.worst} px apart, radius ${f.R} (${f.pairs} violations)`);
-      ok(f.services === 0, "services never stack at statewide zoom (Jacob's rule)");
+      const f = cz.floor, e = cz.seam, t = cz.town, u = cz.under;
+      /* take 185 · A197 P1 · the statewide floor used to assert badges. It now
+         asserts NONE: the pin layers draw nothing below z9.2 and the clusterer
+         counts only what they would draw (measured at take 184: at z9 every
+         badge on screen was places no layer drew). */
+      ok(f.badges === 0 && f.pins === 0,
+         `fully zoomed out (z${cz.minz}) nothing stacks and nothing draws — the clusterer honours the pin layers' floor z${cz.pinFloor} (${f.badges} badges, ${f.pins} pins)`);
+      ok(u.badges === 0 && u.pins === 0,
+         `and just under the floor (z9.0) still nothing (${u.badges} badges, ${u.pins} pins)`);
+      [["z10", cz.c10], ["z11", cz.c11], ["z12", cz.c12]].forEach(([z, x]) => {
+        ok(x.undraw === 0 && (x.badges + x.pins) > 0,
+           `Camp over Grayling at ${z}: every stacked place is one the map would draw (${x.badges} badges, ${x.pins} lone pins, ${x.undraw} undrawable members)`);
+        ok((x.badges + x.pins) <= 40,
+           `and the view holds ${x.badges + x.pins} markers (ceiling 40; take-184 measurement 12 / 7 / 4 on this viewport)`);
+        if (x.badges) ok(x.glyph === true, `every badge at ${z} has its kind's glyph sprite`);
+      });
+      ok(f.services === 0 && u.services === 0, "services never stack at statewide zoom (Jacob's rule)");
       ok(e.pairs === 0,
          `at the old z11.4 seam there is no seam: ${e.badges} badges, ${e.pins} lone pins, closest ${e.worst} px, ${e.pairs} violations`);
       ok(t.pairs === 0 && (t.badges + t.pins) >= 4,
@@ -1466,7 +1489,8 @@ if (zoomed.trails === 0) {
       const kindsOf = (k) => (M.MODES.find((x) => x.k === k) || {}).kinds || [];
       const stacksIn = async (mode) => {
         M.apply(mode, { silent: true }); await s(250);
-        m.jumpTo({ center: [-83.5, 42.6], zoom: 9.0 }); await s(300); S.run();
+        /* take 185: z10 — below the layers' floor nothing stacks any more */
+        m.jumpTo({ center: [-83.5, 42.6], zoom: 10.0 }); await s(300); S.run();
         const src = m.getSource("poistack");
         /* loaded() says the worker has the data; it does not say the screen
            shows it. Under gate starvation the first query after loaded()
@@ -1501,7 +1525,7 @@ if (zoomed.trails === 0) {
             s = (ms) => new Promise((r) => setTimeout(r, ms));
       const was = M.get(), cam = { c: m.getCenter(), z: m.getZoom() };
       M.apply("ride", { silent: true }); await s(200);
-      m.jumpTo({ center: [-83.5, 42.6], zoom: 9.0 }); await s(350); S.run();
+      m.jumpTo({ center: [-83.5, 42.6], zoom: 10.0 }); await s(350); S.run();   /* take 185: z10 */
       const src = m.getSource("poistack");
       for (let w = 0; w < 70; w++) { if (src.loaded() && m.areTilesLoaded()) break; await s(400); }
       await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]);
@@ -1534,7 +1558,7 @@ if (zoomed.trails === 0) {
       return { n, rows, z0: +z0.toFixed(2), z1: +z1.toFixed(2), fitCalled, trace: zs.slice(0, 8).join(">"),
                titled: new RegExp(n + " places here").test(txt) };
     });
-    if (tr.none) ok(false, "no stack to tap at z9 over the southeast");
+    if (tr.none) ok(false, "no stack to tap at z10 over the southeast");
     else {
       ok(tr.titled && tr.rows === tr.n,
          `tapping a stack of ${tr.n} lists all ${tr.rows} in a scrollable tray`);
@@ -1887,7 +1911,7 @@ if (zoomed.trails === 0) {
       ok(cp.modes.includes("camp") && cp.modes.length === 5,
          `Camp is the fifth mode (${cp.modes.join(" · ")})`);
       ok(cp.nfInRide === false && cp.nfInCamp === true && cp.pubInCamp === true,
-         "national forest and state land draw in Camp and stay off in Off-road");
+         `national forest and state land draw in Camp and stay off in Off-road (forest in Off-road ${cp.nfInRide}, forest in Camp ${cp.nfInCamp}, public in Camp ${cp.pubInCamp})`);
       ok(cp.nfDrawn > 0 && !!cp.nfName,
          `the Huron-Manistee is on the map in Camp (${cp.nfDrawn} feature(s), ${cp.nfName})`);
       ok(cp.typed >= 0 && cp.typedSays,

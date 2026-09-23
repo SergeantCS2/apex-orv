@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 184.*
+*Current as of take 185.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -130,6 +130,7 @@ Start here. Do not read top to bottom.
 | pkill/grep -f finds or kills your own shell | 204 |
 | A feature works in some counties and is silently blank in others | 219 |
 | CI rebuilds everything every run although the cache reports a hit | 220 |
+| A detached stage survives the kill aimed at it; a second one starts beside it | 221 |
 
 ---
 
@@ -2781,3 +2782,16 @@ learns nothing after its first save until the key changes. Rule: a cache
 is verified by what the CONSUMER sees after restore (an `ls` and a "skipping
 fetch" line in the log), never by the restore step's own success; and a
 marker that decides whether cached work survives must itself be cached.
+
+**221. `$!` after `setsid nohup … &` is a process that has already exited.**
+setsid(1) forks when it is already a group leader — which a shell
+background job is — and the parent returns at once; the stage runs in the
+CHILD, one PID up. Take 185: a gate launched that way was "killed" by the
+recorded PID (the dead parent), kept running to its end, and a second gate
+was started beside it — two inner renders on one machine, the first one's
+Chrome then killed by the second launch's pre-flight, two crash lines and
+a verdict nobody asked for. Rule: the wrapper writes its own PID into the
+log as its first line (`echo "PID $$"`), and a stop reads it from there —
+never `$!`, never a pattern (landmine 204). Companion: the pre-launch
+count of node/chrome/python3 must be ZERO before a launch, and "kill,
+then launch" is two calls with the count read between them.

@@ -413,6 +413,17 @@ function makeBadges(){
     try{map.addImage(name,x.getImageData(0,0,26*S,26*S),{pixelRatio:S})}catch(e){}}
   Object.keys(POIKIND).forEach(function(k){
     one('bdg-'+k,POIKIND[k].c,POIKIND[k].g)});
+   
+  function glyphOnly(name,glyph){
+    if(done[name]||!map.addImage)return;
+    if(!document.createElement('canvas').getContext)return;
+    done[name]=1;
+    var S=2,c=document.createElement('canvas');c.width=c.height=26*S;
+    var x=c.getContext('2d');x.scale(S,S);
+    x.beginPath();x.lineWidth=2.3;x.lineCap='round';x.lineJoin='round';
+    x.strokeStyle='#FFFFFF';(G[glyph]||G.i)(x);x.stroke();
+    try{map.addImage(name,x.getImageData(0,0,26*S,26*S),{pixelRatio:S})}catch(e){}}
+  Object.keys(POIKIND).forEach(function(k){glyphOnly('stk-'+k,POIKIND[k].g)});
   one('bdg-pad-launch','#2E7FA8','boat');one('bdg-pad-access','#2E8B99','boat');
   one('bdg-pad-camp','#7A5B3A','tent');one('bdg-pad-parking','#4A5560','i');
   one('bdg-dam','#C1121F','dam');
@@ -431,6 +442,18 @@ var CLUSTER_MAXZ=11.4;
 function stackRadius(z){  
   if(z<=8)return 48; if(z>=14)return 24;
   return 48-(z-8)*4}    
+ 
+var PIN_FLOOR=9.2;    
+function pinDrawable(p,m,z){
+  var k=p.k;
+  if((m.kinds||[]).indexOf(k)<0)return false;
+  if(m.demote&&m.demote.indexOf(k)>=0&&z<13)return false;
+  if((k==='launch'||k==='beach')&&!p.named&&z<(m.k==='water'?12:13.5))return false;
+  if(p.d===1){
+    if(z<PIN_FLOOR)return false;
+    if(m.boost&&m.boost.indexOf(k)>=0)return true;
+    return p.pri<=0||(z>=10.5&&p.pri<=1)||z>=11.4}
+  return z>=11.4}
 var poif=((POIS&&POIS.p)||[]).map(function(r,i){
   var k=POIKIND[r.k]||{c:'#4A443B',h:r.k,r:7};
   return {type:'Feature',
@@ -537,6 +560,10 @@ var GAUGE=(function(){
 var CMP_ON=false, MAG=null, MAG_OK=null;
 
  
+ 
+var MAGLOG=[];
+function magLog(d,ev,abs){var now=Date.now();MAGLOG.push({t:now,d:d,ev:ev,abs:abs===true});
+  while(MAGLOG.length&&now-MAGLOG[0].t>3000)MAGLOG.shift()}
 function magStart(){
   if(MAG_OK!==null)return;
   MAG_OK=false;
@@ -547,7 +574,7 @@ function magStart(){
     else if(typeof e.alpha==='number')deg=(360-e.alpha)%360;
     if(deg===null||isNaN(deg))return;
      
-    MAG_OK=true;MAG=(deg+360)%360;
+    MAG_OK=true;MAG=(deg+360)%360;magLog(MAG,e.type,e.absolute);
     if(CMP_ON)cmpPaint()};
   try{window.addEventListener('deviceorientationabsolute',onEv,true)}catch(e){}
   try{window.addEventListener('deviceorientation',onEv,true)}catch(e){}
@@ -1346,10 +1373,14 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       paint:{'circle-color':['get','c'],'circle-stroke-color':'#FFFFFF',
         'circle-stroke-width':2,
         'circle-radius':['interpolate',['linear'],['get','n'],
-          2,13, 10,16, 50,20, 200,24]}},
+          2,16, 10,18, 50,21, 200,25]}},
+     
     {id:'poi-stack',type:'symbol',source:'poistack',
-      layout:{'text-field':['to-string',['get','n']],'text-font':['APEX'],
-        'text-size':['interpolate',['linear'],['get','n'],2,12,50,14],
+      layout:{'icon-image':['concat','stk-',['get','k']],'icon-size':0.62,
+        'icon-offset':[0,-10],'icon-allow-overlap':true,'icon-ignore-placement':true,
+        'text-field':['to-string',['get','n']],'text-font':['APEX'],
+        'text-size':['interpolate',['linear'],['get','n'],2,11,50,13],
+        'text-offset':[0,0.62],
         'text-allow-overlap':true,'text-ignore-placement':true},
       paint:{'text-color':'#FFFFFF'}},
     {id:'cont-label',type:'symbol',source:'cont',minzoom:13.2,
@@ -2535,7 +2566,7 @@ var MODES=[
   {k:'ride',     h:'Off-road', s:'ORV, dirt bike, side-by-side, MTB — trails, riding areas, fuel', act:'ride',
    kinds:['trailhead','camp','fuel','dayuse','view','info','water','toilet','shelter','store','food','mtb'],
    demote:['store','food','info'],
-   groups:{areas:true,peaks:false,contour:false,relief:false,paddle:false,places:true,county:false,public:false},
+   groups:{areas:true,peaks:false,contour:false,relief:false,paddle:false,places:true,county:false,public:false,forest:false},
    basemap:'Map', zoom:9},
    
   {k:'outdoors', h:'Outdoors', s:'Hike, fish, explore — on foot, with trail systems, hills and rivers', act:'foot', machine:'walk',
@@ -2543,26 +2574,28 @@ var MODES=[
    demote:['camp'],
    peaksFrom:9,
     
-   groups:{areas:false,peaks:true,contour:true,relief:false,paddle:true,places:true,county:false,public:false},
+   groups:{areas:false,peaks:true,contour:true,relief:false,paddle:true,places:true,county:false,public:false,forest:false},
    basemap:'Map', zoom:11},
    
   {k:'hunt',     h:'Hunt',     s:'Public land, game areas, counties, stands and cameras — on foot', act:'foot', machine:'walk',
    kinds:['trailhead','camp','water','toilet','info','system','shelter'],
    peaksFrom:9,
-   groups:{areas:false,peaks:true,contour:true,relief:false,paddle:false,places:true,county:true,public:true},
+   groups:{areas:false,peaks:true,contour:true,relief:false,paddle:false,places:true,county:true,public:true,forest:false},
    basemap:'Map', zoom:11},
   {k:'water',    h:'Water',    s:'Beach, kayak, tube, boat — launches and rivers, no trail lines', act:'none', machine:'kayak',
-   kinds:['livery','launch','beach','camp','dayuse','info','toilet','fuel','lighthouse','marina'],
+    
+   kinds:['livery','launch','beach','camp','dayuse','info','toilet','lighthouse','marina'],
    boost:['launch','beach','lighthouse'],
-   groups:{areas:false,peaks:false,contour:false,relief:false,paddle:true,places:true,county:false,public:false},
+   groups:{areas:false,peaks:false,contour:false,relief:false,paddle:true,places:true,county:false,public:false,forest:false},
    basemap:'Hybrid', zoom:10},
    
   {k:'camp',     h:'Camp',     s:'Campgrounds by type, national and state forest, supplies', act:'ride',
-   kinds:['camp','dayuse','shelter','trailhead','launch','beach','water','toilet','fuel','store','food','info'],
-   boost:['camp'], demote:['info','launch','beach','fuel','store','food'],
+   kinds:['camp','dayuse','shelter','trailhead','launch','beach','water','toilet','store','food','info'],
+   boost:['camp'], demote:['info','launch','beach','store','food'],
    groups:{areas:false,peaks:false,contour:false,relief:false,paddle:false,places:true,county:false,public:true,forest:true},
    basemap:'Map', zoom:10}
 ];
+ 
 var mode='ride', POI_BASE={}, POI_MODEF={}, STACKED={};
 function modeOf(k){return MODES.filter(function(m){return m.k===k})[0]||MODES[0]}
  
@@ -4113,6 +4146,11 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       window.__stack={run:restack,radius:stackRadius,maxz:CLUSTER_MAXZ,
         services:SERVICES,hidden:function(){return Object.keys(STACKED).length},
         out:function(){return STACKOUT},
+         
+        floor:PIN_FLOOR,
+        drawable:function(i,z){var f=poif[i];if(!f)return null;
+          var m=MODES.filter(function(x){return x.k===mode})[0]||MODES[0];
+          return pinDrawable(f.properties,m,z==null?map.getZoom():z)},
         card:stackCard};
     }catch(e){}
      
@@ -4590,6 +4628,19 @@ function stRide(){
   else stInfo('RIDE','battery','not reported by this device');
 }
 
+ 
+function stCompass(){
+  var n=MAGLOG.length;
+  if(!n){stInfo('COMPASS','sensor',MAG_OK===null?'not started — open the compass, wait 3 s, re-run':
+    (MAG_OK?'no events in the last 3 s':'no magnetometer events — the compass shows a rose and no needle'));return}
+  var span=(MAGLOG[n-1].t-MAGLOG[0].t)/1000,rate=span>0?(n-1)/span:0,sx=0,sy=0;
+  MAGLOG.forEach(function(e){sx+=Math.cos(e.d*Math.PI/180);sy+=Math.sin(e.d*Math.PI/180)});
+  var mean=Math.atan2(sy,sx)*180/Math.PI,worst=0;
+  MAGLOG.forEach(function(e){var d=Math.abs(((e.d-mean)%360+540)%360-180);if(d>worst)worst=d});
+  stInfo('COMPASS','sensor',n+' events in '+span.toFixed(1)+' s ('+rate.toFixed(1)+'/s) · raw heading spread ±'+
+    worst.toFixed(0)+'° · steadiness '+(Math.hypot(sx,sy)/n).toFixed(3)+' · '+MAGLOG[n-1].ev+
+    (MAGLOG[n-1].abs?' (absolute)':' (relative)')+' · painted raw, no smoothing')}
+
 function stHaptics(){
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Haptics;
   stAdd('HAPTICS','available',!!(C||navigator.vibrate),
@@ -4696,7 +4747,7 @@ function selfTest(opts,done){
   stEnv();stLoad();
    
   stRender(function(){
-  stLayout();stData();stRouting();stSafety();stRide();stHaptics();
+  stLayout();stData();stRouting();stSafety();stRide();stHaptics();stCompass();
   var finish=function(){var rep=stReport();
     try{window.__selfTestReport=rep}catch(e){}
     if(done)done(rep);return rep};
@@ -4788,15 +4839,19 @@ map.on('moveend',railFoldIfAway);
 function restack(){
   var src;try{src=map.getSource('poistack')}catch(e){return}
   if(!src)return;
-  var z=map.getZoom(),R=stackRadius(z),below=z<CLUSTER_MAXZ;
+  var z=map.getZoom(),R=stackRadius(z);
   var m=MODES.filter(function(x){return x.k===mode})[0]||MODES[0];
-  var kinds=m.kinds||[];
   var cw=map.getCanvas().clientWidth,ch=map.getCanvas().clientHeight,pad=R+8;
+   
+  if(z<PIN_FLOOR){
+    if(STACKOUT.length||Object.keys(STACKED).length){
+      STACKED={};applyStackFilters();STACKOUT=[];STACKSIG='';
+      src.setData({type:'FeatureCollection',features:[]})}
+    return}
   var pts=[];
   for(var i=0;i<poif.length;i++){
     var f=poif[i],k=f.properties.k;
-    if(kinds.indexOf(k)<0)continue;
-    if(below&&SERVICES.indexOf(k)>=0)continue;
+    if(!pinDrawable(f.properties,m,z))continue;
     var p;try{p=map.project(f.geometry.coordinates)}catch(e){continue}
     if(p.x<-pad||p.y<-pad||p.x>cw+pad||p.y>ch+pad)continue;
     pts.push({id:f.properties.i,x:p.x,y:p.y,k:k,

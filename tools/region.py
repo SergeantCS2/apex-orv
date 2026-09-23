@@ -124,7 +124,25 @@ def ensure_workspace(rid=None, quiet=False):
     rid = rid or R.id
     mark = os.path.join(ROOT, ".region")
     prev = open(mark).read().strip() if os.path.exists(mark) else None
+    if prev is None:
+        # take 185 · A198: on CI the marker is never present (gitignored, not in
+        # the cache path list), so every run looked like a region switch and
+        # this wiped the restored payloads before the first step — every CI
+        # build since take 118 rebuilt the whole state (landmine 220). The
+        # region stamp ingest writes IS cached and names the region the data
+        # on disk belongs to; trust it exactly as bundle.py does. A stamp for
+        # another region still wipes.
+        st = os.path.join(ROOT, "region_stamp.json")
+        try:
+            if os.path.exists(st):
+                prev = json.load(open(st)).get("region")
+        except Exception:
+            prev = None
     if prev == rid:
+        if not os.path.exists(mark):
+            open(mark, "w").write(rid)
+            if not quiet:
+                print(f"workspace {rid} recognised from region_stamp.json (A198)")
         return False
     import shutil as _sh
     wiped = 0

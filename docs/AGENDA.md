@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 184.* Ranked by blocking-ness, not by interest.
+*Current as of take 185.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -3492,7 +3492,7 @@ one gate check:
   the sum of rows across 83 county files, printed by the step, and the
   shipped `n` must equal it.
 
-## A197 — Pins: density, mode relevance, stability across zoom · DESIGNED take 184 on measurement (P1 take 185 · P2 186 · P3 187 if needed)
+## A197 — Pins: density, mode relevance, stability across zoom · DESIGNED take 184 on measurement · P1 BUILT take 185 (P2 186 · P3 187 if needed)
 The maintainer, 2026-09-23, with five desktop screenshots in Camp at the
 2-, 3- and 5-mile scales: "every zoom, the pins change, every zoom the pins
 shift … a ton of pins, many of which aren't important to the mode we're
@@ -3515,8 +3515,8 @@ it a destination.
 MEASURED (tools/pins_probe.py, to be committed with P1): an instrument that
 replicates restack() and both pin-layer filters over the built poi.json,
 validated against the screenshots (at z8.8–9.0 it gives 150–163 badges
-with counts to 38 in a 1908×880 Camp view around Grayling; at z10.4 a dozen
-stacks plus lone pins — the images). The screenshots are a desktop viewport,
+with counts to 38 in a 1908×880 Camp view around Grayling; at z10.8 thirteen
+stacks plus ten lone pins — the images). The screenshots are a desktop viewport,
 4.5× the phone's 412×915. On the phone, Camp, mean of five centres
 (Grayling, Traverse City, Houghton Lake, Marquette, Mio):
 - z9: 30 badges, 0 lone pins, 0% of badge members drawable — every badge is
@@ -3566,7 +3566,7 @@ Design, in the order the measurement dictates:
   Fold's inner-screen CSS viewport (from the diagnostics card) so N and the
   harness viewport are measured, not guessed. Q4 any manifest row to flip.
 
-## A198 — CI wipes its restored cache every run; the A191 fallback is unreachable there · FOUND take 183 · fix: tools only, on the maintainer's word
+## A198 — CI wipes its restored cache every run; the A191 fallback is unreachable there · FOUND take 183 · SHIPPED take 185
 PROVEN from CI run 84's bundle log and tools/region.py: actions/cache
 restored the 892 MB region-michigan-v3 snapshot ("Cache hit … not saving
 cache" — an exact-key hit is never re-saved), then ensure_workspace() saw no
@@ -3588,7 +3588,7 @@ after.
 - **Ruled out:** disabling the wipe on CI — a foreign cache shipped the
   wrong state once (landmine 199); the wipe must stay for a real switch.
 
-## A199 — First open: the panel says "You're at Bull Gap, home is the Pink Store" · FOUND take 184 (fix: with A200)
+## A199 — First open: the panel says "You're at Bull Gap, home is the Pink Store" · FOUND take 184 · text fixed take 185, flow redesign with A200
 The maintainer, 2026-09-23: "When the app first opens and you open the
 navigation bar, it says you're at Bull Gap." PROVEN: src/app.html line 716,
 the initial `#panel` text is a hardcoded sentence from the Bull Gap era
@@ -3613,7 +3613,7 @@ should be remembered per mode.
 - **Ruled out:** building before the maintainer approves a design; this is
   the front door of planning and it will be judged on the Fold.
 
-## A201 — Compass "works kinda but still jumpy/glitchy" · OPEN (needs a differential test)
+## A201 — Compass "works kinda but still jumpy/glitchy" · OPEN · readback shipped take 185, the number decides the fix
 The maintainer, 2026-09-23. UNKNOWN whether it is the sensor (device
 orientation events on the Fold), the smoothing, or the heading-up camera.
 Next: a readback diagnostic in the self-test — raw heading, smoothed
@@ -3651,3 +3651,16 @@ hand-added section into manifest.py's tables so the render is faithful,
 then regenerate and diff to empty; gate: render() must equal the file.
 - **Ruled out:** regenerating in take 184 — it would have deleted the
   in-app declarations the gate's §8 allowlist cites.
+
+## A205 — Leaving Camp left the national-forest fill on in every other mode · FOUND and FIXED take 185
+Found by the harness, not a rider: a new probe entered Camp mid-run and the
+Camp land-layer check then saw the forest still drawn in Off-road. Cause,
+PROVEN by a differential test on the built app: applyMode() sets a layer
+group only when the mode names it (deliberate, so user-toggled groups keep
+their state), and `forest` was named only by Camp since take 174 — so
+Off-road, Outdoors, Hunt and Water inherited whatever Camp left. Old build:
+Off-road fresh false, Camp true, Off-road after Camp TRUE; fixed build:
+false. Fix: every mode names forest, as every mode already named public.
+The check now prints its three values (landmine 55).
+- **Ruled out:** treating an unnamed group as off — Lakes & rivers and
+  Labels are unnamed on purpose and follow the rider's toggle.

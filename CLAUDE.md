@@ -45,7 +45,10 @@ before that. One render or gate at a time. Before launching:
 `ps -eo comm | awk '$1=="node"||$1=="chrome"' | wc -l` must print 0;
 `df -h /`; `rm -rf /tmp/puppeteer_dev_chrome_profile-* /tmp/apex-fatal-*`.
 Kill by exact name (`pkill -x node`), never by a pattern the calling shell
-carries (landmine 204).
+carries (landmine 204). Launch as `setsid nohup bash -c 'echo "PID $$"; …' &`
+and stop by the PID the log's first line records, never by `$!`, which is
+a parent that has already exited (landmine 221). Read the process count
+between a kill and a launch.
 
 ## Push hygiene
 - The workflow builds on pushes touching `BUILD`, `src/**`, `tools/**`,
