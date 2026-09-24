@@ -12,6 +12,15 @@
 > named for their lake, the rest stepped back outside Water (175). The
 > study below is history and is kept as written.
 
+> **V4 note (2026-09-23, A203).** The presentation overhaul is studied in
+> docs/DESIGN-v4.md, by this study's method: transcription from the
+> maintainer's reference screenshots (§1–§2). Two things written here were
+> never built and are where V4's Hybrid work (A202) starts: the
+> APEX-Hybrid rules in §3 — water overlaid dark, two-tracks dimmed to
+> quiet rust, labels white with a dark halo, road casings off — and §5's
+> T4 "Hybrid tuning". §3's chrome rules stand; V4's proposals extend them
+> (48 px targets, one component set) rather than replace them.
+
 The maintainer's brief, verbatim intent: **"a love child of onX Offroad and AllTrails,
 but Michigan only."** Hybrid/satellite should read like onX; the default light
 map should read like AllTrails; both must carry the same content — parks,

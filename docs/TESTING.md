@@ -76,8 +76,8 @@ simulated positions. Please ride it.
 
 **Turn by turn**
 
-- Plan a route first (Return home, or long-press a spot → Start here /
-  Route here), then Ride it.
+- Plan a route first (Return home, or long-press a spot → Start from here /
+  Directions here), then Ride it.
 - The strip at the top should name the next turn and count the distance
   down: "In 400 ft · Turn left onto Trail 7". **Does it call a turn that
   isn't there? Miss one that is?** Either is the report we most want.
@@ -134,8 +134,8 @@ simulated positions. Please ride it.
 
 ## 6. The five modes
 
-Cycle the mode chip and confirm the whole map follows — layers, pins,
-routing, the machine button.
+Open the mode chip, pick each mode in turn, and confirm the whole map
+follows — layers, pins, routing, the machine button.
 
 - **Off-road** — trails by legal width, riding areas, fuel. Do riding areas
   (Bull Gap, Silver Lake, Mack Lake) look like open ground?

@@ -1809,6 +1809,10 @@ The maintainer, take 99: *"Do we have the tool bucket/tab?"*
   hence the invisible-tap risk and the check that covers it (landmine 158).
 - **Closes** the presentation gap measured at A116. All four numbers now match
   what a finished app looks like.
+- **Corrected (2026-09-23, V4 study):** "zero hard-coded sizes remain" no
+  longer holds — raw px sizes sit outside the scale at src/app.html:66, 67,
+  75, 77, 210, 228, 240, 241 (the tour card, the toast, the splash label,
+  the ride strip). They move onto the scale with A215.
 
 ### A119 resolved at take 101 — Tools is a bucket (see A119 above)
 
@@ -2264,6 +2268,9 @@ poi payload (`t: 1|2`), two symbol layers.
 Screenshots at Silver Lake: the folded sheet's top edge overlaps the
 button row. Fold height vs button row bottom margin; check on the Fold's
 411×960 inner screen with the Android gesture bar.
+*Corrected (2026-09-23, V4 study): 411×960 is the Fold's cover screen
+(landmines 87, 95; tools/render.mjs labels it "fold (cover screen)"). The
+inner screen has never been measured (A197 Q3).*
 
 ### A145 — elevation readout + basemap selector: move up, recolour · P3
 Now the quick chips are gone the top-left stack can rise; the readout is
@@ -2855,6 +2862,10 @@ which.
 - **Ruled out:** tuning it blind on my own taste. The numbers already
   pass; the thing being tuned is how it FEELS at arm's length, and that
   is his measurement, not mine.
+- **Corrected (2026-09-23, V4 study):** the knobs above are history. The
+  radius now runs 48 px at z8 to 24 px at z14 (src/app.html:1340-1342) and
+  stacks form at every zoom from z9.2 (`PIN_FLOOR`, 1353); the pool is
+  what the layers draw since A197 P1.
 
 ## A175 — Splash timing · CLOSED (field-confirmed take 158)
 Lifting on the first idle frame is correct: "when it goes away,
@@ -3492,7 +3503,7 @@ one gate check:
   the sum of rows across 83 county files, printed by the step, and the
   shipped `n` must equal it.
 
-## A197 — Pins: density, mode relevance, stability across zoom · DESIGNED take 184 on measurement · P1 BUILT take 185 · P2 BUILDING take 186 (P3 187 if needed)
+## A197 — Pins: density, mode relevance, stability across zoom · DESIGNED take 184 on measurement · P1 BUILT take 185 · P2 BUILT take 186 · P3 DESIGNING (V4 study, docs/DESIGN-v4.md §10)
 The maintainer, 2026-09-23, with five desktop screenshots in Camp at the
 2-, 3- and 5-mile scales: "every zoom, the pins change, every zoom the pins
 shift … a ton of pins, many of which aren't important to the mode we're
@@ -3565,6 +3576,16 @@ Design, in the order the measurement dictates:
   with marina fuel only. Q2 store in Camp — available-off or on. Q3 the
   Fold's inner-screen CSS viewport (from the diagnostics card) so N and the
   harness viewport are measured, not guessed. Q4 any manifest row to flip.
+- **Field verdict (the maintainer, 2026-09-23; the take it was judged on is
+  asked):** "Pins still need work, but it was better than before. They
+  still shift around, some are unknown, some phase in and out with small
+  zoom adjustments." "Unknown" means look-alike badges (A214). P3 is
+  designed in docs/DESIGN-v4.md §10: the A209 and A210 defects first,
+  instruments calibrated, then zoom-banded stacks.
+- **Corrected (V4 study):** P1's "Marina to priority 0 in poi.py" never
+  shipped — `PRI0` at tools/poi.py:361 leaves marina out. The study asks
+  the maintainer to build it (a pipeline change, §6b clean run) or rule it
+  out.
 
 ## A198 — CI wipes its restored cache every run; the A191 fallback is unreachable there · FOUND take 183 · SHIPPED take 185 · MEASURED run 86
 PROVEN from CI run 84's bundle log and tools/region.py: actions/cache
@@ -3620,7 +3641,7 @@ Next: a readback diagnostic in the self-test — raw heading, smoothed
 heading, update rate over ten seconds — before any change (PROTOCOL §5.3).
 - **Ruled out:** tuning the filter blind; the number comes first.
 
-## A202 — Hybrid looks cheap: the colour scheme of roads and pins over imagery · OPEN (design first)
+## A202 — Hybrid looks cheap: the colour scheme of roads and pins over imagery · DESIGNING (V4 study, docs/DESIGN-v4.md §9)
 The maintainer, 2026-09-23: "not due to low res, just the color scheme of
 roads/pins and more." The road casings, trail colours and pin badges were
 tuned on the Map basemap; over imagery they need their own palette pass
@@ -3628,8 +3649,20 @@ tuned on the Map basemap; over imagery they need their own palette pass
 before a build, judged on the Fold.
 - **Ruled out:** touching the Map basemap's palette in the same change; the
   legend-vs-map palette check (gate) holds each basemap separately.
+- **Corrected (2026-09-23, V4 study):** the palette check does not hold
+  each basemap — tools/verify_palette.mjs never touches `c-base` (it runs on
+  Map only), and check_palette's id regex (tools/gate.py:225) skips
+  hyphenated ids, so the grey outlines `minor-case`/`paved-case`
+  (src/app.html:2494-2495) escape it. Closed by A211.
+- **The maintainer, 2026-09-23:** "many grey lines scattered around when
+  zoomed out — hard to see detail of the map, the whole point of hybrid."
+  PROVEN cause: those two outlines are never dimmed or narrowed on imagery
+  (`setBasemap`, 4420-4480, touches only the centre lines); reproduced in
+  the V4 baseline shots at z7 and z9. Decisions D1–D7 in
+  docs/DESIGN-v4.md §9; Satellite = Hybrid is A212; basemap × machine is
+  A213.
 
-## A203 — UI overhaul: easier, better looking, more premium, same features and more · LATER (umbrella)
+## A203 — UI overhaul: easier, better looking, more premium, same features and more · DESIGNING (V4 study, docs/DESIGN-v4.md)
 The maintainer, 2026-09-23: "At some point I would like to do what I did
 with pins and do a UI overhaul of some kind." An umbrella for A197, A200
 and A202 and whatever the tester round adds; not a take of its own until a
@@ -3637,6 +3670,15 @@ design exists.
 - **Ruled out:** starting it before the pins arc and the first-open flow
   have landed — those are the overhaul's first two pieces and they will
   teach the rest.
+- **Opened 2026-09-23 (V4 study):** P1 and P2 (takes 185–186) and the
+  first-open flow (A199, A200) have landed, and the maintainer asked for
+  the overhaul with the ui-ux-pro-max skill: "The feature set is there, we
+  just need to present it better." Answers the same day: one dark look;
+  study first, then staged takes; references from the maintainer; Map +
+  Hybrid only. The pieces: A197 P3, A202, A208–A217, in takes 187–190
+  (docs/DESIGN-v4.md §12).
+- **Ruled out:** a rebrand, a framework or a native rewrite, and designing
+  the look from the skill's palettes — docs/DESIGN-v4.md §12 says why.
 
 ## A204 — docs/PROVISION.md no longer regenerates from tools/manifest.py · FOUND take 184 · BUILDING take 186
 PROVEN at take 184: `python3 tools/manifest.py` rewrites docs/PROVISION.md
@@ -3699,3 +3741,157 @@ so a per-step stamp only helps once the key changes.
 - **Ruled out:** skipping on "payload exists" — the clean-run rule exists
   because artifacts on disk hid four broken steps at take 13.
 - **Ruled out:** doing it inside take 186 — three items are already in it.
+
+## A208 — V4 foundation: CSS tokens proven by a computed-style diff, and guards with planted controls · DESIGNED 2026-09-23 (V4 study §5, §11) · take 187
+Tokens for colour, z-index and motion completely, and for radius, spacing
+and shadows where a value is shared, each holding today's value
+(docs/DESIGN-v4.md §5). The proof: rebuild www/ only, dump
+`getComputedStyle` for every `#shell` element with each panel and state
+open, and diff it against take 186 — the diff must be empty. Then the §11
+guards at today's floors (38 px targets, 9 px text, today's contrast set),
+each run on its planted control first: contrast composited over white and
+black (A150's never-built check), tap targets on every interactive
+element, a text floor, raw colour literals in the comment-stripped www/,
+the accent counter reading the token, every `var(--x)` declared, CSS/JS
+shared colours equal, Barlow applied.
+- **Ruled out:** tokens read from JS — smoke's `getComputedStyle` stub has
+  no `getPropertyValue` (tools/smoke.mjs:326); the JS tables stay JS and a
+  gate check keeps the shared values equal.
+- **Ruled out:** a pixel diff as the proof — label placement is
+  asynchronous; ask the browser (landmines 99, 189).
+- **Ruled out:** V4 floors in take 187 — the baseline would be almost the
+  whole UI (every control label is 11 px); floors rise in take 189.
+
+## A209 — Pin stacks anchor on the wrong member and can go stale · FOUND 2026-09-23 (code) · take 187
+PROVEN in src/app.html: restack's rank `(+r||9)*10+(+pri||3)` (7134) reads
+rank 0 and priority 0 as missing — a lighthouse sorts last of all kinds and
+every priority-0 destination sorts as priority 3; the stack list's sort
+repeats it (7190). The "unchanged" signature (7166) is the count plus
+name:member-count per stack, blind to which pins and where, so a changed
+set can be skipped and leave stale badges. INFERRED from a scratch replay
+not yet validated: in Water 30 of 73 badges sit on an unintended member.
+tools/pins_probe.py:145 ranks differently from the app; it is fixed in the
+same take so the probe can stand in for the old restack.
+- **Ruled out:** tuning the radius instead — the anchor is chosen by rank,
+  and the rank is wrong.
+
+## A210 — poi-dot draws zoom-gated kinds early: modeFilter gates only step filters · FOUND 2026-09-23 (code) · take 187, after a live read
+PROVEN by reading: `modeFilter` (src/app.html:4364-4373) adds the per-kind
+zoom gate only when a layer's base filter is a zoom step; `poi-dot`'s
+(2654) is not, so kinds a mode puts at z13 (info; Food and Store when
+switched on) would draw unstacked from z11.4 — against take 186's "a
+switched-on kind draws from where it draws today (z13)". Render's Camp z12
+check passes (extra===0), so either its view holds no gated pin or the
+check is vacuous. First a live read on a view that provably contains a
+gated non-destination pin, printing its count (landmines 55, 130); then
+the fix.
+- **Ruled out:** fixing before the live read — a check that passes on empty
+  ground is landmine 54's shape.
+
+## A211 — Harness blind spots a redesign would walk through · FOUND 2026-09-23 (V4 study survey) · take 187
+Each closed with a planted control. The render, probe and palette servers
+serve .svg and .woff2 as octet-stream (MIME tables at tools/render.mjs:47,
+tools/probe.mjs:21, tools/verify_palette.mjs:22). `check_offline`
+(tools/gate.py:132) scans only the top level of www/ — made recursive, with
+a cited allowance for the SVG namespace in the MapLibre vendor files and
+the worker's URL. Render's device list names the stale `c-labels` (3153).
+`verify_palette` silently skips a renamed legend row and never runs on
+Hybrid. `check_palette`'s id regex skips hyphenated ids (gate.py:225) — the
+grey outline colours move into PAL at the same values. The emoji check
+(render:2896) covers `#shell` buttons only, so `#nav`'s 🔊 is never seen.
+- **Ruled out:** raising the in-app self-test's tap check — smoke fakes 40
+  px for every element (tools/smoke.mjs:113) and the self-test ships to
+  riders; the full-coverage check lives in render.
+
+## A212 — Satellite and Hybrid are one basemap · FOUND and DECIDED 2026-09-23: Map + Hybrid only · take 188
+PROVEN: `setBasemap` computes `sat=(m!=='Map')` (src/app.html:4427) and
+nothing else distinguishes Satellite from Hybrid (the only other test is
+`==='Map'`, 5454): the chip cycles three labels over two states. The
+maintainer chose to drop the duplicate. Updated in the same commit: render
+(482, 741, 757, 780, 804, 2983, 3007-3031), smoke (1223),
+tools/probe.mjs:117, and the tour's "Map, satellite or hybrid" (3311) with
+a tour key bump (A147).
+- **Ruled out:** a photo-first Satellite without roads — hiding roads
+  needs landmine 129's never-hide list; offered and not chosen.
+- **Ruled out:** keeping three choices — two labels for one state is not
+  honest.
+
+## A213 — Basemap and machine overwrite each other's road opacity; a restored Water mode opens on Map · FOUND 2026-09-23 (the second INFERRED) · design in V4 study §9 D3 · take 188
+PROVEN: `applyMachine` (src/app.html:4128-4150) rebuilds line-opacity on
+minor, paved, casing-track and casing-fsroad from values read at startup
+on Map, so on Hybrid it undoes the imagery dimming; `setBasemap` writes
+plain numbers over the machine's `case` on casing-track and casing-fsroad.
+Craft machines have `ok:[]` (1027-1029), so in Water the roads' look
+depends on which basemap came before. INFERRED: `setBasemap(0)` at load
+(7265) runs after the mode restore, so a restored Water mode opens on Map;
+render:482-483 accepts Map either way.
+- **Ruled out:** simply multiplying the two — paved at 0.35 × 0.30 ≈ 0.1 and
+  track casings at 0.12 read as absent (landmine 115); the study picks the
+  rule with a floor.
+- **Ruled out:** plain numbers — render reads the `case` shape and 0.285
+  (tools/render.mjs:3342-3354).
+
+## A214 — Look-alike pin badges, and no pin legend · OPEN (V4 design §10) · take 188
+The maintainer, 2026-09-23: "some are unknown" — meaning look-alike
+badges, not names. PROVEN: launch = marina (src/app.html:1221/1232); info =
+toilet (1239/1241); lighthouse and view share the eye glyph; trail system
+and day-use share the tree glyph, greens ΔE≈12 apart (1223/1227); the
+paddle badges duplicate launch, camp and info (1312-1313). OBSERVED in the
+V4 baseline shots: at badge size the campground tent reads as a warning
+triangle. There is no pin legend; the Pins rows show a colour swatch
+(5484-5486). Design: a distinct glyph and colour per kind, colours from the
+references; the Pins rows show the map's own badge image, checked equal
+(landmine 98).
+- **Ruled out:** keeping A197's "no new art" — the maintainer's verdict is
+  that the badges cannot be told apart; the glyph source (today's stroke
+  style or Lucide paths) is chosen by rendering both at z9.2, z10 and z12
+  at DPR 2.625.
+- **Ruled out:** renaming pins as the fix — junk names were not the
+  complaint.
+
+## A215 — Hard to read outdoors: type, contrast, tap targets, map share · OPEN (V4 design §5, §8, §11) · take 189
+The maintainer, 2026-09-23, chose "hard to read outdoors". PROVEN: type
+tokens 9 / 11 / 12.5 / 15 / 18 / 30 px (src/app.html:130), every control
+label 11 px, captions 9 px; `--dim` on the rail 3.3:1 (calculated); the
+ride strip's buttons ~23 px tall (228-232); the tap floor 38 px, checked on
+four classes (6497-6503). MEASURED (desktop Chrome, take 186): the band
+clear of floating controls is 59% / 39% of the height at 411×960, drawer
+folded / open, and 51% / 26% at 360×800 (docs/DESIGN-v4.md §1.6). Design:
+the six-step scale re-based as one decision; text ≥7:1 / ≥4.5:1, non-text
+≥3:1; 48 px targets, 56 px ride controls; the clear band never shrinks.
+- **Ruled out:** a light theme — the maintainer chose one dark look.
+- **Ruled out:** folding map label sizes into the scale (landmine 157,
+  A120).
+- **Ruled out:** paying for size with map — the §1.6 band is a floor.
+
+## A216 — Twelve button families: one component set, one icon per meaning, developer copy out · OPEN (V4 design §6) · take 189
+The maintainer, 2026-09-23, chose "feels inconsistent". PROVEN (take-186
+survey): 12 button families, 8 selected treatments, 4 sheet types, 3
+card-title styles, 15 radii, 13 shadows, ~16 near-duplicate greys, 13
+unused or stale colour tokens; icons with several meanings (`locate`,
+`alert`, `play`, `mountain` for all five modes) and text glyphs as icons
+(▸ ⌂ ◉ ☎ ⤢ ☆ ✕, the turn arrows); 🔊 on `#nav`; "Tell Claude you saw
+RENDER FAIL" (5838) and metres in the navigation line (5255) reach the
+rider. Design: docs/DESIGN-v4.md §6, with licence notices for Lucide (ISC)
+and Barlow (OFL) in Data sources and PROVISION.
+- **Ruled out:** a UI framework or Tailwind — A116, landmine 153; smoke's
+  fake DOM and `check_stubs` bound the markup.
+- **Ruled out:** removing "MAP CENTRE" — it is honesty copy, and smoke
+  asserts it.
+
+## A217 — Planning and starting a route are buried · OPEN (V4 design §7) · take 190
+The maintainer, 2026-09-23: "very confusing to use certain features,
+hidden behind menus, actions" — planning and starting a route. PROVEN from
+the handlers: plan and ride to a place is 4 actions (long-press →
+Directions here → Ride tab → Ride it); Return home and ride is 4 from the
+folded drawer the app opens with — the action row is collapsed there
+(src/app.html:479) — and 3 once it is open; the Plan
+tab is six chips in a sideways strip, two off screen (V4 baseline);
+"Directions here" (a route to a place) and "Directions" (the turn list)
+are different things; Ride it is not on the route card. Targets in
+docs/DESIGN-v4.md §7: 3 and 2 actions, free ride stays 2, the turn list
+renamed, A113's five-on-screen rule re-decided with a counter.
+- **Ruled out:** a router with separate screens (A113) — the map stays
+  visible in every destination.
+- **Ruled out:** lengthening any one-tap path (landmine 135), free ride
+  included.

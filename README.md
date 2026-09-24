@@ -57,8 +57,8 @@ going, tilts and follows — like a navigation app, on two-tracks.
 
 ## Five modes, one chip
 
-The mode chip cycles the whole map — layers, pins, routing and the machine
-button all follow.
+Pick a mode from the mode chip and the whole map follows — layers, pins,
+routing and the machine button.
 
 | Mode | What the map becomes |
 |---|---|
