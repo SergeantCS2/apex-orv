@@ -630,7 +630,7 @@ function cmpRows(hdg){
     if(!at||!ME)return;
     var b=bearing(ME,at),d=mi(ME,at);
      
-    if(d<0.02){out.push('<b>'+label+'</b> <span style="color:#9C9384">'+
+    if(d<0.02){out.push('<b>'+label+'</b> <span style="color:var(--c-9c9384)">'+
       'you are here</span>');return}
     var rel=hdg===null?null:((b-hdg+540)%360-180);
     out.push('<b>'+label+'</b> '+compass(b)+' '+Math.round(b)+'\u00B0 · '+
@@ -649,11 +649,11 @@ function cmpPaint(){
   var H=headingNow(),hdg=H?H.deg:null,rows=cmpRows(hdg);
   box.innerHTML='<div style="text-align:center">'+cmpRose(hdg)+
     '<div style="font:700 var(--t-lg)/1 Barlow,Roboto,system-ui,sans-serif;margin-top:4px">'+
-    (hdg===null?'<span style="color:#9C9384;font-size:var(--t-sm)">'+
+    (hdg===null?'<span style="color:var(--c-9c9384);font-size:var(--t-sm)">'+
        (MAG_OK===false?'this phone is not reporting a compass \u2014 start moving '+
          'and it will use your GPS course instead'
         :'waiting for the compass\u2026')+'</span>'
-     :compass(hdg)+' <span style="color:#9C9384">'+Math.round(hdg)+'\u00B0 true \u00B7 '+
+     :compass(hdg)+' <span style="color:var(--c-9c9384)">'+Math.round(hdg)+'\u00B0 true \u00B7 '+
        (H.src==='compass'?'compass':'course')+'</span>')+
     '</div></div>'+
     (rows.length?'<div style="margin-top:9px;line-height:1.7">'+rows.join('<br>')+'</div>'
@@ -679,7 +679,7 @@ function runCard(a,b,riv){
   rows.push('Take out <b>'+nm(takeOut)+'</b>');
   rows.push('About <b>'+(hi-lo).toFixed(1)+' mi</b> of river between them');
   if(dams.length)
-    rows.push('<b style="color:#C1121F">'+dams.length+' dam'+(dams.length>1?'s':'')+
+    rows.push('<b style="color:var(--shut)">'+dams.length+' dam'+(dams.length>1?'s':'')+
       ' on the way — '+dams.map(nm).join(', ')+'. You must take out and portage '+
       (dams.length>1?'each one':'it')+'.</b>');
   else
@@ -770,7 +770,7 @@ function paddleCard(ft){
     ' <span class="sub">'+riv+'</span>';
   var rows=[];
   if(isDam){
-    rows.push('<b style="color:#C1121F">DAM — you must take out and portage.</b>');
+    rows.push('<b style="color:var(--shut)">DAM — you must take out and portage.</b>');
     var atDam=stops.filter(function(f){
       return f.k!=='dam'&&Math.abs(f.mi-mi)<0.35});
     if(atDam.length)
@@ -794,7 +794,7 @@ function paddleCard(ft){
     var t=stops[j],gap=Math.abs(t.mi-mi),dams=between(bi,j);
     return (dir<0?'Above: ':'Below: ')+'<b>'+(t.n||PADKIND[t.k]||t.k)+'</b> · '+
       (gap<0.1?'at the same spot':gap.toFixed(1)+' mi · '+paddleHours(gap))+
-      (dams.length?' · <b style="color:#C1121F">'+dams.join(', ')+' in between — portage</b>'
+      (dams.length?' · <b style="color:var(--shut)">'+dams.join(', ')+' in between — portage</b>'
                  :' · no dam between')}
   if(bi>=0){
     var up=side(-1),dn=side(1);
@@ -888,6 +888,8 @@ var PAL={
    
    
   minor:'#FFFFFF', paved:'#FFFFFF',
+   
+  minorcase:'#C9C8C2', pavedcase:'#BFBEB8',
    
   closed:'#C1121F', fsclosed:'#C1121F',
    
@@ -1242,8 +1244,8 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       paint:{'line-color':'#FFFFFF','line-opacity':0.55,'line-width':w(1.2,2.6,5.5)}},
      
      
-    lyr('minor-case','minor','#C9C8C2',w(1.2,2.1,3.8)),
-    lyr('paved-case','paved','#BFBEB8',w(1.9,3.4,6.6)),
+    lyr('minor-case','minor',PAL.minorcase,w(1.2,2.1,3.8)),
+    lyr('paved-case','paved',PAL.pavedcase,w(1.9,3.4,6.6)),
     lyr('minor','minor',PAL.minor,w(0.4,0.9,2.2)),
     lyr('paved','paved',PAL.paved,w(0.9,2,4.8)),
      
@@ -2415,7 +2417,7 @@ function renderHits(list){
           show('<div class="tn">'+c.n+'</div>'+
             '<b>'+c.mi+' mi</b> mapped · '+stops.length+' access point'+
             (stops.length===1?'':'s')+
-            (dams.length?' · <b style="color:#C1121F">'+dams.length+' dam'+
+            (dams.length?' · <b style="color:var(--shut)">'+dams.length+' dam'+
               (dams.length>1?'s':'')+' — portages</b>':'')+
             '<br><span class="sub">Tap a stop on the river to plan a run — '+
             'in Water mode a launch pin works too.</span>','');
@@ -2491,7 +2493,7 @@ el('btn-steps').addEventListener('click',function(){
     html+='<div class="st"><div class="ar">'+s.turn[1]+'</div><div class="tx">'+
       s.turn[0]+' '+(named?'<b>'+nm+'</b>':'<i class="unn">'+nm+'</i>')+
       (MACHINE[machine].ok.indexOf(s.cls)<0?' <span class="tag shut">illegal</span>':'')+
-      (s.up>8?'<br><span style="color:#C9A227">climbs '+ft(s.up)+' ft</span>':'')+
+      (s.up>8?'<br><span style="color:var(--c-c9a227)">climbs '+ft(s.up)+' ft</span>':'')+
       '</div><div class="d">'+(s.mi<0.1?(s.mi*5280|0)+' ft':s.mi.toFixed(1)+' mi')+
       (at>0.05?'<div class="at">at '+at.toFixed(1)+' mi</div>':'')+
       '</div></div>'});
@@ -2700,7 +2702,8 @@ function modeFilter(base,m,id){
     for(var i=3;i<base.length;i+=2){out.push(base[i]);out.push(wrap(base[i+1]))}
     return out}
   var b=(base===true)?['literal',true]:base;
-  return ['all',inK,b]}
+   
+  return wrap(b)}
 
 function applyMode(k,opts){
   opts=opts||{};var m=modeOf(k);mode=m.k;
@@ -3605,7 +3608,7 @@ function buildLyrPanel(){
     var sel=(i===bmi),dis=(i>0&&!SAT_OK);
     h+='<button class="actrow'+(sel?' on':'')+'" data-bm="'+i+'"'+
        (dis?' disabled':'')+'>'+
-       '<span class="sw" style="background-color:'+(i===0?'#E4D7BC':'#4E6A4A')+'"></span>'+
+       '<span class="sw" style="background-color:'+(i===0?'var(--sand)':'var(--c-4e6a4a)')+'"></span>'+
        '<span>'+nm+(dis?' — not in this bundle':'')+'</span></button>'});
   h+='<div class="sect">Layers</div>';
   LYRGROUPS.forEach(function(g,i){
@@ -3745,7 +3748,7 @@ function sourcesCard(){
     'before you ride.</div>'+
     '<div class="sub">'+SOURCES.map(function(r){
       return '<b>'+r[0]+'</b><br>'+r[1]+'<br><a href="'+r[2]+
-        '" target="_blank" rel="noopener" style="color:#D98E32">'+r[2]+'</a>'
+        '" target="_blank" rel="noopener" style="color:var(--c-d98e32)">'+r[2]+'</a>'
       }).join('<br><br>')+'</div>'+
     (PRIVACY_URL?'<div class="k">PRIVACY</div><div class="sub"><a href="'+PRIVACY_URL+'" target="_blank" rel="noopener">Privacy policy</a> — '+
       'nothing you do in this app is sent anywhere; the policy says so in full.</div>':'')+
@@ -4098,7 +4101,7 @@ function placeCard(at,kind,title){
   if(kind!=='me')rows.push('<span class="unit">'+d.toFixed(2)+' mi '+b.pt+
     ' ('+b.deg+'°) from your position</span>');
   var ad=addressAt(at)||addressAt(at,true);
-  if(ad)rows.push('<span style="color:#F5EFE2">'+ad.txt+'</span>');
+  if(ad)rows.push('<span style="color:var(--bone)">'+ad.txt+'</span>');
   if(ne)rows.push('<span class="unit">nearest: '+(ne.e.n||label(ne.e.c))+
     (ne.e.id?' · '+ne.e.id:'')+' — '+ne.mi.toFixed(2)+' mi</span>');
   var acts=[];
@@ -4787,15 +4790,15 @@ function stRenderPanel(rep){
   var rows=ST.map(function(r){
     var col=r.ok===null?'#9A9184':(r.ok?'#8FAE63':'#C1121F');
     var mk=r.ok===null?'·':(r.ok?'✓':'✕');
-    return '<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid #241F1A">'+
+    return '<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--c-241f1a)">'+
       '<span style="color:'+col+';font-weight:700;width:12px">'+mk+'</span>'+
-      '<span style="color:#F5EFE2;min-width:112px;font:600 var(--t-sm) ui-monospace,monospace">'+
+      '<span style="color:var(--bone);min-width:112px;font:600 var(--t-sm) ui-monospace,monospace">'+
       r.g+'·'+r.id+'</span>'+
-      '<span style="color:#C9C0B2;font-size:var(--t-sm);flex:1">'+
+      '<span style="color:var(--c-c9c0b2);font-size:var(--t-sm);flex:1">'+
       String(r.d).replace(/[<>]/g,'')+'</span></div>'}).join('');
   var bad=rep.fail>0;
   show('<b style="font-size:var(--t-lg)">Self-test · '+
-    '<span style="color:'+(bad?'#C1121F':'#8FAE63')+'">'+rep.pass+' passed, '+
+    '<span style="color:'+(bad?'var(--shut)':'var(--ok)')+'">'+rep.pass+' passed, '+
     rep.fail+' failed</span></b><br>'+
     '<div style="max-height:46vh;overflow:auto;margin:8px 0">'+rows+'</div>'+
     '<button id="st-copy" class="chip">Copy report</button> '+
@@ -4957,8 +4960,9 @@ function restack(){
     if(!pinDrawable(f.properties,m,z))continue;
     var p;try{p=map.project(f.geometry.coordinates)}catch(e){continue}
     if(p.x<-pad||p.y<-pad||p.x>cw+pad||p.y>ch+pad)continue;
+     
     pts.push({id:f.properties.i,x:p.x,y:p.y,k:k,
-      r:(+f.properties.r||9)*10+(+f.properties.pri||3),
+      r:(f.properties.r==null?9:+f.properties.r)*10+(f.properties.pri==null?3:+f.properties.pri),
       c:f.geometry.coordinates})}
   pts.sort(function(a,b){return a.r-b.r});
   var cell=R,grid={},stacks=[];
@@ -4987,7 +4991,9 @@ function restack(){
   STACKED=hide;
   if(changed)applyStackFilters();
    
-  var sig=out.length+'|'+out.map(function(f){return f.properties.n+':'+f.properties.ids.length}).join(',');
+   
+  var sig=out.length+'|'+out.map(function(f){return f.properties.ids+'@'+f.properties.k+'@'+
+    f.geometry.coordinates.join(',')}).join('|');
   STACKOUT=out;
   if(sig===STACKSIG)return;
   STACKSIG=sig;
@@ -5004,7 +5010,9 @@ function stackCard(f){
    
   RAIL_AT=f.geometry.coordinates.slice();
    
-  recs.sort(function(a,b){var ka=(POIKIND[a.r.k]||{}).r||9,kb=(POIKIND[b.r.k]||{}).r||9;
+   
+  recs.sort(function(a,b){var pa=POIKIND[a.r.k],pb=POIKIND[b.r.k],
+      ka=(pa&&pa.r!=null)?pa.r:9,kb=(pb&&pb.r!=null)?pb.r:9;
     return ka-kb||(a.r.n||'').localeCompare(b.r.n||'')});
   var rows='',lastK=null;
   recs.forEach(function(o,n){
@@ -5013,7 +5021,7 @@ function stackCard(f){
       (kd.h||o.r.k).toUpperCase()+'</div>';lastK=o.r.k}
     rows+='<button class="chip" data-si="'+n+'" style="width:100%;'+
       'justify-content:flex-start;text-align:left">'+
-      '<span style="color:'+(kd.c||'#8B857A')+'">\u25cf</span><span>'+nm+'</span></button>'});
+      '<span style="color:'+(kd.c||'var(--c-8b857a)')+'">\u25cf</span><span>'+nm+'</span></button>'});
   show('<b>'+recs.length+' places here</b>'+
     '<div class="sub">Stacked at this zoom. Tap one, or keep zooming in.</div>'+
     '<div style="max-height:46vh;overflow:auto">'+rows+'</div>','');
@@ -5190,7 +5198,7 @@ map.on('click',function(e){
         if(rec.runs&&rec.runs.length)x+='<div class="k">RUNS \u00b7 '+rec.runs.length+'</div>'+
           '<div class="sub">'+rec.runs.map(function(r){return '<span style="color:'+
           (DCOL[r.d]||'#8B857A')+'">\u25cf</span> '+r.n+(DLAB[r.d]?' \u00b7 '+DLAB[r.d]:'')}).join('<br>')+'</div>';
-        if(rec.web)x+='<div class="sub"><a href="'+rec.web+'" target="_blank" style="color:#D98E32">Website \u2197</a></div>';
+        if(rec.web)x+='<div class="sub"><a href="'+rec.web+'" target="_blank" style="color:var(--c-d98e32)">Website \u2197</a></div>';
         return x})()+
       (wrun?'<div class="k">ON THE '+wrun.riv.toUpperCase().replace('RIVER','').trim()+' RIVER</div>'+
         '<div class="sub">'+
@@ -5255,7 +5263,7 @@ map.on('click',function(e){
   var _rs=restrictOf(ed);
   if(_rs){
     var banned=_rs.ban&&_rs.ban.indexOf(machine)>=0;
-    bits.push('<br><b'+(banned?' style="color:#C1121F"':'')+'>'+
+    bits.push('<br><b'+(banned?' style="color:var(--shut)"':'')+'>'+
       (banned?'NOT for your machine — ':'Restriction: ')+'</b>'+_rs.say+
       (_rs.unknown?' <span class="sub">(as published; not interpreted)</span>':''));}
   if(UP[ed.i]||DN[ed.i])bits.push('+'+ft(UP[ed.i])+' / -'+ft(DN[ed.i])+' ft');

@@ -1,4 +1,223 @@
-# HANDOFF — through Take 186 · V3
+# HANDOFF — through Take 187 · V3
+
+## Take 187 — 2026-09-23 — V4 foundation: tokens proven by a computed-style diff, guards with planted controls (A208); pin anchors and stale stacks (A209); poi-dot's zoom gate (A210); harness blind spots and the inner screen (A211)
+
+Before this take: the V4 design study (A203) — docs/DESIGN-v4.md, AGENDA
+A208–A217, the brief rewritten — committed as 498539a, docs only, not yet
+pushed. The maintainer, the same evening: "Continue onwards, tokens are a
+non issue", with eight reference screenshots (onX Offroad ×4, AllTrails,
+onX Backcountry ×3 — transcribed in docs/DESIGN-v4.md §4) and the take-186
+self-test from the Fold. From that self-test: the inner screen is 749×832
+CSS px at dpr 2.625 (A197 Q3) — a size the harness had never laid the app
+out at — and "Web Speech API absent in this WebView": spoken
+turn-by-turn is silent on the phone (A218, recorded, not built). The pins,
+restated: "how they shift as you zoom in the same spot, and some seem to
+popup/disappear. It's just super inconsistent."
+
+A208 — the foundation. The token pass: the stylesheet's 139 colour literals,
+16 z-indexes and 16 raw durations, and the 20 colour literals in template
+inline styles, now read var() — 104 new tokens plus the ten that existed
+(bone, flag, shut, route, rail, line, dim, ok, sand, ink), every one holding
+the value it replaced. The twelve difficulty tokens that were stale, unused
+copies of PAL are gone. The new ones are named by value on purpose: take 189
+gives them V4 roles and removes the block. Deviation from the study, said
+here: radius and spacing were not tokenised — take 189 puts them straight
+onto the V4 scale, and aliasing today's 15 radii and ~38 paddings first
+would be churn. The proof is not the script: `node tools/probe.mjs styles`
+dumps the computed style of every element (51 properties) in 21 states, each
+from a fresh load; `stylediff` of the take-186 build against this one:
+IDENTICAL — every element's computed style in all 21 states, before and
+after. Its negative control: a planted colour change in a copy of the dump
+is reported by element and property. Guards, each on a planted input every
+run — gate `check_tokens`: no colour literal in the stylesheet outside :root
+and none in a template's inline style (the take-186 source fails it, naming
+139 and 20), every var() declared (123 tokens; --strip-h is set at run
+time), and five colours the stylesheet shares with the script and the loader
+agree (--shut/PAL.closed, --route/the route line, --bone, --rail and
+--flag/the fatal screen). Its scope, said plainly: hex and rgb() literals
+in the stylesheet and in templates' style= attributes (the stylesheet holds
+no named colour but `transparent`, and no hsl); the five colours in inline
+SVG fill=/stroke= attributes and the five canvas colours stay with the JS
+tables, which take 189 decides (docs/DESIGN-v4.md §5). Render: the V4 audit — tap targets on every
+interactive element, a 9 px text floor, and WCAG contrast against the
+composited background (over white and black where it floats on the map) — in
+15 forced states on a clean reload — the reload asserted ready and each
+state asserted reached before it is audited, both on planted controls (a
+wait that times out, a state that never opens), each state waited for frame
+by frame until it is reached and its transitions and animations are done
+(landmine 224) — today's offenders listed exactly (a new offender fails,
+and so does a listed one the audit no longer sees: a fixed one leaves its
+list in the same change, one no longer reached is a coverage loss, not a
+fix; a known one getting worse does not fail):
+six tap targets under 38 px (the ride strip's N↑ at 23, the tour's close and
+the folded grabber at 34, map markers and the legend's tier rows at 26), no
+text under 9 px, six texts under 4.5:1 (the --dim units at 3.31, the route
+cards' details at 2.95, RETURN HOME's orange at 4.43, a warning at 4.46);
+its planted 30 px button, 8 px label and #555-on-#4A4A4A chip caught and a
+hidden button ignored. Barlow and Barlow Condensed loaded and applied; a
+family that does not exist is not reported loaded. The clear band
+(docs/DESIGN-v4.md §8) is measured by `probe.mjs v4` — folded 59.2%, 51.0%
+and 52.9% at 411×960, 360×800 and 749×832; with the drawer full, 360×800
+keeps 2.2% clear, 411×960 12.2% and the inner screen 5.1% — but NOT asserted: a render guard failed three times the
+same way (PROTOCOL §5) — inside render's run the drawer's geometry
+contradicted its class (25% "folded" at 360×800 where a fresh page and a
+readback of render's own sequence read 51%). Ruled out: state left by the
+checks before it (reordered, reloaded), saved storage (cleared), the drawer
+reopening itself (state re-read). The cause surfaced at the seal, when the
+probe's final run read the inner screen's drawer swapped, the class saying
+the opposite of the geometry: headless Chrome leaves a CSS transition
+pending, at its old value, until a frame is drawn, and with the map idle a
+700 ms wait drew none (landmine 224; PROVEN in the probe by reading the
+transitions' state, INFERRED for render's run). The probe now draws a frame
+and waits for the drawer's transitions before it measures; the numbers
+above are its settled reads. The guard returns that way with V4's drawer
+(take 189).
+The accent budget and the Pins-selector swatch check read the accent from
+its token (both sites were the literal 226,87,15), and count a planted
+second accent surface.
+
+A209 — pin anchors and stale stacks. restack() read rank 0 and priority 0 as
+missing (`(+r||9)*10+(+pri||3)`), and so did the stack tray's sort; both
+honour the zeros now. The "unchanged, don't resend" signature was the count
+and each stack's member count and id-string length — blind to which pins and
+where; it is the members, the anchor kind and the anchor's place now.
+MEASURED with the committed probe (`tools/pins_probe.py anchors`, the static
+replica over the built poi.json): the take-186 ranking anchored 33 of 89
+Water badges (37%) on a member the ranking did not intend, 1 of 83 in
+Off-road, 1 of 77 in Outdoors, none in Camp or Hunt. And the thing the
+maintainer actually named, measured before anything moves it (`sweep`):
+stepping z9.2→14.0 by 0.1, the badge set changes on 21–39% of steps, and on
+21–40% of the steps inside one tile zoom where no kind arrives — the
+clusterer re-partitions as its radius and the on-screen distances change.
+The rank fix does not move that number (21–40% under either ranking). This
+take does not stop pins shifting; A197 P3's zoom bands (take 188) are the
+fix. My first version of the signature dropped the count that led the old
+one, so an empty badge set signed as '' — repin()'s "unknown, send" marker —
+and a mode switch that left no stacks kept the previous mode's badges on the
+map. Render's z5.2 floor check caught it (3 badges at the state floor). I
+first read it as two queued updates and added a 12-second wait to test that;
+the badges never cleared, so the wait came out and the count went back in
+front of the signature (landmine 223).
+
+A210 — poi-dot's zoom gate. PROVEN live on the take-186 build (desktop
+Chrome, `probe.mjs eval`): in Off-road, info pins — a kind the mode puts at
+z13 — drawn by poi-dot at z11.6, 12 and 12.6 (six in view) while the app's
+own gate, `__stack.drawable`, refused them until 13: modeFilter wrapped a
+STEP base filter with the per-kind zoom and returned a plain one bare, and
+poi-dot's is plain. It wraps both now. After, on the take-187 build, the
+same read: those info pins draw nowhere at z11.6–12.6 (0 in view) and from
+z13 on, where the gate agrees (3–6 in view).
+
+A211 — the harness's blind spots. MIME types for .svg, .woff2, .png and
+.webp in the render, probe and palette servers. check_offline walks every
+folder of www/ (bundle/ is data), with the two kinds of URL the vendored
+MapLibre files carry as TEXT allowed by name — the SVG/XML namespace and one
+console warning's issue link, each anchored at the URL's start — and two
+planted CDN URLs caught every run, one carrying the namespace text in its
+path. The scan of vendor/ found no other URL; the worker URL the study
+expected is not a remote one.
+Render's device matrix gains the Fold's inner screen, 749×832 at 2.625 (the
+size the maintainer uses, never laid out before: nothing overflows, every
+control reachable, the ride HUD fits at 749 of 749 px); the stale `c-labels`
+gives way to `c-layers`, and a missing id now fails instead of being
+skipped. verify_palette fails on a renamed legend row (a planted rename
+proves the lookup) and runs the swatch-against-paint comparison on Hybrid as
+well as Map. check_palette reads hyphenated layer ids; the two grey road
+outlines moved into PAL at the same values (`minorcase`, `pavedcase`), and
+the check fails on the take-186 source, naming both. The emoji scan covers
+the ride strip (#nav), outside #shell: 🔊 is listed as the one known offender
+(A216 draws it in take 189), and a planted emoji is caught.
+
+The probe: `styles` and `stylediff` (above), and `v4` — the study's scenes
+on the cover screen, the clear band measured at 411×960, 360×800 and the
+inner 749×832 (the drawer's state read back before each reading; open at its
+maximum height), with the inner screen shot as well. Every mode now sets the
+tour and guide keys before the page loads and waits for the splash to go
+(landmine 222).
+
+Recorded, not built: A218 (spoken turns are silent on the Fold — no Web
+Speech API in its WebView); A197 Q3 answered; A136's references received and
+transcribed (docs/DESIGN-v4.md §4).
+
+What I got wrong: the study's first baseline capture shot the splash and
+then the first-run tour over every frame (landmine 222); the plan counted
+Return home at 3 actions from the opening screen when the folded drawer
+collapses the action row (4); check_tokens' first version read line 8's
+`<style>__MLGCSS__</style>` placeholder as the stylesheet and reported every
+token undeclared — caught by its own run on the new source before it was
+trusted. The first full gate refused twice, neither in the app: my planted
+CDN URL in gate.py read as an undeclared provisioning host by manifest.py's
+scan of tools/ (the control's strings are split now), and the APK on disk
+was still take 186's (the gate holds it to BUILD; ci/apk.sh rebuilt it). The
+cold audit of my own diff then found four holes in guards I had written:
+render's V4 checks swallowed a reload that never got ready (a splash would
+have been audited as a clean app) and never asserted that each forced state
+opened (a control that failed to open would have been audited as whatever
+was on screen); the namespace allowance matched anywhere in a URL; and
+check_tokens' five colour pairs had no planted control, with one anchor
+that `fsclosed:` could also match. All four fixed, each with its control,
+and the gate run again.
+It also found that my token pass had deleted take 46's "difficulty, not
+taxonomy" rationale along with the stale tokens it sat on; it is restored
+beside PAL (a comment: www/ rebuilt byte-identical). Then the probe's last
+run read the inner screen's drawer swapped, and the cause was mine: I read
+layout right after a class change without a frame drawn (landmine 224). The
+band numbers recorded here held when re-read settled; the tool could not
+have told me if they had not. The next full gate refused once, on my own
+reach check: the HD sheet renders after two promises, and a fixed 700 ms
+missed it in that run (it had passed the run before). With the audit waiting
+frame by frame for transitions, the next render then reported the route
+cards' four contrast offenders "no longer offending" with nothing about them
+changed: each card enters with cardIn from opacity 0, and read as it
+started, the whole panel was skipped as hidden. The wait covers finite
+animations now, and the offender lists are exact, so a coverage loss fails
+instead of passing as a fix. And a scope note: the study's Step 0 kept the probe change
+uncommitted; it is committed here, with the take it serves.
+
+The V4 mockup, for the maintainer to judge on the Fold (a private
+claude.ai canvas, link in chat): nine screens at the cover's 411×960 — the
+map at rest, a place card, route options and riding, linked for a tap-through
+in Play; the Pins legend with badges by shape; and Hybrid today against a
+run-time preview of DESIGN.md §3's rules at z9 and z7. The previews are the
+take-187 app with MapLibre style changes applied in the browser — real data,
+not built.
+
+SEAL: gate PASSED, 44 checks — the 43 plus check_tokens — with smoke 319
+across 5 passes and render 318/0 inside it (499 s), on the tree committed
+here: every code file predates that run; only docs follow it (this paragraph and the brief's take-187 status).
+ci/apk.sh green on the 187 artifacts (versionCode 187, signer CN=APEX Off-
+road). Sent to the maintainer before this line was written: seven visual-QA
+scenes from this build (cover and inner screen), and two take-186 against
+take-187 pairs at one camera each over the same data — Water over Marquette
+at z11, where the badge leaves the city label for the harbor lighthouse
+(A209), and Off-road at z12, where take 186's six info pins, named "A" to
+"F", are gone until z13 (A210). `probe.mjs v4`, settled, read the same band
+twice. Take 186: CI run 87 green, release take-87, tagged t186 and pushed.
+Sealed as a commit on main; pushed with 498539a on the maintainer's go; t187
+tagged and pushed once CI is green. Not promoted to Play: the A183 device
+check is open. Field: the app should look exactly as take 186 did — the
+token pass moved no computed style, so anything that looks different is a
+finding; Water around z10–12, a badge shows the kind that leads its stack;
+switch to a mode with no badge in view, none stays behind; Off-road at z12,
+no info pins until z13.
+
+DEFERRED: A197 P3's zoom bands, A214's badges (the lighthouse draws the
+viewpoint's eye) and the "All labels" badge circle (take 188); A202, A212
+and A213 (take 188, after the mockup verdict); A215 and A216 (take 189),
+with the render clear-band guard (a frame drawn before it reads, landmine
+224), radius and spacing tokens, the SVG-attribute and canvas colours, the
+card glyphs in the emoji scope (the route card's ⛽ draws as a box in this
+desktop Chrome) and the probe's `styles` mode settling transitions before
+its dump (it reads a pending one at its old value on both sides of a diff);
+A217 (take 190); the fatal screen's malformed font declaration in
+build_app.py (its own take, with a clean run); A218 (design first); A201's
+fix once the COMPASS number is in; A207; the gate's ALLOW host patterns
+match anywhere in a URL (pre-existing, found in this take's audit); marina
+priority 0 (the maintainer's call); junk pin names ("A" to "F", "car
+parking"); the personal-name sweep; PROTOCOL §0.4/§0.5 wording; the
+README/TESTING/A180 identity claim; the root apex.yml; DEV_CN by
+fingerprint; the inner-screen two-pane layout, landscape and a light theme;
+Play screenshots on the Fold; the A183 device check.
 
 ## Take 186 — 2026-09-23 — the Pins selector (A197 P2), Set home in one button (A200), PROVISION regenerates faithfully (A204)
 

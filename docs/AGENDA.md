@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 186.* Ranked by blocking-ness, not by interest.
+*Current as of take 187.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -2150,12 +2150,16 @@ app, and re-tunes street-label halos for the light ground.
   (take 116): Michigan as a whole → Great Lakes water polygons via the area
   handler → tuning. Multiple takes budgeted.
 
-## A136 — onX Backcountry study · AWAITING REFERENCES take 115
+## A136 — onX Backcountry study · REFERENCES RECEIVED 2026-09-23 (docs/DESIGN-v4.md §4, R6–R8)
 
 Third reference for the design synthesis. Slot reserved in docs/DESIGN.md §7.
 - **Ruled out:** designing from the app's reputation before the maintainer's screenshots
   arrive — transcribe, don't invent (landmine 190).
 - **Open:** everything, pending captures.
+- **Received 2026-09-23:** three onX Backcountry screenshots on the Fold's
+  inner screen — a trailhead sheet, a selected route, a route page —
+  transcribed in docs/DESIGN-v4.md §4 (R6–R8). They feed V4 (A203) rather
+  than a study of their own.
 
 ## A137 — App modes: the multi-discipline vision · RECORDED take 117 (the maintainer)
 
@@ -3459,7 +3463,7 @@ constant; the Pages URL was asked of the maintainer, not guessed.
 - **Ruled out:** a rate-the-app prompt (a nag; impossible in closed
   testing); a link under Tools can come with the production listing.
 
-## A196 — The address index ships partial at full green: 39 of 83 counties missing from the take-182 build · FOUND take 183 · BUILDING take 184
+## A196 — The address index ships partial at full green: 39 of 83 counties missing from the take-182 build · FOUND take 183 · SHIPPED take 184
 Found in take 183's audit by comparing the take-182 APK from the release
 with a cold build of the same tree on the workstation: 448,918 address
 segments and 712 ZIP codes in the shipped index against 763,825 and 1,075
@@ -3586,6 +3590,19 @@ Design, in the order the measurement dictates:
   shipped — `PRI0` at tools/poi.py:361 leaves marina out. The study asks
   the maintainer to build it (a pipeline change, §6b clean run) or rule it
   out.
+- **Q3 answered (the maintainer's self-test, take 186, 2026-09-23):** the
+  inner screen is 749×832 CSS px at dpr 2.625; the cover is 411×960
+  (render's matrix). The harness had never laid the app out at 749×832 —
+  it joins render's device matrix in take 187 (A211).
+- **MEASURED take 187 (tools/pins_probe.py `sweep`, committed; the static
+  replica over the built poi.json, phone viewport, five centres):** stepping
+  z9.2→14.0 by 0.1, the badge set changes on 21–39% of steps (Camp 21, Off-road
+  34, Outdoors 31, Hunt 33, Water 39) and on 21–40% of the steps that stay
+  inside one tile zoom — so the shifting the maintainer sees is the clusterer
+  re-partitioning as its radius and the on-screen distances change, not kinds
+  arriving. The A209 rank fix moves anchors (`anchors`: Water 33 of 89 badges)
+  but not the churn (21–40% under either ranking). P3's zoom bands are the fix
+  (docs/DESIGN-v4.md §10).
 
 ## A198 — CI wipes its restored cache every run; the A191 fallback is unreachable there · FOUND take 183 · SHIPPED take 185 · MEASURED run 86
 PROVEN from CI run 84's bundle log and tools/region.py: actions/cache
@@ -3680,7 +3697,7 @@ design exists.
 - **Ruled out:** a rebrand, a framework or a native rewrite, and designing
   the look from the skill's palettes — docs/DESIGN-v4.md §12 says why.
 
-## A204 — docs/PROVISION.md no longer regenerates from tools/manifest.py · FOUND take 184 · BUILDING take 186
+## A204 — docs/PROVISION.md no longer regenerates from tools/manifest.py · FOUND take 184 · SHIPPED take 186
 PROVEN at take 184: `python3 tools/manifest.py` rewrites docs/PROVISION.md
 without the NWIS in-app section, the citation-only hosts, the acorn and
 USFS-boundary sections and the in-app roles on the imagery and DNR entries
@@ -3742,7 +3759,7 @@ so a per-step stamp only helps once the key changes.
   because artifacts on disk hid four broken steps at take 13.
 - **Ruled out:** doing it inside take 186 — three items are already in it.
 
-## A208 — V4 foundation: CSS tokens proven by a computed-style diff, and guards with planted controls · DESIGNED 2026-09-23 (V4 study §5, §11) · take 187
+## A208 — V4 foundation: CSS tokens proven by a computed-style diff, and guards with planted controls · DESIGNED 2026-09-23 (V4 study §5, §11) · BUILT take 187
 Tokens for colour, z-index and motion completely, and for radius, spacing
 and shadows where a value is shared, each holding today's value
 (docs/DESIGN-v4.md §5). The proof: rebuild www/ only, dump
@@ -3761,8 +3778,34 @@ shared colours equal, Barlow applied.
   asynchronous; ask the browser (landmines 99, 189).
 - **Ruled out:** V4 floors in take 187 — the baseline would be almost the
   whole UI (every control label is 11 px); floors rise in take 189.
+- **Ruled out, take 187 (PROTOCOL §5, three strikes):** the clear-band guard
+  inside render. Three attempts failed the same way — inside render's run the
+  drawer's geometry contradicted its class at measure time (25% "folded" at
+  360×800, where a fresh page and a readback of render's own sequence read
+  51%). Tried and ruled out: state left by earlier checks (reordered and
+  reloaded), saved storage (cleared), the drawer reopening itself (state
+  re-read). The measure and its floors live in `tools/probe.mjs v4`. The
+  cause, found at the seal (landmine 224): headless Chrome leaves the
+  drawer's CSS transitions pending, at their old values, until a frame is
+  drawn — PROVEN in the probe, which now draws a frame and waits for them
+  before it measures. The guard returns that way with V4's drawer (take 189).
+- **Built, take 187 — where it differs from the design above:** colour,
+  z-index and motion tokenised completely (139 + 20 colours, 16 z-indexes,
+  16 durations; 104 tokens, named by value); radius, spacing and shadows
+  not (a shadow's colour is a token, its shape is not) — take 189 puts them
+  onto the V4 scale directly. The colour check reads src/app.html, not the
+  built www/, and holds ZERO rather than a ratchet: the stylesheet outside
+  :root and templates' style= attributes (inline SVG fill=/stroke= and the
+  canvas colours stay with the JS tables). The style dump covers every
+  element, not only #shell, in 21 states. The render audit asserts its
+  clean reload ready and each of its 15 states reached before auditing it,
+  each on a planted control (both found missing by the cold audit before
+  the seal), and waits for each state frame by frame rather than on a timer
+  (landmine 224). Its offender lists are exact, not a ceiling: a listed
+  offender the audit no longer sees fails, so a coverage loss cannot pass
+  as a fix.
 
-## A209 — Pin stacks anchor on the wrong member and can go stale · FOUND 2026-09-23 (code) · take 187
+## A209 — Pin stacks anchor on the wrong member and can go stale · FOUND 2026-09-23 (code) · BUILT take 187 (the churn itself is A197 P3's)
 PROVEN in src/app.html: restack's rank `(+r||9)*10+(+pri||3)` (7134) reads
 rank 0 and priority 0 as missing — a lighthouse sorts last of all kinds and
 every priority-0 destination sorts as priority 3; the stack list's sort
@@ -3774,8 +3817,15 @@ tools/pins_probe.py:145 ranks differently from the app; it is fixed in the
 same take so the probe can stand in for the old restack.
 - **Ruled out:** tuning the radius instead — the anchor is chosen by rank,
   and the rank is wrong.
+- **Built, take 187:** both zeros honoured in restack() and the tray's
+  sort; the signature is the count, then each stack's members, anchor kind
+  and anchor place. MEASURED with the committed probe (`pins_probe.py
+  anchors`): the take-186 ranking anchored 33 of 89 Water badges elsewhere
+  (1 of 83 Off-road, 1 of 77 Outdoors, 0 Camp and Hunt). `sweep`: the badge
+  set changes on 21–40% of 0.1-zoom steps inside one tile zoom under either
+  ranking — this fix does not stop pins shifting; A197 P3 does.
 
-## A210 — poi-dot draws zoom-gated kinds early: modeFilter gates only step filters · FOUND 2026-09-23 (code) · take 187, after a live read
+## A210 — poi-dot draws zoom-gated kinds early: modeFilter gates only step filters · FOUND 2026-09-23 (code) · BUILT take 187 (live read before and after)
 PROVEN by reading: `modeFilter` (src/app.html:4364-4373) adds the per-kind
 zoom gate only when a layer's base filter is a zoom step; `poi-dot`'s
 (2654) is not, so kinds a mode puts at z13 (info; Food and Store when
@@ -3787,8 +3837,13 @@ gated non-destination pin, printing its count (landmines 55, 130); then
 the fix.
 - **Ruled out:** fixing before the live read — a check that passes on empty
   ground is landmine 54's shape.
+- **Built, take 187:** PROVEN live on take 186 (`probe.mjs eval`, Off-road):
+  info pins drawn by poi-dot at z11.6, 12 and 12.6 (six in view) while
+  `__stack.drawable` refused them until 13. modeFilter wraps a plain base
+  filter as it wraps a step one; on take 187 the same read finds 0 in view
+  at z11.6–12.6 and 3–6 from z13.
 
-## A211 — Harness blind spots a redesign would walk through · FOUND 2026-09-23 (V4 study survey) · take 187
+## A211 — Harness blind spots a redesign would walk through · FOUND 2026-09-23 (V4 study survey) · BUILT take 187
 Each closed with a planted control. The render, probe and palette servers
 serve .svg and .woff2 as octet-stream (MIME tables at tools/render.mjs:47,
 tools/probe.mjs:21, tools/verify_palette.mjs:22). `check_offline`
@@ -3802,6 +3857,15 @@ grey outline colours move into PAL at the same values. The emoji check
 - **Ruled out:** raising the in-app self-test's tap check — smoke fakes 40
   px for every element (tools/smoke.mjs:113) and the self-test ships to
   riders; the full-coverage check lives in render.
+- **Added 2026-09-23:** the inner screen, 749×832 at dpr 2.625 (A197 Q3,
+  measured on the Fold), joins render's device matrix — the app had never
+  been laid out at the size the maintainer uses.
+- **Built, take 187:** the recursive scan of www/ found two kinds of URL in
+  vendor/, both text: the SVG/XML namespaces and one console warning's issue
+  link — allowed by name, anchored at the URL's start; no worker URL (the
+  design's guess). Two planted CDN URLs are caught every run, one carrying
+  the namespace text in its path. The emoji scan lists `nav-voice` as its
+  one known offender (A216 draws it in take 189).
 
 ## A212 — Satellite and Hybrid are one basemap · FOUND and DECIDED 2026-09-23: Map + Hybrid only · take 188
 PROVEN: `setBasemap` computes `sat=(m!=='Map')` (src/app.html:4427) and
@@ -3895,3 +3959,19 @@ renamed, A113's five-on-screen rule re-decided with a counter.
   visible in every destination.
 - **Ruled out:** lengthening any one-tap path (landmine 135), free ride
   included.
+
+## A218 — Spoken turn-by-turn is silent on the Fold: its WebView has no Web Speech API · FOUND 2026-09-23 (field, take-186 self-test) · OPEN, design first
+The maintainer's self-test on the Fold (take 186; Android 16, WebView
+Chrome 153): "[VOICE] engine — Web Speech API absent in this WebView —
+strip stays silent". Voice guidance (take 173) is feature-detected, so it
+fails honestly — the strip shows the turn and nothing is spoken. The V3
+brief named the VOICE line the second field test that mattered; this is its
+answer. A spoken turn needs Android's own text-to-speech (a Capacitor
+plugin over TextToSpeech — check upstream first, PROTOCOL §3); whether the
+phone has offline voice data is UNKNOWN.
+- **Ruled out:** a network speech service — the field has no signal
+  (PROTOCOL §8).
+- **Ruled out:** calling it working because nothing errors — the self-test
+  says absent.
+- **Ruled out:** building it inside V4 — it is a capability, not
+  presentation; it waits for the maintainer's call.

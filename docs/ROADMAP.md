@@ -1,6 +1,6 @@
 # ROADMAP — APEX ORV · V3
 
-*Current as of take 186. Take 176 is the production baseline: on Google
+*Current as of take 187. Take 176 is the production baseline: on Google
 Play as com.apexoffroad.app, closed testing with real users from
 2026-09-02.*
 
@@ -14,8 +14,10 @@ finish the arcs the design already committed to.
 **Now**
 - Tester feedback loop: every field report becomes an agenda item and a
   take. The navigation arc (170–173), Camp (174) and the pin cleanup
-  (175) have never met a real trail. Most wanted: the self-test VOICE
-  line, the follow camera's feel at speed, arrival firing where expected.
+  (175) have never met a real trail. Most wanted: the follow camera's feel
+  at speed, arrival firing where expected. The self-test VOICE line came
+  back 2026-09-23: no Web Speech API in the Fold's WebView — spoken turns
+  are silent (A218).
 - A190 · HD download tiers — this view, this county, whole state one
   level sharper (clipped to land). The downloader shipped in take 178
   (six lanes, batch pause, one retry, wake lock, tier-named progress);

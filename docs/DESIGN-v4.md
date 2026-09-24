@@ -105,9 +105,13 @@ Line numbers are `src/app.html` unless a file is named.
   (1223/1227), and the paddle badges duplicate launch/camp/info
   (1312-1313). There is no pin legend; the Pins rows show a colour swatch
   (5484-5486).
-- INFERRED, not yet validated: a scratch replay of `restack()` changed its
-  badge set on 26–44% of 0.1-zoom steps. `tools/pins_probe.py:145` ranks
-  with defaults that differ from the app, so it is not "old restack" yet.
+- MEASURED take 187 (`tools/pins_probe.py sweep`, committed; the static
+  replica over the built poi.json): the badge set changes on 21–39% of
+  0.1-zoom steps (Camp 21, Off-road 34, Outdoors 31, Hunt 33, Water 39), and
+  on 21–40% inside one tile zoom where no kind arrives — the clusterer
+  re-partitions; the A209 rank fix moves anchors (Water 33 of 89) but not
+  the churn. (The study's first figure, 26–44%, came from an unvalidated
+  scratch replay.)
 
 ### 1.3 Planning and starting a route (A217)
 PROVEN from the handlers. "Actions" counts taps and one long-press.
@@ -174,10 +178,19 @@ WebView), `getBoundingClientRect`, `~/apex-shots/v4-baseline/measure.json`:
 | 411×960 | open | 70% | 39% |
 | 360×800 | folded | 88% | 51% |
 | 360×800 | open | 63% | 26% |
+| 749×832 (inner, take 187) | folded | 88% | 53% |
+| 749×832 (inner, take 187) | open | 67% | 31% |
 
 "Clear band" = from the bottom of the left control stack (230 px) to the
 top of the tool strip. It is what bigger targets and a larger type scale
-spend first (§8).
+spend first (§8). The inner-screen rows were measured on the take-187 build
+(`node tools/probe.mjs v4`, the drawer state read back before measuring —
+the first run measured "open" on a drawer the resize had folded again).
+Re-read at the seal with the drawer settled (landmine 224: in headless
+Chrome a transition waits for a frame): 88.0% / 52.9% folded, the open
+drawer's top at 66.5%. The take-186 rows were read before that was known;
+their folded values agree with the settled take-187 reads (89.6%, 87.5%),
+the open ones are not re-verified.
 
 ### 1.7 Seen in the baseline shots
 OBSERVED in `~/apex-shots/v4-baseline/` (outside the repo, A206): the
@@ -289,7 +302,136 @@ Needed from the maintainer, as screenshots, before §5–§10 get values:
 Transcriptions go here as they arrive: sampled colours, counted radii and
 sizes, named patterns (the DESIGN.md §1–§2 method).
 
-*Awaiting references.*
+### 4.1 Received 2026-09-23 — eight screenshots, transcribed
+
+Colours are medians of hue-matched pixels over a region (approximate but
+close); sizes for the Fold shots are measured at 2.625 image px per CSS px
+and are ±1–2 px. R1–R2 are iPhone captures; R3–R8 are the Fold (R3, R4, R6–R8
+the inner screen; R5 the cover).
+
+**R1 · onX Offroad, Go & Track while recording** (the maintainer circled
+Distance)
+- A compass tape across the top: a near-black band (#0E0D08), cardinal
+  letters, ticks, an orange heading needle (#E99C40).
+- Hybrid: imagery dimmed and desaturated; public land a translucent
+  blue-grey fill with thin outlines; trails green (#72B160) with a white
+  casing; the recorded track thick dotted red (#C82A1F).
+- Map symbols by shape: hexagons (state forest, trail system), a
+  triangle-in-square (trail camp), round badges (launch), "TH"; labels white
+  with a dark halo; water names italic serif; road shields (495, 491).
+- Right column: black rounded squares — north-up, locate (orange pin), and
+  zoom +/− in one tall pill.
+- A white sheet with three big stats and small labels beneath — Time
+  03:37:36 · **Distance 39.6 mi** · Elevation 1335 ft (#232323 on white) —
+  and two full-width actions: Resume (orange #F2A33C, dark text) and End
+  (red #B7423B, white text).
+- Five tabs, icon + label: Discover, Offline Maps, My Content, Tools, Go &
+  Track (#232220).
+
+**R2 · onX Offroad, Discover at ~z12 over Kalkaska**
+- Imagery strongly dimmed and desaturated (mid-tone #3D3F3A); **water dark
+  navy (#172937)**; public land as blue-grey outlines.
+- **Roads are thin dark dashed lines on the photo — no light casings, no
+  grey grid.**
+- Trails: the ORV trail periwinkle blue (#768ECA) with a white casing; a tan
+  dashed trail with a dark casing; a cyan (#6EEAF2) dashed class.
+- Symbols: teardrop pins with a white glyph for destinations (campground —
+  blue #37669C with a camper; a saved route start — black with a
+  motorcycle); round light badges for Boat Ramp and Gate; an orange hexagon
+  (#DA9D4C) for a trail system. Labels white with a dark halo; lake names
+  italic serif.
+- Chrome: menu (dark circle), logo, search (circle) across the top; a right
+  column of light circles (~44 pt): weather, north, layers, 2D, drive;
+  "Filters · Active: 1" bottom-left; a floating frosted tab bar with the
+  selected tab in its own pill.
+
+**R3 · onX Offroad, all of Michigan (the Fold's inner screen)**
+- **At state zoom only highways (thin grey, with shields) and trails (green
+  #5DAE4F, blue #5674B2) are drawn** over dark imagery (#4B5453) and navy
+  water (#112138) — no minor roads, no two-track mesh. Region names in
+  letter-spaced caps ("MICHIGAN", "UPPER PENINSULA", "LOWER PENINSULA"); the
+  state line dotted yellow-green.
+- Chrome: menu / logo / search; a right column of dark rounded squares
+  (Weather with a label, N, layers, 2D, drive); "Upgrade" (#F2A33C) and
+  "Filters" bottom-left; dark tab bar (#222222).
+
+**R4 · onX, the My Content sheet**
+- A dark sheet with a grabber, the title left, a circular × right; a
+  section title and a one-line helper; one full-width primary action.
+- Waypoints as teardrop pins in type colours (blue, yellow, white, red)
+  with a white glyph; small dark label chips beside them.
+
+**R5 · AllTrails, a trail card (the Fold's cover screen)**
+- Light map (ground #EEEDEB, water #C1DCEF), roads white with a grey
+  casing; the selected trail lime (#A9F185) with a white casing and
+  direction chevrons; a lime start pin; parks as green tree circles.
+- A near-black sheet (#0F110E), rounded top, grabber; title with a chevron
+  (≈19–20 px); a stats row with icons — distance, ↗ gain, ↘ loss, time
+  (≈13–14 px); an elevation profile (white line; min/max elevation; 0 /
+  midpoint / total distance); secondary actions as icon + label (More,
+  Activity, Download); **one primary action: "Start", a lime pill
+  (#AAF286), 48 px tall, with a navigation arrow.**
+- Map controls: dark circles (~47 px, #0F110E) — collapse, compass, route,
+  locate on the left; layers (with a count badge) and weather sharing one
+  pill, AR and draw on the right; a scale bar top-left.
+
+**R6–R8 · onX Backcountry (the Fold's inner screen, 749×832)** — A136's
+references, awaited since take 128
+- Light topo map (ground #EEEDCE, water #B8E3F6, contours); POI labels
+  large and bold, dark with a white halo; lake names blue italic,
+  letter-spaced; trailheads as dark "TH" circles; campgrounds as a white
+  tent in a dark rounded square (#5A5A5A); launches as small circles; parks
+  as green trees.
+- Selection: the selected route blue (#125AEC) with a bright yellow halo
+  (#EEE50A) and direction chevrons; the selected pin ringed in yellow.
+- The sheet (#1A1A1A): grabber; a centred title (≈15 px bold) and
+  subtitle ("1 onX Hike Route ⌄"); a kebab (⋮) right; a horizontal route
+  card (#333333, 64 px tall): image tile, kicker ("Hike Route"), title,
+  "Moderate | 9.9 mi | +781 ft" with dividers; then the place's own
+  section: kicker ("Trailhead"), a very large title (≈34 px bold), amenity
+  icons in columns.
+- **One floating primary action per state: a white pill (#FFFFFF, #333333
+  text, 48 × 187 px) with an icon** — "Trailhead Details", "Route Details",
+  "View Map".
+- The detail page: header title and "9.9mi • +781ft"; a hero photo ("1/1");
+  kicker + ≈34 px title; a source chip ("From Hiking Project ›"); a body
+  paragraph (≈16 px); tag chips.
+
+### 4.2 What the references say for APEX (inputs to §5–§10, for approval
+through the mockup)
+1. **Hybrid (D1–D5):** R2 and R3 are the spec, and they agree with
+   DESIGN.md §3: dark, desaturated imagery; navy water; roads with no light
+   casing (thin dark lines at z12; only highways at state zoom); trails
+   bright with a casing; labels white with a dark halo.
+2. **Pins (A214):** onX separates kinds by **shape** as well as colour —
+   teardrops for destinations and waypoints, round badges for services,
+   hexagons for trail systems and forests, squares for camps, lettered
+   "TH". Its tent sits in a dark square, which keeps it from reading as a
+   warning sign.
+3. **Cards and sheets (§6, A217):** one primary action per state, large and
+   unmistakable (R5's Start, R6–R8's white pill, R1's Resume/End);
+   secondary actions small, icon + label; a stats row with icons; titles
+   ≈15–34 px, body ≈16 px — against APEX's 11–15 px today.
+4. **Controls:** map buttons are ≈44–48 px circles or rounded squares in a
+   right-hand column; search at the top; five tabs with icon + label
+   (APEX has four).
+5. **Riding:** a compass tape across the top (APEX has `#hudbar`) and three
+   big stats in a sheet — the maintainer circled Distance.
+6. **The inner screen:** R3, R4, R6–R8 lay it out as map above and a
+   full-width sheet below — no side panel.
+
+### 4.3 Answers
+- **8 · The Fold's CSS viewports.** Inner: **749×832 at dpr 2.625**
+  (PROVEN — the maintainer's self-test, take 186, SM-F966U1, Android 16,
+  WebView Chrome 153; map-has-room 612 of 832 px). Cover: 411×960
+  (render's matrix; the Fold7 cover's 1080×2520 at 2.625 gives the same —
+  INFERRED). **The harness has never laid the app out at 749×832** (A211),
+  and it is the screen the maintainer uses.
+- **9 · The build judged.** The self-test reads Take 186 — the pin and
+  Hybrid answers describe take 186 (INFERRED from the build on the phone).
+- The same self-test: "Web Speech API absent in this WebView — strip stays
+  silent" — spoken turn-by-turn is silent on the Fold (A218). COMPASS "not
+  started" — A201 still waits for its number.
 
 ---
 
@@ -300,7 +442,10 @@ MapLibre paint — stay JS; a gate check keeps the values both sides share
 (accent, bone, ink) equal. Smoke's `getComputedStyle` stub has no
 `getPropertyValue` (smoke.mjs:326), so JS never reads tokens.
 `build_app.py`'s loader screens (`fatal()` 130-136, the PARTIAL card
-199-209) are tokenised or exempted by name.
+199-209) are tokenised or exempted by name. Found at take 187 and left for
+take 189: templates also colour inline SVG through fill=/stroke= attributes
+(five literals) and the canvas draws with five more — JS-side values, outside
+`check_tokens`' scope (the stylesheet and style= attributes).
 
 | Group | Tokens | Take 187 (today's values) | V4 rule (take 189) |
 |---|---|---|---|
@@ -386,7 +531,23 @@ Targets, for approval:
 ## 8 · Map share (budget)
 
 §1.6 is the floor: V4 may not shrink the clear band at 360×800 or 411×960,
-drawer open or folded. Bigger targets and type are paid for by layout,
+drawer open or folded — nor at 749×832, the inner screen the maintainer
+uses (§4.3), once take 187 has measured it there.
+
+Take 187 measures the band with `node tools/probe.mjs v4` (folded: 59.2%,
+51.0%, 52.9%). An open drawer is as tall as what it holds, so the open
+measure fills it to its maximum height — and there 360×800 leaves 2.2% of
+the height clear (the left stack and the tool strip nearly meet), 411×960
+12.2%, 749×832 5.1% (MEASURED, desktop Chrome, the drawer settled). A render guard was built and taken out
+after three failed attempts (PROTOCOL §5): inside render's run the drawer's
+geometry contradicted its class at measure time (25% "folded" at 360×800,
+where a fresh page and a readback of render's own sequence both read 51%).
+Ruled out: state left by earlier checks, saved storage, the drawer reopening
+itself. The cause, found at the seal (landmine 224): headless Chrome leaves
+a CSS transition pending until a frame is drawn, and nothing draws one while
+the map is idle; the probe now draws a frame and waits for the drawer's
+transitions. The guard returns that way with V4's drawer (take 189), which also sets the
+open budget; the small phone is where it bites. Bigger targets and type are paid for by layout,
 not by map. The floating stack is placed by hand-typed offsets (250-328),
 so 48 px controls are a relayout, not a token change. A ride-HUD overlap
 check (`#nav` vs `#hudbar`, `#hudstats`, `#alert`) lands with the 56 px
@@ -496,7 +657,7 @@ planted element must *not* be flagged.
 | Accent budget from the token (render:1617, 2441) | render | 1 | 1 | second accent surface |
 | Every `var(--x)` declared | gate | all | all | undeclared var |
 | No emoji/glyph icons, incl. `#nav` and cards | render | extended scope | same | planted glyph |
-| Clear band (§8) | render | §1.6 floor | same | 200 px panel |
+| Clear band (§8), three sizes | probe (render guard deferred, §8) | measured | render guard + open budget | a 200 px taller mode chip |
 | Ride-HUD overlap | render | — | added | overlapping element |
 | Tap counts (§7) | render | — | take 190 | extra step |
 | Pin re-partition per 0.1 step | probe/render | measured | < 5% | old restack |

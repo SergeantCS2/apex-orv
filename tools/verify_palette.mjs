@@ -19,8 +19,11 @@ catch { console.log("puppeteer absent — run `npm ci` first, skipping"); proces
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const WWW = join(ROOT, "www");
+/* take 187 · A211 — .svg/.woff2/.png/.webp were served as octet-stream */
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
-               ".json": "application/json", ".jpg": "image/jpeg", ".pbf": "application/x-protobuf" };
+               ".json": "application/json", ".jpg": "image/jpeg", ".png": "image/png",
+               ".webp": "image/webp", ".svg": "image/svg+xml", ".woff2": "font/woff2",
+               ".pbf": "application/x-protobuf" };
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? pass++ : fail++; console.log(`  ${c ? "ok  " : "FAIL"} ${m}`); };
@@ -77,7 +80,7 @@ ok(ready === true, "map appeared and finished loading");
 await new Promise((r) => setTimeout(r, 2500));
 
 /* 1 · the swatches, rendered, against the paint the map actually uses */
-const rows = await page.evaluate(() => {
+const readRows = () => page.evaluate(() => {
   const norm = (s) => {
     if (!s) return null;
     if (s.startsWith("#")) {
@@ -109,8 +112,10 @@ const rows = await page.evaluate(() => {
     try { paint[id] = norm(window.map.getPaintProperty(id, "line-color")); } catch { }
   }
   const showExpr = window.map.getPaintProperty("show-line", "line-color");
-  return { out, paint, showExpr, PAL: window.PAL || null };
+  const base = ((document.querySelector("#c-base span") || {}).textContent || "").trim();
+  return { out, paint, showExpr, base, PAL: window.PAL || null };
 });
+const rows = await readRows();
 
 console.log("\n1 · legend swatch vs the colour MapLibre paints");
 const EXPECT = {
@@ -118,13 +123,46 @@ const EXPECT = {
   "difficult · 24\" / MCCCT": "mccct", "Two-track": "track",
   "forest road · drivable": "fsroad", "closed · do not ride": "closed",
 };
-for (const r of rows.out) {
-  const key = EXPECT[r.label];
-  if (!key) continue;
-  const want = rows.paint[key];
-  ok(r.swatch === want,
-     `${r.label.padEnd(26)} swatch ${r.swatch} = map ${want}`);
-}
+/* take 187 · A211 — a legend row whose label no longer matches used to be
+   skipped in silence, so renaming one retired its check. Every expected row
+   must now be present; the lookup is proved on a planted rename first. */
+const missingOf = (labels) => Object.keys(EXPECT).filter((l) => !labels.includes(l));
+ok(missingOf(Object.keys(EXPECT).map((l, i) => i ? l : l + " (renamed)")).length === 1,
+   "a planted renamed legend row is reported missing (the check's negative control)");
+const compare = (R) => {
+  const miss = missingOf(R.out.map((r) => r.label));
+  ok(miss.length === 0, `[${R.base}] every legend row is present${miss.length ? " — missing: " + miss.join(", ") : ""}`);
+  for (const r of R.out) {
+    const key = EXPECT[r.label];
+    if (!key) continue;
+    const want = R.paint[key];
+    ok(r.swatch === want,
+       `[${R.base}] ${r.label.padEnd(26)} swatch ${r.swatch} = map ${want}`);
+  }
+};
+compare(rows);
+
+/* take 187 · A211 — A202 said this check held each basemap; it only ever ran
+   on Map. Hybrid now gets the same comparison. */
+const onHybrid = await page.evaluate(async () => {
+  const s = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let i = 0; i < 4; i++) {
+    const l = ((document.querySelector("#c-base span") || {}).textContent || "").trim();
+    if (l === "Hybrid") return true;
+    const b = document.getElementById("c-base"); if (!b) return false; b.click(); await s(1200);
+  }
+  return false;
+});
+ok(onHybrid, "the basemap chip reaches Hybrid");
+if (onHybrid) compare(await readRows());
+/* back to Map: the checks below were written against it */
+await page.evaluate(async () => {
+  const s = (ms) => new Promise((r) => setTimeout(r, ms));
+  for (let i = 0; i < 4; i++) {
+    const l = ((document.querySelector("#c-base span") || {}).textContent || "").trim();
+    if (l === "Map") return; const b = document.getElementById("c-base"); if (!b) return; b.click(); await s(1200);
+  }
+});
 
 console.log("\n2 · show-only colours come from the same table");
 const flat = JSON.stringify(rows.showExpr);

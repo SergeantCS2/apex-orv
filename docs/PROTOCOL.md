@@ -1,6 +1,6 @@
 # PROTOCOL · V3
 
-*Revised 2026-09-03, take 186. Take 176 is the production baseline.*
+*Revised 2026-09-03, take 187. Take 176 is the production baseline.*
 
 ## §0 — Production line rules (V3)
 

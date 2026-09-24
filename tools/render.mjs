@@ -46,7 +46,10 @@ const ok = (c, m) => { console.log((c ? "  ok   " : "  FAIL ") + m); if (!c) fai
 
 const TYPES = { ".html": "text/html", ".js": "application/javascript",
   ".css": "text/css", ".json": "application/json", ".jpg": "image/jpeg",
-  ".png": "image/png", ".pbf": "application/x-protobuf" };
+  ".png": "image/png", ".pbf": "application/x-protobuf",
+  /* take 187 · A211 — served as octet-stream before, which a browser refuses
+     for an <img> SVG and may for a font */
+  ".svg": "image/svg+xml", ".woff2": "font/woff2", ".webp": "image/webp" };
 
 const server = createServer((req, res) => {
   if (req.url === "/favicon.ico") { res.writeHead(204); return res.end(); }
@@ -87,6 +90,10 @@ const DEVICES = [
   { name: "mid    (Pixel 8 / S24)", width: 412, height: 915, dpr: 2.6 },
   { name: "large  (Pro Max / Ultra)", width: 430, height: 932, dpr: 3 },
   { name: "fold   (cover screen)", width: 411, height: 960, dpr: 2.625 },
+  /* take 187 · A197 Q3 / A211 — the maintainer's self-test on the Fold:
+     749x832 css px at dpr 2.625. The screen the app is used on had never
+     been laid out here. */
+  { name: "fold   (inner screen)", width: 749, height: 832, dpr: 2.625 },
 ];
 await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2.6 });
 
@@ -1614,7 +1621,11 @@ if (zoomed.trails === 0) {
       const rows = [...panel.querySelectorAll("[data-pk]")];
       const labels = rows.map((r) => r.innerText.trim());
       const offRows = rows.filter((r) => /Food|Store/.test(r.innerText)).map((r) => r.className.includes(" on"));
-      const accentSw = rows.filter((r) => /226,\s*87,\s*15/.test(getComputedStyle(r.querySelector(".sw")).backgroundColor)).length;
+      /* take 187 · A208 — the accent read from its token, not typed */
+      const _pr = document.createElement("div"); _pr.style.background = "var(--accent, var(--flag))";
+      document.body.appendChild(_pr); const _acc = (getComputedStyle(_pr).backgroundColor.match(/\d+/g) || []).slice(0, 3); _pr.remove();
+      const _ACC = new RegExp("^rgba?\\(" + _acc.join(",\\s*") + "(,|\\))");
+      const accentSw = rows.filter((r) => _ACC.test(getComputedStyle(r.querySelector(".sw")).backgroundColor)).length;
       const hasReset = !!panel.querySelector("[data-pkreset]");
       const foodBefore = /"food"/.test(ftxt("poi-dot"));
       /* toggle Toilets off */
@@ -2426,8 +2437,15 @@ if (zoomed.trails === 0) {
      "orange appears once per screen"; the take-115 audit found .actrow.on still
      glowing full orange because a rule held in memory decays. Counted now: at
      rest, at most ONE element on screen may wear the accent as a surface. */
+  /* take 187 · A208 — the accent is READ from its token, not typed as 226,87,15:
+     a literal passes in silence the day V4 changes the colour. A planted
+     second accent surface must trip the count first (its negative control). */
   const accent = await page.evaluate(() => {
-    const hit = [];
+    const pr = document.createElement("div"); pr.style.background = "var(--accent, var(--flag))";
+    document.body.appendChild(pr); const acc = (getComputedStyle(pr).backgroundColor.match(/\d+/g) || []).slice(0, 3);
+    pr.remove();
+    const ACC = new RegExp("^rgba?\\(" + acc.join(",\\s*") + "(,|\\))");
+    const count = () => { const hit = [];
     for (const el of document.querySelectorAll("body *")) {
       const r = el.getBoundingClientRect();
       if (r.width < 2 || r.height < 2) continue;
@@ -2438,14 +2456,23 @@ if (zoomed.trails === 0) {
          inherited, so the swatch itself reports hidden. */
       if (cs.visibility === "hidden") continue;
       const bg = cs.backgroundColor;
-      if (/226,\s*87,\s*15/.test(bg) && !/0\.[012]\d*\)$/.test(bg))
+      if (ACC.test(bg) && !/0\.[012]\d*\)$/.test(bg))
         hit.push(el.id || el.className || el.tagName);
     }
-    return hit;
+    return hit; };
+    const planted = [0, 1].map((i) => { const p = document.createElement("div"); p.id = "v4plant-acc" + i;
+      p.style.cssText = "position:fixed;left:" + (4 + i * 30) + "px;top:4px;width:20px;height:20px;"
+        + "background:var(--accent, var(--flag));z-index:99999"; document.body.appendChild(p); return p; });
+    const withPlant = count(); planted.forEach((p) => p.remove());
+    return { acc: acc.join(","), hit: count(),
+             caught: withPlant.includes("v4plant-acc0") && withPlant.includes("v4plant-acc1") };
   });
-  ok(accent.length <= 1,
-     `the accent is spent at most once per screen (${accent.length}: `
-     + `${accent.join(", ") || "none"})`);
+  ok(accent.caught && accent.acc.split(",").length === 3,
+     `the accent counter reads its colour from the token (rgb ${accent.acc}) and counts a `
+     + `planted second surface (its negative control)`);
+  ok(accent.hit.length <= 1,
+     `the accent is spent at most once per screen (${accent.hit.length}: `
+     + `${accent.hit.join(", ") || "none"})`);
 
   /* Take 112 · four field findings from Jacob's take-110 session. */
   const field = await page.evaluate(async () => {
@@ -2892,21 +2919,33 @@ if (zoomed.trails === 0) {
     const shell = document.getElementById("shell");
     const svgs = shell.querySelectorAll("button svg.ic").length;
     const leftover = (shell.innerHTML.match(/__IC_[a-z]+__/g) || []).length;
-    // emoji still sitting inside a control
+    // emoji still sitting inside a control — take 187 · A211: the ride strip
+    // (#nav) sits OUTSIDE #shell and this scan never looked at it
     const EM = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
-    const emojiButtons = [...shell.querySelectorAll("button")]
+    const scan = () => [...shell.querySelectorAll("button"), ...document.querySelectorAll("#nav button")]
       .filter((b) => EM.test(b.textContent)).map((b) => b.id || b.className);
+    // its negative control: a planted emoji control must be caught by the same scan
+    const plant = document.createElement("button"); plant.id = "v4plant-emoji";
+    plant.textContent = "\u{1F680}"; shell.appendChild(plant);
+    const caught = scan().includes("v4plant-emoji"); plant.remove();
+    const emojiButtons = scan();
     // a control whose handler still fires after the icon pass
     let fired = false;
     const t = document.querySelector('#tabs .tab[data-go="plan"]');
     t.click(); fired = /\bon\b/.test(t.className);
     document.querySelector('#tabs .tab[data-go="map"]').click();
-    return { svgs, leftover, emojiButtons, fired };
+    return { svgs, leftover, emojiButtons, caught, fired };
   });
   ok(icn.svgs >= 16, `${icn.svgs} controls carry a drawn icon`);
   ok(icn.leftover === 0, `no icon placeholder reached the screen (${icn.leftover})`);
-  ok(icn.emojiButtons.length === 0,
-     `no emoji left in a control${icn.emojiButtons.length ? ": " + icn.emojiButtons.join(", ") : ""}`);
+  /* take 187 · the one known offender is listed; the set may only shrink —
+     A216 draws the voice button's 🔊 as an icon in take 189 */
+  const EMOJI_KNOWN = ["nav-voice"];
+  const emojiNew = icn.emojiButtons.filter((x) => !EMOJI_KNOWN.includes(x));
+  ok(icn.caught, "the emoji scan catches a planted emoji control (its negative control)");
+  ok(emojiNew.length === 0,
+     `no emoji in a control beyond the known ${EMOJI_KNOWN.join(", ")} `
+     + `(${icn.emojiButtons.join(", ") || "none"})`);
   ok(icn.fired === true,
      "handlers survived the icon pass — icons replace a button's CHILDREN, "
      + "never a shared parent's innerHTML");
@@ -3150,9 +3189,12 @@ for (const dev of DEVICES) {
       if (r.width > vw + 1) wide.push((e.id || e.className || e.tagName) + " " + Math.round(r.width));
     });
     const off = [];
-    ["btn-home", "c-base", "c-labels", "coords"].forEach((id) => {
+    /* take 187 · A211 — `c-labels` left the app long ago and this list kept
+       skipping it in silence; a missing id now fails the check. The Layers
+       chip stands in for it. */
+    ["btn-home", "c-base", "c-layers", "coords"].forEach((id) => {
       const e = document.getElementById(id);
-      if (!e) return;
+      if (!e) { off.push(id + " (missing)"); return; }
       const r = e.getBoundingClientRect();
       if (!r.height) return;
       // A chip inside a horizontally scrolling strip is not off-screen, it is
@@ -3188,7 +3230,6 @@ for (const dev of DEVICES) {
   });
   ok(fit.wide.length === 0 && fit.off.length === 0,
      `${dev.name} ${dev.width}x${dev.height}: nothing overflows, controls reachable`
-     + (fit.wide.length ? " — wide: " + fit.wide.join(", ") : "")
      + (fit.wide.length ? " — wide: " + fit.wide.join(", ") : "")
      + (fit.off.length ? " — off-screen: " + fit.off.join(", ") : ""));
   ok(fit.hud.barVisible && fit.hud.barWidth === fit.vw && fit.hud.labels > 0
@@ -3394,6 +3435,223 @@ ok(px.colors > 40, `map viewport has ${px.colors} distinct colours (a blank map 
 ok(px.dominant < 0.90,
    `busiest colour covers ${(100 * px.dominant).toFixed(1)}% — under 90% means terrain and trails drew`);
 console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).toFixed(0)} KB)`);
+
+/* take 187 · A208 · the V4 guards (docs/DESIGN-v4.md §11): tap targets on every
+   interactive element, a text-size floor and contrast against what is really
+   behind the text — measured in the states a rider reaches (landmine 111),
+   each proved on planted controls first. The offender SETS are a ratchet:
+   today's are listed and may only shrink; take 189 raises the floors to V4's
+   (48 and 56 px, 12 px, 4.5:1 and 7:1). */
+{
+  const V4_TAP = [
+    "#actpanel button.actrow.tierrow",
+    "#map div.pin.drop.maplibregl-marker.maplibregl-marker-anchor-center",
+    "#map div.pin.me.maplibregl-marker.maplibregl-marker-anchor-center",
+    "#nav-north",
+    "#peek",
+    "#tour-x"];
+  const V4_TEXT = [];
+  const V4_CONTRAST = [
+    "#routes div.sub",
+    "#routes div.sub.warn",
+    "#routes span",
+    "#routes span.sub",
+    "#btn-home",
+    "#coords span.unit"];
+  /* 1 · a CLEAN page and a fresh profile's storage: the checks above leave a
+     ride, routes, panels, a home and trips behind */
+  await page.evaluate(() => { try { localStorage.clear(); localStorage.setItem("apex.tour.v1", "1");
+    localStorage.setItem("apex.guide.v2", "1"); } catch (e) {} });
+  await page.setViewport({ width: 411, height: 960, deviceScaleFactor: 2.625 });
+  await page.reload({ waitUntil: "networkidle0" });
+  /* landmine 222 — and a page that never gets ready must FAIL here, not have
+     its splash screen audited as a clean app */
+  const v4ready = await page.waitForFunction(() => window.map && window.map.loaded && window.map.loaded()
+    && !document.getElementById("splash")
+    && /\bready\b/.test((document.getElementById("shell") || {}).className || ""), { timeout: 120000 })
+    .then(() => true, () => false);
+  /* its negative control: a wait that times out must read as NOT ready */
+  const neverReady = await page.waitForFunction(() => false, { timeout: 50 }).then(() => true, () => false);
+  ok(v4ready && !neverReady, "the V4 checks start on a ready app after a clean reload (map loaded, splash gone, "
+     + "#shell ready); a wait that times out reads as not ready (its negative control)");
+  /* The clear band (docs/DESIGN-v4.md §8) is NOT asserted here in take 187.
+     Three attempts failed the same way (PROTOCOL §5): inside this run the
+     drawer's geometry at measure time contradicts its class — "folded" read
+     25% at 360x800 where a fresh page reads 51% (tools/probe.mjs v4, and a
+     readback of this very sequence outside render). Ruled out: state left
+     by the checks above (reordered, reloaded), saved storage (cleared), the
+     drawer reopening itself (state re-read). The cause, found at the seal
+     (landmine 224): headless Chrome leaves a CSS transition PENDING, at its
+     old value, until a frame is drawn, and a wait draws none while the map
+     is idle — PROVEN in the probe, INFERRED for this run. The measure lives
+     in the probe, which now draws a frame and waits for the drawer's
+     transitions; the guard returns that way with the drawer's redesign
+     (take 189). */
+
+  /* the bundled faces are loaded and applied; a family that does not exist is not */
+  const font = await page.evaluate(() => {
+    const has = (fam) => [...document.fonts].some((f) => f.family.replace(/["']/g, "") === fam && f.status === "loaded");
+    const chip = document.querySelector("#shell .chip, #shell .basebtn");
+    return { barlow: has("Barlow"), condensed: has("Barlow Condensed"), bogus: has("NoSuchFont"),
+             fam: chip ? getComputedStyle(chip).fontFamily : "" };
+  });
+  ok(font.barlow && font.condensed && !font.bogus && /Barlow/.test(font.fam),
+     `Barlow and Barlow Condensed are loaded and applied (${font.fam.slice(0, 32)}); a family that `
+     + `does not exist is not reported loaded (the check's negative control)`);
+  /* 2 · the audit walks states that change the page, so it goes last */
+  await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2.6 });
+  await new Promise((x) => setTimeout(x, 1200));
+  const aud = await page.evaluate(async () => {
+    const s = (ms) => new Promise((r) => setTimeout(r, ms));
+    const AUDIT = (F) => {
+      const px = (v) => parseFloat(v) || 0;
+      const rgba = (c) => { const m = (c || "").match(/[\d.]+/g) || [0, 0, 0, 0];
+        return [+m[0], +m[1], +m[2], m[3] == null ? 1 : +m[3]]; };
+      const over = (top, bot) => { const a = top[3]; return [0, 1, 2].map((i) => top[i] * a + bot[i] * (1 - a)).concat(1); };
+      const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+        return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+      const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+      const STATE = /^(on|sel|arm|folded|ready|swap|gone|empty|open)$/;
+      const keyOf = (el) => { if (el.id) return "#" + el.id; let a = el.parentElement;
+        while (a && !a.id && a !== document.body) a = a.parentElement;
+        const cls = [...el.classList].filter((c) => !STATE.test(c)).join(".");
+        return (a && a.id ? "#" + a.id + " " : "") + el.tagName.toLowerCase() + (cls ? "." + cls : ""); };
+      const shown = (el) => { const r = el.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) return null;
+        if (r.bottom <= 0 || r.right <= 0 || r.top >= innerHeight || r.left >= innerWidth) return null;
+        for (let a = el; a && a !== document.documentElement; a = a.parentElement) {
+          const c = getComputedStyle(a);
+          if (c.display === "none" || c.visibility === "hidden" || +c.opacity === 0) return null;
+        }
+        return r; };
+      const ownText = (el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      const out = { tap: {}, text: {}, contrast: {}, haloed: 0 };
+      const INTERACTIVE = "button, a[href], input, select, textarea, [role=button], .rc, .hit, [data-jump], [data-wpgo], [data-svopen]";
+      for (const el of document.querySelectorAll(INTERACTIVE)) {
+        const r = shown(el); if (!r) continue;
+        const m = Math.min(r.width, r.height);
+        if (m < F.tap) { const k = keyOf(el); out.tap[k] = Math.min(out.tap[k] || 1e9, Math.round(m)); }
+      }
+      for (const el of document.querySelectorAll("body *")) {
+        if (!ownText(el) || /^(SCRIPT|STYLE)$/.test(el.tagName)) continue;
+        if (el.closest(".maplibregl-canvas-container")) continue;   // map markers draw their own
+        const r = shown(el); if (!r) continue;
+        const cs = getComputedStyle(el), size = px(cs.fontSize), k = keyOf(el);
+        if (size < F.text) out.text[k] = Math.min(out.text[k] || 1e9, size);
+        if ((cs.textShadow && cs.textShadow !== "none") || px(cs.webkitTextStrokeWidth) > 0) { out.haloed++; continue; }
+        const fg = rgba(cs.color), layers = []; let base = null;
+        for (let a = el; a && a !== document.documentElement; a = a.parentElement) {
+          const c = getComputedStyle(a), bg = rgba(c.backgroundColor);
+          if (c.backgroundImage && c.backgroundImage !== "none") break;   // a gradient: judge against both extremes
+          if (bg[3] > 0) { layers.push(bg); if (bg[3] >= 0.999) { base = bg; break; } }
+        }
+        const finish = (b0) => { let b = b0; for (let i = layers.length - 1; i >= 0; i--) if (layers[i] !== base) b = over(layers[i], b); return ratio(over(fg, b), b); };
+        const cr = base ? finish(base) : Math.min(finish([255, 255, 255, 1]), finish([0, 0, 0, 1]));
+        const large = size >= 24 || (size >= 18.66 && +cs.fontWeight >= 700);
+        if (cr < (large ? 3 : F.contrast)) out.contrast[k] = Math.min(out.contrast[k] || 1e9, +cr.toFixed(2));
+      }
+      return out;
+    };
+    const merge = (acc, o) => { for (const t of ["tap", "text", "contrast"]) for (const [k, v] of Object.entries(o[t]))
+      acc[t][k] = Math.min(acc[t][k] == null ? 1e9 : acc[t][k], v); acc.haloed += o.haloed; return acc; };
+    const F = { tap: 38, text: 9, contrast: 4.5 };
+
+    /* the planted controls first: the audit must see them, and must NOT see the hidden one */
+    const fx = document.createElement("div"); fx.id = "v4plant";
+    fx.style.cssText = "position:fixed;left:20px;top:300px;z-index:99999;background:#4a4a4a;padding:6px";
+    fx.innerHTML = '<button id="v4plant-small" style="height:30px;width:60px;min-height:0;padding:0;color:#fff;background:#000;border:0">x</button>'
+      + '<span id="v4plant-tiny" style="font-size:8px;color:#fff;background:#000">tiny</span>'
+      + '<span id="v4plant-grey" style="font-size:14px;color:#555;background:#4a4a4a">grey</span>'
+      + '<button id="v4plant-hidden" style="display:none;height:30px">h</button>';
+    document.body.appendChild(fx); await s(100);
+    const pl = AUDIT(F); fx.remove();
+    const planted = { small: pl.tap["#v4plant-small"] != null, tiny: pl.text["#v4plant-tiny"] != null,
+      grey: pl.contrast["#v4plant-grey"] != null, hiddenNotSeen: pl.tap["#v4plant-hidden"] == null };
+
+    /* the forced states (landmine 111) */
+    const acc = { tap: {}, text: {}, contrast: {}, haloed: 0 };
+    const click = (q) => { const e = document.querySelector(q); if (e) e.click(); return !!e; };
+    const tab = (t) => click(`#tabs .tab[data-go="${t}"]`);
+    /* each state proves it was reached before it is audited: a control that
+       failed to open would otherwise be audited as whatever was on screen.
+       And it waits on FRAMES, not a timer (landmine 224): a transition that a
+       class change starts stays pending until a frame is drawn, an idle page
+       draws few, and a drawer still pending reads as opacity 0 — its content
+       would be skipped as hidden. The same holds for a card's entrance
+       (cardIn, from opacity 0): read as it starts, a whole panel is skipped.
+       So: frame by frame until the state is reached and no transition or
+       finite animation is left, six seconds at most. (The HD sheet renders
+       after two promises; a fixed 700 ms missed it in one run.) */
+    const visited = [], unreached = [];
+    const up = (id) => { const e = document.getElementById(id); return !!e && !e.hidden; };
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    const settleTo = async (reached, max) => { const t0 = Date.now(); let r = false;
+      do { await frame(); try { r = !!reached(); } catch (e) { r = false; }
+        if (r && !document.getAnimations().some((a) => a.playState === "running" && a.effect
+          && isFinite(a.effect.getComputedTiming().endTime))) return true;
+      } while (Date.now() - t0 < max);
+      return r; };
+    const run = async (name, fn, reached, wait = 700, max = 6000) => { try { await fn(); } catch (e) {} await s(wait);
+      const r = await settleTo(reached, max);
+      visited.push(name); if (!r) unreached.push(name); merge(acc, AUDIT(F)); };
+    /* the reach check's negative control: a state that never opens is reported */
+    await run("planted: never opens", async () => {}, () => false, 0, 300);
+    const reachCaught = unreached.pop() === "planted: never opens"; visited.pop();
+    await run("rest", async () => {}, () => true);
+    await run("drawer open", async () => window.railSet(true),
+      () => !/\bfolded\b/.test(document.getElementById("rail").className));
+    for (const t of ["plan", "ride", "tools", "map"]) await run("tab " + t, async () => tab(t),
+      () => /\bon\b/.test(document.querySelector(`#tabs .tab[data-go="${t}"]`).className), 400);
+    await run("mode picker", async () => click("#c-mode"), () => up("modepanel")); click("#c-mode"); await s(300);
+    await run("activity picker", async () => click("#c-act"), () => up("actpanel")); click("#c-act"); await s(300);
+    await run("layers", async () => click("#c-layers"), () => up("lyrpanel")); click("#c-layers"); await s(300);
+    await run("place card", async () => { const c = window.map.getCenter();
+      window.map.fire("contextmenu", { lngLat: { lng: c.lng + 0.01, lat: c.lat } }); window.railSet(true); },
+      () => !!document.getElementById("pc-route"), 900);
+    await run("route cards", async () => { click("#pc-route");
+      for (let i = 0; i < 60 && !document.querySelector(".rc"); i++) await s(250); },
+      () => !!document.querySelector(".rc"), 600);
+    await run("hd sheet", async () => click("#c-hd"),
+      () => /HD imagery/.test(document.getElementById("panel").textContent));
+    await run("tour", async () => { tab("tools"); await s(300); click("#c-tour"); }, () => up("tour"), 900);
+    try { window.__tour && window.__tour.close && window.__tour.close(); } catch (e) {} await s(300);
+    await run("guide", async () => window.guideShow(), () => up("guide"), 600);
+    try { window.guideClose(true); } catch (e) {} await s(300);
+    await run("ride", async () => { tab("ride"); await s(300); click("#c-ride"); }, () => up("nav"), 3500);
+    return { planted, offenders: acc, visited, unreached, reachCaught };
+  });
+  ok(aud.planted.small && aud.planted.tiny && aud.planted.grey && aud.planted.hiddenNotSeen,
+     "the V4 audit catches its planted controls (a 30 px button, an 8 px label, "
+     + "#555 on #4A4A4A) and ignores a hidden one");
+  ok(aud.reachCaught && aud.unreached.length === 0, `the audit reached each of its ${aud.visited.length} states `
+     + `before auditing it, and reports a planted state that never opens (its negative control)`
+     + (aud.unreached.length ? " — not reached: " + aud.unreached.join(", ") : ""));
+  const fresh = (got, known) => Object.keys(got).filter((k) => !known.includes(k));
+  const nT = fresh(aud.offenders.tap, V4_TAP), nX = fresh(aud.offenders.text, V4_TEXT),
+        nC = fresh(aud.offenders.contrast, V4_CONTRAST);
+  ok(nT.length === 0, `no new tap target under 38 px (${V4_TAP.length} known)`
+     + (nT.length ? " — new: " + nT.map((k) => `${k} ${aud.offenders.tap[k]}px`).join(", ") : ""));
+  ok(nX.length === 0, `no new text under 9 px (${V4_TEXT.length} known)`
+     + (nX.length ? " — new: " + nX.map((k) => `${k} ${aud.offenders.text[k]}px`).join(", ") : ""));
+  ok(nC.length === 0, `no new text under 4.5:1 contrast (${V4_CONTRAST.length} known, `
+     + `${aud.offenders.haloed} haloed map labels judged by their halo)`
+     + (nC.length ? " — new: " + nC.map((k) => `${k} ${aud.offenders.contrast[k]}:1`).join(", ") : ""));
+  /* the lists are exact, not only a ceiling: a listed offender the audit no
+     longer sees is either fixed — take it off its list in the same change —
+     or no longer reached, and a coverage loss must not pass as a fix (take
+     187: the route cards' four went "no longer offending" while an entrance
+     animation hid the whole panel). Its control: a planted listed key that
+     cannot be seen is reported. */
+  const unseen = (tap, text, contrast) => [...tap.filter((k) => !(k in aud.offenders.tap)),
+    ...text.filter((k) => !(k in aud.offenders.text)), ...contrast.filter((k) => !(k in aud.offenders.contrast))];
+  const gone = unseen(V4_TAP, V4_TEXT, V4_CONTRAST);
+  const plantSeen = unseen([...V4_TAP, "#v4plant-never"], V4_TEXT, V4_CONTRAST).includes("#v4plant-never");
+  ok(plantSeen && gone.length === 0, "every listed offender was seen: a fixed one leaves its list, and one the "
+     + "audit cannot see is a coverage loss, not a fix; a planted listed key that cannot be seen is reported "
+     + "(its negative control)" + (gone.length ? " — not seen: " + gone.join(", ") : ""));
+
+  await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2.6 });
+}
 
 await browser.close();
 server.close();

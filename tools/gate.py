@@ -87,6 +87,24 @@ ALLOW = re.compile(r"openstreetmap\.org|maplibre\.org|github\.com/maplibre"
                    # User Data policy wants the policy reachable from inside
                    # the app, not just the listing.
                    r"|sergeantcs2\.github\.io")
+# take 187 · A211 — the scan now reaches www/'s subfolders. The vendored
+# MapLibre files there carry two kinds of URL that are TEXT, never fetched:
+# the SVG/XML namespace inside inline SVG (an identifier, not a location) and
+# one console warning that cites an upstream issue. Named, so everything else
+# in vendor/ refuses exactly as the top level does. Anchored at the URL's
+# start, so a CDN URL that carries the namespace text in its path still refuses.
+ALLOW_TEXT = re.compile(r"^https?://(?:www\.w3\.org/(?:2000/svg|1999/xlink|1999/xhtml|XML/1998/namespace)"
+                        r"|github\.com/mapbox/mapbox-gl-js/issues)")
+
+
+def _offline_hits(name, text):
+    hits = []
+    for i, line in enumerate(text.splitlines(), 1):
+        for url in re.findall(r"https?://[^\s\"'<>)]+", line):
+            if ALLOW.search(url) or ALLOW_TEXT.search(url):
+                continue          # attribution, licence and namespace text only
+            hits.append(f"{name}:{i} {url[:70]}")
+    return hits
 
 
 def check_scrub():
@@ -133,20 +151,35 @@ def check_offline():
     www = os.path.join(ROOT, "www")
     if not os.path.isdir(www):
         return notes.append("no www/ to scan")
-    hits = []
-    for fn in sorted(os.listdir(www)):
-        if not fn.endswith((".html", ".js", ".css")):
-            continue
-        for i, line in enumerate(read("www", fn).splitlines(), 1):
-            for url in re.findall(r"https?://[^\s\"'<>)]+", line):
-                if ALLOW.search(url):
-                    continue          # attribution and licence text only
-                hits.append(f"{fn}:{i} {url[:70]}")
+    # take 187 · A211 — its negative control, every run: a planted CDN
+    # reference must be caught, one that carries the namespace text in its
+    # path as well, and the SVG namespace itself must not be.
+    # (the planted URLs are split so the provisioning-host scan of tools/,
+    # manifest.py, does not read this control as a host the tools fetch)
+    if not _offline_hits("planted", 'src="https:' + '//cdn.example.com/x.js"') \
+       or not _offline_hits("planted", 'src="https:' + '//cdn.example.com/www.w3.org/2000/svg/x.js"') \
+       or _offline_hits("planted", 'xmlns="http:' + '//www.w3.org/2000/svg"'):
+        return fails.append("check_offline failed its own planted control — the "
+                            "scan cannot be trusted this run")
+    # take 187 · A211 — every folder, not just the top level (vendor/ and any
+    # new css/ or icons/ were never scanned). bundle/ is data, checked elsewhere.
+    hits, n = [], 0
+    for dirpath, dirnames, filenames in os.walk(www):
+        dirnames[:] = sorted(d for d in dirnames
+                             if not (dirpath == www and d == "bundle"))
+        for fn in sorted(filenames):
+            if not fn.endswith((".html", ".js", ".css", ".svg")):
+                continue
+            p = os.path.join(dirpath, fn)
+            n += 1
+            hits += _offline_hits(os.path.relpath(p, www),
+                                  open(p, encoding="utf-8", errors="replace").read())
     if hits:
         fails.append("remote origins in shipped assets (PROTOCOL §8):\n      "
                      + "\n      ".join(hits[:8]))
     else:
-        notes.append("offline: no remote origins in www/")
+        notes.append(f"offline: no remote origins in www/ ({n} files, "
+                     "subfolders included; both planted CDN URLs were caught)")
 
 
 # ── 4. Style integrity ──────────────────────────────────────────────────────
@@ -222,7 +255,9 @@ def check_palette():
 
     bad = []
     # 1. every lyr() call paints from PAL
-    for lid, cls, col in re.findall(r"lyr\('([a-z0-9]+)','([a-z0-9]+)',([^,]+),", src):
+    # take 187 · A211 — ids may carry a hyphen: `[a-z0-9]+` never matched
+    # 'minor-case' or 'paved-case', whose colours were literals it could not see
+    for lid, cls, col in re.findall(r"lyr\('([a-z0-9-]+)','([a-z0-9]+)',([^,]+),", src):
         if not col.strip().startswith("PAL."):
             bad.append(f"layer '{lid}' paints {col.strip()} instead of a PAL entry")
     # 2. the show-only match expression carries no literal
@@ -243,7 +278,7 @@ def check_palette():
     # as something already explained — fsclosed is closed-red, and the red row
     # explains both. Anything left must be declared exempt in the app with a
     # reason, so a new drawn class cannot slip in unexplained.
-    drawn = {c for _l, c, _p in re.findall(r"lyr\('([a-z0-9]+)','([a-z0-9]+)',([^,]+),", src)}
+    drawn = {c for _l, c, _p in re.findall(r"lyr\('([a-z0-9-]+)','([a-z0-9]+)',([^,]+),", src)}
     acts = re.search(r"var ACTS=\[(.*?)\n\];", src, re.S)
     explained = set()
     if acts:
@@ -266,6 +301,96 @@ def check_palette():
                  f"agree; {len(drawn)} drawn classes, {len(exempt)} exempt "
                  f"({', '.join(sorted(exempt))})")
 
+
+
+# ── 4b. The token layer holds (take 187 · A208) ─────────────────────────────
+# The token pass moved every colour, layer and duration in the stylesheet onto
+# :root, holding the values it had (the computed-style diff against take 186
+# proved nothing moved). These keep it that way, each proved on a planted
+# input every run: (1) no colour literal in the stylesheet outside :root, and
+# none in a template's inline style — build_app.py's loader screens are not in
+# src/ and must render without the stylesheet; (2) every var(--x) the app uses
+# is declared, because an undeclared one resets the property in silence;
+# (3) colours the stylesheet shares with the script and the loader agree.
+COLOUR = re.compile(r"#[0-9A-Fa-f]{3,8}\b|rgba?\([^)]*\)")
+
+
+def _css_literals(css):
+    body = re.sub(r":root\{[^}]*\}", "", re.sub(r"/\*.*?\*/", "", css, flags=re.S))
+    return COLOUR.findall(body)
+
+
+def _inline_literals(js):
+    return [v for m in re.finditer(r"style=(\\?['\"])(.*?)\1", js)
+            for v in COLOUR.findall(m.group(2))]
+
+
+def _undeclared(css, js):
+    roots = " ".join(re.findall(r":root\{[^}]*\}", css))
+    declared = set(re.findall(r"(--[\w-]+)\s*:", roots))
+    declared |= set(re.findall(r"setProperty\(\s*['\"](--[\w-]+)", js))
+    return sorted(set(re.findall(r"var\(\s*(--[\w-]+)", css + js)) - declared)
+
+
+def _pairs_bad(root, pairs):
+    out = []
+    for tok, m, grp, what in pairs:
+        if not m:
+            out.append(f"cannot find {what} to compare with {tok}")
+        elif root.get(tok) != m.group(grp).upper():
+            out.append(f"{tok} is {root.get(tok)} but {what} is {m.group(grp).upper()}")
+    return out
+
+
+def check_tokens():
+    src, loader = read("src", "app.html"), read("tools", "build_app.py")
+    if not src or not loader:
+        return notes.append("tokens: no src/app.html or build_app.py to read")
+    if (_css_literals("a{color:#123456}") != ["#123456"]
+            or _css_literals(":root{--x:#123456}")
+            or _inline_literals('<b style="color:#abcdef">x</b>') != ["#abcdef"]
+            or _undeclared(":root{--a:1}", "x{color:var(--b)}") != ["--b"]
+            or not _pairs_bad({"--x": "#111111"}, [("--x", re.match(r"(#222222)", "#222222"), 1, "planted")])
+            or _pairs_bad({"--x": "#111111"}, [("--x", re.match(r"(#111111)", "#111111"), 1, "planted")])
+            or not _pairs_bad({}, [("--x", None, 1, "planted")])):
+        return fails.append("check_tokens failed its own planted controls — its "
+                            "scans cannot be trusted this run")
+    # the app's own stylesheet — line 8's <style>__MLGCSS__</style> is the
+    # MapLibre placeholder, and reading it as "the stylesheet" reads nothing
+    m0 = re.search(r"<style>\s*:root\{", src)
+    if not m0:
+        return fails.append("token layer (A208): no <style> block opening with :root")
+    a = m0.start()
+    css = src[a:src.index("</style>", a)]
+    script = src[src.index("</style>", a):]
+    bad = []
+    lit = _css_literals(css)
+    if lit:
+        bad.append(f"{len(lit)} colour literal(s) in the stylesheet outside :root "
+                   f"({', '.join(sorted(set(lit))[:5])}) — make it a token")
+    inl = _inline_literals(script)
+    if inl:
+        bad.append(f"{len(inl)} colour literal(s) in template inline styles "
+                   f"({', '.join(sorted(set(inl))[:5])}) — use var(--token)")
+    und = _undeclared(css, script)
+    if und:
+        bad.append("var() of undeclared token(s): " + ", ".join(und[:6]))
+    root = dict((k, v.strip().upper()) for k, v in re.findall(
+        r"(--[\w-]+)\s*:\s*([^;}]+)", " ".join(re.findall(r":root\{[^}]*\}", css))))
+    # \b: PAL.fsclosed ends in "closed:" too
+    pal_closed = re.search(r"\bclosed:'(#[0-9A-Fa-f]{6})'", script)
+    route = re.search(r"id:'routeline'.*?'line-color':'(#[0-9A-Fa-f]{6})'", script, re.S)
+    fat = re.search(r"color:(#[0-9A-Fa-f]{6});background:(#[0-9A-Fa-f]{6})", loader)
+    fat_acc = re.search(r"color:(#[0-9A-Fa-f]{6});margin-bottom:14px", loader)
+    pairs = [("--shut", pal_closed, 1, "PAL.closed"), ("--route", route, 1, "the route line"),
+             ("--bone", fat, 1, "the loader's fatal text"), ("--rail", fat, 2, "the loader's fatal ground"),
+             ("--flag", fat_acc, 1, "the loader's fatal accent")]
+    bad += _pairs_bad(root, pairs)
+    if bad:
+        return fails.append("token layer (A208): " + "; ".join(bad))
+    notes.append(f"tokens: 0 colour literals outside :root, 0 in template styles, "
+                 f"every var() declared ({len(root)} tokens); {len(pairs)} shared "
+                 f"colours agree; planted controls caught")
 
 # ── 4c. Per-vehicle legality, not just per-class ─────────────────────────────
 # Take 80. MACHINE[m].ok is a CLASS allow-list, which encodes the DNR's rules
@@ -1839,7 +1964,7 @@ def check_ledger_order():
 
 
 for fn in (check_handoff, check_stamps, check_offline, check_splash, check_scrub,
-           check_style, check_palette, check_machine_legality,
+           check_style, check_palette, check_tokens, check_machine_legality,
            check_ledgers, check_osm_fallback, check_gauges_fallback, check_drawn,
            check_region_clean, check_no_duplicate_defs, check_ledger_order,
            check_layer_control,

@@ -20,6 +20,10 @@ truth this instrument is checked against each take.
   python3 tools/pins_probe.py calib        the screenshot calibration
   python3 tools/pins_probe.py --rule draw  only the take-185 rule
   python3 tools/pins_probe.py --off toilet --on food   a rider's choices (take 186)
+  python3 tools/pins_probe.py sweep        take 187: how often the badge set changes per 0.1 zoom
+  python3 tools/pins_probe.py anchors      take 187: badges the take-186 ranking anchored elsewhere
+  --rank old   reproduce take 186's ranking, which read rank 0 and priority 0 as
+               missing (A209) — the negative control for the fix
 """
 import json, math, os, subprocess, sys
 
@@ -118,7 +122,17 @@ def drawable(rec, mode, z):
     return True
 
 
-def restack(mode, z, centre, cw, ch, rule="draw"):
+def rank_of(rec, k, rank):
+    """take 187 · A209. 'app': rank 0 and priority 0 are the top ranks, as the
+    app reads them since take 187 (and as this probe always did). 'old': the
+    take-186 app's `(+r||9)*10+(+pri||3)`, which read both zeros as missing."""
+    r, pri = POIKIND.get(k, (9, 0, None))[0], rec.get("pri", 3)
+    if rank == "old":
+        return (r or 9) * 10 + (pri or 3)
+    return r * 10 + pri
+
+
+def restack(mode, z, centre, cw, ch, rule="draw", rank="app"):
     """rule='kinds': the pre-185 pool (every kind the mode lists, services out
     below 11.4). rule='draw': the take-185 pool (what the layers would draw,
     nothing below the floor)."""
@@ -142,7 +156,7 @@ def restack(mode, z, centre, cw, ch, rule="draw"):
             if x < -pad or y < -pad or x > cw + pad or y > ch + pad:
                 continue
             pts.append({"id": i, "x": x, "y": y, "k": k,
-                        "r": POIKIND.get(k, (9, 0, None))[0] * 10 + rec.get("pri", 3), "rec": rec})
+                        "r": rank_of(rec, k, rank), "rec": rec})
     pts.sort(key=lambda q: q["r"])          # JS sort is stable; ties keep array order
     grid, stacks = {}, []
     for q in pts:
@@ -185,6 +199,51 @@ def table(rule, modes=("camp", "ride", "water", "outdoors", "hunt"), zooms=(9, 1
                   f"{mean('markers'):8.1f} {drawn:6.0f}% {mean('ghost'):6.1f} {max(r['maxn'] for r in rs):5}")
 
 
+def _sig(r):
+    return frozenset((b["anchor"]["id"], frozenset(q["id"] for q in b["m"])) for b in r["_badges"])
+
+
+def sweep(modes=("camp", "ride", "water", "outdoors", "hunt"), cw=412, ch=915, rank="app"):
+    """take 187 · A197 P3's instrument: step the zoom 9.2 -> 14.0 by 0.1 over each
+    centre and count the steps where the badge set (anchor + members) changes.
+    'within' counts only steps that stay inside one tile zoom and cross no layer
+    minzoom — the changes a rider sees on a small zoom with nothing new
+    arriving; kind arrivals at the thresholds are A197's, not the clusterer's."""
+    print(f"sweep 9.2->14.0 by 0.1, viewport {cw}x{ch}, rank={rank}, mean over {len(CENTRES)} centres")
+    print(f"{'mode':9} {'all steps':>10} {'within a tile zoom':>19}")
+    zs = [round(9.2 + 0.1 * i, 1) for i in range(49)]
+    for mode in modes:
+        ch_all = ch_in = n_all = n_in = 0
+        for c in CENTRES.values():
+            prev = None
+            for z in zs:
+                sig = _sig(restack(mode, z, c, cw, ch, "draw", rank))
+                if prev is not None:
+                    pz, same_tile = prev[0], math.floor(prev[0]) == math.floor(z)
+                    crosses = any(pz < t <= z for t in (PIN_FLOOR, CLUSTER_MAXZ))
+                    n_all += 1; ch_all += sig != prev[1]
+                    if same_tile and not crosses:
+                        n_in += 1; ch_in += sig != prev[1]
+                prev = (z, sig)
+        print(f"{mode:9} {100 * ch_all / max(1, n_all):9.0f}% {100 * ch_in / max(1, n_in):18.0f}%")
+
+
+def anchors(modes=("camp", "ride", "water", "outdoors", "hunt"), zooms=(9.5, 10.5, 11.5, 12.5, 13.5), cw=412, ch=915):
+    """take 187 · A209's measurement: badges whose members are the same under both
+    rankings but whose anchor — the member the badge sits on and shows — differs."""
+    print(f"badges anchored differently by the take-186 ranking, viewport {cw}x{ch}, {len(CENTRES)} centres")
+    for mode in modes:
+        moved = total = 0
+        for c in CENTRES.values():
+            for z in zooms:
+                new = {frozenset(q["id"] for q in b["m"]): b["anchor"]["id"] for b in restack(mode, z, c, cw, ch)["_badges"]}
+                old = {frozenset(q["id"] for q in b["m"]): b["anchor"]["id"] for b in restack(mode, z, c, cw, ch, "draw", "old")["_badges"]}
+                for m, a in new.items():
+                    if m in old:
+                        total += 1; moved += old[m] != a
+        print(f"  {mode:9} {moved:4} of {total:4} badges ({100 * moved / max(1, total):.0f}%)")
+
+
 def calib():
     print("screenshot calibration: Camp, 1908x880, rule=kinds (the pre-185 app), over the Grayling anchor")
     c = CENTRES.get("Grayling") or next(iter(CENTRES.values()))
@@ -199,9 +258,15 @@ if __name__ == "__main__":
     if "--on" in args: ON = set(args[args.index("--on") + 1].split(","))
     if "--off" in args: OFF = set(args[args.index("--off") + 1].split(","))
     skip = {rule} | (ON or set()) | (OFF or set())
+    rank = args[args.index("--rank") + 1] if "--rank" in args else "app"
+    skip |= {rank}
     what = [a for a in args if not a.startswith("--") and a not in skip and "," not in a][:1] or ["table"]
     if what[0] == "calib":
         calib()
+    elif what[0] == "sweep":
+        sweep(rank=rank)
+    elif what[0] == "anchors":
+        anchors()
     else:
         for r in ([rule] if rule else ["kinds", "draw"]):
             table(r)

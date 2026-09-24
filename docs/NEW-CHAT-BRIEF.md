@@ -1,4 +1,4 @@
-# APEX ORV — NEW CHAT BRIEF · V4 (rewritten 2026-09-23 at take 186)
+# APEX ORV — NEW CHAT BRIEF · V4 (rewritten 2026-09-23 at take 186, brought to take 187)
 
 Read this first, then CLAUDE.md (how work happens on the workstation),
 then the newest HANDOFF entries. PROTOCOL is the law; LANDMINES §0 is the
@@ -14,10 +14,10 @@ It is tested on the maintainer's Samsung Galaxy Z Fold and, since take
 sandbox and seed zips). Stack: Capacitor 8 + MapLibre GL 5 + an offline
 bundle; a Python pipeline over the Geofabrik Michigan extract, DNR/USFS
 ArcGIS layers, USGS DEM and imagery; a harness of smoke (319 assertions
-over 5 passes at take 186), render (306 checks) and the gate (43 checks);
+over 5 passes at take 187), render (318 checks) and the gate (44 checks);
 append-only ledgers.
 
-## Where it stands at take 186
+## Where it stands at take 187
 
 **Play:** take 176 is the production baseline — `com.apexoffroad.app`,
 closed testing since 2026-09-02. Takes 183–186 each went green in CI and
@@ -38,6 +38,11 @@ Since the V3 brief (take 180):
 - **186** — the Pins selector (A197 P2); Set home in one button (A200);
   PROVISION regenerates from its tool (A204); a visual QA loop,
   `node tools/probe.mjs take` (A206).
+- **187** — V4's foundation, nothing a rider should see change: CSS
+  tokens proven by a computed-style diff, and guards on planted controls
+  (A208); pin anchors and stale badges (A209); info pins held to their
+  zoom (A210); harness blind spots, and the Fold's inner screen in the
+  device matrix (A211).
 
 ## V4 — the presentation overhaul (A203)
 
@@ -47,9 +52,12 @@ the rules taken from the ui-ux-pro-max skill, the decisions, and takes
 187–190 (foundation, the map, the look, the flow). Its pieces are A197 P3,
 A202 and A208–A217. Decided that day: one dark look; study first, then
 staged takes; the look transcribed from the maintainer's reference
-screenshots (landmine 190) — **still awaited**; Map + Hybrid only.
-Nothing of V4 is built. The "before" screens are in
-`~/apex-shots/v4-baseline/`, outside the repo.
+screenshots (landmine 190) — received 2026-09-23 and transcribed
+(DESIGN-v4 §4); Map + Hybrid only. Take 187 built the foundation; a
+clickable mockup (a private claude.ai canvas) awaits the maintainer's
+verdict, which unlocks takes 188–190. The "before" screens are in
+`~/apex-shots/v4-baseline/`, take 187's in `~/apex-shots/t187/`, outside
+the repo.
 
 ## What only the phone can answer
 
@@ -58,7 +66,9 @@ Nothing of V4 is built. The "before" screens are in
   IndexedDB (A190).
 - The self-test COMPASS line (A201) — the fix waits on it.
 - Sunlight, gloves and the fold seam — never measured (A18).
-- The Fold's inner-screen CSS viewport (A197 Q3).
+- Spoken turns: the Fold's WebView has no Web Speech API (A218).
+- The Fold's inner-screen CSS viewport — answered: 749×832 at dpr 2.625
+  (A197 Q3), in render's device matrix since take 187.
 
 ## How work happens (since take 183)
 
@@ -78,15 +88,19 @@ Nothing of V4 is built. The "before" screens are in
   throw (217); do not re-split `www/` while a render runs; the gate
   buffers its output; two chats, one ledger — check the highest agenda
   and landmine numbers before assigning one.
-- At this brief: take 186, agenda A217, landmine 221.
+- New at take 187: a harness hook is not a readiness signal (222); a
+  reset marker must not be a value the data can produce (223); in
+  headless Chrome a transition waits for a frame — draw one before
+  reading layout after a class change (224).
+- At this brief: take 187, agenda A218, landmine 224.
 
 ## Order (as of 2026-09-23)
 
 1. **Tester field reports** as they arrive — each an agenda item, and in
    a take.
 2. **A183** — the device check; take 186 is the Play candidate.
-3. **V4 (A203)** — `docs/DESIGN-v4.md`; waits on the references; never
-   ahead of A183.
+3. **V4 (A203)** — `docs/DESIGN-v4.md`; take 187 built the foundation;
+   188–190 wait on the mockup verdict; never ahead of A183.
 4. **A189** — the "Road hazards" layer, designed at take 180; build after
    A183, on approval. How it ranks against V4 is the maintainer's call
    (not yet made).

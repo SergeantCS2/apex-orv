@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 186.*
+*Current as of take 187.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -131,6 +131,9 @@ Start here. Do not read top to bottom.
 | A feature works in some counties and is silently blank in others | 219 |
 | CI rebuilds everything every run although the cache reports a hit | 220 |
 | A detached stage survives the kill aimed at it; a second one starts beside it | 221 |
+| A screenshot shows the splash, or the tour, instead of the scene | 222 |
+| Old badges stay after a mode switch; an update a cache should send is skipped | 223 |
+| A layout read after a class change shows the old state; the class says the new one | 224 |
 
 ---
 
@@ -2795,3 +2798,50 @@ log as its first line (`echo "PID $$"`), and a stop reads it from there —
 never `$!`, never a pattern (landmine 204). Companion: the pre-launch
 count of node/chrome/python3 must be ZERO before a launch, and "kill,
 then launch" is two calls with the count read between them.
+
+**222. A harness hook is not a readiness signal.** The V4 baseline capture
+(2026-09-23) waited for `window.__nav`, `__stack` and `__mode` — the hooks
+the load handler defines — and its first frame was the splash, "DRAWING THE
+MAP" at 70%: the hooks exist before the splash is gone. In the fresh
+browser profile the first-run tour (`apex.tour.v1` unset) then covered and
+dimmed every later frame. Wait for what render checks — the splash node
+removed and `#shell.ready` — and set the tour and guide keys before the page
+loads (`evaluateOnNewDocument`). What a frame shows is part of what it
+proves; `tools/probe.mjs take` had the same wait and worked by timing.
+
+**223. A reset marker must not be a value the data can produce.** Take 187
+widened restack()'s "unchanged, don't resend" signature to the members and
+anchors of every stack (A209) and dropped the count that led it. An empty
+badge set then signed as `''` — the value repin() writes to mean "unknown,
+send the next one". A mode switch that left no stacks at the current camera
+compared equal, skipped the clearing setData, and the previous mode's three
+badges stayed on the map; render's z5.2 floor check caught it. My first
+explanation — two updates queued, loaded() read between them — was wrong,
+and the 12-second wait I added to test it proved so: the badges never
+cleared. The old `0|` prefix had been keeping "nothing" apart from
+"unknown" without saying so. When a reset value means "unknown", make sure
+no real computation can produce it, and say why in the code.
+
+**224. In headless Chrome a CSS transition waits for a frame.** Take 187's
+last probe run read the inner screen's drawer swapped — "folded" at the open
+drawer's geometry, "open" at the folded one — with the class saying the
+opposite each time; render's clear-band guard had failed three times the
+same way (A208, ruled out under PROTOCOL §5). The drawer folds by CSS
+transitions (max-height, opacity and padding on `#railbody` and
+`#actions`). Read in the page with the map idle, 700 ms after
+`railSet(false)`: all six transitions `running`, `pending`, currentTime 0;
+the rail's top still the open drawer's (557 of 832 px) while
+`document.timeline` had moved on 700 ms. A 1×1 screenshot drew a frame, and
+700 ms later the top was the folded one (732). A new transition's start
+time is set by the next frame, and nothing asks for one while the map is
+idle; by 3.7 s something had drawn one, but when is not the harness's to
+choose. So a fixed wait after a class change is not a readiness signal
+(landmine 222's shape). Before reading layout after a class change: draw a
+frame (a 1×1 screenshot), then wait until `el.getAnimations({subtree:true})`
+holds no transition — `tools/probe.mjs` settleDrawer does both. Inside a
+page, awaiting `requestAnimationFrame` draws one, slowly while idle (two
+took 930 ms and 852 ms, the transitions still pending after them and done
+700 ms later); render's V4 audit waits frame by frame until its state is
+reached and no transition or finite animation is left. Animations count
+too: a card enters with cardIn, from opacity 0, and an audit that read the
+panel as it started skipped every route card as hidden.
