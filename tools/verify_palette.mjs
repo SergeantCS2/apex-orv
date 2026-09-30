@@ -101,8 +101,12 @@ const readRows = () => page.evaluate(() => {
       label: el.textContent.trim(),
       tappable: !!(el.dataset && el.dataset.k),
       tier: el.className.includes("tierrow"),
+      tag: el.tagName,
       swatch: cs.backgroundColor === "rgba(0, 0, 0, 0)" ? norm(cs.color) : norm(cs.backgroundColor),
-      height: Math.round(el.getBoundingClientRect().height),
+      /* take 188 · A215 · the laid-out height, not the drawn one: the picker
+         opens with a scale(.98) entrance that headless Chrome leaves pending
+         until a frame is drawn (landmine 224), so a 48 px row read 47 */
+      height: el.offsetHeight,
     });
   });
   /* what MapLibre paints, straight off the style */
@@ -177,10 +181,23 @@ console.log("\n3 · legend-only rows explain, they do not filter");
 const tiers = rows.out.filter(r => r.tier);
 ok(tiers.length >= 4, `${tiers.length} tier rows rendered`);
 ok(tiers.every(r => !r.tappable), "no tier row is tappable (no data-k)");
+/* take 188 · A215 · a legend row is a div, not a button: nothing reads it
+   as an undersized control; and the V4 floor, 48 px (was 36). Both judges
+   are proved on planted copies of the real rows first (landmine 54; review
+   round 1: neither had a negative control): one tier row as a BUTTON, one
+   real control at 47 px, each must be rejected. */
+const tierDiv = (R) => R.filter(r => r.tier).every(r => r.tag === "DIV");
+const floor48 = (R) => R.filter(r => !r.tier).every(r => r.height >= 48);
+const plantRow = (pick, patch) => { const c = rows.out.map((r) => ({ ...r })); const i = c.findIndex(pick);
+  if (i >= 0) Object.assign(c[i], patch); return i >= 0 ? c : null; };
+const pTier = plantRow((r) => r.tier, { tag: "BUTTON" }), pLow = plantRow((r) => !r.tier, { height: 47 });
+ok(!!pTier && !tierDiv(pTier) && !!pLow && !floor48(pLow),
+   "the tier-div and 48 px judges reject their plants (a tier row as BUTTON, a real control at 47 px)");
+ok(tierDiv(rows.out), `every tier row is a div (${[...new Set(tiers.map(r => r.tag))].join(", ")})`);
 ok(rows.out.filter(r => !r.tier).every(r => r.tappable),
    "every non-tier row IS tappable");
-ok(rows.out.filter(r => !r.tier).every(r => r.height >= 36),
-   "every real control is still >= 36 px for gloves");
+ok(floor48(rows.out),
+   `every real control is >= 48 px for gloves (smallest ${Math.min(...rows.out.filter(r => !r.tier).map(r => r.height))} px)`);
 
 console.log("\n4 · the fsroad casing draws");
 const drew = await page.evaluate(() => {

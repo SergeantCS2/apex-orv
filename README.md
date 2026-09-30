@@ -16,11 +16,14 @@ APK are different app identities and install side by side.
 
 ## It navigates
 
-Tap **Ride it** and the map centres on you, turns to face the way you're
-going, tilts and follows — like a navigation app, on two-tracks.
+Press and hold a spot → **Route here** → **Ride it**, or **Return home** →
+**Ride it** from the folded drawer, and the map centres on you, turns to
+face the way you're going, tilts and follows — like a navigation app, on
+two-tracks.
 
 - **Turn by turn** on the route you planned: "In 400 ft · Turn left onto
-  Trail 7", remaining distance, a time from your own pace, **"You have
+  Trail 7", remaining distance, one arrival time (the route's estimate,
+  then your own pace), **"You have
   arrived"**, and a re-route from where you are when you're 40 m off.
 - **On the river**: plan a run, tap Navigate this run, and the map points
   **downstream** — not where the phone thinks you're heading, because a
@@ -32,8 +35,8 @@ going, tilts and follows — like a navigation app, on two-tracks.
 - **If the app dies mid-ride** — force-stopped, phone dead — the next launch
   offers **Resume your trip?** with your track, your clock and your
   destination intact.
-- Pan to pause following; Re-centre or Locate to resume; N↑ for north-up.
-  The screen stays awake while it follows.
+- Pan to pause following; **Re-centre** in the ride sheet resumes it, and
+  **North up** turns the map north-up. The screen stays awake while it follows.
 
 > [!IMPORTANT]
 > **The map is not permission.** Trail designations come from the Michigan
@@ -90,7 +93,7 @@ a road between two boat launches.
 ## Outdoors
 
 - **455 hiking and trail systems**, every one with its mileage
-- **112 MTB systems** wearing a little hand-drawn bike
+- **112 MTB systems**, each on a hexagon badge with a bike
 - **36 ski & snowboard hills** — tap one for its runs by name and difficulty
   (green · blue · black, terrain parks too), its website, and a photo where
   Wikipedia has one. Difficulty comes from the source or stays grey; it is
@@ -176,7 +179,8 @@ River, fits the whole river on screen, and points you at the run planner.
   written to be read aloud to a county dispatcher — and it refuses to print
   a coordinate it can't stand behind
 - Breadcrumb trail, lossless retrace, truck pin, compass, mark-this-spot
-- Ride recording with an HUD that fits four device sizes
+- Ride recording with a compass ribbon and a ride sheet — trip, to go and
+  arrive on a route; trip, time and speed on a free ride
 - A **self-test under Tools** that runs 50+ checks on your actual phone —
   load, data, routing, safety, GPS — and prints what it found
 
@@ -211,8 +215,8 @@ is named there as excluded.
 record of every take since the first; `docs/LANDMINES.md` numbers 200+
 known failure modes so they are stepped around instead of rediscovered;
 `docs/AGENDA.md` carries every decision with what was *ruled out* and why.
-The build gates on all of it: ~300 smoke assertions across six modes,
-281 rendered-pixel checks in a real browser, and a final gate that has
+The build gates on all of it: over 450 smoke assertions across five passes,
+about 600 checks in a real browser, and a final gate that has
 refused seals for a stale document stamp, a missing ruled-out line, and a
 URL that hadn't been declared — each time correctly.
 

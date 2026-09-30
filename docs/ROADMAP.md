@@ -1,6 +1,6 @@
 # ROADMAP — APEX ORV · V3
 
-*Current as of take 187. Take 176 is the production baseline: on Google
+*Current as of take 188. Take 176 is the production baseline: on Google
 Play as com.apexoffroad.app, closed testing with real users from
 2026-09-02.*
 
@@ -29,11 +29,13 @@ finish the arcs the design already committed to.
 - A183 · R8 shrinking/obfuscation — BUILT take 183: keep rules, the dex
   and mapping asserted on the artifact, mapping in the play-assets zip.
   Open: the device check before the AAB is promoted.
-- A203 · V4, the presentation overhaul — DESIGNING in docs/DESIGN-v4.md.
-  The feature set stays; takes 187–190 are the foundation, the map (Hybrid
-  A202, pins A197 P3), the look and the flow. Waits on the maintainer's
-  reference screenshots (landmine 190) and does not jump ahead of A183's
-  device check.
+- A203 · V4, the presentation overhaul — BUILT in takes 187 and 188
+  (docs/DESIGN-v4.md). The feature set stays. Take 187 was the foundation.
+  Take 188 was everything else, as one take on the maintainer's word of
+  2026-09-24: the map (Hybrid A202, pins A197 P3), the look and the flow.
+  It is on the local v4 branch, headed for a pull request, and not
+  promoted ahead of A183's device check. Next: a render speed-up, then
+  polish takes after the maintainer's verdict on the Fold.
 - A189 · "Road hazards" LAYER — DESIGNED take 180, measured on the extract
   (3,675 plate readers, 1,938 low bridges, 694 fords, 0 speed cameras);
   build after A183 on approval. A160 streaming CLOSED: nothing downloads

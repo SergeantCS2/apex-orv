@@ -4,7 +4,7 @@
 > every tap, templates every link from your username, and copies the workflows
 > for you. What follows is the reference version of the same flow.
 
-*Current as of take 187.* Three artifacts, four screens, no laptop.
+*Current as of take 188.* Three artifacts, four screens, no laptop.
 
 You need, saved to your phone first (all in the project outputs):
 `build.yml` · `bootstrap.yml` · `apex-seed.zip`
@@ -46,7 +46,7 @@ after). When it finishes:
 
 ## 5. Stage 0 — browser pan test
 
-Open the Pages URL on the Fold, cover screen, portrait. Tap **⏱ Pan test**.
+Open the Pages URL on the Fold, cover screen, portrait. Tap **Pan test** (Tools, then Diagnostics).
 Report: avg fps · p99 min fps · NET badge · GRAPH badge.
 Pass: avg ≥ 50, p99 min ≥ 30, NET green.
 
@@ -57,7 +57,7 @@ when asked). Then, in order:
 
 1. Open with wifi **on**. Map renders, labels show, GPS asks permission.
 2. **Airplane mode on. Force-stop. Reopen.** Identical map, NET stays green.
-3. Tap **▶ Ride it** and walk to the mailbox — the truck pins itself, the
+3. Tap **Ride it** (Ride tab) and walk to the mailbox — the truck pins itself, the
    breadcrumb draws, **Retrace** brings you back.
 
 Updates: every new take is a new APK on Releases that installs **over** the

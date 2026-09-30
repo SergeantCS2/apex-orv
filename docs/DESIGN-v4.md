@@ -1,10 +1,18 @@
-# DESIGN · V4 — the presentation overhaul · study (no code yet)
+# DESIGN · V4 — the presentation overhaul · study, built in takes 187 and 188
 
 *Opened 2026-09-23 at take 186 for A203. Transcribe, don't invent (landmine
 190): §4 waits for the maintainer's reference screenshots, and nothing in
 §5–§11 is built before the maintainer approves it. Evidence is labelled
 PROVEN (read in the code or observed, and what), MEASURED (counted, and
 how), INFERRED (reasoned) or UNKNOWN.*
+
+*Built since: take 187 laid the foundation; take 188 built the rest as one
+take (the maintainer, 2026-09-24; §12). Where the study below plans work
+for take 189 or 190, that work landed in take 188. "Built, take 188" notes
+in §9–§12 say what shipped; the maintainer's later decisions stand where
+the study said otherwise. Every take-188 number is desktop headless Chrome
+or node on the workstation; on the Fold each one is UNKNOWN until read
+there.*
 
 The feature set stays. V4 changes how it is presented: the map (Hybrid,
 pins), the controls (one component set, readable in sun and with gloves)
@@ -40,6 +48,7 @@ the cover-vs-inner screen layout.
 Decisions, same day:
 - **One dark look.** No light theme; raise size and contrast.
 - **Study first, then staged takes**, each bundling several items.
+  (Reversed 2026-09-24: takes 188–190 became one take, 188 — §12.)
 - **References come from the maintainer** (§4) — the look is transcribed.
 - **"Unknown" pins are look-alike badges** (A214), not junk names.
 - **Buried = planning and starting a route** (A217), not Tools or Layers.
@@ -112,6 +121,10 @@ Line numbers are `src/app.html` unless a file is named.
   re-partitions; the A209 rank fix moves anchors (Water 33 of 89) but not
   the churn. (The study's first figure, 26–44%, came from an unvalidated
   scratch replay.)
+- Note (take 188): that figure counts badges LEAVING the view as churn; on
+  the zoom-band design, which re-partitions 0.0% by construction, the same
+  column still reads 10–27% (landmine 225). The line numbers above are the
+  take-186 audit's.
 
 ### 1.3 Planning and starting a route (A217)
 PROVEN from the handlers. "Actions" counts taps and one long-press.
@@ -309,8 +322,9 @@ close); sizes for the Fold shots are measured at 2.625 image px per CSS px
 and are ±1–2 px. R1–R2 are iPhone captures; R3–R8 are the Fold (R3, R4, R6–R8
 the inner screen; R5 the cover).
 
-**R1 · onX Offroad, Go & Track while recording** (the maintainer circled
-Distance)
+**R1 · onX Offroad, Go & Track while recording** (a circle around
+Distance is someone else's annotation, not the maintainer's — corrected
+2026-09-24: "ignore that circle")
 - A compass tape across the top: a near-black band (#0E0D08), cardinal
   letters, ticks, an orange heading needle (#E99C40).
 - Hybrid: imagery dimmed and desaturated; public land a translucent
@@ -416,7 +430,8 @@ through the mockup)
    right-hand column; search at the top; five tabs with icon + label
    (APEX has four).
 5. **Riding:** a compass tape across the top (APEX has `#hudbar`) and three
-   big stats in a sheet — the maintainer circled Distance.
+   big stats in a sheet (the circle on Distance was not the maintainer's;
+   the ride sheet follows the V4 mockup, A222).
 6. **The inner screen:** R3, R4, R6–R8 lay it out as map above and a
    full-width sheet below — no side panel.
 
@@ -598,6 +613,84 @@ The §4 references confirm or replace those rules before D1–D5 get values.
   source, or GeoJSON `tolerance`, before any pipeline step. Merged lines
   stay out of `HIT` (7333) and keep their legality class.
 
+**Built, take 188.** The maintainer approved Hybrid "as the preview"
+(2026-09-24) and chose "Safer" for its lines (2026-09-25). One table in
+`src/app.html` (`HYB_OPA`, `HYB_FLOOR`, `SAT_TONE`, `HYB_WATER`, `HYB_TXT`,
+`HYB_HALO`, `HYB_KEEP`) holds it. Map's look is unchanged except where a
+take-187 defect was fixed (A213, A220). Numbers are desktop headless,
+as measured by the build.
+- **D1.** On Hybrid the four road casings (`minor-case`, `paved-case`,
+  `casing-track`, `casing-fsroad`) are off by visibility, not opacity. The
+  trail `casing` stays. Two-track keeps its colour at 0.55; the study's
+  "quiet rust" was not built. "Safer": a two-track too wide for the
+  machine fades to `HYB_FLOOR` 0.165, which is Map's own floor. Ridable
+  against too-wide reads ΔE 18.1 / 16.4 / 15.2 over canopy / median /
+  bright ground; step 5's 0.25 read 14.2 / 13.0 / 12.0. Ridable against
+  the ground reads 25.2 / 22.7 / 21.1. Landmine 108's bar is 15. PROVEN
+  in render's Safer line. The too-wide line is faint by design: about
+  ΔE 6–7 from the ground.
+- **D2.** Highways stay, at 0.35 on Hybrid. `minor` is the one layer
+  Hybrid holds back: a zoom range starts at exactly 11.5, never opacity 0
+  (A59). Render G4 checks that nothing on `NEVER_HIDE` or the ridable
+  network is hidden. Forest roads draw at full strength (1) on Hybrid.
+  That was the default N1 against the preview's 0.6 (ΔE 18.2 / 13.2 /
+  6.4); the maintainer confirmed it with "Safer".
+- **D3.** `netOpacity()` is the only writer of line opacity on the twelve
+  `MACH_LAYERS`, and it derives the value from basemap and machine
+  together. Smoke G11 counts 72 writes and 0 plain numbers. On Map, after
+  a machine change, every row equals take 187's (hyb_m4). A restored
+  Water mode reopens on Hybrid with the kayak's dimming, 3 of 3. Render
+  G2, G3 and G6 hold this.
+- **D4.** `sat`, `sat-base` and `sat-patch` share one tone: saturation
+  −0.35, brightness-max 0.82, contrast 0.06. Water on Hybrid is R2's navy
+  #172937. `raster-fade-duration` 150 was left as found; it is an
+  unrecorded A120 exception, now given a Corrected line there.
+- **D5.** Fourteen label layers read #F4F2EE on rgba(10,10,10,0.85) at
+  width 1.6. The keep-list (`HYB_KEEP`) keeps its paint, among them
+  pins, stack counts, paddle labels, shields, trail and riding-area
+  names. So riding-area names stay green on a white halo, where the
+  preview drew them white.
+- **D6.** Built: Map and Hybrid only. The tour and guide keys were bumped
+  once (`apex.tour.v2`, `apex.guide.v3`). Render G1 and smoke both
+  rejected take 187's Map → Satellite → Hybrid cycle.
+- **D7, as the maintainer scoped it.** "Accept the cost" (2026-09-25)
+  lifted the time budget as a cut rule. "Trails + forest roads only"
+  (2026-09-30) set the scope, and that settles cold-audit findings F5 and
+  F6 as decided, not as defects.
+  - **What is chained.** `NETLO_CLS` holds route72, trail50, moto24,
+    mccct, fstrail, fsroad, fsclosed and closed. They are chained by the
+    runtime `chainStrokes` into a draw-only low-zoom set, on Hybrid below
+    z11 only. Map filters exclude the strokes, and Map z9 is
+    pixel-identical.
+  - **What stays per edge.** `NETLO_SKIP` holds track, paved and minor,
+    each with its measured reason in the code.
+  - **Kept at z7 on Hybrid.**
+    - The five trail classes: 48–88% before, 99.3–100% now.
+    - fsroad: 65–76% before, 99.0–99.4% now.
+    - fsclosed: 75–83% before, 99.3–99.6% now.
+    - closed: 87–96% before, 100% now.
+    - Two-track (90.1 / 94.7%) and paved (96.9 / 89.6%) draw as in take
+      187.
+  - **Cost.**
+    - +9,816 strokes and +190,565 vertices (+11.7%), with 89–111 ms of
+      main-thread chaining.
+    - Time to ready: not separable from run-to-run noise against D7 off.
+      INFERRED: under about 1 s.
+    - Hybrid→Map: 474 ms, against 329 on take 187 and 437 with D7 off.
+    - All PROVEN on desktop.
+  - **Taps.** A tap on a stroke resolves to the nearest drawn edge of its
+    class. The card says so, and it never reads "Not an ORV route".
+  - **Guards.** Smoke G8 (vertex conservation, and the scope against a
+    recorded per-edge list), G8s (which filters are wrapped) and G9
+    (stroke taps). Render G10 (strokes vs per edge at four readings).
+    Each was watched failing on planted builds.
+  - **Ruled out.** Chaining every class: +2.5 / +3.0 s to ready over take
+    187 in step 9, and +3.0 / +3.2 s for the ten-class scope. Also ruled
+    out: GeoJSON `tolerance`, and twin layer ids.
+  - **Seen, not changed.** A closed line on a chained stroke keeps one
+    dash rhythm, so at z9 it reads more dotted than per-edge drawing did.
+    INFERRED cause.
+
 ---
 
 ## 10 · Pins (A197 P3, A209, A210, A214)
@@ -619,6 +712,20 @@ services never stack at statewide zoom.
   split. Band width is the stability-vs-precision knob, set by
   measurement. Target: under 5% re-partition per 0.1 step, kind arrivals
   excluded (A197 — no clusterer removes those).
+  **Built take 188** (A197 P3): edges `STACK_BANDS=[9.2,10,11,11.4,12,13,
+  14,15,16,17]` — pinDrawable()'s real changes (9.2, 11, 11.4, 12, 13, 14)
+  plus looseness choices (10, 15, 16, and 17 = maxZoom, a point band);
+  bottom-up, world pixels, cached under modeNow(), emitted near the view
+  only. The metric is re-partition over Q (places pooled at the previous
+  step and still in view), not the badge-set column, which counts view
+  exits (landmine 225). Measured: 0.0% within a band in all five modes
+  (pins_probe) and live (0 of 1,050 steps), 0 merges at edges.
+  Render's pins-stay-put guard reads 0 of 150 within-band steps. Take
+  187's clusterer, transcribed into the same guard, reads 26 of 150
+  (17.3%). There are 0 merges over 24 edge steps. A tray row eases to the
+  band where its place stands alone. The band build takes 25–35 ms in
+  desktop Chrome; the self-test's `stack-build` row reports it on the
+  Fold.
 - **Upstream re-checked (PROTOCOL §3), ruled out again:** supercluster
   places at centroids (lakes) and would need vendoring; `cluster:true`
   re-clusters on every `setData`, which queues behind tile loads (15.9 s
@@ -628,42 +735,121 @@ services never stack at statewide zoom.
   separately. A non-zero `fadeDuration` would be an A120 exception the
   maintainer approves; `raster-fade-duration:150` (2418, 2421) already is
   one, unrecorded.
+  **Take 188:** both were left as found. `fadeDuration:0` is the
+  maintainer's call, and A120 now records it: a Corrected line for the
+  raster fade, and a Pending line for a non-zero `fadeDuration`. Zooming
+  out, up to 4 pins (Camp) or 3 (Water) draw loose until `moveend`
+  restacks them, the same as take 187 (desktop, PROVEN). A restack on the
+  `zoom` event was not built.
 - **Badges (A214):** each kind a distinct glyph and colour — including
   system vs day-use and the paddle duplicates. Reverses A197's "no new
   art", on the maintainer's verdict. Glyph source — today's stroke style
   (rationale 1246-1247: "a stroke sketch outlives any imported path" at 8
   px) or Lucide paths — chosen by rendering both at z9.2, z10 and z12 at
   DPR 2.625. Colours from §4.
+  - **Built in take 188 (step 6)** — "shape + glyph, onX-style" (the
+    maintainer, 2026-09-24). The shape says the family: teardrop for a
+    destination (`d:1`), circle for a service, square for camps, hexagon
+    for trail systems. This departs from the V4 mockup, which drew
+    Trailhead, Day use and Viewpoint round, and the Trailhead as a round
+    charcoal badge with Barlow "TH" text. The family rule is kept: a `d:1`
+    kind is never a circle, charcoal is `STACK_MIXED`, and fillText
+    depends on the device font. One table: `POIKIND` `s`/`c`/`g` plus `BADGE_PAD`
+    (src/app.html), held by gate `check_badges`. The glyphs a `g` names live
+    in `LUCIDE`, the one icon table the chrome reads too (step 10's A216
+    fold, done at its merge; landmine 107), or, for the two drafts, in
+    `APEX_GLYPHS`; `badgeMarkup(g)` reads both.
+  - **Source and weight:** Lucide (lucide-static 1.37.0, pasted
+    byte-for-byte and gate-checked), plus two glyphs in Lucide's grammar
+    that Lucide lacks: `apex-th` and `apex-lighthouse`. The weight is
+    `BADGE_LW` 2.25 grid units, the mockup's, and the lightest that read at
+    z9.2 on both basemaps on the probe sheet (`probe badges`:
+    `badges-{map,hybrid}-z{9.2,10,12}.png`, arms A–E, where A is take 187's
+    strokes). The stack glyph is 2.25 × 1.35.
+  - **Colours:** the spec's table (§4), except fuel. Fuel moved off the
+    closure/dam red to #701A1A (ΔE76 36 from `--shut`). The gate enforces
+    ≥20 within a shape, ≥12 overall, white ≥4.5:1, and ≥20 from the
+    accent, ≥18 from `STACK_MIXED`, ≥20 from `--shut`.
 - **Legend:** the Pins rows show the map's own badge image, checked equal
-  (landmine 98); a `.sw` stays for render:1617 or that check moves with it
-  (landmine 217).
-- The "All labels" badge circle (left as found, take 186).
+  (landmine 98). **Built (take 188):** the row's image is the PNG of the
+  canvas given to `addImage` (`BADGE_URL`), in a `.sw.pb` box 36 px tall.
+  Render R3 decodes each row and compares it with `m.getImage` within
+  1/1, in every mode. The accent check (render.mjs `accentSw`, 1670 at
+  step 6) reads the row image's fill pixel, not the empty `.sw`
+  background.
+  The V4 mockup's helper line sits under "Pins in …" (`.pnote`, src/app.html
+  `BADGE_FAMILY`): "Each badge is the one the map draws. Shapes by family:
+  …", naming only the families the mode's rows show, and only when every
+  row is a drawn badge (render R3b; smoke asserts it is absent under
+  stubs). **After steps 11 and 12:** the rows are 48 px, with a hairline
+  between rows and a 12 px gap after the badge.
+  Not built, on purpose:
+  - The mockup's 32 px ringed badge. The row shows the map's own 26×36
+    canvas, so the legend stays the map badge.
+  - The ON/OFF word and a switch on every row. That would be a second
+    selected-state language, against §6's one selected state. An off row
+    is unhighlighted and its badge dimmed to .45.
+  - RESET in the header. The Reset row stays at the bottom.
+- The "All labels" badge circle: **resolved in take 188 by A226, the other
+  way round.** The row is now "Map text" (`LYRGROUPS` `k:'labels'`,
+  `txt:true`, no ids or `with` list; src/app.html `textSet`) and hides
+  text only: every text-bearing symbol layer, derived from the style,
+  gets an empty `text-field`, and ON restores the style's own from a
+  memo. Pins, badges, stack circles and a stack's count stay, and **no
+  visibility is written**, so ON cannot show a group the mode keeps off.
+  The earlier take-188 fix (step 6: hide the stack circle with the text,
+  `with:['poi-stack-bg']`, held by render R4) is gone, and R4 with it. Held by render's A226 lines (take 187's path run live
+  as the control) and by gate `check_layer_control` (5 planted A226
+  controls). pad-dam, the hazard circle (A112), is a circle layer and is
+  never touched.
 
 ---
 
 ## 11 · Guards, each with a planted control
 
-Floors in take 187 are today's; take 189 raises them to V4's. Offender sets
-may only shrink. Every check runs the same function on its planted
-control, never throws inside `page.evaluate` (landmine 217), and a hidden
-planted element must *not* be flagged.
+Floors in take 187 were that take's own. Take 188 raised them to V4's
+(planned for 189, built in 188), and the offender lists are now empty.
+Offender sets may only shrink. Every check runs the same function on its
+planted control, never throws inside `page.evaluate` (landmine 217), and
+does *not* flag a hidden planted element.
 
-| Guard | Where | 187 | 189 | Planted control |
+| Guard | Where | 187 | 188 (built) | Planted control |
 |---|---|---|---|---|
-| Contrast, text over its background composited on pure white and pure black (A150's never-built check); stroked/haloed map text its own rule | render | today's set | 7:1 / 4.5:1 / 3:1 | low-contrast chip |
-| Tap target, every interactive element, each state forced (landmine 111) | render | 38 px | 48 / 56 px | 30 px button |
-| Text floor | render | 9 px | 12 px | 11 px span (in 189) |
-| Raw colour literals, comment-stripped `www/` | gate | today's set | exemptions only | planted literal |
-| Accent budget from the token (render:1617, 2441) | render | 1 | 1 | second accent surface |
+| Contrast, text over its background composited on pure white and pure black (A150's never-built check); stroked/haloed map text its own rule | render | today's set | 7:1 for `--text-1`/`--text-2` (4.5 large), 4.5:1 for other text (3 large), 3:1 for non-text; `V4_CONTRAST` and `V4_NONTEXT` empty | low-contrast span, SVG text and fill plants |
+| Tap target, every interactive element, each state forced (landmine 111) | render | 38 px | 48 px; 56 for `#hudbtns button` and `#c-ride`; `V4_TAP` empty | 44 px button, 50 px ride button |
+| Text floor | render | 9 px | 12 px; `V4_TEXT` empty | 11 px span |
+| Raw colour and px literals, comment-stripped | gate | today's set | `check_tokens` (no value-named token; style= read across lines, A224; SVG `fill=`/`stroke=`); `check_scale` (no px literal outside `var()` fallbacks; unused exemptions fail) | planted literal, planted rules |
+| Accent budget from the token (render.mjs `accentSw`) | render | 1 | 1 at rest, at the place card and at the route cards | second accent surface |
 | Every `var(--x)` declared | gate | all | all | undeclared var |
-| No emoji/glyph icons, incl. `#nav` and cards | render | extended scope | same | planted glyph |
-| Clear band (§8), three sizes | probe (render guard deferred, §8) | measured | render guard + open budget | a 200 px taller mode chip |
-| Ride-HUD overlap | render | — | added | overlapping element |
-| Tap counts (§7) | render | — | take 190 | extra step |
-| Pin re-partition per 0.1 step | probe/render | measured | < 5% | old restack |
-| Pins legend = map badge image | render | — | take 188 | swapped image |
+| No emoji/glyph icons, incl. `#nav` and cards | render + gate | extended scope | render `V4_GLYPH` empty; `check_glyphs`: two exemptions by site (`#peek-chev` ▾, the summit ▲); `check_icons`: every Lucide string byte-for-byte against lucide-static | planted glyphs, a chevron off its site |
+| Clear band (§8), three sizes | render | measured (probe) | render G1: folded ≥ 0.592 / 0.510 / 0.529 (take 187's), open ≥ 0.12 | a taller mode chip, a drawer whose class says folded |
+| Ride-HUD overlap; controls hidden while riding | render | — | G2/G3 at every device size; the floating controls hidden while riding and back after Stop (the maintainer, 2026-09-25) | overlapping element; the hide rule overridden; the ride flag left on |
+| Tap counts (§7) | render | — | the tap walker: A ≤ 3, B ≤ 2 (at 360×800 and 411×960), C ≤ 3, D ≤ 2, E ≤ 1; take 187's A and B come back BLOCKED through probe | extra step; Ride it hidden |
+| Destinations (A113) | render | `most < total` | at most 7 per tab, all on screen | an 8th Tools chip |
+| One selected state (§6) | render | — | every family shows a `--sel` dot (a tab its bar), a heavier label and a `--sel` line when on, with no fill change, and none of it when off | a red-bordered chip, a tab whose weight does not move, a chip whose fill changes |
+| Pin re-partition per 0.1 step | probe/render | measured | 0 of 150 within-band steps (target < 5%); 0 merges at band edges | take 187's clusterer |
+| Pins legend = map badge image | render + gate | — | render R1–R3; gate `check_badges` (shape by family, colour distances) | swapped image |
+| Map text hides text only (A226) | render + gate | — | no visibility written, pins drawn; `check_layer_control` | take 187's path, run live; 5 planted controls |
+| Licence notices | gate + render | — | `check_licences`: Lucide, Barlow, MapLibre GL JS, Capacitor in `www/licenses.txt` and the Data sources card | a notice's last line removed, a version drift |
 | CSS/JS shared colours equal | gate | added | same | planted mismatch |
 | Barlow applied (`document.fonts.check`) | render | added | same | wrong family name |
+
+**Built, take 188: what else guards the take.**
+- Hybrid: render's Hybrid block (its G1–G7) and the Safer line. The
+  style diff against take 187 (G12) was a scratch tool of the build, not
+  a committed guard.
+- D7: smoke G8, G8s and G9, and render G10 (§9).
+- The ride flows: a guard for each confirmed finding of the take's cold
+  audit and of the review of its fixes. The audit confirmed 21 and
+  refuted 3; F5 and F6 were decided by the maintainer, not fixed.
+  - Most guards are smoke drills. Each smoke-guarded fix was taken out
+    of a copy of the built app, and its drill failed on that mutant: 28
+    of 28 caught (PROVEN).
+  - The drills cover a route cleared by a machine change, loop arrival,
+    a GPS dropout, separate GPS watches, the away card and a held
+    resume.
+- The in-app self-test's own tap check stays at 38 px on four classes. It
+  ships to riders, and smoke fakes 40 px.
 
 Harness gaps closed in take 187 (A211): `.svg`/`.woff2` MIME types in the
 render, probe and palette servers; `check_offline` recursive, with a cited
@@ -697,6 +883,20 @@ not `display:none`; `#actions` outside `#railbody`.
 | 189 | the look: A215, A216; licence notices (Lucide ISC, Barlow OFL) in Data sources and PROVISION via `tools/manifest.py` | the mockup |
 | 190 | the flow: A217; the tour, `#guide`, TESTING.md and README follow; tour and guide keys bumped (A147) | the mockup |
 
+**Reversed 2026-09-24 — takes 188, 189 and 190 are one take (188).** The
+maintainer's instruction of 2026-09-24, with his decisions on the mockup
+the same day (Hybrid "as the preview"; pin badges "shape + glyph,
+onX-style"; the ride sheet as the mockup draws it, A222 — "Distance first"
+withdrawn with the circle it rested on; marinas ranked by water body, A219,
+then "Marinas can stay as they are" the same day). The staging above bought one approval gate per take;
+the mockup now carries those approvals at once, and the maintainer's rule
+since take 184 is one build/gate/CI cycle per take with every ready fix in
+it. What the staging protected is kept inside the take: each piece has its
+own agenda item, ruled-outs and HANDOFF paragraph, lands in order (the
+map, then pins, then the look, components and flow) on a green smoke, and
+a piece that cannot be made green by the seal is cut whole and keeps its
+number as OPEN or DEFERRED.
+
 The mockup: a private page at 411×960 built from real probe shots with V4
 chrome in Barlow and Lucide — the route flow, a place card, the pin
 legend, Hybrid before and after — made only after §4 is transcribed, and
@@ -715,8 +915,80 @@ the take-186 Play candidate.
 - **Ruled out:** MapLibre or supercluster clustering for pins (§10).
 - **Ruled out:** hiding roads on Hybrid by opacity 0 (A59), or at all
   without landmine 129's list.
-- **Ruled out:** one take for everything — the maintainer chose staged
-  takes.
+- ~~**Ruled out:** one take for everything — the maintainer chose staged
+  takes.~~ Struck 2026-09-24: the maintainer reversed it (above) — one
+  take, 188, with the pieces recorded and ordered separately inside it.
+
+**Built, take 188 — one take.** The build went in order: the maintainer's
+decisions of 2026-09-24 first (Hybrid, badges, the ride sheet), then the
+study's take 188 (pin bands, D7), then its 189 and 190 (icons, look,
+components, flow). From step 6 on, independent steps were built in
+parallel git worktrees ("Yes, parallel lanes", the maintainer,
+2026-09-24). They were merged one at a time, with every Chrome run under a
+single lock. The tree was then re-verified after each merge group.
+- **The map.** Hybrid as the preview, with "Safer" lines and D7 as scoped
+  (§9). Map and Hybrid only (A212). Casings follow their lines (A220).
+- **Pins.** Zoom bands (A197 P3) and badges by shape and glyph (A214,
+  §10). "All labels" became "Map text", which hides text only (A226).
+- **The look (A215).** One role-token block. Type at 12 / 14 / 16 / 18 /
+  22 / 32. 48 px controls, and 56 px for the ride controls. Opaque chips
+  and panels. A drawer capped at 38vh.
+- **Components (A216).** One Lucide table (`LUCIDE`, 74 strings, plus two
+  drafts in `APEX_GLYPHS`) and no text glyphs. Chips and buttons are
+  pills, with one sheet language and one selected state. The existing
+  selectors were restyled: the `.btn` class of §6 was not built
+  (landmine 92). Licence notices for Lucide, Barlow, MapLibre GL JS and
+  Capacitor are in `www/licenses.txt` and the Data sources card.
+- **The flow (A217).**
+  - "Route here" and "Turns".
+  - Return home on the folded drawer.
+  - Ride it under the route cards.
+  - Every tab's strip wraps, with at most 7 per tab.
+  - Wrong turn only while the simulator rides.
+  - A seven-step tour.
+  - Walked taps: A 3, B 2, C 3, D 2, E 1 (render, desktop).
+- **The ride.** The ride sheet follows the mockup (A222): Trip, To go and
+  Arrive on a route; Trip, Time and Speed on a free ride. Stop,
+  Re-centre, North up and Voice are in the sheet. A resumed trip shows
+  the sheet (A221). The maintainer's decisions of 2026-09-25 are built:
+  - While riding, the floating map controls hide, as the mockup's Ride
+    screen does.
+  - On a phone, a GPS failure refuses: "No GPS fix — turn on location and
+    try again. Nothing started." No simulated ride starts (A223). The
+    simulator stays a deliberate test tool.
+  - There is one arrival estimate: the route's own until about ten moving
+    fixes, then the rider's pace.
+- **Checked cold.** A cold audit of the whole take confirmed 21 findings
+  and refuted 3. F5 and F6 were settled by the maintainer's D7 scope; the
+  rest were fixed. A review of those fixes confirmed R1–R11 (R3 and R9
+  are one defect, so ten), all fixed. Each fix has a guard: a smoke
+  drill, a render read or a gate plant. Every smoke drill was watched failing on a mutant
+  with its fix taken out (28 of 28). Every number is desktop headless;
+  the Fold is UNKNOWN.
+
+**What remains for V4.**
+1. **The render speed-up, first.** Take 188 roughly doubled render: about
+   13 min and 606 ok lines, against take 187's 7 min and 317 (the gate
+   counted 318). MEASURED from the log files' creation and last-write
+   times on the workstation; the
+   take-188 figure includes any wait for the Chrome lock. Every lane,
+   merge and gate waits on render, and the gate runs it again. How to
+   speed it up is not designed yet (UNKNOWN). It comes before any more V4
+   work.
+2. **Then polish takes, after the maintainer's verdict on the Fold.** Each
+   polish take waits for what the phone shows. The build recorded these
+   candidates, from desktop shots only:
+   - the mockup items not built (the Pins rows' switch and RESET header,
+     §10; the mockup's control positions, which would break §8's floor);
+   - the badge departures that §10 records;
+   - the sand strip above Layers (UNKNOWN on the Fold);
+   - closed lines' dash rhythm on Hybrid at z9, and the faint too-wide
+     two-track (§9);
+   - pins loose on a zoom-out until `moveend` (§10);
+   - "BSD 3-Clause" breaking at its hyphen at 360 px wide;
+   - the empty folded-drawer band on a ride with no fix;
+   - whether Resume should stop a ride that is running.
+   Spoken turns (A218) stay OPEN outside V4.
 
 ## 13 · Deferred
 

@@ -56,6 +56,29 @@ if (mode === "stylediff") {
   console.log(n ? `STYLES DIFFER: ${n} element-states` : "STYLES IDENTICAL");
   process.exit(n ? 1 : 0);
 }
+/* take 188 · G13 · the tour and guide keys are READ from the built app, never
+   typed here: the keys are versioned with their content (A147) and a typed
+   copy goes stale on the take that bumps them, when the tour then covers every
+   scene (landmine 222). A key that cannot be read ends the run — the planted
+   strings prove the reader first. */
+const appKey = (js, name) => { const m = new RegExp("\\bvar\\s+" + name + "\\s*=\\s*['\"]([^'\"]+)['\"]").exec(js || "");
+  return m ? m[1] : null; };
+if (appKey("var TOURKEY='apex.tour.v9',TOUR={}", "TOURKEY") !== "apex.tour.v9" || appKey("var TOUR={on:false}", "TOURKEY") !== null) {
+  console.log("FAIL: the storage-key reader failed its planted strings"); process.exit(1); }
+/* a single-file build inlines the script into index.html */
+const APPJS = [join(WWW, "app.js"), join(WWW, "index.html")].filter((f) => existsSync(f))
+  .map((f) => readFileSync(f, "utf8")).find((t) => /\bvar\s+(TOURKEY|GUIDEKEY)\b/.test(t)) || "";
+const TOURKEY = appKey(APPJS, "TOURKEY"), GUIDEKEY = appKey(APPJS, "GUIDEKEY");
+if (!TOURKEY || !GUIDEKEY) {
+  console.log(`FAIL: cannot read ${!TOURKEY ? "TOURKEY" : "GUIDEKEY"} from ${join(WWW, "app.js")} — the tour or guide would cover every scene`);
+  process.exit(1); }
+/* stderr, not stdout: `probe.mjs eval x.js > out.json` must stay pure JSON for
+   `pins_probe.py steps --live out.json` (step-2 review) */
+console.error(`  storage keys from www/app.js: ${TOURKEY}, ${GUIDEKEY}`);
+/* take 188 · APEX_VIEWPORT=WxH[xDPR] sets any mode's viewport, so an eval can
+   measure the small phone (360x800x3) or the inner screen */
+const VP = /^(\d+)x(\d+)(?:x([\d.]+))?$/.exec(process.env.APEX_VIEWPORT || "");
+if (process.env.APEX_VIEWPORT && !VP) { console.log("FAIL: APEX_VIEWPORT must read WxH or WxHxDPR"); process.exit(1); }
 const srv = createServer((rq, rs) => {
   const p = join(WWW, decodeURIComponent(rq.url.split("?")[0]));
   if (!existsSync(p) || p.endsWith("/")) { rs.writeHead(404); return rs.end(); }
@@ -70,12 +93,13 @@ const pg = await b.newPage();
 /* take 187 · the V4 modes shoot the Fold's cover screen (render's device
    matrix, A197 Q3); the older modes keep the harness's phone viewport */
 const COVER = { width: 411, height: 960, deviceScaleFactor: 2.625 };
-await pg.setViewport(mode === "v4" || mode === "styles" ? COVER
+await pg.setViewport(VP ? { width: +VP[1], height: +VP[2], deviceScaleFactor: +(VP[3] || 2) }
+  : mode === "v4" || mode === "styles" || mode === "badges" ? COVER
   : { width: 412, height: 915, deviceScaleFactor: 2 });
 /* take 187 · landmine 222: in a fresh profile the first-run tour and guide
    cover every scene — mark both seen before the app reads them */
-await pg.evaluateOnNewDocument(() => { try { localStorage.setItem("apex.tour.v1", "1");
-  localStorage.setItem("apex.guide.v2", "1"); } catch (e) {} });
+await pg.evaluateOnNewDocument((t, g) => { try { localStorage.setItem(t, "1");
+  localStorage.setItem(g, "1"); } catch (e) {} }, TOURKEY, GUIDEKEY);
 const URL0 = `http://127.0.0.1:${srv.address().port}/index.html`;
 /* landmine 222: the harness hooks exist before the splash is gone — wait for
    what render checks, the splash node removed and #shell ready */
@@ -108,9 +132,9 @@ if (mode === "shots") {
   await s(400); await shot("3-plan-tab");
   await pg.evaluate(() => { document.querySelector('#tabs .tab[data-go="map"]').click();
     document.getElementById("c-layers")?.click(); }); await s(500); await shot("4-layers-panel");
-  await pg.evaluate(() => { document.getElementById("c-layers")?.click();
-    try { localStorage.removeItem("apex.guide.v1"); } catch(e){}
-    window.guideShow(); }); await s(500); await shot("5-first-run-guide");
+  await pg.evaluate((g) => { document.getElementById("c-layers")?.click();
+    try { localStorage.removeItem(g); } catch(e){}
+    window.guideShow(); }, GUIDEKEY); await s(500); await shot("5-first-run-guide");
   console.log("screens written to " + out);
 } else if (mode === "take") {
   /* the scenes takes 185–186 changed: the first-open card, Camp at three
@@ -165,7 +189,7 @@ if (mode === "shots") {
   const out = OUT; mkdirSync(out, { recursive: true });
   const s = (ms) => new Promise((r) => setTimeout(r, ms));
   await pg.evaluate(() => { try { window.guideClose(true); } catch (e) {} });
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {   /* take 188 · A212: Map and Hybrid only */
     const label = await pg.evaluate(() =>
       (document.getElementById("c-base").innerText || "x").trim().toLowerCase());
     await s(1800); await pg.screenshot({ path: `${out}/base-${label}.png` });
@@ -292,7 +316,12 @@ if (mode === "shots") {
     await click("pc-route");
     await pg.waitForFunction(() => document.querySelectorAll(".rc").length > 0, { timeout: 30000 }).catch(() => console.log("  no route cards"));
     await s(800); await settle(); await shot("05-route-options");
-    await tab("ride"); await s(300); await click("c-ride"); await s(6000); await shot("06-ride-started");
+    /* take 188 · A217 · the ride starts the V4 way: Ride it under the route
+       options (it folds the drawer and shows the Ride tab itself); the Ride
+       tab's chip is only the fallback, said so in the log */
+    if (!(await click("rc-ride"))) { console.log("  (no #rc-ride: started from the Ride tab's chip)");
+      await tab("ride"); await s(300); await click("c-ride"); }
+    await s(6000); await shot("06-ride-started");
     await click("c-ride"); await s(800); await tab("map"); await s(300);
   }
   await click("c-layers"); await s(600); await shot("07-layers-top");
@@ -316,18 +345,32 @@ if (mode === "shots") {
      filler in the panel, removed at once), since an open drawer is as tall as
      what it holds; each reading re-checks the drawer's state and retries,
      because startup messages open it by themselves after a load */
+  /* take 188 · the band's edges are named, not guessed (the look review): the
+     TOP edge is the lowest bottom of the scale corner, #readout and every
+     .basebtn shown; the BOTTOM edge is the highest top of #tools, #rail and
+     the attribution corner. #map, #chips and transient overlays (panels,
+     toast, tour, alert) never bound it. Each reading names the element that
+     set each edge, so a moved control shows up as a new name, not a new number. */
   const bandAt = (open) => pg.evaluate((open) => {
-    const R = (id) => { const e = document.getElementById(id); if (!e || e.hidden) return null;
-      const b2 = e.getBoundingClientRect(); return (b2.width || b2.height) ? b2 : null; };
+    const box = (e) => { if (!e || e.hidden) return null; const cs = getComputedStyle(e);
+      if (cs.display === "none" || cs.visibility === "hidden") return null;
+      const b2 = e.getBoundingClientRect(); return (b2.width && b2.height) ? b2 : null; };
+    const name = (e) => e.id ? "#" + e.id : "." + String(e.className).trim().split(/\s+/)[0];
     const P = document.getElementById("panel"); let fill = null;
     if (open && P) { fill = document.createElement("div"); fill.id = "v4band-fill"; fill.style.height = "2000px"; P.appendChild(fill); }
-    const stack = ["c-base", "c-act", "c-mode"].map(R).filter(Boolean);
-    const top = Math.max(...stack.map((b2) => b2.bottom));
-    const railR = R("rail"), bottom = Math.min(...["rail", "tools"].map(R).filter(Boolean).map((b2) => b2.top));
+    const TOP = [document.querySelector(".maplibregl-ctrl-bottom-left"), document.getElementById("readout"),
+      ...document.querySelectorAll(".basebtn")];
+    const BOTTOM = [document.getElementById("tools"), document.getElementById("rail"),
+      document.querySelector(".maplibregl-ctrl-bottom-right")];
+    let top = 0, topBy = null, bottom = innerHeight, bottomBy = null;
+    for (const e of TOP) { const b2 = box(e); if (b2 && b2.bottom > top) { top = b2.bottom; topBy = name(e); } }
+    for (const e of BOTTOM) { const b2 = box(e); if (b2 && b2.top < bottom) { bottom = b2.top; bottomBy = name(e); } }
+    const railR = box(document.getElementById("rail"));
     const folded = /\bfolded\b/.test((document.getElementById("rail") || {}).className || "");
     if (fill) fill.remove();
     return { clearBand: +((bottom - top) / innerHeight).toFixed(3),
-             mapAboveDrawer: railR ? +(railR.top / innerHeight).toFixed(3) : null, folded, vw: innerWidth, vh: innerHeight };
+             mapAboveDrawer: railR ? +(railR.top / innerHeight).toFixed(3) : null, folded, vw: innerWidth, vh: innerHeight,
+             top: Math.round(top), topBy, bottom: Math.round(bottom), bottomBy };
   }, open);
   /* landmine 224 — the drawer folds by CSS transitions on #railbody and
      #actions, and in headless Chrome a transition that starts while nothing
@@ -352,6 +395,300 @@ if (mode === "shots") {
   }
   writeFileSync(`${out}/v4-measure.json`, JSON.stringify(measure, null, 1));
   console.log("v4 scenes and measurements written to " + out);
+} else if (mode === "ridesheet") {
+  /* take 188 · A222 · the ride sheet as a rider sees it, at the small phone,
+     the cover screen and the inner screen: a real route near Mio planned the
+     app's way (long-press → Start here, long-press → Route here), a ride
+     started, and synthetic fixes driven along the route through
+     window.__nav.fix — a headless Chrome never gets a fix, so without them no
+     sheet is drawn (take 187, v4-06). Routed first (Trip / To go / Arrive),
+     then guidance off (Trip / Time / Speed), then routed with the drawer
+     OPEN on the route cards (the stats fold away, the ride buttons stay —
+     landmine 135). PNGs: <out>/ridesheet-*.png. */
+  const out = OUT; mkdirSync(out, { recursive: true });
+  const s = (ms) => new Promise((r) => setTimeout(r, ms));
+  const settleAll = () => pg.evaluate(async () => { const s2 = (ms) => new Promise((r) => setTimeout(r, ms));
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    for (let i = 0; i < 60; i++) { await frame(); if (!document.getAnimations().some((a) => a.playState === "running"
+      && a.effect && isFinite(a.effect.getComputedTiming().endTime))) break; await s2(50); }
+    try { const m = window.map; for (let i = 0; i < 30; i++) { if (m.areTilesLoaded()) break; await s2(300); }
+      await Promise.race([new Promise((r) => m.once("idle", r)), s2(4000)]); } catch (e) {} });
+  const planned = await pg.evaluate(async () => { const s2 = (ms) => new Promise((r) => setTimeout(r, ms));
+    const m = window.map, N = window.__nav;
+    m.jumpTo({ center: [-84.118, 44.546], zoom: 13 }); await s2(500);
+    m.fire("contextmenu", { lngLat: { lng: -84.12855, lat: 44.53949 } }); await s2(300);
+    const a = document.getElementById("pc-start"); if (a) a.click(); await s2(300);
+    m.fire("contextmenu", { lngLat: { lng: -84.10724, lat: 44.55265 } }); await s2(300);
+    const b2 = document.getElementById("pc-route"); if (b2) b2.click();
+    let G = null; for (let i = 0; i < 80; i++) { await s2(250); G = N.plan(); if (G) break; }
+    if (!G) return { ok: false };
+    const tab = document.querySelector('#tabs .tab[data-go="ride"]'); if (tab) tab.click(); await s2(300);
+    document.getElementById("c-ride").click(); await s2(300);
+    /* ride the first 40% of the line, a fix every ~60 m at 8 m/s */
+    const at = (mm) => { let i = 0; while (i < G.cum.length - 2 && G.cum[i + 1] < mm) i++;
+      const t = (mm - G.cum[i]) / Math.max(1, G.cum[i + 1] - G.cum[i]);
+      return [G.pts[i][0] + (G.pts[i + 1][0] - G.pts[i][0]) * t, G.pts[i][1] + (G.pts[i + 1][1] - G.pts[i][1]) * t]; };
+    for (let mm = 0; mm <= G.total * 0.4; mm += 60) { N.fix(at(mm), 8, 8, null); await s2(60); }
+    window.__probeAt = at(G.total * 0.4);   /* re-sent after guidance is switched back on */
+    await s2(1200);
+    return { ok: true, total: Math.round(G.total), rail: document.getElementById("rail").className,
+      hud: !document.getElementById("hudstats").hidden };
+  });
+  console.log("  route: " + JSON.stringify(planned));
+  const shots = [];
+  for (const [w, h, dpr] of [[360, 800, 3], [411, 960, 2.625], [749, 832, 2.625]]) {
+    await pg.setViewport({ width: w, height: h, deviceScaleFactor: dpr }); await s(1200);
+    for (const variant of ["routed", "free", "open"]) {
+      const routed = variant !== "free";
+      await pg.evaluate((routed, open) => { try { window.railSet(open); const N = window.__nav;
+        /* guidance switched back on has no projection until a fix arrives —
+           the sheet honestly reads dashes until then — so one fix is re-sent */
+        if (routed) { N.start(); N.fix(window.__probeAt, 8, 8, null); } else N.stop(); window.hudPaint(); } catch (e) {} }, routed, variant === "open");
+      await settleAll(); await s(300);
+      const name = `ridesheet-${variant}-${w}x${h}`;
+      const read = await pg.evaluate(() => { const hs = document.getElementById("hudstats"), r = hs.getBoundingClientRect();
+        return { shown: !hs.hidden && r.height > 0, top: Math.round(r.top), bottom: Math.round(r.bottom),
+          rail: document.getElementById("rail").className || "open",
+          text: [...hs.querySelectorAll(".hc")].filter((c) => !c.hidden && c.getBoundingClientRect().height > 0)
+            .map((c) => c.innerText.replace(/\s+/g, " ").trim()) }; });
+      await pg.screenshot({ path: `${out}/${name}.png` }); shots.push(name);
+      console.log(`  ${name}.png ${JSON.stringify(read)}`);
+    }
+  }
+  await pg.evaluate(() => { try { window.railSet(false); if (window.__nav) window.__nav.stopReal(); } catch (e) {} });
+  console.log(`ride sheet shots written to ${out} (${shots.length})`);
+} else if (mode === "badges") {
+  /* take 188 · A214 · the badge sheet the glyph source and weight are chosen
+     from (DESIGN-v4 §10: "chosen by rendering both at z9.2, z10 and z12 at
+     DPR 2.625"). Every arm is drawn in the V4 shapes and colours, so only the
+     glyph differs between rows:
+       A  take 187's own stroke glyphs, copied verbatim from src/app.html
+          1300-1335 at 63f1676 (an eligible candidate, not only a baseline)
+       B  Lucide at stroke 2.25 (the mockup's weight)
+       C  Lucide at 2.6 (the spec's default)
+       D  Lucide at 3.0
+       E  the app's own bdg-* images, when window.__badges exists
+     Lucide is read here from LUCIDE and APEX_GLYPHS in www/app.js (the one
+     table since take 188's A216 fold) when the app has them,
+     else from node_modules/lucide-static plus this file's drafts of the two
+     glyphs Lucide lacks (apex-th, apex-lighthouse). The camera is the bundle
+     manifest's Grayling anchor (landmine 197); the app's pin layers and the floating
+     chrome are hidden for the shots and restored after. Set APEX_SHOTS. */
+  const out = OUT; mkdirSync(out, { recursive: true });
+  const s = (ms) => new Promise((r) => setTimeout(r, ms));
+  /* the V4 table as built in take 188 (A214; fuel off the hazard red, N14):
+     kind, shape, colour, Lucide glyph, take 187's glyph, d. Once the app has
+     window.__badges, its own spec wins per kind. */
+  const KINDS = [
+    ["trailhead", "drop", "#A0441C", "apex-th", "flag", 1],
+    ["launch", "drop", "#1873B1", "sailboat", "boat", 1],
+    ["marina", "drop", "#0E2D56", "anchor", "boat", 1],
+    ["beach", "drop", "#806A10", "umbrella", "sun", 1],
+    ["dayuse", "drop", "#386C1D", "trees", "tree", 1],
+    ["lighthouse", "drop", "#A52941", "apex-lighthouse", "eye", 1],
+    ["ski", "drop", "#3A33B0", "mountain-snow", "ski", 1],
+    ["livery", "drop", "#118562", "kayak", "boat", 1],
+    ["view", "drop", "#843991", "binoculars", "eye", 1],
+    ["pad-access", "drop", "#175A63", "waves-arrow-down", "boat", 1],
+    ["camp", "square", "#75522E", "tent", "tent", 1],
+    ["shelter", "square", "#525251", "warehouse", "tent", 0],
+    ["system", "hex", "#A46103", "footprints", "tree", 1],
+    ["mtb", "hex", "#1F5131", "bike", "bike", 1],
+    ["fuel", "circle", "#701A1A", "fuel", "fuel", 0],   /* off the closure red (N14, step 6) */
+    ["store", "circle", "#5B377C", "shopping-bag", "bag", 0],
+    ["food", "circle", "#A23182", "utensils", "cup", 0],
+    ["info", "circle", "#3E526C", "info", "i", 0],
+    ["water", "circle", "#0B71CA", "droplet", "drop", 0],
+    ["toilet", "circle", "#1C7C72", "toilet", "i", 0],
+    ["pad-parking", "circle", "#797565", "circle-parking", "i", 0]];
+  /* drafts in Lucide's grammar (24 grid, round strokes), used only when the
+     app has no LUCIDE/APEX_GLYPHS: a lettered TH in strokes (not fillText, which
+     depends on the device font) and a lighthouse */
+  const DRAFTS = {
+    "apex-th": '<path d="M3 6h8"/><path d="M7 6v12"/><path d="M14 6v12"/><path d="M21 6v12"/><path d="M14 12h7"/>',
+    "apex-lighthouse": '<path d="M8 22h8"/><path d="M9 22l1-12h4l1 12"/><path d="M10 10V7h4v3"/>'
+      + '<path d="M9 7l3-3 3 3"/><path d="M4 7l2 .5"/><path d="M20 7l-2 .5"/>' };
+  const lucideFile = (n) => { const f = join(ROOT, "node_modules", "lucide-static", "icons", n + ".svg");
+    if (!existsSync(f)) return null;
+    const m = /<svg[^>]*>([\s\S]*?)<\/svg>/.exec(readFileSync(f, "utf8").replace(/<!--[\s\S]*?-->/g, ""));
+    return m ? m[1].replace(/\s+/g, " ").trim() : null; };
+  let appGlyphs = null;
+  try { const js = readFileSync(join(WWW, "app.js"), "utf8"), { runInNewContext } = await import("node:vm");
+    const table = (n) => { const i = js.indexOf("var " + n + "={"); if (i < 0) return null;
+      return runInNewContext("(" + js.slice(i + 5 + n.length, js.indexOf("};", i) + 1) + ")"); };
+    const L = table("LUCIDE"), A = table("APEX_GLYPHS");
+    if (L || A) appGlyphs = Object.assign({}, L || {}, A || {}); }
+  catch (e) { console.log("  (LUCIDE/APEX_GLYPHS in www/app.js would not parse: " + e.message + ")"); appGlyphs = null; }
+  const GLY = {}, missing = [];
+  for (const k of KINDS) { const g = k[3];
+    GLY[g] = (appGlyphs && appGlyphs[g]) || lucideFile(g) || DRAFTS[g] || null; if (!GLY[g]) missing.push(g); }
+  const glyphSource = appGlyphs ? "LUCIDE + APEX_GLYPHS in www/app.js" : "node_modules/lucide-static + this probe's apex-* drafts";
+  console.log("  glyphs from " + glyphSource + (missing.length ? " — MISSING: " + missing.join(", ") : ""));
+  const ARMS = [["A", "take 187 strokes", 0], ["B", "Lucide 2.25", 2.25], ["C", "Lucide 2.6", 2.6], ["D", "Lucide 3.0", 3.0]];
+  const reg = await pg.evaluate((KINDS, GLY, ARMS) => { try {
+    const m = window.map, S = 2, BARE = { info: 1, "circle-parking": 1 };
+    /* take 187's G, verbatim (src/app.html 1300-1335 at 63f1676) */
+    var G={
+    tree:function(x){x.moveTo(13,6);x.lineTo(8,15);x.lineTo(18,15);x.closePath();
+      x.moveTo(13,15);x.lineTo(13,19)},
+    bike:function(x){x.moveTo(11,17);x.arc(8,17,3,0,Math.PI*2);x.moveTo(21,17);x.arc(18,17,3,0,Math.PI*2);
+      x.moveTo(8,17);x.lineTo(12,10);x.lineTo(18,17);x.moveTo(12,10);x.lineTo(16,10);
+      x.moveTo(12,10);x.lineTo(13,17);x.moveTo(16,10);x.lineTo(18,17);x.moveTo(11,9);x.lineTo(14,9)},
+    ski:function(x){x.moveTo(16.6,6.5);x.arc(15,6.5,1.6,0,Math.PI*2);
+      x.moveTo(14,8.5);x.lineTo(11.5,13);x.moveTo(13,10.5);x.lineTo(16.5,12.5);x.lineTo(18,17);
+      x.moveTo(11.5,13);x.lineTo(9.5,16.2);x.moveTo(11.5,13);x.lineTo(12.5,16.2);
+      x.moveTo(6,18.6);x.lineTo(16,15.4);x.moveTo(7.2,20.4);x.lineTo(17.2,17.2)},
+    tent:function(x){x.moveTo(6,18);x.lineTo(13,7);x.lineTo(20,18);x.closePath();
+      x.moveTo(13,18);x.lineTo(13,12)},
+    boat:function(x){x.moveTo(6,15);x.lineTo(20,15);x.lineTo(17,19);x.lineTo(9,19);
+      x.closePath();x.moveTo(13,15);x.lineTo(13,6);x.lineTo(18,12);x.lineTo(13,12)},
+    fuel:function(x){x.rect(8,7,7,12);x.moveTo(15,11);x.lineTo(18,11);
+      x.lineTo(18,17)},
+    flag:function(x){x.moveTo(9,20);x.lineTo(9,6);x.lineTo(18,9);x.lineTo(9,12)},
+    sun:function(x){x.arc(13,13,4,0,6.283);x.moveTo(13,5);x.lineTo(13,7);
+      x.moveTo(13,19);x.lineTo(13,21);x.moveTo(5,13);x.lineTo(7,13);
+      x.moveTo(19,13);x.lineTo(21,13)},
+    drop:function(x){x.moveTo(13,6);x.bezierCurveTo(9,12,8,14,8,16);
+      x.arc(13,16,5,3.1416,0,true);x.bezierCurveTo(18,14,17,12,13,6)},
+    bag:function(x){x.rect(8,10,10,9);x.moveTo(10,10);x.arc(13,10,3,3.1416,0)},
+    cup:function(x){x.moveTo(8,8);x.lineTo(8,16);x.arc(11,16,3,3.1416,0,true);
+      x.moveTo(14,8);x.lineTo(14,14);x.moveTo(14,10);x.arc(14,12,2,-1.57,1.57)},
+    eye:function(x){x.moveTo(6,13);x.bezierCurveTo(9,8,17,8,20,13);
+      x.bezierCurveTo(17,18,9,18,6,13);x.moveTo(15,13);
+      x.arc(13,13,2,0,6.283)},
+    i:function(x){x.moveTo(13,11);x.lineTo(13,18);x.moveTo(13,7);x.lineTo(13,8)},
+    dam:function(x){x.moveTo(7,7);x.lineTo(13,18);x.lineTo(19,7);
+      x.moveTo(13,10);x.lineTo(13,13)}
+    };
+    /* the V4 shapes in 26-unit space (A214 spec): circle r11 at (13,13);
+       rounded square 2.75..23.25 r4.5; pointy-top hexagon R12 at (13,13);
+       teardrop head r11 at (13,12.5), tip (13,34.8), on a 26x36 canvas */
+    const shape = (x, sh, dy) => { x.beginPath();
+      if (sh === "circle") x.arc(13, 13 + dy, 11, 0, Math.PI * 2);
+      else if (sh === "square") { const a = 2.75, b = 23.25, r = 4.5; x.moveTo(a + r, a + dy);
+        x.arcTo(b, a + dy, b, b + dy, r); x.arcTo(b, b + dy, a, b + dy, r); x.arcTo(a, b + dy, a, a + dy, r); x.arcTo(a, a + dy, b, a + dy, r); }
+      else if (sh === "hex") { for (let i = 0; i < 6; i++) { const t = -Math.PI / 2 + i * Math.PI / 3;
+        x[i ? "lineTo" : "moveTo"](13 + 12 * Math.cos(t), 13 + dy + 12 * Math.sin(t)); } }
+      else { const cy = 12.5 + dy, tip = 34.8 + dy, t = Math.acos(11 / (tip - cy));
+        const t1 = Math.PI / 2 - t, t2 = Math.PI / 2 + t; x.moveTo(13, tip);
+        x.lineTo(13 + 11 * Math.cos(t1), cy + 11 * Math.sin(t1)); x.arc(13, cy, 11, t1, t2, true); }
+      x.closePath(); };
+    const lucide = (x, markup, cx, cy, lw, bare) => {
+      if (typeof Path2D === "undefined" || !markup) return false;
+      const doc = new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + markup + "</svg>", "image/svg+xml");
+      const p = new Path2D(), n = (e, a) => +e.getAttribute(a) || 0;
+      for (const e of doc.documentElement.children) {
+        const t = e.tagName;
+        if (t === "path") p.addPath(new Path2D(e.getAttribute("d")));
+        else if (t === "circle") { if (bare && n(e, "r") >= 9.5) continue;
+          p.moveTo(n(e, "cx") + n(e, "r"), n(e, "cy")); p.arc(n(e, "cx"), n(e, "cy"), n(e, "r"), 0, Math.PI * 2); }
+        else if (t === "ellipse") { p.moveTo(n(e, "cx") + n(e, "rx"), n(e, "cy"));
+          p.ellipse(n(e, "cx"), n(e, "cy"), n(e, "rx"), n(e, "ry"), 0, 0, Math.PI * 2); }
+        else if (t === "line") { p.moveTo(n(e, "x1"), n(e, "y1")); p.lineTo(n(e, "x2"), n(e, "y2")); }
+        else if (t === "rect") { const q = new Path2D(); (q.roundRect ? q.roundRect(n(e, "x"), n(e, "y"), n(e, "width"), n(e, "height"), n(e, "rx"))
+          : q.rect(n(e, "x"), n(e, "y"), n(e, "width"), n(e, "height"))); p.addPath(q); }
+        else if (t === "polyline" || t === "polygon") { const v = (e.getAttribute("points") || "").trim().split(/[\s,]+/).map(Number);
+          for (let i = 0; i + 1 < v.length; i += 2) p[i ? "lineTo" : "moveTo"](v[i], v[i + 1]); if (t === "polygon") p.closePath(); }
+        else return false; }
+      /* a 14-unit glyph box centred on the shape's head (A214 spec) */
+      x.save(); x.translate(cx - 7, cy - 7); x.scale(14 / 24, 14 / 24);
+      x.lineWidth = lw; x.lineCap = "round"; x.lineJoin = "round"; x.strokeStyle = "#FFFFFF"; x.stroke(p); x.restore();
+      return true; };
+    /* once the app has its table, every arm takes the app's shape and colour
+       per kind, so the sheet compares glyphs against what ships */
+    const used = KINDS.map(([k, sh, col, lg, og, d]) => { try {
+      const v = window.__badges && window.__badges.spec(k);
+      if (v && v.c && v.s) return [k, v.s, v.c, lg, og, d, "app"]; } catch (e) {}
+      return [k, sh, col, lg, og, d, "spec"]; });
+    const made = [], failed = [];
+    for (const [arm, , lw] of ARMS) for (const [k, sh, col, lg, og] of used) {
+      const name = "probe-" + arm + "-" + k, H = sh === "drop" ? 36 : 26, c = document.createElement("canvas");
+      c.width = 26 * S; c.height = H * S; const x = c.getContext("2d"); x.scale(S, S);
+      shape(x, sh, 0.6); x.fillStyle = "rgba(0,0,0,.22)"; x.fill();
+      shape(x, sh, 0); x.fillStyle = col; x.fill(); x.lineWidth = 1.6; x.lineJoin = "round"; x.strokeStyle = "#FFFFFF"; x.stroke();
+      const cy = sh === "drop" ? 12.5 : 13;
+      let ok = true;
+      if (arm === "A") { x.save(); x.translate(0, cy - 13); x.beginPath(); x.lineWidth = 1.7; x.lineCap = "round"; x.lineJoin = "round";
+        x.strokeStyle = "#FFFFFF"; (G[og] || G.i)(x); x.stroke(); x.restore(); }
+      else ok = lucide(x, GLY[lg], 13, cy, lw, !!BARE[lg]);
+      if (!ok) { failed.push(name); continue; }
+      try { if (m.hasImage(name)) m.removeImage(name); m.addImage(name, x.getImageData(0, 0, 26 * S, H * S), { pixelRatio: S }); made.push(name); }
+      catch (e) { failed.push(name + " (" + e.message + ")"); } }
+    const hasE = !!window.__badges;
+    return { made: made.length, failed, hasE, used,
+      eMissing: hasE ? KINDS.map((k) => "bdg-" + k[0]).filter((n) => !m.hasImage(n)) : [] };
+  } catch (e) { return { err: String(e && e.stack || e) }; } }, KINDS, GLY, ARMS);
+  console.log("  badges registered: " + JSON.stringify(reg));
+  /* the anchors come from the bundle's manifest, as render reads them — BUNDLE
+     is not a window global (app.js is wrapped, take 127), so a page-side read
+     of window.BUNDLE finds nothing */
+  const manF = join(WWW, "bundle", "manifest.json");
+  const anc = ((existsSync(manF) ? JSON.parse(readFileSync(manF, "utf8")) : {}).anchors || []).find((x) => x[0] === "Grayling");
+  const gr = anc ? [anc[1], anc[2]] : null;
+  if (reg.err || !gr) {
+    console.log("FAIL: the badge sheet cannot be drawn — " + (reg.err || "no Grayling anchor in the bundle manifest (landmine 197)"));
+    await b.close(); srv.close(); process.exit(1);
+  }
+  const arms = ARMS.map((a) => a[0]).concat(reg.hasE ? ["E"] : []);
+  const settle = async () => { await pg.evaluate(async () => { const s2 = (ms) => new Promise((r) => setTimeout(r, ms));
+    const m = window.map; for (let i = 0; i < 40; i++) { if (m.areTilesLoaded()) break; await s2(300); }
+    await Promise.race([new Promise((r) => m.once("idle", r)), s2(6000)]); await s2(500); }); };
+  const base = (want) => pg.evaluate(async (want) => { const s2 = (ms) => new Promise((r) => setTimeout(r, ms));
+    for (let i = 0; i < 4; i++) { const l = ((document.querySelector("#c-base span") || {}).textContent || "").trim();
+      if (l === want) return true; document.getElementById("c-base").click(); await s2(1200); } return false; }, want);
+  /* hide the pins and the chrome, lay the sheet out, shoot, and put it all back */
+  const hidden = await pg.evaluate(() => { const m = window.map, was = {};
+    for (const l of m.getStyle().layers) if (/^(poi-(dot|stack)|pad-(dot|lbl|dam))/.test(l.id)) {
+      was[l.id] = m.getLayoutProperty(l.id, "visibility") || "visible"; m.setLayoutProperty(l.id, "visibility", "none"); }
+    const st = document.createElement("style"); st.id = "probe-badges-css";
+    st.textContent = "#stage > :not(#map), #rail, #tabs { visibility: hidden !important; }"
+      + " #probe-badges-rows { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 99999;"
+      + " font: 600 11px/1 sans-serif; color: #fff; text-shadow: 0 0 3px #000, 0 0 3px #000; }";
+    document.head.appendChild(st); return was; });
+  const layout = await pg.evaluate((KINDS, arms) => { const m = window.map, COLS = 7, PX = 52, PY = 52, X0 = 44, Y0 = 70;
+    const size = (id) => { try { return m.getLayoutProperty(id, "icon-size"); } catch (e) { return null; } };
+    const major = size("poi-dot-major") || 1, minor = size("poi-dot") || 1;
+    const cells = [], rows = document.createElement("div"); rows.id = "probe-badges-rows";
+    arms.forEach((arm, ai) => KINDS.forEach(([k, sh, , , , d], ki) => {
+      const row = ai * Math.ceil(KINDS.length / COLS) + Math.floor(ki / COLS);
+      cells.push({ px: [X0 + (ki % COLS) * PX, Y0 + row * PY + (sh === "drop" ? 12 : 0)],
+        img: arm === "E" ? "bdg-" + k : "probe-" + arm + "-" + k, s: sh, d, arm, k }); }));
+    arms.forEach((arm, ai) => { const t = document.createElement("div"); t.textContent = arm;
+      t.style.cssText = "position:absolute;left:6px;top:" + (Y0 - 6 + ai * Math.ceil(KINDS.length / COLS) * PY) + "px";
+      rows.appendChild(t); });
+    document.body.appendChild(rows);
+    m.addSource("probe-badges", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    const lay = (id, dv, sz) => m.addLayer({ id, type: "symbol", source: "probe-badges", filter: ["==", ["get", "d"], dv],
+      layout: { "icon-image": ["get", "img"], "icon-size": sz, "icon-allow-overlap": true, "icon-ignore-placement": true,
+        "icon-anchor": ["match", ["get", "s"], "drop", "bottom", "center"] } });
+    lay("probe-badges-major", 1, major); lay("probe-badges-minor", 0, minor);
+    return { cells, iconSize: { major, minor }, grid: { COLS, PX, PY, X0, Y0 } }; }, reg.used || KINDS, arms);
+  const place = () => pg.evaluate((cells) => { const m = window.map;
+    m.getSource("probe-badges").setData({ type: "FeatureCollection", features: cells.map((c) => ({ type: "Feature",
+      properties: { img: c.img, s: c.s, d: c.d }, geometry: { type: "Point", coordinates: m.unproject(c.px).toArray() } })) }); }, layout.cells);
+  const shots = [];
+  for (const bm of ["Map", "Hybrid"]) {
+    const on = await base(bm);
+    if (!on) { console.log("  (could not reach the " + bm + " basemap — skipped)"); continue; }
+    for (const z of [9.2, 10, 12]) {
+      await pg.evaluate((c, z) => window.map.jumpTo({ center: c, zoom: z }), gr, z);
+      await place(); await settle();
+      await pg.screenshot({ clip: { x: 0, y: 0, width: 1, height: 1 } });   /* landmine 224: draw a frame */
+      const f = `badges-${bm.toLowerCase()}-z${z}.png`; await pg.screenshot({ path: `${out}/${f}` }); shots.push(f); console.log("  " + f);
+    }
+  }
+  await base("Map");
+  await pg.evaluate((was) => { const m = window.map;
+    for (const id of ["probe-badges-major", "probe-badges-minor"]) if (m.getLayer(id)) m.removeLayer(id);
+    if (m.getSource("probe-badges")) m.removeSource("probe-badges");
+    for (const n of m.listImages()) if (/^probe-/.test(n)) m.removeImage(n);
+    for (const id of Object.keys(was)) m.setLayoutProperty(id, "visibility", was[id]);
+    for (const id of ["probe-badges-css", "probe-badges-rows"]) { const e = document.getElementById(id); if (e) e.remove(); } }, hidden);
+  writeFileSync(`${out}/badges-order.json`, JSON.stringify({ arms: arms.map((a) => (ARMS.find((x) => x[0] === a) || [a, "the app's own bdg-* (window.__badges)"]).slice(0, 2).join(" · ")),
+    kinds: (reg.used || KINDS).map((k) => ({ k: k[0], shape: k[1], colour: k[2], lucide: k[3], take187: k[4], d: k[5], from: k[6] })),
+    glyphSource, missing, registered: reg, iconSize: layout.iconSize, grid: layout.grid, camera: "the bundle's Grayling anchor",
+    shots }, null, 1));
+  console.log("badge sheet written to " + out + (shots.length === 6 ? "" : " — only " + shots.length + " of 6 shots"));
 } else if (mode === "eval") {
   const code = readFileSync(process.argv[3] || "/dev/stdin", "utf8");
   // eval as a string expression — the Function wrapper mangled user code
