@@ -268,10 +268,34 @@ SOURCES = [
         "host": "unpkg.com",
         "name": "MapLibre GL JS",
         "what": "Renderer, vendored into the bundle at build time",
-        "licence": "BSD 3-Clause",
+        # take 188 · the BSD notice a binary redistribution must reproduce
+        "licence": "BSD 3-Clause (MapLibre contributors; it contains code from "
+                   "Mapbox GL JS, BSD 3-Clause, glfx.js, MIT, and d3-color, BSD "
+                   "3-Clause). Full text in www/licenses.txt, read from the "
+                   "LICENSE.txt published with 5.24.0; the notice is in Tools -> "
+                   "Data sources",
         "tool": "ci/bundle.sh",
         "phase": "build",
         "refresh": "on version bump",
+        "note": "ci/bundle.sh fetches maplibre-gl@5, so the build floats within 5.x; "
+                "tools/gate.py check_licences fails if the vendored build stops "
+                "saying 3-Clause BSD or leaves major 5, and names a minor drift",
+    },
+    {
+        # take 188 · the app runtime: installed by npm, compiled into the APK
+        "file": "node_modules/@capacitor/{android,core,device,geolocation,haptics,share}",
+        "filenote": "npm packages at the versions package-lock.json pins",
+        "name": "Capacitor (the Android app runtime and its plugins)",
+        "what": "the native shell that hosts the web app on Android, its bridge, "
+                "and the Device, Geolocation, Haptics and Share plugins",
+        "licence": "MIT (2017-present Drifty Co.; the plugins 2020-present Ionic, "
+                   "Geolocation 2025 Ionic). Full texts in www/licenses.txt; the "
+                   "notice is in Tools -> Data sources",
+        "tool": "`npm ci` in ci/bundle.sh, from npm's registry like every package "
+                "in package-lock.json; `npx cap sync android` in ci/apk.sh compiles it into the APK",
+        "phase": "build",
+        "refresh": "on a package-lock bump: tools/gate.py check_licences compares "
+                   "each package's LICENSE and version with www/licenses.txt",
     },
     {
         "host": "github.com",
@@ -297,6 +321,39 @@ SOURCES = [
                 "pipeline runs before `npm ci` and must not depend on it",
         "phase": "vendored",
         "refresh": "only if the parser needs updating; it is a pinned copy",
+    },
+    {
+        # take 188 · A216 · pasted, never fetched: the icon strings live in
+        # the app's source, so no host and no build step reads the package
+        "file": "src/app.html (LUCIDE)",
+        "filenote": "74 inner-SVG strings, one per icon, keyed by Lucide name (tools/gate.py check_icons holds the count to the table)",
+        "name": "Lucide icons (pasted, not fetched)",
+        "what": "the line icons on every control, marker and card, pasted from "
+                "the lucide-static npm package 1.37.0; tools/gate.py check_icons "
+                "compares each string to node_modules/lucide-static",
+        "licence": "ISC (Lucide Icons and Contributors); the icons derived from "
+                   "Feather are MIT (Cole Bemis). Full texts in www/licenses.txt; "
+                   "the notice is in Tools -> Data sources",
+        "tool": "nobody at build time — pasted by hand from a script's output; "
+                "the gate reads the npm package after `npm ci`",
+        "phase": "vendored",
+        "refresh": "on a lucide-static bump: re-paste the strings and LUCIDE_V, "
+                   "and check_icons proves them",
+    },
+    {
+        # take 188 · A216 · committed font files, never fetched
+        "file": "www/fonts/*.woff2, assets/fonts/Barlow-SemiBold.ttf",
+        "filenote": "six UI cuts and the map-label source, committed",
+        "name": "Barlow and Barlow Condensed (committed, never fetched)",
+        "what": "the app's typeface (six cuts, v1.408) and the map-label glyph "
+                "pack tools/glyphs.py builds from Barlow SemiBold",
+        "licence": "SIL Open Font License 1.1, Copyright 2017 The Barlow Project "
+                   "Authors. Full text in www/licenses.txt; the notice is in "
+                   "Tools -> Data sources",
+        "tool": "nobody at build time — committed; tools/glyphs.py reads the "
+                "committed TTF",
+        "phase": "vendored",
+        "refresh": "only on a deliberate typeface update; the files are pinned copies",
     },
 ]
 

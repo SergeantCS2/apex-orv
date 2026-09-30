@@ -200,15 +200,15 @@ el('b-src').className='badge good';
  
  
 var MACHINE={
-  bike:{lbl:'🏍 Dirt bike 24"',ok:['route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track']},
-  quad:{lbl:'🛻 Quad 50"',ok:['route72','trail50','mccct','fstrail','fsroad','paved','minor','track']},
-  sxs:{lbl:'🚙 Side-by-side 72"',ok:['route72','fsroad','paved','minor']},
+  bike:{lbl:'Dirt bike 24"',ic:'dirtbike',ok:['route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track']},
+  quad:{lbl:'Quad 50"',ic:'fourwheel',ok:['route72','trail50','mccct','fstrail','fsroad','paved','minor','track']},
+  sxs:{lbl:'Side-by-side 72"',ic:'fourwheel',ok:['route72','fsroad','paved','minor']},
    
-  walk:{lbl:'🥾 On foot',ok:['foot','route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track'],spd:3},
+  walk:{lbl:'On foot',ic:'walk',ok:['foot','route72','trail50','moto24','mccct','fstrail','fsroad','paved','minor','track'],spd:3},
    
-  kayak:{lbl:'🛶 Kayak',ok:[],mph:3.0,spread:0.5},
-  canoe:{lbl:'🛶 Canoe',ok:[],mph:2.5,spread:0.5},
-  raft:{lbl:'🛟 Raft / tube',ok:[],mph:1.8,spread:0.4}
+  kayak:{lbl:'Kayak',ic:'paddle',ok:[],mph:3.0,spread:0.5},
+  canoe:{lbl:'Canoe',ic:'paddle',ok:[],mph:2.5,spread:0.5},
+  raft:{lbl:'Raft / tube',ic:'raft',ok:[],mph:1.8,spread:0.4}
 };
 function spd(e){var m=MACHINE[machine];return (m&&m.spd)||SPEED[e.c]||14}
  
@@ -267,6 +267,38 @@ var nf2=EDGES.filter(function(e){return e.d}).map(function(e){return {type:'Feat
   geometry:{type:'LineString',coordinates:decode(GR.g[e.i])}}});
 
  
+var NETLO=[],NETLO_MS=0,NETLO_ERR=null,
+    NETLO_CLS=['route72','trail50','moto24','mccct','fstrail','fsroad','fsclosed','closed'],
+     
+    NETLO_SKIP={track:'90.1-94.7% kept at z7; 704,198 stroke vertices',
+                paved:'89.6-96.9% kept at z7; 190,401 stroke vertices',
+                minor:'Hybrid draws it from z11.5 only'};
+try{
+  var _nl0=Date.now(),NFI=[];
+  nf2.forEach(function(f){if(NETLO_CLS.indexOf(f.properties.c)>=0)NFI[f.properties.i]=f.geometry.coordinates});
+  NETLO=chainStrokes(function(e){return NETLO_CLS.indexOf(e.c)>=0?e.c:''},function(i){return NFI[i].slice()})
+    .map(function(f,k){return {type:'Feature',properties:{c:f.properties.c,lo:1,s:k},
+      geometry:f.geometry}});
+  NETLO_MS=Date.now()-_nl0;
+}catch(e){NETLO=[];NETLO_ERR=String(e&&e.message||e)}
+var NETLO_Z=NETLO.length?11:0;
+ 
+function netF(f){return NETLO_Z?['step',['zoom'],['all',f,['==',['get','lo'],1]],
+  NETLO_Z,['all',f,['!',['has','lo']]]]:f}
+ 
+function netMapF(f){return NETLO_Z?['all',f,['!',['has','lo']]]:f}
+ 
+function netBaseF(f){
+  if(Array.isArray(f)&&f[0]==='all'&&f.length===3)return f[1];
+  if(Array.isArray(f)&&f[0]==='step'&&Array.isArray(f[4]))return f[4][1];
+  return f}
+ 
+var NETFT={},NETF_HYB=false;
+function netLyrF(id,f,cls){
+  if(cls&&NETLO_CLS.indexOf(cls)<0)return f;
+  NETFT[id]={m:netMapF(f),h:netF(f)};return NETFT[id].m}
+
+ 
  
 function strokeLen(pts){
   var m=0;
@@ -282,8 +314,10 @@ function placeDist(p){
   var d=mi(ME,p);
   return d.toFixed(d<10?1:0)+' mi '+compass(bearing(ME,p))+' of you';}
 
-function chainStrokes(key){
+ 
+function chainStrokes(key,geo){
   key=key||labelFor;
+  geo=geo||function(i){return decode(GR.g[i])};
   var byKey={};
   EDGES.forEach(function(e){
      
@@ -299,7 +333,7 @@ function chainStrokes(key){
       (adj[e.a]||(adj[e.a]=[])).push(e);(adj[e.b]||(adj[e.b]=[])).push(e)});
     function walk(from,e){
        
-      var pts=decode(GR.g[e.i]).slice(),cur=(e.a===from?e.b:e.a);
+      var pts=geo(e.i),cur=(e.a===from?e.b:e.a);
       used[e.i]=1;
       if(e.a!==from)pts.reverse();
       for(;;){
@@ -307,9 +341,9 @@ function chainStrokes(key){
         for(var i=0;i<cand.length;i++)if(!used[cand[i].i]){nx=cand[i];break}
         if(!nx)break;
         used[nx.i]=1;
-        var g=decode(GR.g[nx.i]);
+        var g=geo(nx.i);
         if(nx.a!==cur)g.reverse();
-        pts=pts.concat(g.slice(1));
+        for(var q=1;q<g.length;q++)pts.push(g[q]);
         cur=(nx.a===cur?nx.b:nx.a)}
       return pts}
      
@@ -338,95 +372,128 @@ var showFeats=(SHOW&&SHOW.r?SHOW.r:[]).map(function(r){
  
  
 var POIKIND={
-  fuel:     {c:'#C1121F', h:'Fuel',        r:1, g:'fuel'},
-  trailhead:{c:'#D2500C', h:'Trailhead',   r:1, d:1, g:'flag'},
-  camp:     {c:'#7A5B3A', h:'Campground',  r:2, d:1, g:'tent'},
-  launch:   {c:'#2E7FA8', h:'Boat launch', r:2, d:1, g:'boat'},
-  beach:    {c:'#C9A227', h:'Beach',       r:3, d:1, g:'sun'},
-  dayuse:   {c:'#3D6B35', h:'Day use',     r:3, d:1, g:'tree'},
+  fuel:     {c:'#701A1A', h:'Fuel',        r:1, s:'circle', g:'fuel'},
+  trailhead:{c:'#A0441C', h:'Trailhead',   r:1, d:1, s:'drop', g:'apex-th'},
+  camp:     {c:'#75522E', h:'Campground',  r:2, d:1, s:'square', g:'tent'},
+  launch:   {c:'#1873B1', h:'Boat launch', r:2, d:1, s:'drop', g:'sailboat'},
+  beach:    {c:'#806A10', h:'Beach',       r:3, d:1, s:'drop', g:'umbrella'},
+  dayuse:   {c:'#386C1D', h:'Day use',     r:3, d:1, s:'drop', g:'trees'},
    
-  system:   {c:'#2F7D4F', h:'Trail system', r:1, d:1, g:'tree'},
+  system:   {c:'#A46103', h:'Trail system', r:1, d:1, s:'hex', g:'footprints'},
    
-  lighthouse:{c:'#B23A48', h:'Lighthouse', r:0, d:1, g:'eye'},
-  marina:   {c:'#2E7FA8', h:'Marina',      r:2, d:1, g:'boat'},
-  ski:      {c:'#3D6CB3', h:'Ski & snowboard hill', r:1, d:1, g:'ski'},
-  livery:   {c:'#1E8C7A', h:'Canoe & kayak livery', r:1, d:1, g:'boat'},
-  mtb:      {c:'#1F7A6B', h:'MTB trail system', r:1, d:1, g:'bike'},
-  store:    {c:'#6B4FA0', h:'Store',       r:3, g:'bag'},
-  food:     {c:'#6B4FA0', h:'Food',        r:4, g:'cup'},
-  view:     {c:'#3D6B35', h:'Viewpoint',   r:4, d:1, g:'eye'},
-  info:     {c:'#4A5560', h:'Information', r:5, g:'i'},
-  water:    {c:'#2E7FA8', h:'Drinking water', r:5, g:'drop'},
-  toilet:   {c:'#4A5560', h:'Toilets',     r:6, g:'i'},
-  shelter:  {c:'#4A5560', h:'Shelter',     r:6, g:'tent'}
+  lighthouse:{c:'#A52941', h:'Lighthouse', r:0, d:1, s:'drop', g:'apex-lighthouse'},
+  marina:   {c:'#0E2D56', h:'Marina',      r:2, d:1, s:'drop', g:'anchor'},
+  ski:      {c:'#3A33B0', h:'Ski & snowboard hill', r:1, d:1, s:'drop', g:'mountain-snow'},
+  livery:   {c:'#118562', h:'Canoe & kayak livery', r:1, d:1, s:'drop', g:'kayak'},
+  mtb:      {c:'#1F5131', h:'MTB trail system', r:1, d:1, s:'hex', g:'bike'},
+  store:    {c:'#5B377C', h:'Store',       r:3, s:'circle', g:'shopping-bag'},
+  food:     {c:'#A23182', h:'Food',        r:4, s:'circle', g:'utensils'},
+  view:     {c:'#843991', h:'Viewpoint',   r:4, d:1, s:'drop', g:'binoculars'},
+  info:     {c:'#3E526C', h:'Information', r:5, s:'circle', g:'info'},
+  water:    {c:'#0B71CA', h:'Drinking water', r:5, s:'circle', g:'droplet'},
+  toilet:   {c:'#1C7C72', h:'Toilets',     r:6, s:'circle', g:'toilet'},
+  shelter:  {c:'#525251', h:'Shelter',     r:6, s:'square', g:'warehouse'}
 };
+ 
+var APEX_GLYPHS={
+  'apex-th':'<path d="M3 6h8" /> <path d="M7 6v12" /> <path d="M14 6v12" /> <path d="M21 6v12" /> <path d="M14 12h7" />',
+  'apex-lighthouse':'<path d="M8 22h8" /> <path d="M9 22l1-12h4l1 12" /> <path d="M10 10V7h4v3" /> <path d="M9 7l3-3 3 3" /> <path d="M4 7l2 .5" /> <path d="M20 7l-2 .5" />'
+};
+function badgeMarkup(g){return APEX_GLYPHS[g]||LUCIDE[g]||''}
+ 
+var BADGE_BARE={info:1,'circle-parking':1};
+ 
+var BADGE_PAD={launch:'launch',camp:'camp',
+  access:{c:'#175A63', h:'Canoe access', s:'drop', d:1, g:'waves-arrow-down'},
+  parking:{c:'#797565', h:'Parking', s:'circle', g:'circle-parking'}
+};
+ 
+var BADGE_LW=2.25;
+var BADGE_URL={};        
+ 
+var BADGE_CV={},BADGE_DRAWN=[],BADGE_ENC0=null;
+var BADGE_MISSING=[];    
+ 
+var BADGE_FAMILY=[{s:'drop',w:'teardrop places to go'},{s:'circle',w:'round services'},
+  {s:'square',w:'square camps and shelters',of:['camp','shelter']},
+  {s:'hex',w:'hexagon trail systems',of:['system','mtb']},{k:'trailhead',w:'lettered trailheads'}];
+var BADGE_DROPS=Object.keys(POIKIND).filter(function(k){return POIKIND[k].s==='drop'});
+var PAD_DROPS=Object.keys(BADGE_PAD).filter(function(k){return (badgeSpec('pad-'+k)||{}).s==='drop'});
+function badgeSpec(k){
+  k=String(k);
+  if(k.indexOf('pad-')===0){var p=BADGE_PAD[k.slice(4)];
+    return typeof p==='string'?(POIKIND[p]||null):(p||null)}
+  return POIKIND[k]||null}
+function badgeURL(name){
+  if(BADGE_URL[name]===undefined&&BADGE_CV[name]){
+    try{BADGE_URL[name]=BADGE_CV[name].toDataURL('image/png')}catch(e){BADGE_URL[name]=''}
+    BADGE_CV[name]=null}
+  return BADGE_URL[name]||''}
+function padName(k){return k==='dam'?'Dam':((badgeSpec('pad-'+k)||{}).h||k)}
+ 
+function badgeShape(x,s,dy){
+  x.beginPath();
+  if(s==='circle')x.arc(13,13+dy,11,0,Math.PI*2);
+  else if(s==='square'){var a=2.75,b=23.25,r=4.5;x.moveTo(a+r,a+dy);
+    x.arcTo(b,a+dy,b,b+dy,r);x.arcTo(b,b+dy,a,b+dy,r);
+    x.arcTo(a,b+dy,a,a+dy,r);x.arcTo(a,a+dy,b,a+dy,r)}
+  else if(s==='hex'){for(var i=0;i<6;i++){var t=-Math.PI/2+i*Math.PI/3;
+    if(i)x.lineTo(13+12*Math.cos(t),13+dy+12*Math.sin(t));
+    else x.moveTo(13+12*Math.cos(t),13+dy+12*Math.sin(t))}}
+  else{var cy=12.5+dy,tip=34.8+dy,h=Math.acos(11/(tip-cy)),t1=Math.PI/2-h,t2=Math.PI/2+h;
+    x.moveTo(13,tip);x.lineTo(13+11*Math.cos(t1),cy+11*Math.sin(t1));
+    x.arc(13,cy,11,t1,t2,true)}
+  x.closePath()}
+ 
+function badgeGlyph(x,g,cx,cy,box,lw){
+  var mk=badgeMarkup(g);
+  if(!mk||typeof Path2D==='undefined')return false;
+  function at(a,n){var m=new RegExp('\\b'+n+'="([^"]*)"').exec(a);return m?m[1]:null}
+  function num(a,n){return +(at(a,n)||0)}
+  var p=new Path2D(),re=/<(path|circle|line|rect)\b([^>]*)>/g,m,n=0;
+  while((m=re.exec(mk))){var t=m[1],a=m[2];
+    if(t==='path')p.addPath(new Path2D(at(a,'d')));
+    else if(t==='circle'){var r=num(a,'r');if(BADGE_BARE[g]&&r>=9.5)continue;
+      p.moveTo(num(a,'cx')+r,num(a,'cy'));p.arc(num(a,'cx'),num(a,'cy'),r,0,Math.PI*2)}
+    else if(t==='line'){p.moveTo(num(a,'x1'),num(a,'y1'));p.lineTo(num(a,'x2'),num(a,'y2'))}
+    else p.rect(num(a,'x'),num(a,'y'),num(a,'width'),num(a,'height'));
+    n++}
+  if(!n)return false;
+  x.save();x.translate(cx-box/2,cy-box/2);x.scale(box/24,box/24);
+  x.lineWidth=lw;x.lineCap='round';x.lineJoin='round';x.strokeStyle='#FFFFFF';
+  x.stroke(p);x.restore();
+  return true}
 
 function makeBadges(){
    
-  var G={
-    tree:function(x){x.moveTo(13,6);x.lineTo(8,15);x.lineTo(18,15);x.closePath();
-      x.moveTo(13,15);x.lineTo(13,19)},
-     
-    bike:function(x){x.moveTo(11,17);x.arc(8,17,3,0,Math.PI*2);x.moveTo(21,17);x.arc(18,17,3,0,Math.PI*2);
-      x.moveTo(8,17);x.lineTo(12,10);x.lineTo(18,17);x.moveTo(12,10);x.lineTo(16,10);
-      x.moveTo(12,10);x.lineTo(13,17);x.moveTo(16,10);x.lineTo(18,17);x.moveTo(11,9);x.lineTo(14,9)},
-     
-    ski:function(x){x.moveTo(16.6,6.5);x.arc(15,6.5,1.6,0,Math.PI*2);
-      x.moveTo(14,8.5);x.lineTo(11.5,13);x.moveTo(13,10.5);x.lineTo(16.5,12.5);x.lineTo(18,17);
-      x.moveTo(11.5,13);x.lineTo(9.5,16.2);x.moveTo(11.5,13);x.lineTo(12.5,16.2);
-      x.moveTo(6,18.6);x.lineTo(16,15.4);x.moveTo(7.2,20.4);x.lineTo(17.2,17.2)},
-    tent:function(x){x.moveTo(6,18);x.lineTo(13,7);x.lineTo(20,18);x.closePath();
-      x.moveTo(13,18);x.lineTo(13,12)},
-    boat:function(x){x.moveTo(6,15);x.lineTo(20,15);x.lineTo(17,19);x.lineTo(9,19);
-      x.closePath();x.moveTo(13,15);x.lineTo(13,6);x.lineTo(18,12);x.lineTo(13,12)},
-    fuel:function(x){x.rect(8,7,7,12);x.moveTo(15,11);x.lineTo(18,11);
-      x.lineTo(18,17)},
-    flag:function(x){x.moveTo(9,20);x.lineTo(9,6);x.lineTo(18,9);x.lineTo(9,12)},
-    sun:function(x){x.arc(13,13,4,0,6.283);x.moveTo(13,5);x.lineTo(13,7);
-      x.moveTo(13,19);x.lineTo(13,21);x.moveTo(5,13);x.lineTo(7,13);
-      x.moveTo(19,13);x.lineTo(21,13)},
-    drop:function(x){x.moveTo(13,6);x.bezierCurveTo(9,12,8,14,8,16);
-      x.arc(13,16,5,3.1416,0,true);x.bezierCurveTo(18,14,17,12,13,6)},
-    bag:function(x){x.rect(8,10,10,9);x.moveTo(10,10);x.arc(13,10,3,3.1416,0)},
-    cup:function(x){x.moveTo(8,8);x.lineTo(8,16);x.arc(11,16,3,3.1416,0,true);
-      x.moveTo(14,8);x.lineTo(14,14);x.moveTo(14,10);x.arc(14,12,2,-1.57,1.57)},
-    eye:function(x){x.moveTo(6,13);x.bezierCurveTo(9,8,17,8,20,13);
-      x.bezierCurveTo(17,18,9,18,6,13);x.moveTo(15,13);
-      x.arc(13,13,2,0,6.283)},
-    i:function(x){x.moveTo(13,11);x.lineTo(13,18);x.moveTo(13,7);x.lineTo(13,8)},
-    dam:function(x){x.moveTo(7,7);x.lineTo(13,18);x.lineTo(19,7);
-      x.moveTo(13,10);x.lineTo(13,13)}
-  };
   var done={};
-  function one(name,color,glyph){
-    if(done[name]||!map.addImage)return;
-     
-    if(!document.createElement('canvas').getContext)return;
-    done[name]=1;
-    var S=2,c=document.createElement('canvas');c.width=c.height=26*S;
-    var x=c.getContext('2d');x.scale(S,S);
-    x.beginPath();x.arc(13,13.6,11,0,6.283);x.fillStyle='rgba(0,0,0,.22)';x.fill();
-    x.beginPath();x.arc(13,13,11,0,6.283);x.fillStyle=color;x.fill();
-    x.lineWidth=1.6;x.strokeStyle='#FFFFFF';x.stroke();
-    x.beginPath();x.lineWidth=1.7;x.lineCap='round';x.lineJoin='round';
-    (G[glyph]||G.i)(x);x.stroke();
-    try{map.addImage(name,x.getImageData(0,0,26*S,26*S),{pixelRatio:S})}catch(e){}}
-  Object.keys(POIKIND).forEach(function(k){
-    one('bdg-'+k,POIKIND[k].c,POIKIND[k].g)});
-   
-  function glyphOnly(name,glyph){
-    if(done[name]||!map.addImage)return;
-    if(!document.createElement('canvas').getContext)return;
-    done[name]=1;
-    var S=2,c=document.createElement('canvas');c.width=c.height=26*S;
-    var x=c.getContext('2d');x.scale(S,S);
-    x.beginPath();x.lineWidth=2.3;x.lineCap='round';x.lineJoin='round';
-    x.strokeStyle='#FFFFFF';(G[glyph]||G.i)(x);x.stroke();
-    try{map.addImage(name,x.getImageData(0,0,26*S,26*S),{pixelRatio:S})}catch(e){}}
-  Object.keys(POIKIND).forEach(function(k){glyphOnly('stk-'+k,POIKIND[k].g)});
-  one('bdg-pad-launch','#2E7FA8','boat');one('bdg-pad-access','#2E8B99','boat');
-  one('bdg-pad-camp','#7A5B3A','tent');one('bdg-pad-parking','#4A5560','i');
-  one('bdg-dam','#C1121F','dam');
+  if(!map.addImage)return;
+  if(!document.createElement('canvas').getContext)return;
+  function draw(name,spec,stack){
+    if(done[name])return;done[name]=1;
+    try{
+      if(!spec||!spec.s)throw new Error('no badge spec');
+      var S=2,drop=(spec.s==='drop'&&!stack),H=drop?36:26,c=document.createElement('canvas');
+      c.width=26*S;c.height=H*S;
+      var x=c.getContext('2d'),ok;x.scale(S,S);
+      if(stack){
+         
+        ok=badgeGlyph(x,spec.g,13,13,16,BADGE_LW*1.35)}
+      else{
+        badgeShape(x,spec.s,0.6);x.fillStyle='rgba(0,0,0,.22)';x.fill();
+        badgeShape(x,spec.s,0);x.fillStyle=spec.c;x.fill();
+        x.lineWidth=1.6;x.lineJoin='round';x.strokeStyle='#FFFFFF';x.stroke();
+        ok=badgeGlyph(x,spec.g,13,drop?12.5:13,14,BADGE_LW)}
+      if(!ok)BADGE_MISSING.push(name+(typeof Path2D==='undefined'?' (no Path2D)':' (glyph '+spec.g+')'));
+      map.addImage(name,x.getImageData(0,0,26*S,H*S),{pixelRatio:S});
+      BADGE_DRAWN.push(name);
+       
+      if(!stack)BADGE_CV[name]=c;
+    }catch(e){BADGE_MISSING.push(name+' ('+((e&&e.message)||e)+')')}}
+  Object.keys(POIKIND).forEach(function(k){draw('bdg-'+k,POIKIND[k])});
+  Object.keys(POIKIND).forEach(function(k){draw('stk-'+k,POIKIND[k],true)});
+  Object.keys(BADGE_PAD).forEach(function(k){draw('bdg-pad-'+k,badgeSpec('pad-'+k))});
+  BADGE_ENC0=Object.keys(BADGE_URL).length;
    
   if(!done['mi-diamond']&&map.addImage&&document.createElement('canvas').getContext){done['mi-diamond']=1;
     var S2=2,cv=document.createElement('canvas');cv.width=cv.height=30*S2;
@@ -438,6 +505,8 @@ function makeBadges(){
     try{map.addImage('mi-diamond',g.getImageData(0,0,30*S2,30*S2),{pixelRatio:S2})}catch(e){}}}
  
 var SERVICES=['food','store','fuel'];
+ 
+var STACK_MIXED='#2B2926';
 var CLUSTER_MAXZ=11.4;    
 function stackRadius(z){  
   if(z<=8)return 48; if(z>=14)return 24;
@@ -456,6 +525,8 @@ function pinDrawable(p,m,z){
   if(kz!=null)return T>=kz;
   if(p.d===1)return p.pri<=0||(T>=10.5&&p.pri<=1)||T>=11.4;
   return true}
+ 
+var STACK_BANDS=[9.2,10,11,11.4,12,13,14,15,16,17];
 var poif=((POIS&&POIS.p)||[]).map(function(r,i){
   var k=POIKIND[r.k]||{c:'#4A443B',h:r.k,r:7};
   return {type:'Feature',
@@ -494,13 +565,13 @@ var padf=[],padpin=[];
   (c.f||[]).forEach(function(f){
     padpin.push({type:'Feature',
       properties:{k:f.k,n:f.n||null,mi:f.mi,riv:c.n,
-        lb:(f.n||({dam:'Dam',launch:'Boat launch',access:'Canoe access',
-                   camp:'Campground',parking:'Parking'}[f.k]||f.k))},
+        lb:(f.n||padName(f.k))},
       geometry:{type:'Point',coordinates:f.p}})})});
 
  
-var PADKIND={dam:'Dam',launch:'Boat launch',access:'Canoe access',
-             camp:'Campground',parking:'Parking'};
+ 
+var PADKIND={};
+['dam'].concat(Object.keys(BADGE_PAD)).forEach(function(k){PADKIND[k]=padName(k)});
 
  
 var PADDLE_MPH=2.5, PADDLE_SPREAD=0.5;
@@ -609,19 +680,19 @@ function cmpRose(deg){
     x1=50+Math.sin(a)*r; y1=50-Math.cos(a)*r;
     x2=50+Math.sin(a)*(r-len); y2=50-Math.cos(a)*(r-len);
     ticks+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+
-      '" y2="'+y2.toFixed(1)+'" stroke="'+(major?'#F2ECE0':'#9C9384')+
+      '" y2="'+y2.toFixed(1)+'" style="stroke:'+(major?'var(--text-1)':'var(--text-3)')+
       '" stroke-width="'+(major?1.6:1)+'"/>'}
   var lbl='',C=['N','E','S','W'];
   for(i=0;i<4;i++){
     a=(i*90-(deg||0))*Math.PI/180;
     lbl+='<text x="'+(50+Math.sin(a)*31).toFixed(1)+'" y="'+(50-Math.cos(a)*31+3.4).toFixed(1)+
-      '" text-anchor="middle" font-size="10" font-weight="700" fill="'+
-      (i===0?'#E2570F':'#F2ECE0')+'">'+C[i]+'</text>'}
+      '" text-anchor="middle" font-size="10" font-weight="700" style="fill:'+
+      (i===0?'var(--accent)':'var(--text-1)')+'">'+C[i]+'</text>'}
   return '<svg viewBox="0 0 100 100" width="128" height="128" aria-hidden="true">'+
-    '<circle cx="50" cy="50" r="47" fill="none" stroke="rgba(255,255,255,.22)"/>'+
+    '<circle cx="50" cy="50" r="47" fill="none" style="stroke:var(--border-strong)"/>'+
     ticks+lbl+
-    (deg===null?'':'<path d="M50 8 L45 20 L55 20 Z" fill="#E2570F"/>')+
-    '<circle cx="50" cy="50" r="2.4" fill="#F2ECE0"/></svg>'}
+    (deg===null?'':'<path d="M50 8 L45 20 L55 20 Z" style="fill:var(--accent)"/>')+
+    '<circle cx="50" cy="50" r="2.4" style="fill:var(--text-1)"/></svg>'}
 
 function cmpRows(hdg){
   var out=[];
@@ -630,7 +701,7 @@ function cmpRows(hdg){
     if(!at||!ME)return;
     var b=bearing(ME,at),d=mi(ME,at);
      
-    if(d<0.02){out.push('<b>'+label+'</b> <span style="color:var(--c-9c9384)">'+
+    if(d<0.02){out.push('<b>'+label+'</b> <span style="color:var(--text-3)">'+
       'you are here</span>');return}
     var rel=hdg===null?null:((b-hdg+540)%360-180);
     out.push('<b>'+label+'</b> '+compass(b)+' '+Math.round(b)+'\u00B0 · '+
@@ -649,11 +720,11 @@ function cmpPaint(){
   var H=headingNow(),hdg=H?H.deg:null,rows=cmpRows(hdg);
   box.innerHTML='<div style="text-align:center">'+cmpRose(hdg)+
     '<div style="font:700 var(--t-lg)/1 Barlow,Roboto,system-ui,sans-serif;margin-top:4px">'+
-    (hdg===null?'<span style="color:var(--c-9c9384);font-size:var(--t-sm)">'+
+    (hdg===null?'<span style="color:var(--text-3);font-size:var(--t-sm)">'+
        (MAG_OK===false?'this phone is not reporting a compass \u2014 start moving '+
          'and it will use your GPS course instead'
         :'waiting for the compass\u2026')+'</span>'
-     :compass(hdg)+' <span style="color:var(--c-9c9384)">'+Math.round(hdg)+'\u00B0 true \u00B7 '+
+     :compass(hdg)+' <span style="color:var(--text-3)">'+Math.round(hdg)+'\u00B0 true \u00B7 '+
        (H.src==='compass'?'compass':'course')+'</span>')+
     '</div></div>'+
     (rows.length?'<div style="margin-top:9px;line-height:1.7">'+rows.join('<br>')+'</div>'
@@ -679,7 +750,7 @@ function runCard(a,b,riv){
   rows.push('Take out <b>'+nm(takeOut)+'</b>');
   rows.push('About <b>'+(hi-lo).toFixed(1)+' mi</b> of river between them');
   if(dams.length)
-    rows.push('<b style="color:var(--shut)">'+dams.length+' dam'+(dams.length>1?'s':'')+
+    rows.push('<b style="color:var(--danger-text)">'+dams.length+' dam'+(dams.length>1?'s':'')+
       ' on the way — '+dams.map(nm).join(', ')+'. You must take out and portage '+
       (dams.length>1?'each one':'it')+'.</b>');
   else
@@ -693,7 +764,7 @@ function runCard(a,b,riv){
   if(swapped)
     rows.push('<span class="sub">Tapped in the other order — a river only runs '+
       'one way, so this is the run.</span>');
-  var _mc=MACHINE[machine]||{}, _craft=_mc.mph?_mc.lbl.replace(/^\S+\s/,''):null;
+  var _mc=MACHINE[machine]||{}, _craft=_mc.mph?_mc.lbl:null;
   rows.push('Roughly <b>'+paddleHours(hi-lo)+'</b> of paddling'+
     (dams.length?' plus the portage'+(dams.length>1?'s':''):'')+
     ' <span class="sub">'+(_craft?'as a '+_craft.toLowerCase()+' at '+
@@ -704,18 +775,19 @@ function runCard(a,b,riv){
   show('<div class="tn">The run \u2014 <span class="sub">'+riv+'</span></div>'+
     rows.join('<br>')+
     '<div class="sub" style="margin-top:8px">'+
-    '<button class="chip" id="pd-nav">'+ic('play')+'<span>Navigate this run</span></button> '+
+    '<button class="chip" id="pd-nav">'+ic('ride')+'<span>Navigate this run</span></button> '+
     '<button class="chip" id="pd-clear">'+ic('close')+'<span>Clear</span></button></div>',
     dams.length?'fail':'pass');
   var cb=el('pd-clear');
-  if(cb)cb.addEventListener('click',function(){runClear();show('Run cleared.','')});
+  if(cb)cb.addEventListener('click',function(){runClear();ack('Run cleared.')});
    
   var nb=el('pd-nav');
   if(nb)nb.addEventListener('click',function(){
     runSet(riv,putIn,takeOut);
     if(mode!=='water')applyMode('water',{silent:true});
     if(!rideMode)el('c-ride').click();
-    show('<b>Navigating the '+riv+'</b><div class="sub">'+(putIn.n||'Put-in')+
+     
+    if(rideMode||riding)show('<b>Navigating the '+riv+'</b><div class="sub">'+(putIn.n||'Put-in')+
       ' to '+(takeOut.n||'take-out')+'. The map points downstream; the strip '+
       'counts down to the take-out and calls what is coming.</div>','')});
   RUNFROM=null}
@@ -745,7 +817,7 @@ function areaCard(pr){
     photoHTML('area',pr.n,c)+
     '<div class="k">OPEN RIDING</div>'+
     '<div class="sub">About '+pr.ac+' acres you may ride anywhere on \u2014 '+
-    'this is ground, not a trail, so Return home and Directions route to its '+
+    'this is ground, not a trail, so Return home and Route here plan to its '+
     'edge, never across it. ORV licence and trail permit required.</div>'+
     (c?'<div class="k">WHERE</div><span class="tn">'+c[1].toFixed(5)+'  '+c[0].toFixed(5)+'</span>'+
        '<div class="sub">'+placeDist(c)+'</div>':''),'');
@@ -770,7 +842,7 @@ function paddleCard(ft){
     ' <span class="sub">'+riv+'</span>';
   var rows=[];
   if(isDam){
-    rows.push('<b style="color:var(--shut)">DAM — you must take out and portage.</b>');
+    rows.push('<b style="color:var(--danger-text)">DAM — you must take out and portage.</b>');
     var atDam=stops.filter(function(f){
       return f.k!=='dam'&&Math.abs(f.mi-mi)<0.35});
     if(atDam.length)
@@ -794,7 +866,7 @@ function paddleCard(ft){
     var t=stops[j],gap=Math.abs(t.mi-mi),dams=between(bi,j);
     return (dir<0?'Above: ':'Below: ')+'<b>'+(t.n||PADKIND[t.k]||t.k)+'</b> · '+
       (gap<0.1?'at the same spot':gap.toFixed(1)+' mi · '+paddleHours(gap))+
-      (dams.length?' · <b style="color:var(--shut)">'+dams.join(', ')+' in between — portage</b>'
+      (dams.length?' · <b style="color:var(--danger-text)">'+dams.join(', ')+' in between — portage</b>'
                  :' · no dam between')}
   if(bi>=0){
     var up=side(-1),dn=side(1);
@@ -819,7 +891,7 @@ function paddleCard(ft){
   var _gn=(_gp&&GAUGES)?GAUGE.near(_gp,12):null;
   show('<div class="tn">'+head+'</div>'+rows.join('<br>')+
     (_gn?'<div class="sub" id="pd-cond" style="margin-top:8px">'+
-      '<button class="chip" id="pd-gauge">'+ic('info')+
+      '<button class="chip" id="pd-gauge">'+ic('gauge')+
       '<span>River conditions (USGS, live)</span></button></div>':'')+
     (acts?'<div class="sub" style="margin-top:8px">'+acts+'</div>':''),
     isDam?'fail':'');
@@ -848,7 +920,7 @@ function paddleCard(ft){
   if(f2)f2.addEventListener('click',function(){
     runCard(RUNFROM,{mi:here.mi,n:pr.n,k:pr.k},riv)});
   var f3=el('pd-cancel');
-  if(f3)f3.addEventListener('click',function(){runClear();show('Run cancelled.','')});
+  if(f3)f3.addEventListener('click',function(){runClear();ack('Run cancelled.')});
 }
 
 var peakf=((CONT&&CONT.pk)||[]).map(function(p){
@@ -906,7 +978,7 @@ function wCase(cond,t,f){
     14,['case',cond,t[1],f[1]],
     17,['case',cond,t[2],f[2]]]}
 function lyr(id,cls,col,wd,dash){var o={id:id,type:'line',source:'net',
-  filter:['==',['get','c'],cls],layout:{'line-cap':dash?'butt':'round','line-join':'round'},
+  filter:netLyrF(id,['==',['get','c'],cls],cls),layout:{'line-cap':dash?'butt':'round','line-join':'round'},
   paint:{'line-color':col,'line-width':wd}};if(dash)o.paint['line-dasharray']=dash;return o}
 
  
@@ -1091,6 +1163,9 @@ var HDDL=(function(){
   return M;
 })();
 var SAT_OK=!!TILES||!!(SAT&&SATB&&(SATB[2]-SATB[0])>1e-6&&(SATB[3]-SATB[1])>1e-6);
+ 
+var SAT_TONE={'raster-saturation':-0.35,'raster-brightness-max':0.82,'raster-contrast':0.06};
+function satPaint(p){for(var k in SAT_TONE)p[k]=SAT_TONE[k];return p}
 var SATBOX=SAT_OK?SATB:(BUNDLE.bbox||[0,0,1,1]);
 var SATURL=SAT_OK?SAT:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
  
@@ -1146,7 +1221,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     pubpt:{type:'geojson',data:{type:'FeatureCollection',features:pubpt}},
     areapt:{type:'geojson',data:{type:'FeatureCollection',features:areapt}},
 
-    net:{type:'geojson',data:{type:'FeatureCollection',features:nf2}},
+    net:{type:'geojson',data:{type:'FeatureCollection',features:nf2.concat(NETLO)}},
     strokes:{type:'geojson',data:{type:'FeatureCollection',features:strokes}},
     shortpts:{type:'geojson',data:shortPts},
     showonly:{type:'geojson',data:{type:'FeatureCollection',features:showFeats}},
@@ -1194,15 +1269,13 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
       paint:{'fill-color':'#0FAE57','fill-opacity':0.22}},
      
     {id:'sat',type:'raster',source:'sat',layout:{visibility:'none'},
-      paint:{'raster-opacity':1,'raster-fade-duration':0,
-        'raster-saturation':-0.35,'raster-brightness-max':0.82,
-        'raster-contrast':0.06}},
+      paint:satPaint({'raster-opacity':1,'raster-fade-duration':0})},
      
     (SPARSE&&TILES.zmin<=11)?{id:'sat-base',type:'raster',source:'satbase',layout:{visibility:'none'},
-      paint:{'raster-opacity':1,'raster-fade-duration':150}}
+      paint:satPaint({'raster-opacity':1,'raster-fade-duration':150})}
       :{id:'sat-base',type:'circle',source:'satbase',layout:{visibility:'none'},paint:{'circle-radius':0}},
     SPARSE?{id:'sat-patch',type:'raster',source:'satpatch',layout:{visibility:'none'},
-      paint:{'raster-opacity':1,'raster-fade-duration':150}}
+      paint:satPaint({'raster-opacity':1,'raster-fade-duration':150})}
       :{id:'sat-patch',type:'circle',source:'satpatch',layout:{visibility:'none'},paint:{'circle-radius':0}},
      
     {id:'hillshade',type:'raster',source:'hs',
@@ -1229,18 +1302,20 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
      
     {id:'casing',type:'line',source:'net',
       layout:{'line-cap':'round','line-join':'round'},
-      filter:['in',['get','c'],['literal',['route72','trail50','moto24','mccct','fstrail']]],
+      filter:netLyrF('casing',['in',['get','c'],['literal',['route72','trail50','moto24','mccct','fstrail']]]),
        
       paint:{'line-color':'#FFFFFF','line-opacity':0.95,'line-width':w(3.2,7.2,15)}},
      
     {id:'casing-track',type:'line',source:'net',
       layout:{'line-cap':'round','line-join':'round'},
-      filter:['==',['get','c'],'track'],
+       
+      filter:netLyrF('casing-track',['==',['get','c'],'track'],'track'),
       paint:{'line-color':'#FFFFFF','line-opacity':0.75,'line-width':w(1.7,3.8,8)}},
      
     {id:'casing-fsroad',type:'line',source:'net',
       layout:{'line-cap':'round','line-join':'round'},
-      filter:['==',['get','c'],'fsroad'],
+       
+      filter:netLyrF('casing-fsroad',['==',['get','c'],'fsroad'],'fsroad'),
       paint:{'line-color':'#FFFFFF','line-opacity':0.55,'line-width':w(1.2,2.6,5.5)}},
      
      
@@ -1356,7 +1431,11 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'icon-size':w(0.52,0.72,0.95),'icon-allow-overlap':true,
         'text-field':['step',['zoom'],'',12.8,['get','n']],
         'text-font':['APEX'],'text-size':w(8.5,10,11.5),'text-max-width':9,
-        'text-offset':[0,1.15],'text-anchor':'top','text-padding':3,
+         
+        'icon-anchor':BADGE_DROPS.length?['match',['get','k'],BADGE_DROPS,'bottom','center']:'center',
+        'text-offset':BADGE_DROPS.length?['match',['get','k'],BADGE_DROPS,
+          ['literal',[0,0.35]],['literal',[0,1.15]]]:[0,1.15],
+        'text-anchor':'top','text-padding':3,
         'text-optional':true,'symbol-sort-key':['get','r']},
       paint:{'text-color':['get','c'],'text-halo-color':'#FFFFFF',
         'text-halo-width':1.7}},
@@ -1371,7 +1450,10 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'icon-allow-overlap':true,'icon-padding':2,
         'text-field':['step',['zoom'],'',11,['get','n']],
         'text-font':['APEX'],'text-size':w(9.5,11,12.5),'text-max-width':9,
-        'text-offset':[0,1.5],'text-anchor':'top','text-padding':3,
+        'icon-anchor':BADGE_DROPS.length?['match',['get','k'],BADGE_DROPS,'bottom','center']:'center',
+        'text-offset':BADGE_DROPS.length?['match',['get','k'],BADGE_DROPS,
+          ['literal',[0,0.35]],['literal',[0,1.5]]]:[0,1.5],
+        'text-anchor':'top','text-padding':3,
         'text-optional':true,'symbol-sort-key':['get','r']},
       paint:{'text-color':['get','c'],'text-halo-color':'#FFFFFF',
         'text-halo-width':1.9}},
@@ -1417,9 +1499,12 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-max-width':10,'text-padding':4,'text-line-height':1.15},
       paint:{'text-color':'#3A352E','text-halo-color':'#FFFFFF','text-halo-width':1.9}},
      
+     
     {id:'pad-dot',type:'symbol',source:'padpin',minzoom:9.5,
+      filter:['!=',['get','k'],'dam'],
       layout:{visibility:'none',
         'icon-image':['concat','bdg-pad-',['get','k']],
+        'icon-anchor':PAD_DROPS.length?['match',['get','k'],PAD_DROPS,'bottom','center']:'center',
         'icon-size':w(0.5,0.68,0.9),'icon-allow-overlap':true},
       paint:{}},
     {id:'pad-lbl',type:'symbol',source:'padpin',minzoom:12.4,
@@ -1521,37 +1606,102 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
 
  
  
-var ICONS={
-  mountain:'<path d="m8 3 4 8 5-5 5 15H2L8 3z" />',
- 
-  layers:'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />',
-  vehicle:'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" /> <circle cx="7" cy="17" r="2" /> <path d="M9 17h6" /> <circle cx="17" cy="17" r="2" />',
-  home:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />',
-  here:'<line x1="2" x2="5" y1="12" y2="12" /> <line x1="19" x2="22" y1="12" y2="12" /> <line x1="12" x2="12" y1="2" y2="5" /> <line x1="12" x2="12" y1="19" y2="22" /> <circle cx="12" cy="12" r="7" />',
-  fuel:'<path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 4 0v-6.998a2 2 0 0 0-.59-1.42L18 5" /> <path d="M14 21V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v16" /> <path d="M2 21h13" /> <path d="M3 9h11" />',
-  play:'<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />',
-  stop:'<rect width="18" height="18" x="3" y="3" rx="2" />',
-  alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" />',
-  locate:'<line x1="2" x2="5" y1="12" y2="12" /> <line x1="19" x2="22" y1="12" y2="12" /> <line x1="12" x2="12" y1="2" y2="5" /> <line x1="12" x2="12" y1="19" y2="22" /> <circle cx="12" cy="12" r="7" /> <circle cx="12" cy="12" r="3" />',
-  clock:'<circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" />',
-  info:'<circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" />',
-  loop:'<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" />',
-  star:'<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />',
-  shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />',
-  search:'<path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" />',
-  map:'<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" /> <path d="M15 5.764v15" /> <path d="M9 3.236v15" />',
-  sat:'<path d="m13.5 6.5-3.148-3.148a1.205 1.205 0 0 0-1.704 0L6.352 5.648a1.205 1.205 0 0 0 0 1.704L9.5 10.5" /> <path d="M16.5 7.5 19 5" /> <path d="m17.5 10.5 3.148 3.148a1.205 1.205 0 0 1 0 1.704l-2.296 2.296a1.205 1.205 0 0 1-1.704 0L13.5 14.5" /> <path d="M9 21a6 6 0 0 0-6-6" /> <path d="M9.352 10.648a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l4.296-4.296a1.205 1.205 0 0 0 0-1.704l-2.296-2.296a1.205 1.205 0 0 0-1.704 0z" />',
-  target:'<circle cx="12" cy="12" r="10" /> <line x1="22" x2="18" y1="12" y2="12" /> <line x1="6" x2="2" y1="12" y2="12" /> <line x1="12" x2="12" y1="6" y2="2" /> <line x1="12" x2="12" y1="22" y2="18" />',
-  phone:'<path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" />',
-  close:'<path d="M18 6 6 18" /> <path d="m6 6 12 12" />',
-  check:'<path d="M20 6 9 17l-5-5" />',
-  pin:'<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" />',
-  truck:'<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" /> <path d="M15 18H9" /> <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14" /> <circle cx="17" cy="18" r="2" /> <circle cx="7" cy="18" r="2" />',
-  route:'<circle cx="6" cy="19" r="3" /> <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" /> <circle cx="18" cy="5" r="3" />',
+var LUCIDE_V='1.37.0';
+var ICON_OF={
+  map:'map',hybrid:'satellite',layers:'layers',hd:'download',activity:'funnel',
+  offroad:'mountain',outdoors:'trees',hunt:'target',water:'waves-horizontal',camp:'tent',
+  dirtbike:'motorbike',fourwheel:'car',walk:'footprints',paddle:'kayak',raft:'life-buoy',
+  home:'house',start:'crosshair',locate:'locate-fixed',compass:'compass',north:'navigation-2',
+  fuel:'fuel',dark:'clock',ride:'play',stop:'square',stopdl:'circle-stop',
+  warn:'triangle-alert',route:'route',loop:'repeat',saved:'star',search:'search',
+  spot:'map-pin',dispatch:'phone',centre:'maximize',close:'x',del:'trash-2',
+  tour:'circle-question-mark',guide:'book-open',about:'info',sources:'database',
+  selftest:'shield-check',diag:'stethoscope',pantest:'move',gauge:'gauge',
+  tools:'sliders-horizontal',voice:'volume-2',voiceoff:'volume-x',straight:'arrow-up',
+  bearleft:'arrow-up-left',bearright:'arrow-up-right',left:'corner-up-left',
+  right:'corner-up-right',sharpleft:'arrow-down-left',sharpright:'arrow-down-right',
+  uturn:'undo-2',arrive:'circle-dot',reroute:'refresh-cw',downstream:'arrow-down',
+  external:'external-link',pass:'circle-check',fail:'circle-x',truck:'truck'
+};
+var LUCIDE={
+  'map':'<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" /> <path d="M15 5.764v15" /> <path d="M9 3.236v15" />',
+  'satellite':'<path d="m13.5 6.5-3.148-3.148a1.205 1.205 0 0 0-1.704 0L6.352 5.648a1.205 1.205 0 0 0 0 1.704L9.5 10.5" /> <path d="M16.5 7.5 19 5" /> <path d="m17.5 10.5 3.148 3.148a1.205 1.205 0 0 1 0 1.704l-2.296 2.296a1.205 1.205 0 0 1-1.704 0L13.5 14.5" /> <path d="M9 21a6 6 0 0 0-6-6" /> <path d="M9.352 10.648a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l4.296-4.296a1.205 1.205 0 0 0 0-1.704l-2.296-2.296a1.205 1.205 0 0 0-1.704 0z" />',
+  'layers':'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />',
+  'download':'<path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" />',
+  'funnel':'<path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z" />',
+  'mountain':'<path d="m8 3 4 8 5-5 5 15H2L8 3z" />',
+  'trees':'<path d="M10 10v.2A3 3 0 0 1 8.9 16H5a3 3 0 0 1-1-5.8V10a3 3 0 0 1 6 0Z" /> <path d="M7 16v6" /> <path d="M13 19v3" /> <path d="M12 19h8.3a1 1 0 0 0 .7-1.7L18 14h.3a1 1 0 0 0 .7-1.7L16 9h.2a1 1 0 0 0 .8-1.7L13 3l-1.4 1.5" />',
+  'target':'<circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" />',
+  'waves-horizontal':'<path d="M2 12q2.5 2 5 0t5 0 5 0 5 0" /> <path d="M2 19q2.5 2 5 0t5 0 5 0 5 0" /> <path d="M2 5q2.5 2 5 0t5 0 5 0 5 0" />',
+  'tent':'<path d="M3.5 21 14 3" /> <path d="M20.5 21 10 3" /> <path d="M15.5 21 12 15l-3.5 6" /> <path d="M2 21h20" />',
+  'motorbike':'<path d="m18 14-1-3" /> <path d="m3 9 6 2a2 2 0 0 1 2-2h2a2 2 0 0 1 1.99 1.81" /> <path d="M8 17h3a1 1 0 0 0 1-1 6 6 0 0 1 6-6 1 1 0 0 0 1-1v-.75A5 5 0 0 0 17 5" /> <circle cx="19" cy="17" r="3" /> <circle cx="5" cy="17" r="3" />',
+  'car':'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" /> <circle cx="7" cy="17" r="2" /> <path d="M9 17h6" /> <circle cx="17" cy="17" r="2" />',
+  'footprints':'<path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z" /> <path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z" /> <path d="M16 17h4" /> <path d="M4 13h4" />',
+  'kayak':'<path d="M18 17a1 1 0 0 0-1 1v1a2 2 0 1 0 2-2z" /> <path d="M20.97 3.61a.45.45 0 0 0-.58-.58C10.2 6.6 6.6 10.2 3.03 20.39a.45.45 0 0 0 .58.58C13.8 17.4 17.4 13.8 20.97 3.61" /> <path d="m6.707 6.707 10.586 10.586" /> <path d="M7 5a2 2 0 1 0-2 2h1a1 1 0 0 0 1-1z" />',
+  'life-buoy':'<circle cx="12" cy="12" r="10" /> <path d="m4.93 4.93 4.24 4.24" /> <path d="m14.83 9.17 4.24-4.24" /> <path d="m14.83 14.83 4.24 4.24" /> <path d="m9.17 14.83-4.24 4.24" /> <circle cx="12" cy="12" r="4" />',
+  'house':'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />',
+  'crosshair':'<circle cx="12" cy="12" r="10" /> <line x1="22" x2="18" y1="12" y2="12" /> <line x1="6" x2="2" y1="12" y2="12" /> <line x1="12" x2="12" y1="6" y2="2" /> <line x1="12" x2="12" y1="22" y2="18" />',
+  'locate-fixed':'<line x1="2" x2="5" y1="12" y2="12" /> <line x1="19" x2="22" y1="12" y2="12" /> <line x1="12" x2="12" y1="2" y2="5" /> <line x1="12" x2="12" y1="19" y2="22" /> <circle cx="12" cy="12" r="7" /> <circle cx="12" cy="12" r="3" />',
+  'compass':'<circle cx="12" cy="12" r="10" /> <path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" />',
+  'navigation-2':'<polygon points="12 2 19 21 12 17 5 21 12 2" />',
+  'fuel':'<path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 4 0v-6.998a2 2 0 0 0-.59-1.42L18 5" /> <path d="M14 21V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v16" /> <path d="M2 21h13" /> <path d="M3 9h11" />',
+  'clock':'<circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" />',
+  'play':'<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />',
+  'square':'<rect width="18" height="18" x="3" y="3" rx="2" />',
+  'circle-stop':'<circle cx="12" cy="12" r="10" /> <rect x="9" y="9" width="6" height="6" rx="1" />',
+  'triangle-alert':'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" />',
+  'route':'<circle cx="6" cy="19" r="3" /> <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" /> <circle cx="18" cy="5" r="3" />',
+  'repeat':'<path d="m17 2 4 4-4 4" /> <path d="M3 11v-1a4 4 0 0 1 4-4h14" /> <path d="m7 22-4-4 4-4" /> <path d="M21 13v1a4 4 0 0 1-4 4H3" />',
+  'star':'<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />',
+  'search':'<path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" />',
+  'map-pin':'<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" />',
+  'phone':'<path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" />',
+  'maximize':'<path d="M8 3H5a2 2 0 0 0-2 2v3" /> <path d="M21 8V5a2 2 0 0 0-2-2h-3" /> <path d="M3 16v3a2 2 0 0 0 2 2h3" /> <path d="M16 21h3a2 2 0 0 0 2-2v-3" />',
+  'x':'<path d="M18 6 6 18" /> <path d="m6 6 12 12" />',
+  'trash-2':'<path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />',
+  'circle-question-mark':'<circle cx="12" cy="12" r="10" /> <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /> <path d="M12 17h.01" />',
+  'book-open':'<path d="M12 5v16" /> <path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z" />',
+  'info':'<circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" />',
+  'database':'<ellipse cx="12" cy="5" rx="9" ry="3" /> <path d="M3 5V19A9 3 0 0 0 21 19V5" /> <path d="M3 12A9 3 0 0 0 21 12" />',
+  'shield-check':'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /> <path d="m9 12 2 2 4-4" />',
+  'stethoscope':'<path d="M11 2v2" /> <path d="M5 2v2" /> <path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1" /> <path d="M8 15a6 6 0 0 0 12 0v-3" /> <circle cx="20" cy="10" r="2" />',
+  'move':'<path d="M12 2v20" /> <path d="m15 19-3 3-3-3" /> <path d="m19 9 3 3-3 3" /> <path d="M2 12h20" /> <path d="m5 9-3 3 3 3" /> <path d="m9 5 3-3 3 3" />',
+  'gauge':'<path d="m12 14 4-4" /> <path d="M3.34 19a10 10 0 1 1 17.32 0" />',
+  'sliders-horizontal':'<path d="M10 5H3" /> <path d="M12 19H3" /> <path d="M14 3v4" /> <path d="M16 17v4" /> <path d="M21 12h-9" /> <path d="M21 19h-5" /> <path d="M21 5h-7" /> <path d="M8 10v4" /> <path d="M8 12H3" />',
+  'volume-2':'<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" /> <path d="M16 9a5 5 0 0 1 0 6" /> <path d="M19.364 18.364a9 9 0 0 0 0-12.728" />',
+  'volume-x':'<path d="M11 4.702a.7.7 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.7.7 0 0 0 11 19.298z" /> <path d="m16.5 14.5 5-5" /> <path d="m16.5 9.5 5 5" />',
+  'arrow-up':'<path d="m5 12 7-7 7 7" /> <path d="M12 19V5" />',
+  'arrow-up-left':'<path d="M7 17V7h10" /> <path d="M17 17 7 7" />',
+  'arrow-up-right':'<path d="M7 7h10v10" /> <path d="M7 17 17 7" />',
+  'corner-up-left':'<path d="M20 20v-7a4 4 0 0 0-4-4H4" /> <path d="M9 14 4 9l5-5" />',
+  'corner-up-right':'<path d="m15 14 5-5-5-5" /> <path d="M4 20v-7a4 4 0 0 1 4-4h12" />',
+  'arrow-down-left':'<path d="M17 7 7 17" /> <path d="M17 17H7V7" />',
+  'arrow-down-right':'<path d="m7 7 10 10" /> <path d="M17 7v10H7" />',
+  'undo-2':'<path d="M9 14 4 9l5-5" /> <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" />',
+  'circle-dot':'<circle cx="12" cy="12" r="1" /> <circle cx="12" cy="12" r="10" />',
+  'refresh-cw':'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" />',
+  'arrow-down':'<path d="M12 5v14" /> <path d="m19 12-7 7-7-7" />',
+  'external-link':'<path d="M15 3h6v6" /> <path d="M10 14 21 3" /> <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />',
+  'circle-check':'<circle cx="12" cy="12" r="10" /> <path d="m16 9-5.5 5.5L8 12" />',
+  'circle-x':'<circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" />',
+  'truck':'<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" /> <path d="M15 18H9" /> <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14" /> <circle cx="17" cy="18" r="2" /> <circle cx="7" cy="18" r="2" />',
+  'sailboat':'<path d="M10 2v15" /> <path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z" /> <path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z" />',
+  'anchor':'<path d="M12 6v16" /> <path d="m19 13 2-1a9 9 0 0 1-18 0l2 1" /> <path d="M9 11h6" /> <circle cx="12" cy="4" r="2" />',
+  'umbrella':'<path d="M12 13v7a2 2 0 0 0 4 0" /> <path d="M12 2v2" /> <path d="M20.992 13a1 1 0 0 0 .97-1.274 10.284 10.284 0 0 0-19.923 0A1 1 0 0 0 3 13z" />',
+  'mountain-snow':'<path d="m8 3 4 8 5-5 5 15H2L8 3z" /> <path d="M4.14 15.08c2.62-1.57 5.24-1.43 7.86.42 2.74 1.94 5.49 2 8.23.19" />',
+  'binoculars':'<path d="M10 10h4" /> <path d="M19 7V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v3" /> <path d="M20 21a2 2 0 0 0 2-2v-3.851c0-1.39-2-2.962-2-4.829V8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2z" /> <path d="M 22 16 L 2 16" /> <path d="M4 21a2 2 0 0 1-2-2v-3.851c0-1.39 2-2.962 2-4.829V8a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2z" /> <path d="M9 7V4a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v3" />',
+  'waves-arrow-down':'<path d="M12 10L12 2" /> <path d="M16 6L12 10L8 6" /> <path d="M2 15C2.6 15.5 3.2 16 4.5 16C7 16 7 14 9.5 14C12.1 14 11.9 16 14.5 16C17 16 17 14 19.5 14C20.8 14 21.4 14.5 22 15" /> <path d="M2 21C2.6 21.5 3.2 22 4.5 22C7 22 7 20 9.5 20C12.1 20 11.9 22 14.5 22C17 22 17 20 19.5 20C20.8 20 21.4 20.5 22 21" />',
+  'warehouse':'<path d="M18 21V10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1v11" /> <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 1.132-1.803l7.95-3.974a2 2 0 0 1 1.837 0l7.948 3.974A2 2 0 0 1 22 8z" /> <path d="M6 13h12" /> <path d="M6 17h12" />',
+  'bike':'<circle cx="18.5" cy="17.5" r="3.5" /> <circle cx="5.5" cy="17.5" r="3.5" /> <circle cx="15" cy="5" r="1" /> <path d="M12 17.5V14l-3-3 4-3 2 3h2" />',
+  'shopping-bag':'<path d="M16 10a4 4 0 0 1-8 0" /> <path d="M3.103 6.034h17.794" /> <path d="M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z" />',
+  'utensils':'<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /> <path d="M7 2v20" /> <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />',
+  'droplet':'<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" />',
+  'toilet':'<path d="M7 12h13a1 1 0 0 1 1 1 5 5 0 0 1-5 5h-.598a.5.5 0 0 0-.424.765l1.544 2.47a.5.5 0 0 1-.424.765H5.402a.5.5 0 0 1-.424-.765L7 18" /> <path d="M8 18a5 5 0 0 1-5-5V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8" />',
+  'circle-parking':'<circle cx="12" cy="12" r="10" /> <path d="M9 17V7h4a3 3 0 0 1 0 6H9" />'
 };
 
 function ic(n,sz){
-  var d=ICONS[n];
+  var d=LUCIDE[ICON_OF[n]];
   if(!d)return '';
    
   return '<svg class="ic" width="'+(sz||15)+'" height="'+(sz||15)+'" viewBox="0 0 24 24" '+
@@ -1578,11 +1728,12 @@ function setChip(id,icon,label,on){
 
 try{paintIcons()}catch(e){}
  
+ 
 try{var _sh=document.getElementById('shell');
   if(_sh&&_sh.className.indexOf('ready')<0)_sh.className+=' ready'}catch(e){}
 
-function mk(cls,txt){var d=document.createElement('div');d.className='pin '+cls;
-  d.textContent=txt;return d}
+function mk(cls,key){var d=document.createElement('div');d.className='pin '+cls;
+  if(key)d.innerHTML=ic(key);return d}
  
 function anchorOf(kind,skip){
   for(var i=0;i<PLACES.length;i++){var p=PLACES[i];
@@ -1596,10 +1747,10 @@ function homeSave(){try{HOME?localStorage.setItem(HOMEKEY,JSON.stringify(HOME))
                         :localStorage.removeItem(HOMEKEY)}catch(e){}}
  
 var ME=CTR.slice();
-var hM=new maplibregl.Marker({element:mk('home','⌂')});
+var hM=new maplibregl.Marker({element:mk('home','home')});
 function homeMark(){if(HOME){hM.setLngLat(HOME).addTo(map)}else{try{hM.remove()}catch(e){}}}
 homeMark();
-var mM=new maplibregl.Marker({element:mk('me','◎')}).setLngLat(ME).addTo(map);
+var mM=new maplibregl.Marker({element:mk('me','start')}).setLngLat(ME).addTo(map);
 var arm=null;
 
  
@@ -1611,7 +1762,7 @@ function homeCard(prefix){
     '<button class="chip" id="hc-tap">Tap the map</button>'+
     (HOME?' <button class="chip" id="hc-clear">Clear home</button>':'')+
     '</div><div class="sub" style="margin-top:6px">Then press and hold where you want to go and tap '+
-    '<b>Directions here</b>; <b>Return home</b> routes back from wherever you are.</div>';
+    '<b>Route here</b>; <b>Return home</b> routes back from wherever you are.</div>';
   show(h,'');
    
   ['me','addr','tap','clear'].forEach(function(w){var b=el('hc-'+w);if(!b)return;
@@ -1619,7 +1770,7 @@ function homeCard(prefix){
       logAct('act  set home '+w);
       if(w==='tap'){arm='home';syncArm();return show('Tap the map to place <b>home</b>.','')}
       if(w==='clear'){HOME=null;homeSave();homeMark();clearRoute();syncSafety();
-        return show('<b>Home cleared.</b>','')}
+        return ack('<b>Home cleared.</b>')}
       if(w==='addr'){arm='homeaddr';syncArm();
         try{el('srch').className='on';el('c-search').className='chip on';el('q').value='';el('q').focus()}catch(e){}
         return show('Type the address — a number and a street, like <b>4952 S Branch Rd</b>. '+
@@ -1632,13 +1783,13 @@ function homeCard(prefix){
           :'<b>No GPS fix in 25 s.</b> Try outside, or set home another way.','');
         HOME=at.slice();homeSave();homeMark();clearRoute();syncSafety();
         show('<b>Home is where you are.</b> Press and hold where you want to go and tap '+
-          '<b>Directions here</b>.','')})})})}
+          '<b>Route here</b>.','')})})})}
 el('c-home').addEventListener('click',function(){
-  if(arm==='home'||arm==='homeaddr'){arm=null;syncArm();return show('Cancelled.','')}
+  if(arm==='home'||arm==='homeaddr'){arm=null;syncArm();return ack('Cancelled.')}
   homeCard('')});
 el('c-me').addEventListener('click',function(){
   arm=arm==='me'?null:'me';syncArm();
-  show(arm?"Tap the map to place <b>where you are</b>.":'Cancelled.','')});
+  if(arm)show("Tap the map to place <b>where you are</b>.",'');else ack('Cancelled.')});
 function syncArm(){el('c-home').className='chip'+((arm==='home'||arm==='homeaddr')?' arm':'');
   el('c-me').className='chip'+(arm==='me'?' arm':'')}
 
@@ -1650,15 +1801,15 @@ el('c-machine').addEventListener('click',function(){
   if(mode==='water'){
     var wi=(WORDER.indexOf(machine)+1)%WORDER.length;
     machine=WORDER[wi];waterCraft=machine;
-    setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''));
-    show('Craft set to <b>'+MACHINE[machine].lbl.replace(/^\S+\s/,'')+
+    setChip('c-machine',MACHINE[machine].ic,MACHINE[machine].lbl);
+    show('Craft set to <b>'+MACHINE[machine].lbl+
       '</b>. Float times on the river cards use it.','');
     return}
   machIdx=(machIdx+1)%ORDER.length;machine=ORDER[machIdx];_legalMemo={};
-  setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''));
+  setChip('c-machine',MACHINE[machine].ic,MACHINE[machine].lbl);
   applyMachine();
   var no=machineIllegal();
-  clearRoute();show('Machine set to <b>'+MACHINE[machine].lbl.replace(/^\S+\s/,'')+
+  clearRoute();show('Machine set to <b>'+MACHINE[machine].lbl+
    '</b>. Routing respects what is legal for it, and the map now shows it: '+
    (no.length?'<b>'+no.length+'</b> kind'+(no.length>1?'s':'')+' of line faded '+
      'because they are too narrow for it. They are still real trails \u2014 just '+
@@ -1816,7 +1967,7 @@ var WPKEY='apex.waypoints.v1';
 
  
  
-var GUIDEKEY='apex.guide.v2';
+var GUIDEKEY='apex.guide.v3';
 
 function guideSeen(){
   if(!svAvailable())return false;
@@ -1836,20 +1987,24 @@ function guideClose(mark){
   logAct('act  guide close');}
 
  
-var TOURKEY='apex.tour.v1',TOUR={on:false,i:0,steps:[]};
+ 
+var TOURKEY='apex.tour.v2',TOUR={on:false,i:0,steps:[]};
 var TOUR_STEPS=[
   {id:'c-mode',   tab:null,   t:'What are you doing today?',
    s:'Off-road, Outdoors, Hunt, Water or Camp. A mode sets the pins, the lines and the routing for that kind of day — and everything it sets stays one tap away.'},
   {id:'c-act',    tab:'map',  t:'Which lines',
    s:'ORV, two-track, hiking, or all of them. The colours are the legend: green, blue and black by difficulty; red is closed.'},
   {id:'c-layers', tab:'map',  t:'Layers',
-   s:'Map, satellite or hybrid; public land, rivers, contours, county lines; which pins this mode shows. Done closes it.'},
+   s:'Map or Hybrid; public land, rivers, contours, county lines; which pins this mode shows. Done closes it.'},
   {id:'c-search', tab:'map',  t:'Search',
    s:'A trail code like H58, a town, a river or a street address — all of it offline.'},
   {id:'c-hd',     tab:null,   t:'Sharper satellite',
    s:'Save HD imagery for this view, your county, or the whole state, on wifi. Nothing downloads on its own.'},
+   
+  {id:'btn-home', tab:null,   t:'Return home',
+   s:'Routes you home from wherever you are \u2014 then Ride it on the route card. No home yet? It asks where home is.'},
   {id:'c-ride',   tab:'ride', t:'Ride',
-   s:'Start recording: the truck pins where you started, the map follows you, and Retrace leads you back on your own track.'}];
+   s:'Press and hold a spot, tap Route here, then Ride it on the route card. Or ride from here with no route: the truck pins where you started, and Retrace leads you back on your own track.'}];
 function tourSeen(){if(!svAvailable())return false;try{return localStorage.getItem(TOURKEY)==='1'}catch(e){return false}}
 function tourMark(){if(svAvailable()){try{localStorage.setItem(TOURKEY,'1')}catch(e){}}}
 function tourReset(){if(svAvailable()){try{localStorage.removeItem(TOURKEY)}catch(e){}}}
@@ -1985,7 +2140,7 @@ function svOpen(rec){
   if(rec.m&&MACHINE[rec.m]){
     machine=rec.m;
     var _mi=ORDER.indexOf(rec.m);if(_mi>=0)machIdx=_mi;
-    setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''))}
+    setChip('c-machine',MACHINE[machine].ic,MACHINE[machine].lbl)}
   ME=rec.f.slice();if(mM)mM.setLngLat(ME);
   var note=stale?'<br><span class="sub">The map has been rebuilt since you saved '+
     'this — it has been routed again on the current data, so closures and '+
@@ -1997,12 +2152,13 @@ function svOpen(rec){
       var a=nearestNode(ME);
       if(a<0)return show('<b>Nothing legal nearby</b> for that machine at the '+
         'saved start point.','fail');
-      RFROM=ME.slice();RTO=ME.slice();
       var out=buildLoops(a,rec.mi);
       if(!out.length)return show('<b>'+rec.n+'</b> will not rebuild — the legal '+
         'network within reach no longer connects back at '+rec.mi+' mi.','fail');
+       
+      RFROM=ME.slice();RTO=ME.slice();DESTLBL='the start';
       out.forEach(function(o){o.h+=' · '+o.s.mi.toFixed(1)+' mi';
-        if(o.repeat>0.25)o.h+=' ⟲'});
+        if(o.repeat>0.25)o.h+=' \u00b7 '+Math.round(o.repeat*100)+'% ridden twice'});
       presentRoutes(out);svPrefer(rec.p)},30);
     return}
   if(!rec.t)return show('<b>'+rec.n+'</b> has no destination saved.','fail');
@@ -2013,20 +2169,18 @@ function svPrefer(k){
    
   if(!k||!last)return;
   for(var i=0;i<last.length;i++)if(last[i].k===k){
-    sel=i;draw(last[i],true);
-    Array.prototype.forEach.call(document.querySelectorAll('.rc'),function(d){
-      d.className='rc'+(+d.dataset.i===sel?' sel':'')});
+    sel=i;draw(last[i],true);rcSel();
     return}}
 
 function buildSavedPanel(){
   var a=svLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region});
   var wp=wpLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region});
   if(!svAvailable())
-    return show('<b>Saved routes are unavailable here.</b> This browser will not '+
-      'let the page store anything. In the app they work normally.','fail');
+    return show('<b>Saved routes are unavailable here.</b> This phone would not let '+
+      'the app store anything \u2014 its storage may be full or blocked.','fail');
   if(!a.length&&!wp.length)
-    return show('<b>Nothing saved yet.</b><br>Plan a route or a loop, then tap '+
-      '<b>☆ Save</b> on the card you want to keep. It is stored on this phone '+
+    return show('<b>Nothing saved yet.</b><br>Plan a route or a loop, pick the card you want to keep, then tap '+
+      '<b>Save</b> under the route options. It is stored on this phone '+
       'only — nothing is sent anywhere — and reopening it routes again on the '+
       'current map, so closures stay up to date.','');
   var h='<div id="routes">';
@@ -2034,7 +2188,7 @@ function buildSavedPanel(){
     h+='<div class="sub" style="margin:2px 0 6px">'+wp.length+' waypoint'+
        (wp.length===1?'':'s')+'</div>';
     wp.forEach(function(x,i){
-      h+='<div class="rc" data-wp="'+i+'"><h5>\u2691 '+x.n+'</h5>'+
+      h+='<div class="rc" data-wp="'+i+'"><h5>'+ic('spot')+x.n+'</h5>'+
          '<div class="sub">'+x.p[1].toFixed(5)+', '+x.p[0].toFixed(5)+'</div>'+
          '<div class="sub"><button class="chip" data-wpgo="'+i+'">Go to</button> '+
          '<button class="chip" data-wpren="'+i+'">Rename</button> '+
@@ -2060,7 +2214,7 @@ function buildSavedPanel(){
   bindw('data-wpgo',function(x){
     logAct('act  go to waypoint '+x.n);
     map.easeTo({center:x.p,zoom:Math.max(map.getZoom(),14),duration:500});
-    placeCard(x.p,'wpt','\u2691 '+x.n)});
+    placeCard(x.p,'wpt',x.n)});
   bindw('data-wpdel',function(x){
     logAct('act  delete waypoint '+x.n);wpDel(x.n);wpDraw();buildSavedPanel()});
   bindw('data-wpren',function(x){
@@ -2081,18 +2235,22 @@ function buildSavedPanel(){
 
 var last=null,sel=null;
  
-function routeToPoint(dest,label){
+ 
+function routeAuto(auto){return (auto&&typeof auto==='object')?{k:auto.k||null,resume:!!auto.resume}
+  :{k:typeof auto==='string'?auto:null,resume:false}}
+function routeToPoint(dest,label,auto){
   logAct('route to '+(label||'?'));
-  RFROM=ME.slice();RTO=dest.slice();
-  el('btn-home').disabled=true;show('Routing…','');
+   
+  el('btn-home').disabled=true;
+  if(auto)rideCard('Routing…','',routeAuto(auto).resume?'Routing to '+(label||'there')+'\u2026':'Re-routing\u2026');
+  else show('Routing…','');
   setTimeout(function(){
     var _t0=performance.now();
     var a=nearestNode(ME),b=nearestNode(dest),out=[];
     var _tSnap=performance.now()-_t0;
-    DESTLBL=label||'there';
     el('btn-home').disabled=false;
     if(a<0||b<0)return show('<b>Nothing legal nearby</b> for a '+
-      MACHINE[machine].lbl.replace(/^\S+\s/,'')+'. Every line within reach is off limits for that machine.','fail');
+      MACHINE[machine].lbl+'. Every line within reach is off limits for that machine.','fail');
     var sa=snapMiles(ME,a),sb=snapMiles(dest,b);
      
     var _dbg={a:a,b:b,sa:sa,sb:sb,tSnap:Math.round(_tSnap),got:[]};
@@ -2109,19 +2267,25 @@ function routeToPoint(dest,label){
       out.push({h:p.h,k:p.k,s:summarise(pa),snap:sa+sb,na:a,nb:b})});
     try{window.__routeDbg=_dbg}catch(e){}
     if(!out.length)return show('<b>No legal route</b> for a '+
-      MACHINE[machine].lbl.replace(/^\S+\s/,'')+' between those two points. Try a wider machine, or move the pins nearer a trail.','fail');
-    presentRoutes(out)},30)}
+      MACHINE[machine].lbl+' between those two points. Try a wider machine, or move the pins nearer a trail.','fail');
+    RFROM=ME.slice();RTO=dest.slice();DESTLBL=label||'there';
+    presentRoutes(out,auto)},30)}
 
 var DESTLBL='home',RFROM=null,RTO=null;
+ 
+var RIDDEN_WARN=null;
 
  
-function presentRoutes(out){
+function presentRoutes(out,auto){
    
   var seen={};out.forEach(function(o){var k=o.s.path.map(function(e){return e.i}).join(',');
     o.dup=seen[k]||false;seen[k]=true});
   last=out;sel=0;
+   
+  var ak=routeAuto(auto).k;
+  if(ak)for(var q=0;q<out.length;q++)if(out[q].k===ak){sel=q;break}
   logAct('route '+out.length+' options, best '+out[0].s.mi.toFixed(1)+' mi');
-  renderRoutes(out);draw(out[0],true)}
+  renderRoutes(out,auto);draw(out[sel],true)}
 
  
 var LOOP_MI=15,LOOP_CHOICES=[6,10,15,20,30,40];
@@ -2191,21 +2355,82 @@ function buildLoops(startNode,targetMi){
   return out}
 el('btn-home').addEventListener('click',function(){
   if(!HOME)return homeCard('<b>No home set.</b> ');    
-  routeToPoint(HOME,'the ⌂ pin')});
+  routeToPoint(HOME,'home')});
 
-function renderRoutes(out){
+ 
+function rcFit(){try{
+  var R=el('routes'),b=el('railbody'),rl=el('rail'),row=el('rcrow'),sh=el('shell');
+  if(!b||!rl||!b.getBoundingClientRect)return;
+  var t0=parseFloat(b.style.getPropertyValue('--rc-trim'))||0,tn=0;
+   
+  if(!R){if(t0)b.style.removeProperty('--rc-trim');return}
+  if(b.getAnimations&&b.getAnimations().some(function(a){return a.playState==='running'}))return;
+  if(/\bfolded\b/.test(rl.className))return;           
+  var riding=!!(sh&&sh.dataset&&sh.dataset.ride),mo=el('rc-more');
+   
+  var sT=R.scrollTop||0,sL=R.scrollLeft||0;
+  if(mo&&!mo.hidden){mo.hidden=true;mo.innerHTML='';mo.dataset.n='0'}
+  for(var pass=0;pass<3&&R.getBoundingClientRect;pass++){
+    R.style.maxHeight='';if(row)row.style.marginTop='';tn=0;
+    var cs=getComputedStyle(b),mh=parseFloat(cs.maxHeight),nb=0;
+    if(isFinite(mh)&&mh>0){
+      if(!riding)mh+=t0;              
+      var br=b.getBoundingClientRect(),rr=R.getBoundingClientRect();
+      var top=rr.top-br.top+b.scrollTop;
+       
+      var rm=row?(parseFloat(getComputedStyle(row).marginTop)||0):0,rowH=row?row.offsetHeight+rm:0;
+      var room=mh-top-rowH,foot=Infinity;
+      if(rr.height>room+0.5){
+        foot=room;
+        var kids=R.querySelectorAll('.rc > *'),line=room,moved=true,it=0;
+        while(moved&&it++<40){moved=false;
+          for(var i=0;i<kids.length;i++){var k=kids[i].getBoundingClientRect();if(k.height<=0)continue;
+            var kt=k.top-rr.top+R.scrollTop,kb=kt+k.height;
+            if(kt<line-0.5&&kb>line+0.5){line=kt;moved=true}}}
+         
+        var c0=R.querySelector('.rc.sel')||R.querySelector('.rc'),k2=c0&&c0.children[1],
+            need=k2?k2.getBoundingClientRect().bottom-rr.top+R.scrollTop:1;
+        if(line>0&&line>=need-0.5){R.style.maxHeight=Math.floor(line)+'px';foot=Math.floor(line);
+          var g=Math.ceil(room-Math.floor(line));
+          if(riding){if(row)row.style.marginTop=(rm+g)+'px'}else tn=g}}
+      var ws=R.querySelectorAll('.rc.sel .warn');
+      for(var w=0;w<ws.length;w++){var wr=ws[w].getBoundingClientRect();
+        if(wr.height>0&&wr.bottom-rr.top+R.scrollTop>foot+0.5)nb++}}
+    if(!mo)break;
+    if(mo.hidden===!nb&&(mo.dataset.n||'0')===String(nb))break;
+    mo.innerHTML=nb?ic('warn')+nb+' more warning'+(nb>1?'s':'')+' below \u2014 scroll the card':'';
+    mo.dataset.n=String(nb);mo.hidden=!nb}
+  if(R.getBoundingClientRect){if(R.scrollTop!==sT)R.scrollTop=sT;if(R.scrollLeft!==sL)R.scrollLeft=sL}
+  if(tn!==t0){if(tn>0)b.style.setProperty('--rc-trim',tn+'px');else b.style.removeProperty('--rc-trim')}
+  }catch(e){}}
+try{el('rail').addEventListener('transitionend',rcFit)}catch(e){}
+try{window.addEventListener('resize',rcFit)}catch(e){}
+ 
+function rcSel(){
+  Array.prototype.forEach.call(document.querySelectorAll('.rc'),function(d){
+    d.className='rc'+(+d.dataset.i===sel?' sel':'')});
+  rcFit()}
+function renderRoutes(out,auto){
   var fuel=FUELS[fi],now=new Date(),
       ss=sunset(ME[1],ME[0],now),nowH=now.getHours()+now.getMinutes()/60;
-  var html='<div id="routes">';
+  var html='<div id="routes">',warn=[];
   out.forEach(function(o,i){
     var s=o.s,mins=Math.round(s.hrs*60),
         arrive=nowH+s.hrs,dark=(ss!==null&&arrive>ss),
         overFuel=(fuel&&s.mi>fuel);
+    warn[i]={fuel:overFuel?s.mi-fuel:0,dark:dark,
+             adv:s.adv>0.05?s.adv:0,snap:o.snap>0.15?o.snap:0};
     html+='<div class="rc'+(i===sel?' sel':'')+'" data-i="'+i+'">'+
       '<h5>'+o.h+(o.dup?' ·<span class="sub"> same line</span>':'')+'</h5>'+
       '<div class="big">'+s.mi.toFixed(1)+' <span class="sub">mi</span></div>'+
-      '<div class="sub">'+(mins>=60?Math.floor(mins/60)+'h '+(mins%60)+'m':mins+' min')+
+      '<div class="sub">~'+etaTxt(s.hrs*60)+
         ' · '+s.off.toFixed(1)+' mi off-pavement</div>'+
+       
+      (overFuel?'<div class="sub warn">'+ic('fuel')+(s.mi-fuel).toFixed(1)+' mi past your range</div>':'')+
+      (dark?'<div class="sub warn">'+ic('dark')+'arrives after dark</div>':'')+
+      (s.adv>0.05?'<div class="sub warn">'+s.adv.toFixed(1)+' mi unverified (OSM)</div>':'')+
+      (o.snap>0.15?'<div class="sub warn">+'+o.snap.toFixed(1)+
+        ' mi off-network (dashed) to reach the trail</div>':'')+
        
       (function(){
         var pd=s.mi>0?Math.round(100*s.des/s.mi):0;
@@ -2221,32 +2446,55 @@ function renderRoutes(out){
       '<div class="sub">hardest <b>'+label(s.hard)+'</b></div>'+
       spark(s.prof,s.up,s.dn)+
       '<div class="sub">climb <b>'+ft(s.up)+' ft</b> · drop '+ft(s.dn)+' ft</div>'+
-      (overFuel?'<div class="sub warn">⛽ '+(s.mi-fuel).toFixed(1)+' mi past your range</div>':
-        (fuel?'<div class="sub good">⛽ within range</div>':''))+
-      (dark?'<div class="sub warn">☾ arrives after dark</div>':'')+
-      (s.adv>0.05?'<div class="sub warn">'+s.adv.toFixed(1)+' mi unverified (OSM)</div>':
-        '<div class="sub good">fully on designated line</div>')+
-      (o.snap>0.15?'<div class="sub warn">+'+o.snap.toFixed(1)+
-        ' mi off-network (dashed) to reach the trail</div>':'')+
+      ((!overFuel&&fuel)?'<div class="sub good">'+ic('fuel')+'within range</div>':'')+
+      (s.adv>0.05?'':'<div class="sub good">fully on designated line</div>')+
       '</div>'});
   html+='</div>';
    
    
-  html+='<div class="sub" style="margin-top:7px">'+
-    '<button class="chip" id="btn-save">\u2606 Save this route</button> '+
-    '<button class="chip" id="btn-clear">\u2715 Clear route</button></div>';
-  show(html,'');
+   
+  html+='<div class="sub" id="rcrow"><div id="rc-more" class="warn" hidden></div>'+
+    ((!rideMode&&!riding)?'<button class="chip primary" id="rc-ride">'+ic('ride')+'<span>Ride it</span></button> ':'')+
+    '<button class="chip" id="btn-save">'+ic('saved')+'<span>Save</span></button> '+
+    '<button class="chip" id="btn-clear">'+ic('close')+'<span>Clear route</span></button></div>';
+   
+   
+  var w0=RIDDEN_WARN;RIDDEN_WARN=warn[sel]||null;
+  if(auto){
+    var w=warn[sel]||{},bits=[],ra=routeAuto(auto);
+    if(w.fuel)bits.push(w.fuel.toFixed(1)+' mi past your range');
+    if(w.dark)bits.push('arrives after dark');
+    if(w.adv)bits.push(w.adv.toFixed(1)+' mi unverified (OSM)');
+    if(w.snap)bits.push('+'+w.snap.toFixed(1)+' mi off-network');
+     
+    if(!rideMode&&!riding){
+      logAct('route cards held: the ride they were for is not running');return}
+    if((w.fuel&&!(w0&&w0.fuel))||(w.dark&&!(w0&&w0.dark)))show(html,'');
+    else rideCard(html,'',ra.resume
+      ?'Trip resumed \u00b7 route to '+(DESTLBL||'there')+(bits.length?' \u00b7 '+bits.join(' \u00b7 '):' is on the map')
+      :'Re-routed \u00b7 '+(bits.length?bits.join(' \u00b7 '):'the new route is on the map'))}
+  else show(html,'');
+   
+  rcFit();
+  var rr=el('rc-ride');
+  if(rr)rr.addEventListener('click',function(){
+     
+    if(rideMode||riding)return;
+    if(last&&sel!==null&&!routeFits(last[sel]))return routeUnfitCard();
+    logAct('act  ride it (route card)');
+    RAIL_MANUAL=false;railSet(false);showTab('ride');
+    el('c-ride').click()});
   var cb2=el('btn-clear');
   if(cb2)cb2.addEventListener('click',function(){
     logAct('act  cleared route');
     clearRoute();last=null;sel=null;
-    show('Route cleared. The map is back to just the network.','')});
+    ack('Route cleared.')});
   var sb=el('btn-save');
   if(sb)sb.addEventListener('click',function(){
     var rec=svCurrent(svName());
     if(!rec)return show('Nothing to save yet.','fail');
-    if(!svAdd(rec))return show('<b>Could not save.</b> This browser will not let '+
-      'the page store anything; in the app it works normally.','fail');
+    if(!svAdd(rec))return show('<b>Could not save.</b> This phone would not let '+
+      'the app store it \u2014 its storage may be full or blocked.','fail');
     logAct('act  saved route '+rec.n);
     show('Saved as <b>'+rec.n+'</b>.<br><span class="sub">Kept on this phone only. '+
       'Reopening it routes again on the current map, so closures and reroutes '+
@@ -2255,8 +2503,8 @@ function renderRoutes(out){
     c.addEventListener('click',function(){
       sel=+c.dataset.i;logAct('act  picked '+((last[sel]||{}).h||sel));
        
-      Array.prototype.forEach.call(document.querySelectorAll('.rc'),function(d){
-        d.className='rc'+(+d.dataset.i===sel?' sel':'')});
+      rcSel();
+      RIDDEN_WARN=warn[sel]||null;
       draw(last[sel],false);
       try{c.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'})}
       catch(e){}})}) }
@@ -2274,8 +2522,8 @@ function spark(p,up,dn){
   return '<div class="prof">'+
     '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" '+
       'style="display:block;width:100%;height:44px">'+
-      '<polygon points="0,'+H+' '+pts.join(' ')+' '+W+','+H+'" fill="rgba(143,174,99,0.22)"/>'+
-      '<polyline points="'+pts.join(' ')+'" fill="none" stroke="#8FAE63" '+
+      '<polygon points="0,'+H+' '+pts.join(' ')+' '+W+','+H+'" style="fill:var(--ok-tint)"/>'+
+      '<polyline points="'+pts.join(' ')+'" fill="none" style="stroke:var(--ok)" '+
         'stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>'+
     '<div class="profax"><span>'+ft(lo)+' ft</span>'+
       '<span>'+ft(hi)+' ft</span></div></div>'}
@@ -2314,6 +2562,15 @@ function draw(o,fit){
   try{var r=el('rail-chips')||document.querySelector('.strip');
     if(r)strip=Math.round(r.getBoundingClientRect().height)}catch(e){}
   map.fitBounds(b,{padding:{top:64,bottom:40+strip,left:36,right:36},duration:800})}
+ 
+function routeFits(o){
+  if(!o||!o.s||!o.s.path)return true;
+  for(var i=0;i<o.s.path.length;i++)if(!machineLegal(o.s.path[i]))return false;
+  return true}
+function routeUnfitCard(){
+  logAct('ride refused: the route is not legal for '+machine);
+  show('<b>This route is not legal for a '+MACHINE[machine].lbl+'.</b> It was planned '+
+    'for another machine. Nothing started \u2014 plan it again for this one.','fail')}
 function clearRoute(){NAVG=null;map.getSource('route').setData({type:'FeatureCollection',features:[]});
   try{map.getSource('alt').setData({type:'FeatureCollection',features:[]});
       map.getSource('approach').setData({type:'FeatureCollection',features:[]})}catch(e){}
@@ -2417,7 +2674,7 @@ function renderHits(list){
           show('<div class="tn">'+c.n+'</div>'+
             '<b>'+c.mi+' mi</b> mapped · '+stops.length+' access point'+
             (stops.length===1?'':'s')+
-            (dams.length?' · <b style="color:var(--shut)">'+dams.length+' dam'+
+            (dams.length?' · <b style="color:var(--danger-text)">'+dams.length+' dam'+
               (dams.length>1?'s':'')+' — portages</b>':'')+
             '<br><span class="sub">Tap a stop on the river to plan a run — '+
             'in Water mode a launch pin works too.</span>','');
@@ -2429,7 +2686,7 @@ function renderHits(list){
         map.easeTo({center:r.c,zoom:13.2,duration:800});
         logAct('act  home from address');
         return show('<b>Home set</b> at '+r.t+'. Press and hold where you want to go and tap '+
-          '<b>Directions here</b>; <b>Return home</b> routes back from wherever you are.','')}
+          '<b>Route here</b>; <b>Return home</b> routes back from wherever you are.','')}
       map.easeTo({center:r.c,zoom:r.k==='place'?13.2:14.6,duration:800});
        
       dropPin(r.c.slice());
@@ -2450,11 +2707,11 @@ el('q').addEventListener('input',function(){
  
 function turnWord(d){
   var a=((d+540)%360)-180,x=Math.abs(a);
-  if(x<22)return ['Continue','↑'];
-  if(x<50)return [a<0?'Bear left':'Bear right',a<0?'↖':'↗'];
-  if(x<115)return [a<0?'Turn left':'Turn right',a<0?'←':'→'];
-  if(x<160)return [a<0?'Sharp left':'Sharp right',a<0?'↰':'↱'];
-  return ['Turn around','↻']}
+  if(x<22)return ['Continue','straight'];
+  if(x<50)return [a<0?'Bear left':'Bear right',a<0?'bearleft':'bearright'];
+  if(x<115)return [a<0?'Turn left':'Turn right',a<0?'left':'right'];
+  if(x<160)return [a<0?'Sharp left':'Sharp right',a<0?'sharpleft':'sharpright'];
+  return ['Turn around','uturn']}
 
 function directions(path,startNode){
   if(!path||!path.length)return [];
@@ -2475,11 +2732,11 @@ function directions(path,startNode){
       inB:L.inB,out:L.outB,at:i}}
   if(acc)steps.push(acc);
   for(var i=0;i<steps.length;i++){
-    steps[i].turn=i===0?['Start on','●']:turnWord(steps[i].inB-steps[i-1].out)}
+    steps[i].turn=i===0?['Start on','start']:turnWord(steps[i].inB-steps[i-1].out)}
   return steps}
 
 el('btn-steps').addEventListener('click',function(){
-  if(!last||sel===null)return show('Pick a <b>Return home</b> route first — directions describe the route you chose.','fail');
+  if(!last||sel===null)return show('Plan a route first \u2014 <b>Route here</b> or <b>Return home</b>. <b>Turns</b> lists the route you chose.','fail');
   var a=nearestNode(ME),steps=directions(last[sel].s.path,a);
   if(!steps.length)return show('No steps.','fail');
   var tot=0,html='<div id="steps">';
@@ -2490,16 +2747,16 @@ el('btn-steps').addEventListener('click',function(){
     var named=s.name&&!/^(two-track|forest road|road|paved|trail)$/i.test(s.name);
     var nm=named?(s.name+(s.id&&s.id!==s.name?' \u00b7 '+s.id:''))
                 :('unnamed '+(s.name||'track')+(s.id?' \u00b7 '+s.id:''));
-    html+='<div class="st"><div class="ar">'+s.turn[1]+'</div><div class="tx">'+
+    html+='<div class="st"><div class="ar">'+ic(s.turn[1])+'</div><div class="tx">'+
       s.turn[0]+' '+(named?'<b>'+nm+'</b>':'<i class="unn">'+nm+'</i>')+
       (MACHINE[machine].ok.indexOf(s.cls)<0?' <span class="tag shut">illegal</span>':'')+
-      (s.up>8?'<br><span style="color:var(--c-c9a227)">climbs '+ft(s.up)+' ft</span>':'')+
+      (s.up>8?'<br><span style="color:var(--warn)">climbs '+ft(s.up)+' ft</span>':'')+
       '</div><div class="d">'+(s.mi<0.1?(s.mi*5280|0)+' ft':s.mi.toFixed(1)+' mi')+
       (at>0.05?'<div class="at">at '+at.toFixed(1)+' mi</div>':'')+
       '</div></div>'});
   html+='</div>';
   show('<span class="tn">'+steps.length+' steps · '+tot.toFixed(1)+
-    ' mi</span><span class="tag legal">'+last[sel].h+'</span>'+html,'')})
+    ' mi</span><span class="meta">'+last[sel].h+'</span>'+html,'')})
 
  
  
@@ -2531,7 +2788,13 @@ var MACH_LAYERS=['casing','casing-track','casing-fsroad','minor','paved',
                  'fsroad','track','route72','fstrail','trail50','mccct','moto24'];
 var OPA_BASE=null;
 
-function applyMachine(){_legalMemo={};
+ 
+var HYB_OPA={minor:[11.5,0,12.5,0.45],paved:0.35,track:0.55};
+var DIM_FLOOR={Map:0.165,Hybrid:0.25};
+ 
+var HYB_FLOOR={track:0.165};
+function netDim(b,fl){return b>0?Math.max(b*MACH_DIM,Math.min(b,fl)):0}
+function netOpacity(){
   if(!map||!map.getLayer)return;
    
   if(!OPA_BASE){
@@ -2540,15 +2803,24 @@ function applyMachine(){_legalMemo={};
       if(!map.getLayer(id))return;
       var v=map.getPaintProperty(id,'line-opacity');
       OPA_BASE[id]=(typeof v==='number')?v:1})}
-  var ok=(MACHINE[machine]||{}).ok||[];
+  var ok=(MACHINE[machine]||{}).ok||[],inOk=['in',['get','c'],['literal',ok]];
+  var bm=BASEMAPS[bmi]||'Map',fl0=DIM_FLOOR[bm]||DIM_FLOOR.Map;
   MACH_LAYERS.forEach(function(id){
     if(!map.getLayer(id))return;
-    var b=OPA_BASE[id];
+    var b=(bm==='Hybrid'&&HYB_OPA[id]!==undefined)?HYB_OPA[id]:OPA_BASE[id],
+        fl=(bm==='Hybrid'&&HYB_FLOOR[id]!==undefined)?HYB_FLOOR[id]:fl0;
     if(b===undefined)b=1;
-    map.setPaintProperty(id,'line-opacity',
-      ['case',['in',['get','c'],['literal',ok]],b,b*MACH_DIM])});
+    var v=(typeof b==='number')?['case',inOk,b,netDim(b,fl)]
+      :['interpolate',['linear'],['zoom'],
+         b[0],['case',inOk,b[1],netDim(b[1],fl)],
+         b[2],['case',inOk,b[3],netDim(b[3],fl)]];
+    map.setPaintProperty(id,'line-opacity',v)})}
+
+function applyMachine(){_legalMemo={};
+  if(!map||!map.getLayer)return;
+  netOpacity();
   var lg=el('machnote');
-  if(lg)lg.textContent=MACHINE[machine].lbl.replace(/^\S+\s/,'')+
+  if(lg)lg.textContent=MACHINE[machine].lbl+
     ' — faded line is legal ORV trail your machine is too wide for';}
 
 function machineIllegal(){
@@ -2562,7 +2834,7 @@ var act='all';
 
 function actLabel(){
   var a=ACTS.filter(function(x){return x.k===act})[0];
-  setChip('c-act',act==='all'?'vehicle':'target',a.h);
+  setChip('c-act','activity',a.h);
   el('c-act').className='basebtn actbtn'+(act==='all'?'':' on')}
 
 function applyAct(){
@@ -2585,17 +2857,30 @@ function applyAct(){
     map.setLayoutProperty('lbl-show','visibility','visible')}
   else{map.setLayoutProperty('show-line','visibility','none');
     map.setLayoutProperty('lbl-show','visibility','none')}
+  netVis();
   actLabel()}
+
+ 
+function netVis(){
+  if(!map||!map.getLayer)return;
+  var onMap=(BASEMAPS[bmi]||'Map')==='Map',cc=styleFacts().casing;
+  function vis(id){try{return map.getLayoutProperty(id,'visibility')!=='none'}catch(e){return false}}
+  function put(id,on){try{if(map.getLayer(id)&&vis(id)!==on)
+    map.setLayoutProperty(id,'visibility',on?'visible':'none')}catch(e){}}
+  put('casing',!cc.length||cc.every(vis));
+  put('casing-track',onMap&&vis('track'));
+  ['casing-fsroad','minor-case','paved-case'].forEach(function(id){put(id,onMap)})}
 
 function buildActPanel(){
   var p=el('actpanel');
   p.innerHTML=ACTS.map(function(a){
      
-    return '<button class="actrow'+(a.tier?' tierrow':'')+
+    var tag=a.tier?'div':'button';
+    return '<'+tag+' class="actrow'+(a.tier?' tierrow':'')+
       (!a.tier&&a.k===act?' on':'')+'"'+(a.tier?'':' data-k="'+a.k+'"')+'>'+
       '<span class="sw'+(a.dash?' dash':'')+'" style="'+
         (a.dash?'color:'+a.sw+';background-color:transparent':'background-color:'+a.sw)+'"></span>'+
-      '<span>'+a.h+'</span></button>'}).join('');
+      '<span>'+a.h+'</span></'+tag+'>'}).join('');
   Array.prototype.forEach.call(p.querySelectorAll('.actrow'),function(b){
     if(!b.dataset||!b.dataset.k)return;
     b.addEventListener('click',function(){
@@ -2607,13 +2892,13 @@ function buildActPanel(){
 var MODES=[
    
    
-  {k:'ride',     h:'Off-road', s:'ORV, dirt bike, side-by-side, MTB — trails, riding areas, fuel', act:'ride',
+  {k:'ride',     h:'Off-road', ic:'offroad', s:'ORV, dirt bike, side-by-side, MTB — trails, riding areas, fuel', act:'ride',
    kinds:['trailhead','camp','fuel','dayuse','view','info','water','toilet','shelter','store','food','mtb'],
    off:['store','food'], z:{store:13,food:13,info:13},
    groups:{areas:true,peaks:false,contour:false,relief:false,paddle:false,places:true,county:false,public:false,forest:false},
    basemap:'Map', zoom:9},
    
-  {k:'outdoors', h:'Outdoors', s:'Hike, fish, explore — on foot, with trail systems, hills and rivers', act:'foot', machine:'walk',
+  {k:'outdoors', h:'Outdoors', ic:'outdoors', s:'Hike, fish, explore — on foot, with trail systems, hills and rivers', act:'foot', machine:'walk',
    kinds:['trailhead','camp','shelter','water','toilet','view','launch','beach','dayuse','info','system','mtb','ski','lighthouse','livery'],
    z:{camp:13},
    peaksFrom:9,
@@ -2621,19 +2906,19 @@ var MODES=[
    groups:{areas:false,peaks:true,contour:true,relief:false,paddle:true,places:true,county:false,public:false,forest:false},
    basemap:'Map', zoom:11},
    
-  {k:'hunt',     h:'Hunt',     s:'Public land, game areas, counties, stands and cameras — on foot', act:'foot', machine:'walk',
+  {k:'hunt',     h:'Hunt', ic:'hunt',     s:'Public land, game areas, counties, stands and cameras — on foot', act:'foot', machine:'walk',
    kinds:['trailhead','camp','water','toilet','info','system','shelter'],
    peaksFrom:9,
    groups:{areas:false,peaks:true,contour:true,relief:false,paddle:false,places:true,county:true,public:true,forest:false},
    basemap:'Map', zoom:11},
-  {k:'water',    h:'Water',    s:'Beach, kayak, tube, boat — launches and rivers, no trail lines', act:'none', machine:'kayak',
+  {k:'water',    h:'Water', ic:'water',    s:'Beach, kayak, tube, boat — launches and rivers, no trail lines', act:'none', machine:'kayak',
     
    kinds:['livery','launch','beach','camp','dayuse','info','toilet','lighthouse','marina'],
    z:{launch:9,beach:9,lighthouse:9},
    groups:{areas:false,peaks:false,contour:false,relief:false,paddle:true,places:true,county:false,public:false,forest:false},
    basemap:'Hybrid', zoom:10},
    
-  {k:'camp',     h:'Camp',     s:'Campgrounds by type, national and state forest, supplies', act:'ride',
+  {k:'camp',     h:'Camp', ic:'camp',     s:'Campgrounds by type, national and state forest, supplies', act:'ride',
    kinds:['camp','dayuse','shelter','trailhead','launch','beach','water','toilet','store','food','info'],
    off:['store','food'], z:{camp:9,info:13,launch:13,beach:13,store:13,food:13},
    groups:{areas:false,peaks:false,contour:false,relief:false,paddle:false,places:true,county:false,public:true,forest:true},
@@ -2673,7 +2958,8 @@ function repin(){
       POI_MODEF[id]=modeFilter(POI_BASE[id]||true,m,id);
       map.setFilter(id,POI_MODEF[id]);
     }catch(e){}});
-  STACKED={};STACKSIG='';setTimeout(function(){try{restack()}catch(e){}},60)}
+   
+  STACKED={};STACKSIG='';STACKWIN=null;setTimeout(function(){try{restack()}catch(e){}},60)}
  
 function modeFilter(base,m,id){
   var inK=['in',['get','k'],['literal',m.kinds]];
@@ -2706,7 +2992,7 @@ function modeFilter(base,m,id){
   return wrap(b)}
 
 function applyMode(k,opts){
-  opts=opts||{};var m=modeOf(k);mode=m.k;
+  opts=opts||{};var m=modeOf(k);mode=m.k;var _m0=machine;
   try{localStorage.setItem('apex.mode',mode)}catch(e){}
    
   if(ACTS.some(function(a){return a.k===m.act})){act=m.act;applyAct()}
@@ -2724,8 +3010,14 @@ function applyMode(k,opts){
       if(MACHINE[machine]&&MACHINE[machine].mph)waterCraft=machine;
       machine=rideMachine||'bike';_legalMemo={}}
     machIdx=Math.max(0,ORDER.indexOf(machine));
-    setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''));
+    setChip('c-machine',MACHINE[machine].ic,MACHINE[machine].lbl);
     applyMachine();
+     
+    if(machine!==_m0&&last){
+      logAct('route cleared: machine '+_m0+' -> '+machine);
+      clearRoute();
+      if(!opts.silent)ack('Route cleared \u2014 it was planned for '+
+        (MACHINE[_m0]?MACHINE[_m0].lbl:_m0)+'. Plan it again for '+MACHINE[machine].lbl+'.')}
   }catch(e){}
    
    
@@ -2736,14 +3028,46 @@ function applyMode(k,opts){
    
   var bi=BASEMAPS.indexOf(m.basemap);
   if(bi>=0&&(bi===0||SAT_OK)&&bi!==bmi)setBasemap(bi);
-  setChip('c-mode','mountain',m.h);
+  setChip('c-mode',m.ic,m.h);
   el('c-mode').className='basebtn modebtn'+(mode==='ride'?'':' on');
   if(!opts.silent)logAct('act  mode '+mode);
    
   try{if(!el('lyrpanel').hidden)buildLyrPanel()}catch(e){}
 }
 
-var BASEMAPS=['Map','Satellite','Hybrid'],bmi=0;
+ 
+var BASEMAPS=['Map','Hybrid'],bmi=0;
+ 
+var HYB_WATER='#172937',HYB_TXT='#F4F2EE',HYB_HALO='rgba(10,10,10,0.85)',HYB_HW=1.6,HYB_ROAD='#F1EBDD';
+ 
+var HYB_KEEP=/^(poi-|pad-)|stack|^(lbl-shield|lbl-trail|lbl-trail-short|lbl-show|area-label)$/;
+var MAPV=null,SFACTS=null;
+ 
+function styleFacts(){
+  if(SFACTS)return SFACTS;
+  var ls=[];try{ls=map.getStyle().layers||[]}catch(e){}
+  var f={lbl:[],water:[],casing:[],minorZ:[0,24],roadF:null},wc=null;
+  ls.forEach(function(l){if(l.id==='water'&&l.paint)wc=JSON.stringify(l.paint['fill-color'])});
+  ls.forEach(function(l){
+    if(l.type==='symbol'&&l.layout&&l.layout['text-field']!==undefined&&!HYB_KEEP.test(l.id))
+      f.lbl.push(l.id);
+    if(l.type==='fill'&&wc&&l.paint&&JSON.stringify(l.paint['fill-color'])===wc)f.water.push(l.id);
+    var cf=l.id==='casing'?netBaseF(l.filter):null;
+    if(Array.isArray(cf)&&cf[0]==='in'&&
+       Array.isArray(cf[2])&&Array.isArray(cf[2][1]))f.casing=cf[2][1].slice();
+    if(l.id==='minor')f.minorZ=[l.minzoom||0,l.maxzoom===undefined?24:l.maxzoom];
+    if(l.id==='lbl-road'&&l.filter)f.roadF=l.filter});
+  if(ls.length)SFACTS=f;
+  return f}
+function hybTable(){
+  var f=styleFacts(),t=[];
+  f.water.forEach(function(id){t.push([id,'fill-color',HYB_WATER])});
+  f.lbl.forEach(function(id){t.push([id,'text-color',HYB_TXT],[id,'text-halo-color',HYB_HALO],
+    [id,'text-halo-width',HYB_HW])});
+   
+  t.push(['minor','line-color',HYB_ROAD],['paved','line-color',HYB_ROAD],
+    ['minor','line-width',w(0.25,0.55,1.3)],['paved','line-width',w(0.6,1.3,3.0)]);
+  return t}
 function setBasemap(i){
   if(!SAT_OK){bmi=0;setChip('c-base','map','Map');
     map.setLayoutProperty('sat','visibility','none');
@@ -2758,29 +3082,34 @@ function setBasemap(i){
       map.setLayoutProperty('sat-base','visibility',sat?'visible':'none')}catch(e){}
    
    
-   
   var reliefOn=false;
   try{reliefOn=map.getLayoutProperty('hillshade','visibility')!=='none'}catch(e){}
   map.setLayoutProperty('hillshade','visibility',reliefOn?'visible':'none');
   if(reliefOn)map.setPaintProperty('hillshade','raster-opacity',sat?0.16:0.42);
-   
-   
-  var roadA=sat?0.35:1, roadC=sat?'#F1EBDD':PAL.minor;
   try{
-    map.setPaintProperty('minor','line-opacity',sat
-      ?['interpolate',['linear'],['zoom'],11.5,0,12.5,0.45]:1);
-    map.setPaintProperty('paved','line-opacity',roadA);
-    map.setPaintProperty('minor','line-color',roadC);
-    map.setPaintProperty('paved','line-color',roadC);
-    map.setPaintProperty('minor','line-width',sat?w(0.25,0.55,1.3):w(0.4,0.9,2.2));
-    map.setPaintProperty('paved','line-width',sat?w(0.6,1.3,3.0):w(0.9,2,4.8));
-    map.setPaintProperty('casing-track','line-opacity',sat?0.4:0.75);
-    map.setPaintProperty('casing-fsroad','line-opacity',sat?0.3:0.55);
+    var T=hybTable(),F=styleFacts();
+    if(sat&&!MAPV){MAPV={};
+      T.forEach(function(r){MAPV[r[0]+'|'+r[1]]=map.getPaintProperty(r[0],r[1])})}
+    if(sat){
+      T.forEach(function(r){map.setPaintProperty(r[0],r[1],r[2])});
+       
+      map.setLayerZoomRange('minor',11.5,F.minorZ[1]);
+       
+      if(F.roadF)map.setFilter('lbl-road',
+        ['step',['zoom'],['all',F.roadF,['!=',['get','c'],'minor']],11.5,F.roadF])}
+    else if(MAPV){
+      T.forEach(function(r){map.setPaintProperty(r[0],r[1],MAPV[r[0]+'|'+r[1]])});
+      map.setLayerZoomRange('minor',F.minorZ[0],F.minorZ[1]);
+      if(F.roadF)map.setFilter('lbl-road',F.roadF)}
   }catch(e){}
    
+  if(NETLO_Z&&sat!==NETF_HYB){
+    try{Object.keys(NETFT).forEach(function(id){
+      if(map.getLayer(id))map.setFilter(id,sat?NETFT[id].h:NETFT[id].m)});
+      NETF_HYB=sat}catch(e){}}
+  netVis();netOpacity();
    
-   
-  setChip('c-base',sat?'sat':'map',m);
+  setChip('c-base',sat?'hybrid':'map',m);
   el('c-base').className='basebtn'+(sat?' on':'');
 }
 
@@ -2835,7 +3164,7 @@ function nearestPavement(ll){
 
  
 var ABOUT='<span class="tn">APEX ORV</span>'+
- '<span class="tag legal">offline</span><span class="tag adv">no account</span><br>'+
+ '<span class="meta">offline</span><span class="meta">no account</span><br>'+
  'Michigan DNR + USDA Forest Service designations, OpenStreetMap for context. '+
  'Every line says which.<br><br>'+
  '<b>This is not an emergency device.</b> It cannot call anyone. In country '+
@@ -2882,6 +3211,8 @@ function rideStart(at){
   RIDE.pulse=setInterval(function(){
     if(!RIDE)return;
      
+    try{hudPaint();if(NAV.on)navChip()}catch(e){}
+     
     if(++RIDE.ticks%3===1)batteryNow().then(function(b){
       if(RIDE&&b){RIDE.batt1=b.lvl;RIDE.chg=RIDE.chg||b.chg}});
      
@@ -2899,8 +3230,13 @@ function rideFix(acc){
 
  
 var HUD={spd:null,hdg:null,at:null,t:null};
+ 
+var FIX_T=0,GPS_STALE_MS=15000;
+function fixStale(){return posMode==='gps'&&FIX_T>0&&Date.now()-FIX_T>GPS_STALE_MS}
+function fixClock(){try{return new Date(FIX_T).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
+  catch(e){return 'the last one'}}
 
-function hudSet(mps,deg,at){
+function hudSet(mps,deg,at,quiet){
    
   try{if(CMP_ON)setTimeout(cmpPaint,0)}catch(e){}
   var now=Date.now();
@@ -2913,7 +3249,8 @@ function hudSet(mps,deg,at){
   if(mps!==null&&mps!==undefined&&isFinite(mps)&&mps>=0)HUD.spd=mps;
   if(deg!==null&&deg!==undefined&&isFinite(deg))HUD.hdg=(deg%360+360)%360;
   if(at){HUD.at=at.slice();HUD.t=now}
-  hudPaint()}
+   
+  if(!quiet)hudPaint()}
 
 function hudShow(on){
   var b=el('hudbar'),s=el('hudstats'),c=el('chips');
@@ -2922,7 +3259,44 @@ function hudShow(on){
    
   if(c)c.hidden=!!on;
   if(!on){HUD={spd:null,hdg:null,at:null,t:null}}
-  hudPaint()}
+  hudPaint();sheetH();simChip()}
+ 
+function sheetH(){try{var s=el('hudstats');
+  var h=(s&&!s.hidden)?(s.offsetHeight||0):0;
+  document.documentElement.style.setProperty('--sheet-h',h+'px')}catch(e){}
+  ridePublish()}
+ 
+var RIDE_G_ROOM=52;    
+function ridePublish(){try{
+  var st=el('stage'),b=el('hudbar'),n=el('nav'),g=el('nav-g'),rw=el('nav-row'),h=0;
+  if(!st)return;
+  var s0=st.getBoundingClientRect().top;
+  if(b&&!b.hidden)h=b.getBoundingClientRect().bottom-s0;
+  if(n&&!n.hidden){
+    var nb=n.getBoundingClientRect().bottom;
+    if(rw&&hudRouted()){
+       
+      var r1=rw.getBoundingClientRect().bottom,pad=nb-(g&&!g.hidden?g.getBoundingClientRect().bottom:r1);
+      if(g&&!g.hidden)RIDE_G_ROOM=Math.max(RIDE_G_ROOM,g.getBoundingClientRect().bottom-r1);
+      nb=Math.max(nb,r1+RIDE_G_ROOM+pad)}
+    h=Math.max(h,nb-s0)}
+  var de=document.documentElement;
+  de.style.setProperty('--ride-top',Math.round(Math.max(0,h))+'px');
+   
+  var low=0;['readout','c-mode','c-act','c-base','c-hd'].forEach(function(id){var e=el(id);
+    if(e&&!e.hidden){var r=e.getBoundingClientRect();if(r.height>0)low=Math.max(low,r.bottom)}});
+   
+  low=Math.max(low,s0+h);
+  var alr=el('alert');
+  if(alr&&/\bon\b/.test(alr.className)){var ar=alr.getBoundingClientRect();if(ar.height>0)low=Math.max(low,ar.bottom)}
+   
+  var hs=el('hudstats'),rb=el('railbody'),GAP=8;    
+   
+  var fl=(hs&&!hs.hidden)?hs:el('tools'),fr=fl?fl.getBoundingClientRect():null;
+  if(fr&&fr.height>0&&rb&&isFinite(low)){
+    var cap=rb.getBoundingClientRect().height+fr.top-low-GAP;
+    if(isFinite(cap)){var cv=Math.floor(cap)+'px';
+      if(de.style.getPropertyValue('--ride-cap')!==cv){de.style.setProperty('--ride-cap',cv);rcFit()}}}}catch(e){}}
 
 function hudPaint(){
   var b=el('hudbar');
@@ -2947,13 +3321,68 @@ function hudPaint(){
       t.innerHTML=out.join('');
     }
   }
+  var old=fixStale();
   var sp=el('hud-spd');
-  if(sp)sp.innerHTML=(HUD.spd===null?'—':Math.round(HUD.spd*2.23694))+
-    '<span class="hu">mph</span>';
+  if(sp)sp.innerHTML=((HUD.spd===null||old)?'—':Math.round(HUD.spd*2.23694))+
+    hudUnit('mph');
+   
+  var ro=hudRouted(),G=HUDG;
+  var sh=function(id,on){var c=el(id);if(c)c.hidden=!on};
+  sh('hc-togo',ro);sh('hc-eta',ro);sh('hc-time',!ro);sh('hc-spd',!ro);
   var tm=el('hud-time');
-  if(tm)tm.textContent=RIDE?Math.round((Date.now()-RIDE.t0)/60000)+' min':'—';
+  if(tm)tm.innerHTML=RIDE?hudClock(Date.now()-RIDE.t0):'—';
   var ds=el('hud-dist');
-  if(ds)ds.textContent=crumbMi.toFixed(1)+' mi';}
+  if(ds)ds.innerHTML=crumbMi.toFixed(1)+hudUnit('mi');
+  var tg=el('hud-togo');
+  if(tg)tg.innerHTML=(G&&G.togo!==null&&!old)?G.togo.toFixed(1)+hudUnit('mi'):'—';
+  var et=el('hud-eta');
+  if(et){var ep=(G&&G.min!==null&&!old)?etaParts(G.min):null;
+    et.innerHTML=ep?'~'+ep[0]+hudUnit(ep[1]):'—'}
+  var src=el('hud-src');
+  if(src)src.hidden=(posMode!=='sim');
+  hudBtns(ro)}
+ 
+ 
+function hudClock(ms){var m=Math.floor(Math.max(0,ms)/60000);
+  if(m<1)return '&lt;1'+hudUnit('min');
+  var c=clockParts(m*60000);return c[0]+hudUnit(c[1])}
+function hudUnit(u){return '<span class="hu"> '+u+'</span>'}
+function clockParts(ms){
+  var m=Math.max(0,Math.round(ms/60000));
+  if(m<60)return [String(m),'min'];
+  var h=Math.floor(m/60),r=m%60;
+  return [h+':'+(r<10?'0':'')+r,'h']}
+ 
+var NAV_PACE_N=10;
+function etaParts(min){return clockParts(Math.max(1,Math.round(min))*60000)}
+function etaTxt(min){var c=etaParts(min);return c[0]+' '+c[1]}
+function navEta(remainM,G){
+  if(_navSpd.length>=NAV_PACE_N){
+    var spd=_navSpd.reduce(function(a,b){return a+b},0)/_navSpd.length;
+    spd=Math.max(spd,((MACHINE[machine]||{}).spd||3)*0.44704);
+    return remainM/spd/60}
+  var hrs=(G&&G.o&&G.o.s&&isFinite(G.o.s.hrs))?G.o.s.hrs:null;
+  return (hrs!==null&&G.total>0)?hrs*60*remainM/G.total:null}
+ 
+var HUDG=null;
+function hudRouted(){return !!(NAV.on&&(RUN||(last&&sel!==null)))}
+ 
+function hudBtns(ro){
+  var V=(typeof VOICE==='object'&&VOICE)||{},vb=el('nav-voice'),vn=el('hud-vnote');
+  if(vb){vb.disabled=!V.ok;vb.className=(V.ok&&V.on)?'on':'';
+     
+    if(NAV_VOICE_IC!==!!(V.ok&&V.on)){NAV_VOICE_IC=!!(V.ok&&V.on);
+      vb.innerHTML=ic(NAV_VOICE_IC?'voice':'voiceoff')+'<span>Voice</span>'}}
+  if(vn){vn.hidden=!!V.ok;
+    var vt=V.ok?'':'Voice is unavailable in this phone\u2019s WebView'+
+      voiceTail(ro===undefined?hudRouted():ro);
+    if(vn.textContent!==vt)vn.textContent=vt}
+  var nb=el('nav-north');if(nb)nb.className=NAV.northUp?'on':'';
+  sheetH()}
+ 
+function voiceTail(ro){
+  if(!ro)return '.';
+  return RUN?' \u2014 the strip shows what is ahead on the river.':' \u2014 the strip shows every turn.'}
 
 function rideStop(){
   if(!RIDE)return null;
@@ -2999,11 +3428,13 @@ function startRecording(at){
     if(!TRUCK)TRUCK=(crumbs[0]||at).slice();
     rideStart(at);
     if(RESUMED_RIDE){RIDE.t0=RESUMED_RIDE.t0;RIDE.mi0=RESUMED_RIDE.mi0||0;RESUMED_RIDE=null}
+     
+    hudShow(true);
     return}
   TRUCK=at.slice(); crumbs=[at.slice()]; crumbMi=0;
   rideStart(at);
   hudShow(true);
-  if(!tM)tM=new maplibregl.Marker({element:mk('truck','⛟')}).setLngLat(TRUCK).addTo(map);
+  if(!tM)tM=new maplibregl.Marker({element:mk('truck','truck')}).setLngLat(TRUCK).addTo(map);
   else tM.setLngLat(TRUCK);
   map.getSource('back').setData({type:'FeatureCollection',features:[]});
   syncSafety()}
@@ -3036,6 +3467,8 @@ function syncSafety(){
   el('b-src').className='badge '+(crumbs.length?'good':'good')}
 
  
+function offRouteHtml(ft){return 'Off route — '+ft+' ft from your line'+
+  '<small>Tap Retrace to follow your own track back to the truck.</small>'}
 function checkOffRoute(){
   if(!last||sel===null||!crumbs.length)return;
   var pts=[];last[sel].s.path.forEach(function(e){pts=pts.concat(decode(GR.g[e.i]))});
@@ -3043,21 +3476,21 @@ function checkOffRoute(){
   var off=best>0.16;                     
   if(off&&!offAlert){offAlert=true;buzz([120,80,120,80,220]);
     el('alert').className='on';
-    el('alert').innerHTML='Off route — '+(best*5280|0)+' ft from your line'+
-      '<small>Tap Retrace to follow your own track back to the truck.</small>'}
-  else if(!off&&offAlert){offAlert=false;el('alert').className=''}}
+    el('alert').innerHTML=offRouteHtml(best*5280|0);ridePublish()}
+  else if(!off&&offAlert){offAlert=false;el('alert').className='';ridePublish()}}
 
  
 el('btn-retrace').addEventListener('click',function(){
-  if(crumbs.length<2)return show('Nothing recorded yet. Tap <b>▶ Ride it</b> to lay a track, or this fills in from GPS on a real ride.','fail');
+   
+  if(crumbs.length<2)return show('Nothing recorded yet. Retrace follows the track a ride records \u2014 tap <b>Ride it</b> (Ride tab) with a GPS fix to start one.','fail');
   var back=crumbs.slice().reverse(), d=0;
   for(var i=1;i<back.length;i++)d+=mi(back[i-1],back[i]);
   map.getSource('back').setData({type:'FeatureCollection',features:[
     {type:'Feature',properties:{},geometry:{type:'LineString',coordinates:back}}]});
   var b=new maplibregl.LngLatBounds();back.forEach(function(c){b.extend(c)});
   map.fitBounds(b,{padding:50,duration:700});
-  el('alert').className='';offAlert=false;
-  show('<span class="tn">Retrace</span><br><span class="tag legal">no router · no network</span><br>'+
+  el('alert').className='';offAlert=false;ridePublish();
+  show('<span class="tn">Retrace</span><br><span class="meta">no router · no network</span><br>'+
    '<b>'+d.toFixed(2)+' mi</b> back along the track you actually rode · '+
    compass(bearing(ME,TRUCK))+' to the truck · '+back.length+' points<br>'+
    'Every foot of this is ground you have already covered.','')});
@@ -3101,7 +3534,7 @@ el('btn-disp').addEventListener('click',function(){
   setTimeout(function(){
     var ne=nearestEdge(ME), nj=nearestJunction(ME);
     var out='<span class="tn">'+ME[1].toFixed(5)+'  '+ME[0].toFixed(5)+'</span>'+
-      '<span class="tag legal">decimal degrees</span><br>';
+      '<span class="meta">decimal degrees</span><br>';
     var bits=[];
      
     var ad=addressAt(ME)||addressAt(ME,true);
@@ -3141,7 +3574,22 @@ function simPath(){
 
 function stopRide(){if(riding){clearInterval(riding);riding=null;
   hudShow(false);
-  setChip('c-ride','play','Ride it')}}
+  setChip('c-ride','ride','Ride it');rideFlag()}}
+ 
+function rideFlag(){try{var s=el('shell');if(!s)return;
+   
+  if(rideMode||riding){s.dataset.ride='1';var rr=el('rc-ride');if(rr)rr.hidden=true}
+  else delete s.dataset.ride}catch(e){}
+   
+  simChip();stripH();ridePublish()}
+ 
+function simChip(){
+  var c=el('c-lost'),r=el('c-ride'),s=el('hudstats');
+  var was=(c?(c.hidden?'1':'0'):'-')+(r?(r.hidden?'1':'0'):'-');
+  if(c)c.hidden=!(riding&&TAB==='ride');
+  if(r&&TAB==='ride')r.hidden=!!((rideMode||riding)&&s&&!s.hidden);
+  var now=(c?(c.hidden?'1':'0'):'-')+(r?(r.hidden?'1':'0'):'-');
+  if(now!==was){stripH();ridePublish()}}
 
  
 var rideMode=null,gotFix=false,fixN=0;
@@ -3176,7 +3624,7 @@ function tripResume(t){
     if(t.mode&&t.mode!==mode)applyMode(t.mode,{silent:true});
     if(t.machine&&MACHINE[t.machine]){machine=t.machine;
       machIdx=Math.max(0,ORDER.indexOf(machine));
-      setChip('c-machine','vehicle',MACHINE[machine].lbl.replace(/^\S+\s/,''))}
+      setChip('c-machine',MACHINE[machine].ic,MACHINE[machine].lbl)}
     crumbs=(t.crumbs||[]).slice();crumbMi=t.crumbMi||0;
     if(crumbs.length)map.getSource('crumb').setData({type:'FeatureCollection',
       features:[{type:'Feature',properties:{},geometry:{type:'LineString',coordinates:crumbs}}]});
@@ -3184,11 +3632,12 @@ function tripResume(t){
     if(t.run)RUNFROM=t.run;
     if(t.runNav)runSet(t.runNav.riv,t.runNav.a,t.runNav.b);
     NAV.northUp=!!(t.nav&&t.nav.northUp);
-    if(t.to){DESTLBL=t.lbl||'there';routeToPoint(t.to,t.lbl);
+     
+    if(t.to){DESTLBL=t.lbl||'there';RTO=t.to.slice();RIDDEN_WARN=null;routeToPoint(t.to,t.lbl,{k:t.prof||null,resume:true});
        
       setTimeout(function(){if(last&&t.prof){var i=-1;
         for(var q=0;q<last.length;q++)if(last[q].k===t.prof){i=q;break}
-        if(i>=0&&i!==sel){sel=i;draw(last[sel],false)}}},400)}
+        if(i>=0&&i!==sel){sel=i;draw(last[sel],false);rcSel()}}},400)}
     RESUMING=true;RESUMED_RIDE=t.ride||null;
     logAct('act  trip resumed '+crumbs.length+' fixes');
     return true}catch(e){show('Could not resume the trip: '+e,'fail');return false}}
@@ -3199,12 +3648,14 @@ function tripResumeCard(){
     (t.crumbMi||0).toFixed(1)+' mi recorded'+(t.lbl?' \u00b7 heading to '+t.lbl:'')+
     (t.run?' \u00b7 a run on the '+t.run.riv:'')+
     '. The app closed mid-trip; everything up to the last fix is still here.</div>'+
-    '<button class="chip" id="trip-resume">'+ic('play')+'<span>Resume</span></button> '+
-    '<button class="chip" id="trip-discard">'+ic('close')+'<span>Discard</span></button>','');
+    '<button class="chip" id="trip-resume">'+ic('ride')+'<span>Resume</span></button> '+
+    '<button class="chip" id="trip-discard">'+ic('del')+'<span>Discard</span></button>','');
   el('trip-resume').addEventListener('click',function(){
-    if(tripResume(t)){el('c-ride').click();
-      show('<b>Trip resumed</b><div class="sub">Recording continues from your last fix.</div>','')}});
-  el('trip-discard').addEventListener('click',function(){tripEnd();show('Trip discarded.','')});
+     
+    if(tripResume(t)){el('c-ride').click();if(rideMode||riding)
+      rideCard('<b>Trip resumed</b><div class="sub">Recording continues from your last fix.</div>','',
+        'Trip resumed \u00b7 recording')}});
+  el('trip-discard').addEventListener('click',function(){tripEnd();ack('Trip discarded.')});
   return true}
 
  
@@ -3220,18 +3671,30 @@ function navFollow(at,mps,deg){
   var z=mps>15?15.0:mps>8?15.5:mps>3?16.0:16.4;
   map.easeTo({center:at,bearing:NAV.northUp?0:brg,pitch:NAV.northUp?0:55,zoom:z,
     duration:900,easing:function(t){return t}})}
+ 
+var NAV_VOICE_IC=null;
 function navChip(){
-  var n=el('nav');if(!n)return;
-  if(!NAV.on){n.hidden=true;return}
+   
+  var n=el('nav');if(!n)return hudBtns();
+  if(!NAV.on){n.hidden=true;return hudBtns()}
   n.hidden=false;
   var dirs=['N','NE','E','SE','S','SW','W','NW'];
-  el('nav-sp').textContent=Math.round(NAV.mps*2.237)+' mph \u00b7 '+dirs[Math.round(((NAV.brg%360)+360)%360/45)%8];
-  el('nav-north').className=NAV.northUp?'on':'';
-  var vb=el('nav-voice');if(vb){vb.hidden=!VOICE.ok;vb.className=VOICE.on?'on':''}
-  el('nav-center').hidden=NAV.follow}
+   
+  el('nav-sp').textContent=!NAV.lastAt?'\u2014':fixStale()?'No GPS fix since '+fixClock()
+    :(Math.round(NAV.mps*2.237)+' mph \u00b7 '+dirs[Math.round(((NAV.brg%360)+360)%360/45)%8]);
+  navGStale();
+  hudBtns()}
+ 
+function navGStale(){
+  var g=el('nav-g');if(!g||g.hidden||!fixStale())return;
+  if((NAVG&&NAVG.arrived)||(RUN&&RUN.arrived))return;
+  g.innerHTML='<b><span class="arw">'+ic('warn')+'</span>Waiting for a GPS fix</b>'+
+    '<span class="eta">No fix since '+fixClock()+' \u00b7 guidance comes back with the next one</span>'}
  
 function navWake(on){try{if(on)WAKE.hold('nav');else WAKE.drop('nav')}catch(e){}}
-function navStart(){NAV.on=true;NAV.follow=true;NAV.lastAt=null;navWake(true);navChip()}
+function navStart(){NAV.on=true;NAV.follow=true;NAV.lastAt=null;FIX_T=0;navWake(true);
+  RIDE_G_ROOM=52;    
+  navChip()}
 function navStop(){NAV.on=false;navWake(false);navChip();navGuideClear();navSay('',true)}
 
  
@@ -3262,6 +3725,8 @@ if(typeof speechSynthesis!=='undefined'){
 
  
 var NAVG=null,_navSpd=[],_navOff=0,_navReT=0;
+ 
+var LOOPWAS=null;
 
  
 var RUN=null,_riverCache={},_rmHist=[];
@@ -3271,7 +3736,7 @@ function runSet(riv,a,b){
     if(f)x=Object.assign({},x,{p:f.p})}return x};
   RUN={riv:riv,a:fix(a),b:fix(b)};_rmHist=[];NAV.riverBrg=null;
   logAct('act  navigate run '+riv)}
-function runNavClear(){RUN=null;NAV.riverBrg=null;_rmHist=[]}
+function runNavClear(){RUN=null;HUDG=null;NAV.riverBrg=null;_rmHist=[]}
 function corridorByName(riv){
   for(var i=0;i<((PADDLE&&PADDLE.c)||[]).length;i++)if(PADDLE.c[i].n===riv)return PADDLE.c[i];
   return null}
@@ -3314,13 +3779,13 @@ function navRiverGuide(at,acc,st){
    
   var toB=RUN.b.p?mi(at,RUN.b.p)*1609.34:1e9,acc_=Math.max(15,acc||0);
   if(!RUN.arrived&&(toB<Math.max(40,acc_)||remain<0.03)){
-    RUN.arrived=true;NAV.follow=false;navChip();
-    g.hidden=false;g.innerHTML='<b><span class="arw">\u2691</span>You have reached the take-out</b>'+
-      '<span class="eta">'+(RUN.b.n||'Take-out')+'</span>';
+    RUN.arrived=true;NAV.follow=false;HUDG={togo:0,min:null};navChip();
+    g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('arrive')+'</span>You have reached the take-out</b>'+
+      '<span class="eta">'+(RUN.b.n||'Take-out')+'</span>';ridePublish();
     buzz([80,60,80,60,200]);
     navSay('You have reached the take-out'+(RUN.b.n?', '+RUN.b.n:''));
-    show('<b>Take-out reached</b><div class="sub">'+(RUN.b.n||'Your take-out')+
-      '. Recording continues until you stop it.</div>','');
+    rideCard('<b>Take-out reached</b><div class="sub">'+(RUN.b.n||'Your take-out')+
+      '. Recording continues until you stop it.</div>','','Take-out reached \u00b7 '+(RUN.b.n||'your take-out'));
     logAct('nav  take-out reached');return true}
   if(RUN.arrived)return true;
    
@@ -3330,19 +3795,23 @@ function navRiverGuide(at,acc,st){
     if(!next&&(q.k==='access'||q.k==='launch'||q.k==='camp')&&q.mi-st.rm<=5)next=q}
   var up=_rmHist.length>=5&&(_rmHist[0]-_rmHist[_rmHist.length-1])>0.05;
   var line1;
-  if(dam){line1='<b><span class="arw">\u26a0</span>Dam in '+(dam.mi-st.rm).toFixed(1)+' mi \u2014 portage'+(dam.n?' \u00b7 '+dam.n:'')+'</b>';
+  if(dam){line1='<b><span class="arw">'+ic('warn')+'</span>Dam in '+(dam.mi-st.rm).toFixed(1)+' mi \u2014 portage'+(dam.n?' \u00b7 '+dam.n:'')+'</b>';
     var dk='dam|'+dam.mi.toFixed(2);if(VOICE.near!==dk){VOICE.near=dk;
       navSay('Dam in '+(dam.mi-st.rm).toFixed(1)+' miles. Portage.')}}
-  else if(next)line1='<b><span class="arw">\u25bc</span>'+(next.k==='camp'?'Camp':'Access')+' in '+(next.mi-st.rm).toFixed(1)+' mi'+(next.n?' \u00b7 '+next.n:'')+'</b>';
-  else line1='<b><span class="arw">\u25bc</span>Downstream to '+(RUN.b.n||'take-out')+'</b>';
-  var craft=(MACHINE[machine]&&MACHINE[machine].mph)?MACHINE[machine].lbl.replace(/^\S+\s/,'').toLowerCase():null;
+  else if(next)line1='<b><span class="arw">'+ic('downstream')+'</span>'+(next.k==='camp'?'Camp':'Access')+' in '+(next.mi-st.rm).toFixed(1)+' mi'+(next.n?' \u00b7 '+next.n:'')+'</b>';
+  else line1='<b><span class="arw">'+ic('downstream')+'</span>Downstream to '+(RUN.b.n||'take-out')+'</b>';
+  var craft=(MACHINE[machine]&&MACHINE[machine].mph)?MACHINE[machine].lbl.toLowerCase():null;
+   
+  HUDG={togo:Math.max(0,remain),min:Math.max(0,remain)/(((MACHINE[machine]||{}).mph)||PADDLE_MPH)*60};
   g.hidden=false;
   g.innerHTML=line1+'<span class="eta">'+Math.max(0,remain).toFixed(1)+' mi to '+(RUN.b.n||'take-out')+
     ' \u00b7 ~'+paddleHours(Math.max(0,remain))+(craft?' as a '+craft:'')+
     ' \u00b7 mile '+st.rm.toFixed(1)+
     (st.off>250?' \u00b7 off the mapped river':'')+(up?' \u00b7 heading UPSTREAM':'')+'</span>';
-  return true}
-function navGuideClear(){NAVG=null;_navSpd=[];_navOff=0;var g=el('nav-g');if(g)g.hidden=true}
+  ridePublish();return true}
+function navGuideClear(){
+  if(NAVG)LOOPWAS=(NAVG.loop&&!NAVG.arrived)?{set:NAVG.set,rid:NAVG.rid||0}:null;
+  NAVG=null;HUDG=null;_navSpd=[];_navOff=0;var g=el('nav-g');if(g)g.hidden=true;ridePublish()}
 function navPlan(){
   if(!last||sel===null||!last[sel])return null;
   var o=last[sel],steps=directions(o.s.path,o.na);
@@ -3357,19 +3826,36 @@ function navPlan(){
    
   var marks=[];for(var k=0;k<steps.length;k++){var li=steps[k].at;
     marks.push(li===0?0:cum[legs[li-1]])}
+   
+   
+  var pv=NAVG,lp=o.na===o.nb,base=0,odo0=crumbMi,sg=0;
+  if(lp&&pv&&pv.loop&&pv.set===last){odo0=pv.odo0;base=pv.base||0}
+  else if(lp&&LOOPWAS&&LOOPWAS.set===last)base=LOOPWAS.rid;
+  if(lp){var r0=base+Math.max(0,crumbMi-odo0)*1609.34;
+    while(sg<cum.length-2&&cum[sg+1]<=r0)sg++}
+  var dst=RTO||pts[pts.length-1];
   NAVG={o:o,steps:steps,marks:marks,pts:pts,cum:cum,total:cum[cum.length-1],
-    dest:RTO||pts[pts.length-1],lbl:DESTLBL,seg:0,arrived:false,key:sel+'|'+(o.k||'')};
+    dest:dst,lbl:DESTLBL,seg:sg,arrived:false,key:sel+'|'+(o.k||''),
+    loop:lp,set:last,odo0:odo0,base:base,rid:base,appr:lp?mi(dst,pts[0])*1609.34:0};
   return NAVG}
-function navProject(at){
-  var G=NAVG,best=1e12,bi=G.seg,bt=0;
+ 
+function navProject(at,lim,want){
+  var G=NAVG,best=1e12,bi=G.seg,bt=0,cand=(want==null)?null:[];
   var lo=Math.max(0,G.seg-40),hi=Math.min(G.pts.length-2,G.seg+400);
   var cosl=Math.cos(at[1]*Math.PI/180),ax=at[0]*cosl,ay=at[1];
   for(var i=lo;i<=hi;i++){
+    if(lim!=null&&i>lo&&G.cum[i]>lim)break;
     var p=G.pts[i],q=G.pts[i+1],px=p[0]*cosl,py=p[1],qx=q[0]*cosl,qy=q[1];
     var dx=qx-px,dy=qy-py,L2=dx*dx+dy*dy,t=L2?((ax-px)*dx+(ay-py)*dy)/L2:0;
     t=t<0?0:t>1?1:t;
     var cx=px+t*dx,cy=py+t*dy,d2=(ax-cx)*(ax-cx)+(ay-cy)*(ay-cy);
-    if(d2<best){best=d2;bi=i;bt=t}}
+    if(d2<best){best=d2;bi=i;bt=t}
+    if(cand)cand.push(i,t,d2)}
+  if(cand){var far=Math.sqrt(best)*111320+15,bd=1e12;
+    for(var c=0;c<cand.length;c+=3){
+      if(Math.sqrt(cand[c+2])*111320>far)continue;
+      var ci=cand[c],pg=G.cum[ci]+cand[c+1]*(G.cum[ci+1]-G.cum[ci]),dd=Math.abs(pg-want);
+      if(dd<bd){bd=dd;bi=ci;bt=cand[c+1]}}}
   var seglen=G.cum[bi+1]-G.cum[bi];
   return {seg:bi,prog:G.cum[bi]+bt*seglen,off:Math.sqrt(best)*111320}}
 function navFmt(m){return m<320?(Math.round(m*3.281/50)*50)+' ft':(m/1609.34).toFixed(1)+' mi'}
@@ -3379,48 +3865,54 @@ function navGuide(at,acc,mps){
   if(!NAVG||NAVG.key!==sel+'|'+(last[sel].k||''))if(!navPlan())return;
   var G=NAVG,g=el('nav-g');if(!g)return;
   if(mps>0.6){_navSpd.push(mps);if(_navSpd.length>60)_navSpd.shift()}
-  var pr=navProject(at);G.seg=pr.seg;
+   
+  var rid=null;
+  if(G.loop){if(crumbMi<G.odo0)G.odo0=crumbMi;rid=G.base+(crumbMi-G.odo0)*1609.34;G.rid=rid}
+  var pr=navProject(at,G.loop?rid+1609.34:null,G.loop?rid:null);G.seg=pr.seg;
   var remain=Math.max(0,G.total-pr.prog);
    
   var toDest=mi(at,G.dest)*1609.34,acc_=Math.max(15,acc||0);
-  if(!G.arrived&&(toDest<Math.max(25,acc_)||remain<25)){
-    G.arrived=true;NAV.follow=false;navChip();
-    g.hidden=false;g.innerHTML='<b><span class="arw">\u2691</span>You have arrived</b>'+
-      '<span class="eta">'+(G.lbl||'Destination')+'</span>';
+  var near=(toDest<Math.max(25,acc_)||remain<25);
+  if(G.loop)near=near&&rid>=G.total*0.5;
+  if(!G.arrived&&near){
+    G.arrived=true;NAV.follow=false;HUDG={togo:0,min:null};navChip();
+    g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('arrive')+'</span>You have arrived</b>'+
+      '<span class="eta">'+(G.lbl||'Destination')+'</span>';ridePublish();
     buzz([80,60,80,60,200]);
     navSay('You have arrived at '+(G.lbl||'your destination'));
-    show('<b>You have arrived</b><div class="sub">'+(G.lbl||'Your destination')+
-      '. Recording continues until you stop it.</div>','');
+    rideCard('<b>You have arrived</b><div class="sub">'+(G.lbl||'Your destination')+
+      '. Recording continues until you stop it.</div>','','Arrived \u00b7 '+(G.lbl||'your destination'));
     logAct('nav  arrived');return}
   if(G.arrived)return;
    
-  if(pr.off>40){_navOff++}else _navOff=0;
+  var onAppr=G.loop&&mi(at,G.pts[0])*1609.34<=G.appr+40;
+  if(pr.off>40&&!onAppr){_navOff++}else _navOff=0;
   if(_navOff>=3&&Date.now()-_navReT>20000&&RTO){
     _navReT=Date.now();_navOff=0;
     var keep=last[sel].k;
     logAct('nav  reroute '+Math.round(pr.off)+' m off');
-    routeToPoint(RTO,DESTLBL);
+    routeToPoint(RTO,DESTLBL,keep||true);
     setTimeout(function(){if(last&&keep){for(var q=0;q<last.length;q++)
-      if(last[q].k===keep&&q!==sel){sel=q;draw(last[sel],false);break}}
+      if(last[q].k===keep&&q!==sel){sel=q;draw(last[sel],false);rcSel();break}}
       NAVG=null},450);
-    g.innerHTML='<b><span class="arw">\u21bb</span>Re-routing</b>';g.hidden=false;return}
+    g.innerHTML='<b><span class="arw">'+ic('reroute')+'</span>Re-routing</b>';g.hidden=false;ridePublish();return}
    
   var ni=-1;for(var k=1;k<G.marks.length;k++){if(G.marks[k]>pr.prog+8){ni=k;break}}
-  var spd=_navSpd.length?_navSpd.reduce(function(a,b){return a+b},0)/_navSpd.length:0;
-  var floorMps=((MACHINE[machine]||{}).spd||3)*0.44704;
-  spd=Math.max(spd,floorMps);
-  var etaMin=Math.round(remain/spd/60);
+   
+  var etaMin=navEta(remain,G);
+  HUDG={togo:remain/1609.34,min:etaMin};
   var line1=ni<0
-    ?'<b><span class="arw">\u2691</span>'+navFmt(remain)+' to '+(G.lbl||'destination')+'</b>'
-    :'<b><span class="arw">'+G.steps[ni].turn[1]+'</span>In '+navFmt(G.marks[ni]-pr.prog)+
+    ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(remain)+' to '+(G.lbl||'destination')+'</b>'
+    :'<b><span class="arw">'+ic(G.steps[ni].turn[1])+'</span>In '+navFmt(G.marks[ni]-pr.prog)+
       ' \u00b7 '+G.steps[ni].turn[0]+' onto '+G.steps[ni].name+'</b>';
    
   if(ni>=0){var d=G.marks[ni]-pr.prog,key=ni+'|'+(d<90?'near':'far');
     if(key!==VOICE.near){VOICE.near=key;
       navSay((d<90?'':'In '+navFmt(d)+', ')+G.steps[ni].turn[0].toLowerCase()+' onto '+G.steps[ni].name)}}
   g.hidden=false;
-  g.innerHTML=line1+'<span class="eta">'+navFmt(remain)+' remaining \u00b7 ~'+
-    (etaMin<1?'1':etaMin)+' min'+(pr.off>40?' \u00b7 '+Math.round(pr.off)+' m off the line':'')+'</span>'}
+  g.innerHTML=line1+'<span class="eta">'+navFmt(remain)+' remaining'+
+    (etaMin!==null?' \u00b7 ~'+etaTxt(etaMin):'')+(pr.off>40?' \u00b7 '+navFmt(pr.off)+' off the line':'')+'</span>';
+  ridePublish()}
 document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='visible')WAKE.resume()});
  
@@ -3431,47 +3923,64 @@ function classifyFix(at){
   logAct('gps  fix '+at[1].toFixed(5)+','+at[0].toFixed(5));
   if(inRegion(at)){posMode='gps';awayMi=0;bootEase(at);return}
   posMode='away';awayMi=mi(at,CTR);
-  show('<b>You are about '+Math.round(awayMi)+' mi from '+
+  show(awayHtml(!!rideMode),'')}
+ 
+function awayHtml(ride){
+  return ('<b>You are about '+Math.round(awayMi)+' mi from '+
     (BUNDLE.name||'this region')+'.</b><br>Planning mode — everything except live '+
     'tracking works. <b>Set home</b> (Plan) — an address, a tap on the map — then '+
-    'press and hold where you want to go and tap <b>Directions here</b>; '+
-    '<b>Start here</b> on any pin moves the ◎ start. Search and elevation work too.'+
-    '<br><br>Live tracking and the dispatch card stay off until you are in the '+
-    'region — they must never report a position you are not standing at.','')}
-function gpsStart(onFix,onFail){
+    'press and hold where you want to go and tap <b>Route here</b>; '+
+    '<b>Start here</b> on any pin moves the start pin. Search and elevation work too.'+
+    '<br><br>Live tracking and the dispatch card work only inside the region '+
+    '— they must never report a position you are not standing at.'+
+    (ride?' Press <b>Ride it</b> again once you are back inside it.':''))}
+ 
+var GPS_FIRST_FIX_MS=86400000;
+function gpsSlow(e){return !!e&&(e.code==='OS-PLUG-GLOC-0010'||e.code===3)}
+ 
+function gpsWatch(onFix,onFail,firstMs){
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Geolocation;
-  if(C){
+  if(C){var h={drv:'cap',id:null,dead:false};
      
     var w;
      
-    try{ w=C.watchPosition({enableHighAccuracy:true,interval:1000},function(pos,err){
+    try{ w=C.watchPosition({enableHighAccuracy:true,interval:1000,timeout:firstMs},function(pos,err){
+      if(h.dead)return;
       if(err||!pos)return onFail&&onFail(err);
       onFix([pos.coords.longitude,pos.coords.latitude],pos.coords.accuracy,
             pos.coords.speed,pos.coords.heading);
     }) }catch(e){ onFail&&onFail(e); return null }
-    if(w&&typeof w.then==='function')w.then(function(id){watchId=id})
+    if(w&&typeof w.then==='function')w.then(function(id){h.id=id;if(h.dead){h.dead=false;gpsClear(h)}})
       .catch(function(e){onFail&&onFail(e)});
-    else watchId=w;
-    return 'cap'}
+    else h.id=w;
+    return h}
   if(navigator.geolocation){
-    watchId=navigator.geolocation.watchPosition(function(pos){
+    return {drv:'web',dead:false,id:navigator.geolocation.watchPosition(function(pos){
       onFix([pos.coords.longitude,pos.coords.latitude],pos.coords.accuracy,
             pos.coords.speed,pos.coords.heading)},
       function(e){onFail&&onFail(e)},
-      {enableHighAccuracy:true,maximumAge:1000,timeout:12000});
-    return 'web'}
+      {enableHighAccuracy:true,maximumAge:1000,timeout:12000})}}
   return null}
-var watchId=null;
-function gpsStop(){
+function gpsClear(h){
+  if(!h||h.dead)return;h.dead=true;
+  if(h.id===null||h.id===undefined)return;    
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Geolocation;
+  try{if(h.drv==='cap'){if(C)C.clearWatch({id:h.id})}
+      else if(navigator.geolocation)navigator.geolocation.clearWatch(h.id)}catch(e){}
+  h.id=null}
+ 
+var watchId=null;
+function gpsStart(onFix,onFail){
+  var h=gpsWatch(onFix,onFail,GPS_FIRST_FIX_MS);
+  if(!h)return null;
+  watchId=h;return h.drv}
+function gpsStop(){
   if(watchId===null)return;
-  try{if(rideMode==='cap'&&C)C.clearWatch({id:watchId});
-      else if(navigator.geolocation)navigator.geolocation.clearWatch(watchId)}catch(e){}
-  watchId=null}
+  gpsClear(watchId);watchId=null}
 function stopReal(){gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=false;
   navStop();tripEnd();runNavClear();
   hudShow(false);
-  setChip('c-ride','play','Ride it');
+  setChip('c-ride','ride','Ride it');rideFlag();
   var R=rideStop();
   if(!R)return show('Recording stopped. <b>'+crumbMi.toFixed(2)+
     ' mi</b> on the track. <b>Retrace</b> follows it back.','');
@@ -3479,7 +3988,7 @@ function stopReal(){gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=f
   var txt=rideReport(R);
   show('<b>Ride recorded — '+crumbMi.toFixed(2)+' mi</b><br>'+
     '<span class="unit">'+(R.hrs*60).toFixed(0)+' min · '+R.fixes+' fixes'+
-    (R.medAcc!==null?' · median ±'+Math.round(R.medAcc)+' m':'')+
+    (R.medAcc!==null?' · median ±'+Math.round(R.medAcc*3.281)+' ft':'')+
     (R.drops?' · <b>'+R.drops+' GPS dropouts</b>':' · no dropouts')+
     (R.drain!==null?' · '+(R.drain*100).toFixed(1)+'% battery':'')+'</span><br>'+
     '<b>Retrace</b> follows the track back.'+
@@ -3487,7 +3996,7 @@ function stopReal(){gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=f
     '<button class="chip" id="rr-share">Share</button></div>','');
   var cp=el('rr-copy');
   if(cp)cp.addEventListener('click',function(){
-    var done=function(){cp.textContent='Copied ✓'};
+    var done=function(){cp.textContent='Copied'};
     if(navigator.clipboard&&navigator.clipboard.writeText)
       navigator.clipboard.writeText(txt).then(done,function(){}); else{
       var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);
@@ -3498,8 +4007,21 @@ function stopReal(){gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=f
     if(S)S.share({title:'APEX ride',text:txt}).catch(function(){});
     else if(navigator.share)navigator.share({title:'APEX ride',text:txt}).catch(function(){})})}
 function onFix(at,acc,mps,deg){
+  FIX_T=Date.now();
   classifyFix(at);
   rideFix(acc);
+  if(posMode==='away'){                      
+     
+    var _rec=gotFix;
+    gpsStop();rideMode=null;gotFix=false;
+    navStop();hudShow(false);
+    setChip('c-ride','ride','Ride it');rideFlag();
+    if(_rec){tripEnd();runNavClear();var _R=rideStop();
+      if(_R)logAct('ride end (left the region) '+(_R.hrs*60).toFixed(0)+'min '+_R.fixes+' fixes');
+       
+      show('<b>Ride ended \u2014 you left '+(BUNDLE.name||'the region')+'.</b> <b>'+
+        crumbMi.toFixed(2)+' mi</b> recorded; <b>Retrace</b> follows it back.<br><br>'+awayHtml(true),'')}
+    paint();return}
    
   var _rs=null;try{_rs=navRiver(at)}catch(e){}
    
@@ -3507,15 +4029,14 @@ function onFix(at,acc,mps,deg){
    
   try{if(!(NAV.on&&_rs&&navRiverGuide(at,acc,_rs)))navGuide(at,acc,mps)}catch(e){}
    
-  if(posMode==='gps')hudSet(mps,deg,at);
-  if(posMode==='away'){                      
-    gpsStop();rideMode=null;
-    setChip('c-ride','play','Ride it');
-    paint();return}
+  if(posMode==='gps')hudSet(mps,deg,at,true);
   if(!gotFix){gotFix=true;startRecording(at);ME=at.slice();mM.setLngLat(ME);
     if(!NAV.on)map.easeTo({center:ME,zoom:14.5,duration:600});
-    show('<span class="tn">Recording</span><span class="tag legal">live GPS</span><br>Truck pinned where you are. Ride.','');return}
+     
+    showQuiet('<span class="tn">Recording</span><span class="meta">live GPS</span><br>Truck pinned where you are. Ride.','Recording \u00b7 live GPS');return}
   ME=at.slice();mM.setLngLat(ME);record(ME);checkOffRoute();
+   
+  hudPaint();
   fixN++;
   tripSave(fixN===1);
    
@@ -3524,20 +4045,43 @@ function onFix(at,acc,mps,deg){
 el('c-ride').addEventListener('click',function(){
   if(rideMode)return stopReal();
   if(riding)return stopRide();
-  rideMode=gpsStart(onFix,function(){
-    if(gotFix)return;                  
-    navStop();
-    stopReal();
-    show('GPS unavailable here — browsers block it on <b>file://</b>. Running the <b>simulator</b> instead; in the APK this is your real track.','');
-    startSim()});
-  if(rideMode){setChip('c-ride','stop','Stop (GPS)',1);navStart();return}
-  startSim()});
+   
+  if(last&&sel!==null&&!routeFits(last[sel]))return routeUnfitCard();
+   
+  railSet(false);
+   
+  var rr=el('rc-ride');if(rr)rr.hidden=true;
+   
+  GPS_REFUSED=false;
+  var refused=false,onGpsFail=function(e){
+    if(gotFix||refused)return;         
+     
+    if(gpsSlow(e)&&rideMode){gpsStop();var m=gpsStart(onFix,onGpsFail);
+      if(m){rideMode=m;logAct('ride gps first fix slow: still waiting');return}}
+    refused=true;gpsRefuse('fail')};
+  rideMode=gpsStart(onFix,onGpsFail);
+  if(rideMode){setChip('c-ride','stop','Stop (GPS)',1);navStart();rideFlag();return}
+  if(!refused){refused=true;gpsRefuse('none')}});
+ 
+var GPS_REFUSED=false;
+function gpsRefuse(why){
+  gpsStop();rideMode=null;gotFix=false;GPS_REFUSED=true;
+  navStop();hudShow(false);
+   
+  setChip('c-ride','ride','Ride it');rideFlag();
+  logAct('ride refused '+why);
+  show(why==='none'
+    ?'<b>This phone reports no GPS receiver.</b> Nothing started \u2014 a ride needs a live position.'
+    :'<b>No GPS fix</b> \u2014 turn on location and try again. Nothing started.','fail')}
+ 
+el('hud-stop').addEventListener('click',function(){
+  if(rideMode||riding)el('c-ride').click()});
 
 function startSim(){
    
   posMode='sim';
   var path=simPath();
-  if(!path)return show('Pick a <b>Return home</b> route first, or move the ◎ pin nearer a trail.','fail');
+  if(!path)return show('Pick a <b>Return home</b> route first, or move the start pin nearer a trail.','fail');
   var pts=[];path.forEach(function(e){pts=pts.concat(decode(GR.g[e.i]))});
    
   if(pts.length&&mi(ME,pts[0])>mi(ME,pts[pts.length-1]))pts.reverse();
@@ -3555,7 +4099,8 @@ function startSim(){
       show('Ride finished. <b>'+crumbMi.toFixed(2)+' mi</b> recorded. Tap <b>Retrace</b>, or <b>Dispatch</b> for what to read out.','pass');return}
     ME=pts[i++].slice();mM.setLngLat(ME);record(ME);checkOffRoute();
     hudSet(null,null,ME);
-    if(i%6===0)map.easeTo({center:ME,duration:280})},170)}
+    if(i%6===0)map.easeTo({center:ME,duration:280})},170);
+  rideFlag()}
 
  
 var LYRGROUPS=[
@@ -3579,18 +4124,21 @@ var LYRGROUPS=[
   {k:'paddle', h:'Rivers & paddling', s:'runs, launches, campgrounds and dams',
    ids:['pad-case','pad-line','pad-dot','pad-lbl','pad-dam','pad-damlbl']},
   {k:'relief', h:'Relief',      s:'hillshade', ids:['hillshade']},
-  {k:'labels', h:'All labels',  s:'every name on the map', ids:null}
+   
+  {k:'labels', h:'Map text',    s:'names and numbers', ids:null, txt:true}
 ];
 
 function lyrOn(g){
-  var ids=g.ids||labelLayers();
+  if(g.txt)return !TXT_OFF;
+  var ids=(g.ids||labelLayers()).concat(g.with||[]);
   for(var i=0;i<ids.length;i++){
     try{if(map.getLayer(ids[i])&&
         map.getLayoutProperty(ids[i],'visibility')!=='none')return true}catch(e){}}
   return false}
 
 function lyrSet(g,on){
-  var ids=g.ids||labelLayers();
+  if(g.txt){textSet(on);var l0=el('c-labels');if(l0)l0.className='chip'+(on?' on':'');return}
+  var ids=(g.ids||labelLayers()).concat(g.with||[]);
   ids.forEach(function(id){
     try{if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'visible':'none')}catch(e){}});
    
@@ -3608,27 +4156,38 @@ function buildLyrPanel(){
     var sel=(i===bmi),dis=(i>0&&!SAT_OK);
     h+='<button class="actrow'+(sel?' on':'')+'" data-bm="'+i+'"'+
        (dis?' disabled':'')+'>'+
-       '<span class="sw" style="background-color:'+(i===0?'var(--sand)':'var(--c-4e6a4a)')+'"></span>'+
+       '<span class="sw" style="background-color:'+(i===0?'var(--map-ground)':'var(--sw-hybrid)')+'"></span>'+
        '<span>'+nm+(dis?' — not in this bundle':'')+'</span></button>'});
   h+='<div class="sect">Layers</div>';
   LYRGROUPS.forEach(function(g,i){
     var on=lyrOn(g);
+     
     h+='<button class="actrow'+(on?' on':'')+'" data-lg="'+i+'">'+
-       '<span class="sw" style="background-color:'+(on?'#E2570F':'transparent')+
-       ';border:1px solid rgba(255,255,255,.5)"></span>'+
-       '<span>'+g.h+'</span></button>'});
+       '<span class="sw" style="background-color:'+(on?'var(--sel)':'transparent')+
+       ';border:1px solid var(--sw-edge)"></span>'+
+       '<span>'+g.h+(g.txt?'<span class="rsub">Names and numbers on the map. Pins and the count on a stack stay \u2014 choose pins under Pins in '+
+       modeOf(mode).h+'.</span>':'')+'</span></button>'});
    
   var pm=modeOf(mode);
   h+='<div class="sect">Pins in '+pm.h+'</div>';
+  var rowsH='',drawn=0,shp={},kin={};
   (pm.kinds||[]).forEach(function(k){
-    var kd=POIKIND[k]||{h:k,c:'#8B857A'},on=pinsOn(pm,k);
-    h+='<button class="actrow'+(on?' on':'')+'" data-pk="'+k+'">'+
-       '<span class="sw" style="background-color:'+(on?kd.c:'transparent')+
-       ';border:1px solid rgba(255,255,255,.5)"></span>'+
+     
+    var kd=POIKIND[k]||{h:k,c:'var(--pin-unknown)'},on=pinsOn(pm,k),u=badgeURL('bdg-'+k);
+    if(u){drawn++;shp[kd.s]=1;kin[k]=1}
+    rowsH+='<button class="actrow'+(on?' on':'')+'" data-pk="'+k+'">'+
+       (u?'<span class="sw pb"><img class="pbdg" src="'+u+'" alt=""></span>':
+       '<span class="sw" style="background-color:'+(on?kd.c:'transparent')+';border:1px solid var(--sw-edge)"></span>')+
        '<span>'+kd.h+'</span></button>'});
+   
+  var fam=BADGE_FAMILY.filter(function(f){return f.s?shp[f.s]:kin[f.k]}).map(function(f){return f.w});
+  if(drawn&&drawn===(pm.kinds||[]).length&&fam.length)
+    h+='<div class="pnote">Each badge is the one the map draws. Shapes by family: '+fam.join(', ')+'.</div>';
+  h+=rowsH;
   h+='<button class="actrow" data-pkreset="1"><span class="sw" style="background-color:transparent"></span><span>Reset to '+pm.h+' defaults</span></button>';
    
-  h+='<button class="actrow" data-lyrdone="1"><span class="sw" style="background-color:transparent"></span><span>Done</span></button>';
+   
+  h+='<div class="lyrfoot"><button class="act" data-lyrdone="1">Done</button></div>';
   p.innerHTML=h;
   var dn=p.querySelector('[data-lyrdone]');
   if(dn)dn.addEventListener('click',function(){p.hidden=true;logAct('tap  layers done')});
@@ -3689,7 +4248,7 @@ function hdCard(confirmId){
       h+='<div class="k">DOWNLOADING '+String(pr.label).toUpperCase()+'</div><div class="sub">'+
         (pr.done+pr.skipped).toLocaleString()+' of '+pr.total.toLocaleString()+' tiles'+left+
         (WAKE.active()?' · the screen stays on until it finishes':'')+'</div>'+
-        '<button class="chip" id="hd-stop">'+ic('alert')+'<span>Stop downloading</span></button>'}
+        '<button class="chip" id="hd-stop">'+ic('stopdl')+'<span>Stop downloading</span></button>'}
     for(var i=0;i<tiers.length;i++){
       var t=tiers[i],big=t.id==='view'&&t.mb>500,fits=!q.known||q.free>=t.mb*1048576*1.2;
       h+='<div class="k">'+t.name+'</div><div class="sub">'+(t.n?t.n.toLocaleString()+' tiles · '+hdMB(t.mb)+
@@ -3699,13 +4258,13 @@ function hdCard(confirmId){
         hdMB(q.free/1048576)+'</div>';continue}
       if(t.confirm&&conf===t.id){
         h+='<div class="sub">'+hdMB(t.mb)+' and '+t.n.toLocaleString()+' tiles. The screen stays on until it finishes; Stop keeps what landed.</div>'+
-          '<button class="chip" id="hd-go-'+t.id+'">'+ic('layers')+'<span>Yes, save the whole state</span></button>'+
-          '<button class="chip" id="hd-no">'+ic('alert')+'<span>Not now</span></button>'}
-      else h+='<button class="chip" id="hd-'+(t.confirm?'ask-':'go-')+t.id+'">'+ic('layers')+'<span>'+t.btn+'</span></button>'}
+          '<button class="chip" id="hd-go-'+t.id+'">'+ic('hd')+'<span>Yes, save the whole state</span></button>'+
+          '<button class="chip" id="hd-no">'+ic('close')+'<span>Not now</span></button>'}
+      else h+='<button class="chip" id="hd-'+(t.confirm?'ask-':'go-')+t.id+'">'+ic('hd')+'<span>'+t.btn+'</span></button>'}
     if(!q.known)h+='<div class="sub">This phone does not say how much space it allows — a save stops itself if space runs out, and keeps what landed.</div>';
     h+='<div class="k">SAVED ON THIS PHONE</div><div class="sub">'+st.tiles.toLocaleString()+
         ' tiles · '+(st.bytes/1048576).toFixed(1)+' MB</div>'+
-      (st.tiles?'<button class="chip" id="hd-del">'+ic('alert')+'<span>Delete all saved HD</span></button>':'');
+      (st.tiles?'<button class="chip" id="hd-del">'+ic('del')+'<span>Delete all saved HD</span></button>':'');
     show(h);
     tiers.forEach(function(t){
       var g=el('hd-go-'+t.id);if(g)g.addEventListener('click',function(){startHDSave(t.tiles,t.label);hdCard()});
@@ -3748,9 +4307,23 @@ function sourcesCard(){
     'before you ride.</div>'+
     '<div class="sub">'+SOURCES.map(function(r){
       return '<b>'+r[0]+'</b><br>'+r[1]+'<br><a href="'+r[2]+
-        '" target="_blank" rel="noopener" style="color:var(--c-d98e32)">'+r[2]+'</a>'
+        '" target="_blank" rel="noopener" style="color:var(--link)">'+r[2]+'</a>'
       }).join('<br><br>')+'</div>'+
-    (PRIVACY_URL?'<div class="k">PRIVACY</div><div class="sub"><a href="'+PRIVACY_URL+'" target="_blank" rel="noopener">Privacy policy</a> — '+
+     
+    '<div class="k">SOFTWARE AND TYPE</div><div class="sub"><b>Icons</b> \u2014 Lucide '+LUCIDE_V+
+    ', ISC licence, \u00a9 Lucide Icons and Contributors; icons derived from Feather under '+
+    'the MIT licence, \u00a9 2013-present Cole Bemis.<br><b>Typeface</b> \u2014 Barlow and '+
+    'Barlow Condensed 1.408, SIL Open Font License 1.1, '+
+    '\u00a9 2017 The Barlow Project Authors.<br><b>Map renderer</b> \u2014 MapLibre GL JS'+
+     
+    (window.maplibregl&&typeof maplibregl.getVersion==='function'?' '+maplibregl.getVersion():'')+
+    ', BSD 3-Clause licence, \u00a9 2023 MapLibre contributors; it contains code from Mapbox GL JS '+
+    '(BSD 3-Clause, \u00a9 2020 Mapbox), glfx.js (MIT, \u00a9 2011 Evan Wallace) and d3-color '+
+    '(BSD 3-Clause, \u00a9 2010-2016 Mike Bostock).<br><b>App runtime</b> \u2014 Capacitor 8 with its '+
+    'Device, Geolocation, Haptics and Share plugins, MIT licence, \u00a9 2017-present Drifty Co.; '+
+    'the plugins \u00a9 2020-present Ionic (Geolocation \u00a9 2025 Ionic).'+
+    '<br>The full licence texts are included in the app package.</div>'+
+    (PRIVACY_URL?'<div class="k">PRIVACY</div><div class="sub"><a href="'+PRIVACY_URL+'" target="_blank" rel="noopener" style="color:var(--link)">Privacy policy</a> — '+
       'nothing you do in this app is sent anywhere; the policy says so in full.</div>':'')+
     '<div class="sub">Links open in your browser and need a connection. '+
     'The map itself does not.</div>','');
@@ -3788,7 +4361,7 @@ try{document.addEventListener('click',function(e){
   panelsClose(PICKERS);logAct('tap  outside — pickers closed')},true)}catch(e){}
 
 var BACK={armed:false,t:null,toast:null};
-function toast(msg,ms){var t=el('toast');if(!t)return;t.textContent=msg;t.hidden=false;
+function toast(msg,ms){var t=el('toast');if(!t)return;stripH();t.textContent=msg;t.hidden=false;
   clearTimeout(BACK.toast);BACK.toast=setTimeout(function(){t.hidden=true},ms||2000)}
 function backPush(){try{if(!history.state||!history.state.apex)history.pushState({apex:1},'')}catch(e){}}
  
@@ -3814,10 +4387,27 @@ function onBack(){
   logAct('back armed');return 'armed'}
 try{window.addEventListener('popstate',function(){onBack()});backPush()}catch(e){}
  
-function stripH(){try{var t=el('tools');if(t)document.documentElement.style
-  .setProperty('--strip-h',t.offsetHeight+'px')}catch(e){}}
+function stripH(){try{var t=el('tools');if(t){var h=t.offsetHeight;
+   
+  var up=stripAttribUp();if(up>0)h+=up;
+  document.documentElement.style.setProperty('--strip-h',h+'px')}}catch(e){}
+   
+  try{var d=el('tools'),r=d&&d.getBoundingClientRect?d.getBoundingClientRect():null,
+    vh=window.innerHeight||document.documentElement.clientHeight;
+    if(r&&r.height>0&&isFinite(vh-r.top))document.documentElement.style
+      .setProperty('--dock-h',Math.max(0,Math.round(vh-r.top+Math.max(0,stripAttribUp())))+'px')}catch(e){}}
+ 
+function stripAttribUp(){try{var t=el('tools'),a=document.querySelector('.maplibregl-ctrl-bottom-right');
+  if(!t||!a||!t.getBoundingClientRect||!a.getBoundingClientRect)return 0;
+  var tr=t.getBoundingClientRect(),ar=a.getBoundingClientRect();
+  return (ar.height>0&&tr.height>0&&ar.top<tr.top)?Math.round(tr.top-ar.top):0}catch(e){return 0}}
 stripH();setTimeout(stripH,600);
 try{window.addEventListener('resize',stripH)}catch(e){}    
+ 
+try{window.addEventListener('resize',ridePublish)}catch(e){}
+ 
+try{el('rail').addEventListener('transitionend',ridePublish)}catch(e){}
+try{el('rail').addEventListener('transitionend',stripH)}catch(e){}
  
 var TAB='map';
 function showTab(t){
@@ -3834,6 +4424,8 @@ function showTab(t){
   var cp=el('cmppanel'); if(cp&&t!=='tools'){cp.hidden=true;CMP_ON=false}
   var lp=el('lyrpanel'); if(lp&&t!=='map')lp.hidden=true;
   var ap=el('actpanel'); if(ap&&t!=='map')ap.hidden=true;
+   
+  simChip();stripH();ridePublish();
   logAct('tap  tab '+t)}
 
 Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'),function(b){
@@ -3857,12 +4449,12 @@ el('c-markme').addEventListener('click',function(){
     'map to mark a spot by hand.','fail');
   var nm=wpName(ME);
   if(!wpAdd({n:nm,p:ME.slice(),r:BUNDLE.region||null,ts:Date.now()}))
-    return show('<b>Could not save.</b> This browser will not let the page store '+
-      'anything; in the app it works normally.','fail');
+    return show('<b>Could not save.</b> This phone would not let the app store '+
+      'it \u2014 its storage may be full or blocked.','fail');
   logAct('act  marked this spot '+nm);
   wpDraw();
   show('Marked <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
-    'Find it again under \u2606 Saved.</span>','pass')});
+    'Find it again under <b>Saved</b> on the Plan tab.</span>','pass')});
 
 el('peek').addEventListener('click',function(){
   var folded=el('rail').className==='folded';
@@ -3887,6 +4479,22 @@ function labelLayers(){
     return map.getStyle().layers.filter(function(l){return l.type==='symbol'})
               .map(function(l){return l.id})
   }catch(e){return []}}
+ 
+var TXT_KEEP=/^(poi-stack|peak-dot)$/,TXT_PLATE=/^lbl-shield$/,TXT_OFF=false,TXT_MEMO=null;
+function textLayers(){
+  var ls=[];try{ls=map.getStyle().layers||[]}catch(e){}
+  var sym={};labelLayers().forEach(function(id){sym[id]=1});
+  return ls.filter(function(l){return sym[l.id]&&l.layout&&
+    l.layout['text-field']!==undefined&&!TXT_KEEP.test(l.id)}).map(function(l){return l.id})}
+function textSet(on){
+  var ids=textLayers();
+  if(!TXT_MEMO){TXT_MEMO={};ids.forEach(function(id){try{
+    TXT_MEMO[id]={tf:map.getLayoutProperty(id,'text-field'),
+      io:TXT_PLATE.test(id)?map.getPaintProperty(id,'icon-opacity'):undefined}}catch(e){}})}
+  ids.forEach(function(id){var mm=TXT_MEMO[id];if(!mm)return;
+    try{map.setLayoutProperty(id,'text-field',on?mm.tf:'');
+      if(TXT_PLATE.test(id))map.setPaintProperty(id,'icon-opacity',on?mm.io:0)}catch(e){}});
+  TXT_OFF=!on}
 var glErr=null;
 map.on('error',function(e){var m=(e&&e.error&&e.error.message)||String(e&&e.error||'');
   if(m&&!glErr){glErr=m;try{window.__mapErr=m}catch(_){}renderHealth()}});
@@ -3907,7 +4515,7 @@ function renderHealth(){
     'not your download.<br><br>Most likely the map engine could not start its '+
     'worker thread in this WebView.'+
     (glErr?'<br><br>Engine said: <b>'+glErr.replace(/[<>]/g,'')+'</b>':'')+
-    '<br><br>Tell Claude you saw <b>RENDER FAIL</b>'+(glErr?' and that message':'')+'.','fail')}
+    '<br><br>The Self-test (Tools, then Diagnostics) records what the map engine said, and its Copy report carries it.','fail')}
  
 function drawCoverage(){
   if(!CTX||!CTX.rings)return;
@@ -4094,42 +4702,45 @@ function nearestEdgeTo(at){
 function placeCard(at,kind,title){
   var e=elevAt(at),ne=nearestEdgeTo(at),b=bearingTo(ME,at),d=mi(ME,at);
   var rows=[];
-  rows.push('<b style="font-size:var(--t-lg)">'+title+'</b>');
+   
+  rows.push('<span class="tn">'+(kind==='wpt'?ic('spot'):'')+title+'</span>');
   rows.push('<span class="mono" style="font-size:var(--t-lg)">'+at[1].toFixed(5)+' '+
     at[0].toFixed(5)+'</span> <span class="unit">DD'+
     (e!==null?' · '+ft(e)+' ft':'')+'</span>');
   if(kind!=='me')rows.push('<span class="unit">'+d.toFixed(2)+' mi '+b.pt+
     ' ('+b.deg+'°) from your position</span>');
   var ad=addressAt(at)||addressAt(at,true);
-  if(ad)rows.push('<span style="color:var(--bone)">'+ad.txt+'</span>');
+  if(ad)rows.push('<span style="color:var(--text-1)">'+ad.txt+'</span>');
   if(ne)rows.push('<span class="unit">nearest: '+(ne.e.n||label(ne.e.c))+
     (ne.e.id?' · '+ne.e.id:'')+' — '+ne.mi.toFixed(2)+' mi</span>');
   var acts=[];
-  if(kind!=='me')acts.push('<button class="chip" id="pc-route">▸ Directions here</button>');
-  if(kind!=='home')acts.push('<button class="chip" id="pc-home">⌂ Make this home</button>');
-  if(kind!=='me')acts.push('<button class="chip" id="pc-start">◉ Start from here</button>');
-  if(kind==='me'&&posMode==='gps')acts.push('<button class="chip" id="pc-disp">☎ Dispatch card</button>');
-  acts.push('<button class="chip" id="pc-go">⤢ Centre</button>');
+   
+  var prime=kind!=='me'?'<div id="pcprime"><button class="chip primary" id="pc-route">'+ic('route')+
+    '<span>Route here</span></button></div>':'';
+  if(kind!=='home')acts.push('<button class="chip" id="pc-home">'+ic('home')+'<span>Make this home</span></button>');
+  if(kind!=='me')acts.push('<button class="chip" id="pc-start">'+ic('start')+'<span>Start from here</span></button>');
+  if(kind==='me'&&posMode==='gps')acts.push('<button class="chip" id="pc-disp">'+ic('dispatch')+'<span>Dispatch card</span></button>');
+  acts.push('<button class="chip" id="pc-go">'+ic('centre')+'<span>Centre</span></button>');
   if(kind==='drop'){
-    acts.push('<button class="chip" id="pc-wpt">☆ Save as waypoint</button>');
+    acts.push('<button class="chip" id="pc-wpt">'+ic('saved')+'<span>Save as waypoint</span></button>');
     if(mode==='hunt')acts.push(Object.keys(WPTYPES).map(function(k){
       return '<button class="chip" data-wpt="'+k+'">'+WPTYPES[k].h+'</button>'}).join(''));
-    acts.push('<button class="chip" id="pc-drop">✕ Remove pin</button>')}
-  show(rows.join('<br>')+'<div style="margin-top:9px">'+acts.join(' ')+'</div>','');
+    acts.push('<button class="chip" id="pc-drop">'+ic('close')+'<span>Remove pin</span></button>')}
+  show(rows.join('<br>')+prime+'<div style="margin-top:9px">'+acts.join(' ')+'</div>','');
   var on=function(id,fn){var b=el(id);if(b)b.addEventListener('click',fn)};
   on('pc-route',function(){routeToPoint(at,title)});
   on('pc-home',function(){logAct('act  make this home');HOME=at.slice();homeSave();homeMark();clearRoute();syncSafety();
      
     if(kind==='drop')clearDrop();
-    show('<b>Home is here now.</b> The ⌂ pin holds this spot — '+
+    show('<b>Home is here now.</b> The home pin holds this spot — '+
       'press and hold anywhere for a new pin.','')});
   on('pc-start',function(){logAct('act  start from here');
      
-    if(posMode==='gps'&&watchId!==null)return show('A live GPS fix is driving your position — '+
+    if(posMode==='gps'&&(watchId!==null||LOCATE_N>0))return show('A live GPS fix is driving your position — '+
       'the start pin follows you and cannot be moved by hand.','');
     ME=at.slice();mM.setLngLat(ME);paint();syncSafety();clearRoute();
     if(kind==='drop')clearDrop();
-    show('<b>Start is here now.</b> The ◎ pin holds this spot and routes measure '+
+    show('<b>Start is here now.</b> The start pin holds this spot and routes measure '+
       'from it — press and hold anywhere for a new pin.','')});
   on('pc-disp',function(){el('btn-disp').click()});
   on('pc-go',function(){map.easeTo({center:at,zoom:Math.max(map.getZoom(),14),
@@ -4137,13 +4748,13 @@ function placeCard(at,kind,title){
   on('pc-wpt',function(){
     var nm=wpName(at);
     if(!wpAdd({n:nm,p:at.slice(),r:BUNDLE.region||null,ts:Date.now()}))
-      return show('<b>Could not save.</b> This browser will not let the page '+
-        'store anything; in the app it works normally.','fail');
+      return show('<b>Could not save.</b> This phone would not let the app '+
+        'store it \u2014 its storage may be full or blocked.','fail');
     logAct('act  saved waypoint '+nm);
     wpDraw();clearDrop();
     show('Saved as <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
-      'Find it again under \u2606 Saved.</span>','pass')});
-  on('pc-drop',function(){clearDrop();show('Pin removed.','')});
+      'Find it again under <b>Saved</b> on the Plan tab.</span>','pass')});
+  on('pc-drop',function(){clearDrop();ack('Pin removed.')});
   Array.prototype.forEach.call(document.querySelectorAll('[data-wpt]'),function(b){
     b.addEventListener('click',function(){
       var k=b.dataset.wpt,nm=WPTYPES[k].h+' \u00b7 '+wpName(at);
@@ -4152,7 +4763,7 @@ function placeCard(at,kind,title){
       logAct('act  saved waypoint '+k);
       wpDraw();clearDrop();
       show('Saved <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
-        'Find it again under \u2606 Saved.</span>','pass')})});
+        'Find it again under <b>Saved</b> on the Plan tab.</span>','pass')})});
 }
 
 function wpDraw(){
@@ -4212,15 +4823,29 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
      
     window.__areas={card:areaCard,groups:LYRGROUPS};
     window.__mode={apply:applyMode,get:function(){return mode},MODES:MODES,now:modeNow};
+    window.__stHud=stHudJudge;    
      
     window.__pins={eff:function(k){return pinsEff(modeOf(k))},set:pinsSet,reset:pinsReset,
       key:pinsKey,forget:function(){PINS={}},
       defaults:function(k){var m=modeOf(k);return (m.kinds||[]).filter(function(x){return pinsDefault(m,x)})}};
      
-    window.__sat={tiles:TILES,sparse:SPARSE,inPatch:inPatch,blank:Array.from(BLANK_PNG),resolve:_satResolve};
+    try{window.__badges={spec:badgeSpec,url:badgeURL,missing:BADGE_MISSING,
+      names:function(){return BADGE_DRAWN.slice()},
+      encoded:function(){return Object.keys(BADGE_URL)},enc0:function(){return BADGE_ENC0},
+      alias:(function(){var o={};Object.keys(BADGE_PAD).forEach(function(k){
+        if(typeof BADGE_PAD[k]==='string')o['bdg-pad-'+k]='bdg-'+BADGE_PAD[k]});return o})(),
+      glyphOK:function(g){return !!badgeMarkup(g)},
+      kinds:Object.keys(POIKIND),pads:Object.keys(BADGE_PAD),
+      drops:BADGE_DROPS,padDrops:PAD_DROPS,family:BADGE_FAMILY}}catch(e){}
+     
+    window.__sat={tiles:TILES,sparse:SPARSE,inPatch:inPatch,blank:Array.from(BLANK_PNG),resolve:_satResolve,
+      ok:SAT_OK};    
+     
+    window.__netLo={n:NETLO.length,ms:NETLO_MS,err:NETLO_ERR,z:NETLO_Z,edges:nf2.length,cls:NETLO_CLS.slice(),
+      skip:Object.keys(NETLO_SKIP),layers:Object.keys(NETFT)};
     window.__hd=HD;
      
-    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};window.__back={onBack:onBack,open:backOpen,panelOpen:panelOpen,state:function(){return BACK}};window.__privacy=function(u){var o=PRIVACY_URL;if(u!==undefined)PRIVACY_URL=u;return o};window.__tour={start:tourStart,next:tourNext,close:tourClose,seen:tourSeen,reset:tourReset,state:function(){return TOUR},steps:TOUR_STEPS};
+    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};window.__back={onBack:onBack,open:backOpen,panelOpen:panelOpen,state:function(){return BACK},toast:toast};window.__privacy=function(u){var o=PRIVACY_URL;if(u!==undefined)PRIVACY_URL=u;return o};window.__tour={start:tourStart,next:tourNext,close:tourClose,seen:tourSeen,reset:tourReset,state:function(){return TOUR},steps:TOUR_STEPS};
     window.__ph={index:PHOTOS,html:photoHTML};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};
@@ -4233,6 +4858,21 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       window.__search=function(q){return search(q)};
       window.__voice=VOICE;window.__say=navSay;window.__voiceProbe=navVoiceProbe;
       window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,
+         
+         
+        sim:function(){railSet(false);startSim()},simStop:stopRide,
+         
+        simSave:function(){return {T:TRUCK?TRUCK.slice():null,c:crumbs.slice(),m:crumbMi,p:posMode,me:ME.slice(),
+          ride:RIDE,last:LASTRIDE,got:gotFix,on:NAV.on,lost:lost,hud:!!(el('hudbar')&&el('hudbar').hidden)}},
+        simRestore:function(v){try{stopRide()}catch(e){}
+          if(RIDE&&RIDE!==v.ride){try{clearInterval(RIDE.pulse)}catch(e){}}
+          RIDE=v.ride;LASTRIDE=v.last;TRUCK=v.T;crumbs=v.c;crumbMi=v.m;posMode=v.p;ME=v.me;
+          gotFix=v.got;NAV.on=v.on;lost=v.lost;
+          try{mM.setLngLat(ME)}catch(e){}
+          try{if(tM&&TRUCK)tM.setLngLat(TRUCK);else if(tM&&!TRUCK){tM.remove();tM=null}}catch(e){}
+          try{map.getSource('crumb').setData({type:'FeatureCollection',features:crumbs.length>1?[{type:'Feature',
+            properties:{},geometry:{type:'LineString',coordinates:crumbs}}]:[]})}catch(e){}
+          hudShow(!v.hud);try{syncSafety()}catch(e){}},
         plan:navPlan,guide:function(){return NAVG},project:navProject,
         runSet:runSet,run:function(){return RUN},river:navRiver,riverLine:riverLine,
         pos:function(v){if(v!==undefined)posMode=v;return posMode},
@@ -4241,7 +4881,9 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         crumbs:function(){return crumbs.length},
         stopReal:stopReal,rail:function(on){try{railSet(!!on)}catch(e){}},
         save:tripSave,load:tripLoad,resume:tripResume,end:tripEnd,card:tripResumeCard,
-        snapshot:tripSnapshot,chip:navChip};
+        snapshot:tripSnapshot,chip:navChip,alert:offRouteHtml,publish:ridePublish,
+         
+        fuel:function(v){if(v!==undefined)FUELS[fi]=v;return FUELS[fi]}};
       window.__splash=SPL;window.__busy=BUSY;
       window.__stack={run:restack,radius:stackRadius,maxz:CLUSTER_MAXZ,
         services:SERVICES,hidden:function(){return Object.keys(STACKED).length},
@@ -4251,7 +4893,16 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         drawable:function(i,z){var f=poif[i];if(!f)return null;
           var m=modeNow();
           return pinDrawable(f.properties,m,z==null?map.getZoom():z)},
-        card:stackCard};
+        card:stackCard,
+         
+        edges:STACK_BANDS,band:stackBand,
+        pool:function(z){var m=modeNow(),o=[];
+          for(var i=0;i<poif.length;i++)if(pinDrawable(poif[i].properties,m,z))o.push(i);
+          return o},
+        rank:function(i){var f=poif[i];return f?stackRank(f.properties):null},
+        stats:function(){return STACKH?{ms:STACKH.ms,key:STACKH.key}:null},
+         
+        stackOf:function(b,i){var S=stackAt(b,i);return S?S.m.slice():null}};
     }catch(e){}
      
     window.hudShow=hudShow;window.hudSet=hudSet;window.hudPaint=hudPaint;
@@ -4307,6 +4958,9 @@ function stEnv(){
     ' scr='+screen.width+'x'+screen.height);
   stInfo('ENV','cores',(navigator.hardwareConcurrency||'?')+
     ' mem='+(navigator.deviceMemory||'?')+'GB online='+navigator.onLine);
+   
+  var stMode='?';try{stMode=STACKH?JSON.parse(STACKH.key).k:'?'}catch(e){}
+  stInfo('ENV','stack-build',STACKH?STACKH.ms+' ms ('+stMode+')':'not built');
 }
 
 function stLoad(){
@@ -4368,6 +5022,9 @@ function stRender(cb){
   map.jumpTo({center:[was.c.lng,was.c.lat],zoom:was.z});
   var vis;try{vis=map.getLayoutProperty('sat','visibility')}catch(e){vis='err'}
   stInfo('RENDER','basemap','sat visibility='+vis+' SAT_OK='+SAT_OK);
+   
+  stInfo('RENDER','net-lo',NETLO_ERR?'chaining failed, every zoom draws per edge: '+NETLO_ERR:
+    NETLO.length+' low-zoom strokes ('+NETLO_CLS.join(', ')+') from '+nf2.length+' edges in '+NETLO_MS+' ms; per edge: '+Object.keys(NETLO_SKIP).join(', '));
    
   if(TILES){
     var mpp=156543.03*Math.cos(CTR[1]*Math.PI/180)/Math.pow(2,TILES.zmax);
@@ -4447,7 +5104,7 @@ function stLayout(){
    
   var _r=el('rail'),_rb=el('railbody');
   var _folded=!_rb||_rb.getBoundingClientRect().height<8;
-  var LIST=_folded?['peek','c-ride','c-locate']
+  var LIST=_folded?['peek','btn-home','c-ride','c-locate']
                   :['btn-home','btn-disp','btn-steps','btn-retrace','c-ride','c-locate'];
   LIST.forEach(function(id){
     var e=el(id);if(!e)return;var r=e.getBoundingClientRect();
@@ -4468,13 +5125,18 @@ function stLayout(){
     var e=map.getPaintProperty(id,'line-opacity');
     if(!e||!e.length||e[0]!=='case')_wired=false})}catch(e){_wired=false}
   stAdd('UI','machine-on-map',_wired,
-    MACHINE[machine].lbl.replace(/^\S+\s/,'')+' — '+_okc.length+' classes legal, '+
+    MACHINE[machine].lbl+' — '+_okc.length+' classes legal, '+
     _no.length+' faded'+(_no.length?' ('+_no.join(', ')+')':''));
    
-  var _hb=el('hudbar'),_hs=el('hudstats'),_rid=!!rideMode;
-  stAdd('UI','hud-matches-ride',
-    !!_hb&&!!_hs&&_hb.hidden===!_rid&&_hs.hidden===!_rid,
-    _rid?'riding — ribbon and stats on screen':'not riding — HUD off screen');
+  var _hb=el('hudbar'),_hs=el('hudstats'),_rid=!!(rideMode||riding);
+   
+  var _drawn=function(e){if(!e||e.hidden)return false;
+    var r=e.getBoundingClientRect();return r.width>0&&r.height>0};
+  var _bar=_drawn(_hb),_ctl=_drawn(_hs)&&_drawn(el('hudbtns')),
+      _sts=_drawn(_hs)&&_drawn(el('hc-dist'));
+  var _hj=stHudJudge({rid:_rid,pend:!!(rideMode&&!gotFix&&!riding),nav:_drawn(el('nav')),
+    bar:_bar,ctl:_ctl,sheet:_drawn(_hs),sts:_sts});
+  stAdd('UI','hud-matches-ride',_hj.ok,_hj.msg);
   var off=[];
   Array.prototype.forEach.call(document.querySelectorAll('#actions .act'),function(e){
     var r=e.getBoundingClientRect();
@@ -4536,8 +5198,8 @@ function stRouting(){
   var a=anchorOf('site'),b=anchorOf('town');
   var na=nearestNode(a),nb=nearestNode(b);
   stAdd('ROUTE','snap',na>=0&&nb>=0,'nodes '+na+' -> '+nb+
-    (_was!==machine?' (as '+MACHINE[machine].lbl.replace(/^\S+\s/,'')+' \u2014 a '+
-      MACHINE[_was].lbl.replace(/^\S+\s/,'').toLowerCase()+' is legal on no land class)':''));
+    (_was!==machine?' (as '+MACHINE[machine].lbl+' \u2014 a '+
+      MACHINE[_was].lbl.toLowerCase()+' is legal on no land class)':''));
   if(na<0||nb<0)return;
   var got=0,detail=[];
   PROFILES.forEach(function(pf){
@@ -4710,9 +5372,19 @@ function stGps(cb){
     stop()},20000);
 }
 
+ 
+function stHudJudge(o){
+  if(o.pend)return {ok:!!(o.nav&&!o.bar&&!o.sheet),
+    msg:'Ride pressed \u2014 waiting for the first fix: strip '+(o.nav?'on':'OFF')+' screen, ribbon '+
+      (o.bar?'ON':'off')+' screen, ride sheet '+(o.sheet?'ON':'off')+' screen'};
+  if(o.rid)return {ok:!!(o.bar&&o.ctl),
+    msg:'riding \u2014 ribbon '+(o.bar?'on':'OFF')+' screen, ride controls '+(o.ctl?'on':'OFF')+' screen'+
+      (o.sts?', stats on screen':o.ctl?'; the stats fold away while the drawer is open':'')};
+  return {ok:!o.bar&&!o.sheet,msg:'not riding \u2014 HUD off screen'}}
+
 function stRide(){
   if(!LASTRIDE&&!RIDE)return stInfo('RIDE','none',
-    'no ride recorded yet — tap ▶ Ride it and go for one; that is what closes A18');
+    'no ride recorded yet — start one with Ride it on the Ride tab');
   var R=LASTRIDE||RIDE;
   stInfo('RIDE','duration',((R.hrs||((Date.now()-R.t0)/3600000))*60).toFixed(0)+' min · '+
     R.fixes+' fixes'+(R.drops?' · '+R.drops+' dropouts':''));
@@ -4733,7 +5405,11 @@ function stRide(){
 function stPins(){
   var parts=MODES.map(function(m){var o=pinsLoad(m.k),n=Object.keys(o).length;
     return m.h+' '+(n?n+' switched ('+Object.keys(o).map(function(k){return k+(o[k]?' on':' off')}).join(', ')+')':'defaults')});
-  stInfo('PINS','choices',parts.join(' · '))}
+  stInfo('PINS','choices',parts.join(' · '));
+   
+  var nb=BADGE_DRAWN.length;
+  stInfo('PINS','badges',nb+' drawn'+(BADGE_MISSING.length?' · missing: '+BADGE_MISSING.join(', '):'')+
+    (typeof Path2D==='undefined'?' · no Path2D — shapes and colours only':''))}
 
 function stCompass(){
   var n=MAGLOG.length;
@@ -4789,16 +5465,16 @@ function pad(s){s=String(s);while(s.length<18)s+=' ';return s}
 function stRenderPanel(rep){
   var rows=ST.map(function(r){
     var col=r.ok===null?'#9A9184':(r.ok?'#8FAE63':'#C1121F');
-    var mk=r.ok===null?'·':(r.ok?'✓':'✕');
-    return '<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--c-241f1a)">'+
-      '<span style="color:'+col+';font-weight:700;width:12px">'+mk+'</span>'+
-      '<span style="color:var(--bone);min-width:112px;font:600 var(--t-sm) ui-monospace,monospace">'+
+    var mk=r.ok===null?'·':ic(r.ok?'pass':'fail',12);
+    return '<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--divider)">'+
+      '<span class="stmk" style="color:'+col+';font-weight:700;width:var(--ic-sm);flex:0 0 var(--ic-sm)">'+mk+'</span>'+
+      '<span style="color:var(--text-1);min-width:112px;font:600 var(--t-sm) ui-monospace,monospace">'+
       r.g+'·'+r.id+'</span>'+
-      '<span style="color:var(--c-c9c0b2);font-size:var(--t-sm);flex:1">'+
+      '<span style="color:var(--text-2);font-size:var(--t-sm);flex:1">'+
       String(r.d).replace(/[<>]/g,'')+'</span></div>'}).join('');
   var bad=rep.fail>0;
   show('<b style="font-size:var(--t-lg)">Self-test · '+
-    '<span style="color:'+(bad?'var(--shut)':'var(--ok)')+'">'+rep.pass+' passed, '+
+    '<span style="color:'+(bad?'var(--danger-text)':'var(--ok)')+'">'+rep.pass+' passed, '+
     rep.fail+' failed</span></b><br>'+
     '<div style="max-height:46vh;overflow:auto;margin:8px 0">'+rows+'</div>'+
     '<button id="st-copy" class="chip">Copy report</button> '+
@@ -4806,7 +5482,7 @@ function stRenderPanel(rep){
   var t=rep.text;
   var cp=el('st-copy');
   if(cp)cp.addEventListener('click',function(){
-    var done=function(){cp.textContent='Copied ✓';setTimeout(function(){cp.textContent='Copy report'},1600)};
+    var done=function(){cp.textContent='Copied';setTimeout(function(){cp.textContent='Copy report'},1600)};
     if(navigator.clipboard&&navigator.clipboard.writeText)
       navigator.clipboard.writeText(t).then(done,legacy); else legacy();
     function legacy(){var ta=document.createElement('textarea');ta.value=t;
@@ -4867,7 +5543,7 @@ function selfTest(opts,done){
 try{window.__selfTest=selfTest}catch(e){}
 el('c-loop').addEventListener('click',function(){
   show('<b>Loop from here</b> — a ride that ends where it starts, on legal line '+
-    'for a '+MACHINE[machine].lbl.replace(/^\S+\s/,'')+'.<br>'+
+    'for a '+MACHINE[machine].lbl+'.<br>'+
     '<div style="margin-top:8px">'+LOOP_CHOICES.map(function(m){
       return '<button class="chip" data-loop="'+m+'">'+m+' mi</button>'}).join(' ')+
     '</div>','');
@@ -4879,24 +5555,25 @@ el('c-loop').addEventListener('click',function(){
       setTimeout(function(){
         var a=nearestNode(ME);
         if(a<0)return show('<b>Nothing legal nearby</b> for a '+
-          MACHINE[machine].lbl.replace(/^\S+\s/,'')+'. Move the ◎ pin closer to a trail.','fail');
-        RFROM=ME.slice();RTO=ME.slice();
+          MACHINE[machine].lbl+'. Move the start pin closer to a trail.','fail');
         var out=buildLoops(a,want);
         if(!out.length)return show('<b>No loop found</b> at '+want+
           ' mi from here. The legal network within reach may not connect back — '+
           'try a different distance, or a narrower machine.','fail');
+         
+        RFROM=ME.slice();RTO=ME.slice();DESTLBL='the start';
         out.forEach(function(o){
           o.h+=' · '+o.s.mi.toFixed(1)+' mi';
-          if(o.repeat>0.25)o.h+=' ⟲'});
+          if(o.repeat>0.25)o.h+=' \u00b7 '+Math.round(o.repeat*100)+'% ridden twice'});
         logAct('loop '+out.length+' options, '+out[0].s.mi.toFixed(1)+' mi');
         presentRoutes(out)},30)})})});
 
 el('c-selftest').addEventListener('click',function(){
-  setChip('c-selftest','shield','Running…');
+  setChip('c-selftest','selftest','Running…');
   show('<b>Self-test running…</b><br>Exercising load, render, data, routing, '+
     'safety, haptics and performance, then waiting up to 20s for a GPS fix.','');
   setTimeout(function(){selfTest({},function(rep){
-    setChip('c-selftest','shield','Self-test');
+    setChip('c-selftest','selftest','Self-test');
     stRenderPanel(rep)})},60)});
 
 [[hM,'home',function(){return HOME},function(){return 'Home / truck'}],
@@ -4942,50 +5619,102 @@ map.on('moveend',railFoldIfAway);
  
 
  
+var ZMAX_STACK=STACK_BANDS[STACK_BANDS.length-1];    
+function stackBand(z){var b=-1;for(var i=0;i<STACK_BANDS.length;i++)if(z>=STACK_BANDS[i])b=i;return b}
+ 
+function stackRank(p){return (p.r==null?9:+p.r)*10+(p.pri==null?3:+p.pri)}
+function stackBuild(m){
+  var t0=Date.now(),n=poif.length,i,b;
+   
+  if(!STACKW){STACKW={x:new Float64Array(n),y:new Float64Array(n),r:new Float64Array(n)};
+    for(i=0;i<n;i++){var c=poif[i].geometry.coordinates,sn=Math.sin(c[1]*Math.PI/180);
+      STACKW.x[i]=(c[0]+180)/360*512;
+      STACKW.y[i]=(0.5-Math.log((1+sn)/(1-sn))/(4*Math.PI))*512;
+      STACKW.r[i]=stackRank(poif[i].properties)}}
+  var WX=STACKW.x,WY=STACKW.y,RK=STACKW.r;
+   
+  var FB=new Int8Array(n);
+  for(i=0;i<n;i++){FB[i]=-1;var p=poif[i].properties;
+    if((m.kinds||[]).indexOf(p.k)<0)continue;
+    for(b=0;b<STACK_BANDS.length;b++)if(pinDrawable(p,m,STACK_BANDS[b])){FB[i]=b;break}}
+  function better(a,c){return RK[a]<RK[c]||(RK[a]===RK[c]&&a<c)}
+  var levels=[],prev=null;
+  for(b=STACK_BANDS.length-1;b>=0;b--){
+    var zb=STACK_BANDS[b],R=stackRadius(zb),sc=Math.pow(2,zb),pts=[],k,t;
+    if(!prev){for(i=0;i<n;i++)if(FB[i]>=0&&FB[i]<=b)pts.push({a:i,m:[i]})}
+    else for(k=0;k<prev.length;k++){var mem=[],a=-1,pm=prev[k].m;
+      for(t=0;t<pm.length;t++)if(FB[pm[t]]<=b){mem.push(pm[t]);if(a<0||better(pm[t],a))a=pm[t]}
+      if(mem.length)pts.push({a:a,m:mem})}
+    pts.sort(function(p1,p2){return RK[p1.a]-RK[p2.a]||p1.a-p2.a});
+     
+    var grid=new Map(),stacks=[];
+    for(k=0;k<pts.length;k++){var q=pts[k],x=WX[q.a]*sc,y=WY[q.a]*sc,
+        cx=Math.floor(x/R),cy=Math.floor(y/R),best=null,bd=R;
+      for(var dx=-1;dx<=1;dx++)for(var dy=-1;dy<=1;dy++){
+        var g=grid.get((cx+dx)*2097152+(cy+dy));if(!g)continue;
+        for(t=0;t<g.length;t++){var d=Math.hypot(g[t].x-x,g[t].y-y);if(d<bd){bd=d;best=g[t]}}}
+      if(best){for(t=0;t<q.m.length;t++)best.m.push(q.m[t])}
+      else{var ns={x:x,y:y,a:q.a,m:q.m.slice()};stacks.push(ns);
+        var gk=cx*2097152+cy,gg=grid.get(gk);if(!gg)grid.set(gk,gg=[]);gg.push(ns)}}
+    levels[b]=stacks;prev=stacks}
+   
+  for(b=0;b<levels.length;b++)levels[b].forEach(function(S){
+    if(S.m.length<2)return;
+    S.m.sort(function(p1,p2){return p1===S.a?-1:p2===S.a?1:(RK[p1]-RK[p2]||p1-p2)});
+    var w=180,so=90,e=-180,no=-90,k0=poif[S.a].properties.k;S.mixed=false;
+    S.m.forEach(function(j){var c=poif[j].geometry.coordinates;
+      if(c[0]<w)w=c[0];if(c[0]>e)e=c[0];if(c[1]<so)so=c[1];if(c[1]>no)no=c[1];
+      if(poif[j].properties.k!==k0)S.mixed=true});
+    S.box=[w,so,e,no]});
+  return {levels:levels,ms:Date.now()-t0}}
+ 
+function stackEnsure(){
+  var m=modeNow(),key=JSON.stringify(m);
+  if(!STACKH||STACKH.key!==key){STACKH=stackBuild(m);STACKH.key=key;STACKWIN=null}
+  return STACKH}
+ 
+function stackAt(b,i){var L=stackEnsure().levels[b]||[];
+  for(var k=0;k<L.length;k++)if(L[k].m.indexOf(i)>=0)return L[k];
+  return null}
+ 
+function stackSplits(ids,z){
+  if(!ids.length)return false;
+  for(var b=stackBand(z)+1;b<STACK_BANDS.length;b++){var S=stackAt(b,ids[0]);
+    if(!S)continue;
+    for(var t=0;t<ids.length;t++)if(S.m.indexOf(ids[t])<0)return true}
+  return false}
+ 
+function stackRevealZ(i,z){var b0=stackBand(z);
+  for(var b=Math.max(b0,0);b<STACK_BANDS.length;b++){var S=stackAt(b,i);
+    if(S&&S.m.length<2)return b===b0?z:Math.min(ZMAX_STACK,STACK_BANDS[b]+0.01)}
+  return ZMAX_STACK}
 function restack(){
   var src;try{src=map.getSource('poistack')}catch(e){return}
   if(!src)return;
-  var z=map.getZoom(),R=stackRadius(z);
-  var m=modeNow();
-  var cw=map.getCanvas().clientWidth,ch=map.getCanvas().clientHeight,pad=R+8;
+  var z=map.getZoom();
    
-  if(z<PIN_FLOOR){
+  if(z<PIN_FLOOR){STACKWIN=null;
     if(STACKOUT.length||Object.keys(STACKED).length){
       STACKED={};applyStackFilters();STACKOUT=[];STACKSIG='';
       src.setData({type:'FeatureCollection',features:[]})}
     return}
-  var pts=[];
-  for(var i=0;i<poif.length;i++){
-    var f=poif[i],k=f.properties.k;
-    if(!pinDrawable(f.properties,m,z))continue;
-    var p;try{p=map.project(f.geometry.coordinates)}catch(e){continue}
-    if(p.x<-pad||p.y<-pad||p.x>cw+pad||p.y>ch+pad)continue;
-     
-    pts.push({id:f.properties.i,x:p.x,y:p.y,k:k,
-      r:(f.properties.r==null?9:+f.properties.r)*10+(f.properties.pri==null?3:+f.properties.pri),
-      c:f.geometry.coordinates})}
-  pts.sort(function(a,b){return a.r-b.r});
-  var cell=R,grid={},stacks=[];
-  function key(x,y){return Math.floor(x/cell)+'|'+Math.floor(y/cell)}
-  for(var n=0;n<pts.length;n++){
-    var q=pts[n],cx=Math.floor(q.x/cell),cy=Math.floor(q.y/cell),best=null,bd=R;
-    for(var dx=-1;dx<=1;dx++)for(var dy=-1;dy<=1;dy++){
-      var g=grid[(cx+dx)+'|'+(cy+dy)];if(!g)continue;
-      for(var t=0;t<g.length;t++){var st=g[t];
-        var d=Math.hypot(st.x-q.x,st.y-q.y);
-        if(d<bd){bd=d;best=st}}}
-    if(best){best.m.push(q);if(q.k!==best.k)best.mixed=true}
-    else{var ns={x:q.x,y:q.y,k:q.k,mixed:false,anchor:q,m:[q]};
-      stacks.push(ns);(grid[key(q.x,q.y)]||(grid[key(q.x,q.y)]=[])).push(ns)}}
-  var hide={},out=[];
-  for(var a=0;a<stacks.length;a++){var S=stacks[a];
-    if(S.m.length<2)continue;
-    for(var b=0;b<S.m.length;b++)hide[S.m[b].id]=1;
+  var H=stackEnsure(),key=H.key,b=stackBand(z),bd=map.getBounds(),
+      V=[bd.getWest(),bd.getSouth(),bd.getEast(),bd.getNorth()];
+   
+  if(STACKWIN&&STACKWIN.b===b&&STACKWIN.key===key&&V[0]>=STACKWIN.w[0]&&V[1]>=STACKWIN.w[1]&&
+     V[2]<=STACKWIN.w[2]&&V[3]<=STACKWIN.w[3])return;
+  var dx=V[2]-V[0],dy=V[3]-V[1],W=[V[0]-dx,V[1]-dy,V[2]+dx,V[3]+dy];
+  var hide={},out=[],L=H.levels[b]||[];
+  for(var a=0;a<L.length;a++){var S=L[a];
+    if(S.m.length<2||S.box[2]<W[0]||S.box[0]>W[2]||S.box[3]<W[1]||S.box[1]>W[3])continue;
+    for(var t=0;t<S.m.length;t++)hide[S.m[t]]=1;
+    var ak=poif[S.a].properties.k;
     out.push({type:'Feature',
-      properties:{n:S.m.length,k:S.anchor.k,mixed:S.mixed,
-        c:S.mixed?'#2B2926':((POIKIND[S.anchor.k]||{}).c||'#2B2926'),
-        ids:S.m.map(function(q){return q.id}).join(',')},
-      geometry:{type:'Point',coordinates:S.anchor.c}})}
+      properties:{n:S.m.length,k:ak,mixed:S.mixed,
+        c:S.mixed?STACK_MIXED:((POIKIND[ak]||{}).c||STACK_MIXED),
+        ids:S.m.join(',')},
+      geometry:{type:'Point',coordinates:poif[S.a].geometry.coordinates}})}
+  STACKWIN={b:b,key:key,w:W};
   var changed=Object.keys(hide).length!==Object.keys(STACKED).length;
   if(!changed)for(var h in hide)if(!STACKED[h]){changed=true;break}
   STACKED=hide;
@@ -4999,6 +5728,8 @@ function restack(){
   STACKSIG=sig;
   src.setData({type:'FeatureCollection',features:out})}
 var STACKOUT=[],STACKSIG='';
+ 
+var STACKH=null,STACKWIN=null,STACKW=null;
 
  
 function stackCard(f){
@@ -5016,24 +5747,31 @@ function stackCard(f){
     return ka-kb||(a.r.n||'').localeCompare(b.r.n||'')});
   var rows='',lastK=null;
   recs.forEach(function(o,n){
-    var kd=POIKIND[o.r.k]||{},nm=o.r.n||kd.h||o.r.k;
+    var kd=POIKIND[o.r.k]||{},nm=o.r.n||kd.h||o.r.k,u=badgeURL('bdg-'+o.r.k);
     if(o.r.k!==lastK){rows+='<div class="k" style="margin-top:'+(lastK?10:0)+'px">'+
       (kd.h||o.r.k).toUpperCase()+'</div>';lastK=o.r.k}
     rows+='<button class="chip" data-si="'+n+'" style="width:100%;'+
       'justify-content:flex-start;text-align:left">'+
-      '<span style="color:'+(kd.c||'var(--c-8b857a)')+'">\u25cf</span><span>'+nm+'</span></button>'});
+      (u?'<img class="pbdg" src="'+u+'" alt="">':
+       '<span class="dot" style="background-color:'+(kd.c||'var(--pin-unknown)')+'"></span>')+'<span>'+nm+'</span></button>'});
+   
+  var zoomSplits=stackSplits(recs.map(function(o){return o.i}),map.getZoom());
   show('<b>'+recs.length+' places here</b>'+
-    '<div class="sub">Stacked at this zoom. Tap one, or keep zooming in.</div>'+
+    '<div class="sub">Stacked at this zoom. '+(zoomSplits?'Tap one, or keep zooming in.':'Tap one.')+'</div>'+
     '<div style="max-height:46vh;overflow:auto">'+rows+'</div>','');
   var host=el('panel')||document;
   Array.prototype.forEach.call(host.querySelectorAll('[data-si]'),function(b){
     b.addEventListener('click',function(){
       var o=recs[+b.dataset.si];if(!o)return;
-      map.easeTo({center:o.r.p,zoom:Math.max(map.getZoom(),15.6),duration:600});
-      setTimeout(function(){
+       
+      var tz=stackRevealZ(o.i,map.getZoom()),fired=false;
+      function tapIt(){if(fired)return;fired=true;
         var pt=map.project(o.r.p),rc=map.getCanvasContainer().getBoundingClientRect();
         map.getCanvasContainer().dispatchEvent(new MouseEvent('click',
-          {bubbles:true,cancelable:true,clientX:rc.left+pt.x,clientY:rc.top+pt.y}))},700)})});
+          {bubbles:true,cancelable:true,clientX:rc.left+pt.x,clientY:rc.top+pt.y}))}
+      map.easeTo({center:o.r.p,zoom:tz,duration:600});
+      map.once('moveend',function(){map.once('idle',tapIt)});
+      setTimeout(tapIt,2000)})});
    
   var xs=recs.map(function(o){return o.r.p[0]}),ys=recs.map(function(o){return o.r.p[1]});
   var w=Math.max.apply(null,xs)-Math.min.apply(null,xs),
@@ -5049,9 +5787,12 @@ function stackCard(f){
       {padding:{top:Math.min(70,Math.round(chh*0.12)),
                 bottom:Math.round(chh*0.38),
                 left:Math.min(40,Math.round(cw*0.1)),right:Math.min(40,Math.round(cw*0.1))},
-       maxZoom:Math.min(16.5,z+3.2)})}catch(e){target=null}}
+        
+       maxZoom:Math.min(ZMAX_STACK,Math.max(Math.min(16.5,z+3.2),
+         STACK_BANDS[Math.min(stackBand(z)+1,STACK_BANDS.length-1)]+0.01))})}catch(e){target=null}}
   if(target)map.easeTo({center:target.center,zoom:target.zoom,duration:700});
-  else map.easeTo({center:f.geometry.coordinates,zoom:Math.min(16.5,z+1.8),duration:600});
+   
+  else map.easeTo({center:f.geometry.coordinates,zoom:Math.max(z,Math.min(16.5,z+1.8)),duration:600});
 }
 
 function applyStackFilters(){
@@ -5068,13 +5809,16 @@ map.on('moveend',restack);
 ['dragstart','rotatestart','zoomstart'].forEach(function(ev){
   map.on(ev,function(e){if(e&&e.originalEvent&&NAV.on&&NAV.follow){NAV.follow=false;navChip()}})});
 el('nav-center').addEventListener('click',function(){NAV.follow=true;navChip();
-  if(ME)map.easeTo({center:ME,bearing:NAV.northUp?0:NAV.brg,pitch:NAV.northUp?0:55,duration:500})});
-el('nav-voice').addEventListener('click',navVoiceToggle);
+   
+  if(ME)map.easeTo(NAV.on?{center:ME,bearing:NAV.northUp?0:NAV.brg,pitch:NAV.northUp?0:55,duration:500}
+                         :{center:ME,duration:500})});
+el('nav-voice').addEventListener('click',function(){if(VOICE.ok)navVoiceToggle()});
 el('nav-north').addEventListener('click',function(){NAV.northUp=!NAV.northUp;navChip();
-  if(ME&&NAV.follow)map.easeTo({center:ME,bearing:NAV.northUp?0:NAV.brg,pitch:NAV.northUp?0:55,duration:500})});
+  if(ME&&NAV.on&&NAV.follow)map.easeTo({center:ME,bearing:NAV.northUp?0:NAV.brg,pitch:NAV.northUp?0:55,duration:500})});
 ['dragstart','zoomstart','rotatestart'].forEach(function(ev){
   map.on(ev,function(e){if(e&&e.originalEvent)_userDrove=true})});
-map.on('load',function(){makeBadges();setBasemap(0);wpDraw();showTab('map');
+ 
+map.on('load',function(){makeBadges();setBasemap(bmi);wpDraw();showTab('map');
    
   try{map.setLayoutProperty('hillshade','visibility','none')}catch(e){}
    
@@ -5088,7 +5832,7 @@ map.on('load',function(){makeBadges();setBasemap(0);wpDraw();showTab('map');
   else locateOnce()});
 
  
-var YOU=null,youM=null;
+var YOU=null,youM=null,LOCATE_N=0,LOCATE_MS=25000;
 function locateOnce(cb){
    
   var handle=function(at,acc){
@@ -5099,31 +5843,34 @@ function locateOnce(cb){
     if(posMode==='away')showAway(acc); else{posMode='gps';ME=at.slice();mM.setLngLat(ME);paint();syncSafety()}
     drawCoverage();
     if(cb)try{cb(at)}catch(e){}};
-  var done=false,saveWatch=watchId;
-  var mode=gpsStart(function(at){
-    if(done)return; done=true;
-    handle(at,null);
-    gpsStop(); watchId=saveWatch;           
-  },function(){ if(!done){done=true; gpsStop(); watchId=saveWatch; if(cb)try{cb(null,'error')}catch(e){}} });
-  if(!mode){if(cb)try{cb(null,'none')}catch(e){};return}    
    
-  setTimeout(function(){ if(!done){done=true; gpsStop(); watchId=saveWatch;
-    if(cb)try{cb(null,'timeout')}catch(e){} } },25000);}
+  var done=false,h=null,counted=false,
+      fin=function(){if(counted){counted=false;LOCATE_N--}gpsClear(h)};
+  h=gpsWatch(function(at){
+    if(done)return; done=true;
+    fin();handle(at,null);
+  },function(){ if(!done){done=true; fin(); if(cb)try{cb(null,'error')}catch(e){}} },LOCATE_MS);
+  if(!h){if(done)return;if(cb)try{cb(null,'none')}catch(e){};return}    
+   
+  if(!done){LOCATE_N++;counted=true}else gpsClear(h);
+   
+  setTimeout(function(){ if(!done){done=true; fin();
+    if(cb)try{cb(null,'timeout')}catch(e){} } },LOCATE_MS);}
 
 function showAway(acc){
   showQuiet('<b>You are about '+Math.round(awayMi)+' mi from '+(BUNDLE.name||'this region')+
     '.</b><br>This download only covers the boxed area — everywhere else is '+
     'deliberately blank, not broken. <b>Planning mode</b> is on: browse, search, '+
-    'press and hold a spot for <b>Start here</b> or <b>Directions here</b>, '+
+    'press and hold a spot for <b>Start here</b> or <b>Route here</b>, '+
     'and <b>Set home</b> on the Plan tab.'+
-    '<br><br>Tap <b>◉ Locate</b> to jump to your real position, or a chip above to '+
+    '<br><br>Tap <b>Locate</b> (Map tab) to jump to your real position, or a chip above to '+
     'jump to the riding area.',
     Math.round(awayMi)+' mi away \u00b7 planning mode')}
 
  
 el('c-lost').addEventListener('click',function(){
   if(rideMode)return show('Live GPS is driving — the alert fires from your actual track, not a button.','');
-  if(!riding)return show('Start <b>▶ Ride it</b> first, then take a wrong turn and watch the alert fire.','');
+  if(!riding)return show('Start <b>Ride it</b> first, then take a wrong turn and watch the alert fire.','');
   lost=true;buzz(40);
   show('Veering off at the next junction — this is the failure the whole app exists to catch.','')});
 
@@ -5131,6 +5878,31 @@ el('c-lost').addEventListener('click',function(){
 var HIT=['route72','trail50','moto24','mccct','fstrail','fsroad','closed','fsclosed','track','paved','minor','foot'];
  
 var HIT_SHOW=['show-line'];
+ 
+function lineWidthAt(v,z){
+  if(typeof v==='number')return v;
+  if(!Array.isArray(v)||v[0]!=='interpolate'||!Array.isArray(v[2])||v[2][0]!=='zoom')return 0;
+  var st=v.slice(3);
+  if(z<=st[0])return +st[1]||0;
+  for(var k=2;k<st.length;k+=2)if(z<=st[k]){var t=(z-st[k-2])/(st[k]-st[k-2]);
+    return (+st[k-1]||0)+t*((+st[k+1]||0)-(+st[k-1]||0))}
+  return +st[st.length-1]||0}
+function loTapMi(ll){
+  var z=map.getZoom(),wmax=0;
+  HIT.forEach(function(id){var v=null;try{v=map.getPaintProperty(id,'line-width')}catch(e){}
+    var x=lineWidthAt(v,z);if(x>wmax)wmax=x});
+  var mpp=78271.517*Math.cos(ll[1]*Math.PI/180)/Math.pow(2,z);
+  return (9*Math.SQRT2+wmax/2+1)*mpp/1609.34}
+function nearestDrawnEdge(ll,c,maxMi){
+  var G=gridBuild(),best=1e9,bi=-1,seen={};
+  var visit=function(list){
+    for(var j=0;j<list.length;j++){var i=list[j];if(seen[i])continue;seen[i]=1;
+      var ed=EDGES[i];if(!ed||!ed.d||ed.c!==c)continue;
+      var g=decode(GR.g[i]);
+      for(var k=1;k<g.length;k++){var d=segNear(ll,g[k-1],g[k]).d;if(d<best){best=d;bi=i}}}};
+  visit.done=function(r){return ringMi(r)>maxMi||(bi>=0&&ringMi(r+1)>best)};
+  gridRings(ll,G.edges,visit,Math.ceil(maxMi/(GCS*0.714*69))+2);
+  return bi>=0&&best<=maxMi?bi:-1}
 map.on('click',function(e){
   if(lp.fired){lp.fired=false;return}    
    
@@ -5196,9 +5968,9 @@ map.on('click',function(e){
         var DCOL={green:'#2F7D4F',blue:'#2E6FA8',black:'#141414',expert:'#141414',park:'#7A5B3A'};
         var DLAB={green:'Beginner',blue:'Intermediate',black:'Advanced',expert:'Expert',park:'Terrain park'};
         if(rec.runs&&rec.runs.length)x+='<div class="k">RUNS \u00b7 '+rec.runs.length+'</div>'+
-          '<div class="sub">'+rec.runs.map(function(r){return '<span style="color:'+
-          (DCOL[r.d]||'#8B857A')+'">\u25cf</span> '+r.n+(DLAB[r.d]?' \u00b7 '+DLAB[r.d]:'')}).join('<br>')+'</div>';
-        if(rec.web)x+='<div class="sub"><a href="'+rec.web+'" target="_blank" style="color:var(--c-d98e32)">Website \u2197</a></div>';
+          '<div class="sub">'+rec.runs.map(function(r){return '<span class="dot" style="background-color:'+
+          (DCOL[r.d]||'var(--pin-unknown)')+'"></span> '+r.n+(DLAB[r.d]?' \u00b7 '+DLAB[r.d]:'')}).join('<br>')+'</div>';
+        if(rec.web)x+='<div class="sub"><a href="'+rec.web+'" target="_blank" style="color:var(--link)">Website '+ic('external')+'</a></div>';
         return x})()+
       (wrun?'<div class="k">ON THE '+wrun.riv.toUpperCase().replace('RIVER','').trim()+' RIVER</div>'+
         '<div class="sub">'+
@@ -5222,7 +5994,7 @@ map.on('click',function(e){
       if(w2)w2.addEventListener('click',function(){
         runCard(RUNFROM,{mi:wrun.stop.mi,n:pr.n||wrun.stop.n,k:wrun.stop.k},wrun.riv)});
       var w3=el('wr-cancel');
-      if(w3)w3.addEventListener('click',function(){runClear();show('Run cancelled.','')});
+      if(w3)w3.addEventListener('click',function(){runClear();ack('Run cancelled.')});
     }
     return;
   }
@@ -5236,6 +6008,17 @@ map.on('click',function(e){
       var pt=el('peek-txt');
       if(pt)pt.textContent='Nothing there \u2014 press and hold to drop a pin';
       return}}
+   
+  var loHit=false;
+  if(f[0].properties.lo){
+    var lll=[e.lngLat.lng,e.lngLat.lat],
+        li=nearestDrawnEdge(lll,f[0].properties.c,loTapMi(lll));
+    if(li<0){
+      if(pf0&&pf0.length&&pf0[0].properties&&pf0[0].properties.n)return pubCard(pf0[0].properties);
+      if(af&&af.length&&af[0].properties&&af[0].properties.n)return areaCard(af[0].properties);
+      return show('That line is too fine to pick out at this zoom \u2014 zoom in and tap it again.','')}
+    loHit=true;
+    f=[{properties:{i:li,c:EDGES[li].c}}]}
   if(f[0].properties.i===undefined){
      
     var pr=f[0].properties;
@@ -5245,6 +6028,9 @@ map.on('click',function(e){
       'you place yourself — routing will never use it.','')}
   var ed=EDGES[f[0].properties.i],a=attrs(ed);
   var out='<span class="tn">'+(ed.n||label(ed.c))+'</span><br>';
+   
+  if(loHit)out+='<div class="sub">The nearest '+label(ed.c)+' segment to your tap at this zoom '+
+    '\u2014 zoom in and tap again for the exact one. Everything on this card is about that segment.</div>';
   out+='<span class="tag '+(a.auth==='legal'?'legal':'adv')+'">'+
     (a.src==='dnr'?'DNR · legal':a.src==='usfs'?'USFS · legal':'OSM · advisory')+'</span>';
   if(a.st&&a.st.toLowerCase().indexOf('temporarily')===0)out+='<span class="tag shut">closed</span>';
@@ -5263,7 +6049,7 @@ map.on('click',function(e){
   var _rs=restrictOf(ed);
   if(_rs){
     var banned=_rs.ban&&_rs.ban.indexOf(machine)>=0;
-    bits.push('<br><b'+(banned?' style="color:var(--shut)"':'')+'>'+
+    bits.push('<br><b'+(banned?' style="color:var(--danger-text)"':'')+'>'+(loHit?'This segment \u2014 ':'')+
       (banned?'NOT for your machine — ':'Restriction: ')+'</b>'+_rs.say+
       (_rs.unknown?' <span class="sub">(as published; not interpreted)</span>':''));}
   if(UP[ed.i]||DN[ed.i])bits.push('+'+ft(UP[ed.i])+' / -'+ft(DN[ed.i])+' ft');
@@ -5292,7 +6078,10 @@ function railSet(open,at){
   }
   var t=el('peek-txt');
   if(t)t.textContent=open?railPeekText():
-    (RAIL_AT?'Details':railPeekText());}
+    (RAIL_AT?'Details':railPeekText());
+  sheetH();
+   
+  rcFit()}
 
 function railFoldIfAway(){
    
@@ -5310,6 +6099,16 @@ function showQuiet(h,peekLine){
   var p=el('panel');p.innerHTML=h;p.className='';
   var t=el('peek-txt');
   if(t&&peekLine)t.textContent=peekLine;}
+
+ 
+ 
+function ack(h){
+  showQuiet(h,'');RAIL_MANUAL=false;railSet(false);
+  toast(String(h).replace(/<[^>]*>/g,''),2400)}
+
+function rideCard(h,s,peekLine){
+  if(rideMode||riding){showQuiet(h,peekLine);return}
+  show(h,s)}
 
 function show(h,s){
   var p=el('panel');p.innerHTML=h;
@@ -5330,7 +6129,7 @@ el('c-locate').addEventListener('click',function(){
   if(flyToYou())return;
   locateOnce();
   setTimeout(function(){if(!flyToYou())geo.trigger()},1200)});
-geo.on('error',function(){show('Location unavailable — browsers block GPS on <b>file://</b> and in embedded frames. Expected here; works in the APK. Use <b>&#39;I am here&#39;</b> to place yourself manually.','fail')});
+geo.on('error',function(){show('Location unavailable — this phone did not give a position (location permission off, or no fix yet). Place yourself by hand with <b>I&#39;m here</b> on the Plan tab.','fail')});
 
  
 el('chips').innerHTML='';
@@ -5397,7 +6196,7 @@ function done(){var d=cap.slice().sort(function(a,b){return a-b});cap=null;
   show('<b>'+(pass?'PASS':'FAIL')+'</b> · avg <b>'+avg+'</b> fps · p99 min <b>'+mn+
    '</b> fps · remote <b>'+remoteHits+'</b><br>'+drew+' of '+EDGES.length+
    ' edges actually rendered. '+(drew===0?
-     'ZERO drew — the high frame rate is an idle renderer, not speed. Tap ⓘ.':
+     'ZERO drew — the high frame rate is an idle renderer, not speed. Run the Self-test for the render checks.':
      pass?'Holds up with the full routable network loaded.'
    :'Below threshold — note both numbers before comparing to the APK.'),
    pass?'pass':'fail')}

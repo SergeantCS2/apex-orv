@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 187.*
+*Current as of take 188.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -134,6 +134,15 @@ Start here. Do not read top to bottom.
 | A screenshot shows the splash, or the tour, instead of the scene | 222 |
 | Old badges stay after a mode switch; an update a cache should send is skipped | 223 |
 | A layout read after a class change shows the old state; the class says the new one | 224 |
+| A stability metric still reads high on a design that is stable by construction | 225 |
+| Trails drawn in pieces at low zoom although every edge is in the source | 226 |
+| A planted control is logged "caught" but could never have failed | 227 |
+| Chrome count above 0 right after taking the Chrome lock | 228 |
+| A launch seemed to vanish; its log ends in one run's verdict followed by another's | 229 |
+| A flat background-coloured strip beside an opaque panel; the canvas has map there | 230 |
+| A mark fails contrast at a ratio the colours it sits on cannot produce | 231 |
+| The ride froze after its first fix; its GPS watch was closed by something else | 232 |
+| Plan, notes or scripts gone after a restart | 233 |
 
 ---
 
@@ -2845,3 +2854,173 @@ took 930 ms and 852 ms, the transitions still pending after them and done
 reached and no transition or finite animation is left. Animations count
 too: a card enters with cardIn, from opacity 0, and an audit that read the
 panel as it started skipped every route card as hidden.
+
+**225. A churn metric that counts things leaving the view measures the camera, not the clusterer.**
+Take 187's committed `pins_probe.py sweep` asked "did the badge set in view
+change between two 0.1-zoom steps?" and read 21–40% inside one tile zoom
+(A197). The zoom-band design built in take 188 re-partitions 0.0% of the
+places it holds from one step to the next inside a band — the stacks are
+fixed by construction — and the same badge-set column still read 10–27%
+on it: zooming in pushes badges off the edge of the view, and every one that
+leaves counts as churn. The study's first design numbers were set on that
+column. The instrument that measures the clusterer asks a narrower
+question: over Q, the places pooled at the previous step that are still in
+view at this one (arrivals and departures both excluded), did any change
+its anchor? That is `sweep`'s re-partition table and render's pins-stay-put
+guard. Before trusting a stability metric, run it on a design you know is
+stable by construction; if it still reads high, it is measuring something
+else.
+
+**226. A GeoJSON line shorter than the tiler's simplification tolerance is
+dropped whole, not simplified.** Below z11 take 187 drew the designated trails
+in pieces on Hybrid. MapLibre's GeoJSON tiler (geojson-vt, `nc` in
+`www/vendor/maplibre-gl-csp-worker.js`) drops a WHOLE line shorter than its
+tolerance: 0.375 px, which is 163 m at z7 and 41 m at z9. Routing edges are
+short (median 76 m), so over Grayling at z7 take 187 kept 71.2% of trail50's
+drawn length, 70.3% of moto24's, 50.2% of mccct's and 48.1% of fstrail's, and
+86–96% at z9 (PROVEN, measured live in take 188's step 3). Every edge was in the
+source, every feature count was right, and nothing warned. Chained by class
+into strokes (A202 D7, `NETLO`), the same classes keep 99.1–100% at z7 (PROVEN,
+step 9). Lowering the source's `tolerance` was ruled out: it keeps about 1.6 M
+vertices at z7, which is heavier than chaining. Chaining is not free either:
+ten classes cost +3.0 s (Water) and +3.2 s (Off-road) time-to-ready on desktop,
+so it is scoped to the classes that lose length (`NETLO_CLS`, with the reason
+for each class left out in `NETLO_SKIP`, src/app.html). Rule: when a line layer
+is built from short segments, measure drawn LENGTH per class at the zooms where
+it is seen, not the features in the source. Chain the segments of one class
+before the tiler sees them, and keep a tap resolvable to the edge under the
+finger (`nearestDrawnEdge`). This is landmine 58's shape: a simplifier's
+degenerate case returns nothing, silently.
+
+**227. A plant that compares a value with itself can never fail.** Take 188's
+step 6 rewrote render's "no pin row wears the accent" guard so that it reads each
+row's badge image through `fillOf`. Its planted control was `_near(accent,
+accent, 24) && !_near(fuel's table colour, accent, 24)`. The first half compares
+the accent with itself. The second compares two table colours that check_badges
+already holds ΔE ≥ 20 apart. Neither half touches fillOf, the decoded image or
+the sampler, so the plant could not fail. Yet render-t188-s6-fix1.log line 151
+printed "a planted accent is caught", and the step's notes said every guard had
+been shown to fail on a planted control. A review caught it by reading. The
+plant now builds a detached row the way the app builds one, with an image filled
+with the accent, and feeds it through the real fillOf. A copy of render.mjs
+whose fillOf ignores the image then failed both lines (RENDER FAILED (2)). The
+guard alone read 0 there and would have passed; the plant is what failed it.
+The cold audit and its review found the same shape in two more checks: render's
+Voice check read `!vb.hidden` on a button that is never hidden now (F14), and
+the F17 drill's `opened` could not fail (R6). All 11 of the review's new mutants
+went NOT CAUGHT by the smoke from before the review
+(mutants-t188-review-headsmoke.log). Rule: a plant is the product's input with
+the fault in it, fed through the same reader the guard uses. A plant that
+exercises only the comparator proves the comparator. Watch the guard fail by
+breaking the reader as well (a copy whose sampler ignores its input), not only
+by planting a value. Landmine 39's shape, one level down.
+
+**228. A released lock is not an exited Chrome.** Take 188 ran its lanes in
+parallel and put every Chrome command under `flock /tmp/apex-chrome.lock`. The
+lock is released when the holder's command returns, while its Chrome is still
+shutting down. Three times the next holder read a Chrome count above 0. Step 9's
+render printed "chrome count 1" and did not refuse (render-t188-s9-d7.log); 11 s
+later every Chrome was its own, so INFERRED the previous holder's Chrome was
+still exiting. Step 10's r4c read "chrome procs: 4" right after step 6's render
+released the lock, and refused (EXIT=97). Step 13's lane job printed "chrome=1"
+and did not refuse (render-t188-s13-lane.log). It then cleared
+`/tmp/puppeteer_dev_chrome_profile-*` while that Chrome was alive, which can pull
+a running Chrome's profile out from under it. Whose Chrome it was, and whether a
+profile went, are UNKNOWN. Step 10's locked_render.sh also printed the count and
+carried on. Rule: inside the lock, wait up to 60 s for `pgrep -x chrome | wc -l`
+to read 0 and refuse if it never does. Clear the profiles only after that, never
+while any Chrome runs. The integration scripts from step 13b on do exactly that
+and read 0 at every start. Landmine 221's "count must be zero" holds inside a
+lock too, because the lock serialises launches, not exits.
+
+**229. A queued `flock … > log` truncates its log at launch, not when it gets
+the lock.** The shell opens and truncates the redirect before flock runs, so a
+launch waiting behind the lock already owns its log. Take 188, step 10: two
+render launches in the `flock … bash -c '…'` form did not show in `ps` right
+after launch and seemed to vanish, so the render was launched again to the same
+log name. One earlier launch was queued, not gone: flock PID 341148 was found
+later and stopped by its own PID. render-t188-s10-r4.log holds a PASSING run
+(PID 343538, "chrome procs: 1", RENDER PASSED / EXIT=0 at lines 351–352) followed
+by the tail of a FAILED one ("RENDER FAILED (1)" / "EXIT=1", lines 353–356), so
+two runs wrote one file. The failure the step had edited V4_CONTRAST for
+("#steps div.d/div.at 3.31:1") is in no log now; the ratio is INFERRED from the
+colours. The notes' "nothing ran twice" was wrong. Whether two Chromes overlapped
+is UNKNOWN. Rule: give every launch a fresh log name and never reuse one. A
+launch that is not in `ps` may be queued behind the lock, so look for its flock
+process (`pgrep -x flock`) before launching again.
+
+**230. An opaque panel over the map can make headless Chrome cull a strip of the
+map canvas.** Take 188's step 11 made the Layers panel opaque (#171613; take
+187's was translucent). In the probe shots v4-07 and v4-08 a flat rectangle the
+colour of #map's background (228,215,188) then sat directly above the open
+panel, as wide as it and about 83 CSS px tall. The step measured it under the
+lock (probe-t188-s11-lane-patch*.log), all PROVEN in desktop headless Chrome. No
+DOM element paints there: the only elements are html, body, #shell, #stage, #map
+and the canvas. The canvas holds map detail there (150 colour bins, 0 transparent
+pixels, the same as with the panel closed). The patch shows at 600 ms, settled,
+with the transition off and with the box-shadow off. With the panel's background
+at alpha .99 it is gone. INFERRED mechanism: the compositor's occlusion culling
+miscomputes the region the opaque, scrolling panel hides. On the Fold's WebView
+it is UNKNOWN; it is not fixed and is carried to the phone check. Rule: when a
+screenshot shows a flat block of the container's background where the map
+should be, read the canvas's own pixels before blaming the style, the data or
+the camera, because a screenshot is the compositor's output, not the canvas. Test
+for culling by setting the covering element's alpha to .99, and do not ship that
+workaround until a phone shows the patch.
+
+**231. A mark's contrast is judged against the surface it is drawn on, not its
+parent's ground.** Step 12 gave every selected state a mark: a `--sel` dot
+(`::before`) inside the control. Render r1 failed "selected #c-search.on 1.15:1,
+selected #c-ride.on 1.15:1" (render-t188-s12-r1.log line 504). The audit
+composited every mark over `bases(el.parentElement)[0]`. For a chip on `#tools`
+that is the strip's gradient, whose most transparent stop over white is white,
+and the bone dot (#F5EFE2) on white is 1.15:1, the logged number exactly. The dot
+is actually drawn inside the chip's opaque #171613, at 15.8:1 (PROVEN by
+arithmetic). It never bit on take 187 because `.chip.on` changed its fill, and
+the fill comparison carried it. It was a wrong test (landmine 54), fixed in the
+judge and not the floor: a `::before` mark is now composited over `bases(mark)`.
+Two plants hold the fix both ways. A bone dot on a dark control over a white
+parent is NOT flagged, and a dot the colour of its own control IS. Rule:
+composite a foreground over the nearest painted ground of the element that draws
+it (for a pseudo-element, its host), never over a container's ground. When a
+ratio looks impossible, recompute it by hand from the colours the judge used;
+here the arithmetic named the wrong ground.
+
+**232. A GPS watch is closed through the handle that opened it, never through a
+shared global.** Take 187's locateOnce saved the ride's global `watchId`, opened
+its own watch through gpsStart (which overwrote the global), and on its first fix
+or its 25 s give-up ran `gpsStop(); watchId=saveWatch`. Its comment said "leave a
+ride's own watch alone". But gpsStop cleared whatever watchId held at that
+moment, and if Ride had been pressed while the startup locate was still waiting,
+that was the RIDE's watch. The ride would then stop moving after its first fix,
+or the chip would read "Stop (GPS)" for ever (INFERRED; not run on a phone). Off
+a ride, gpsStop used the plugin only when rideMode was 'cap', so a Capacitor id
+went to the web clearWatch and the native watch ran on (F19). Take 188 widened
+the window: every watch got GPS_FIRST_FIX_MS (a day) as its first-fix timeout,
+so the startup watch stayed open until its fix or the 25 s timer, where the
+plugin's default had ended it at 10 s. The cold audit found it by reading (F4,
+major). Smoke 11 F4 reproduced it: with the fix taken out, the locate's fix
+closed the ride's watch ("closed [15]", which is the ride's id; CAUGHT in
+mutants-t188-audit-*.log, PROVEN). The fix: gpsWatch returns a handle `{drv,
+id}`, gpsClear closes exactly that handle through the driver that opened it (also
+when the plugin hands its id back later), and only gpsStart and gpsStop touch the
+ride's. Rule: a resource is closed through its own handle by whoever opened it.
+Saving and restoring a shared global around a borrow is not ownership, because
+anything asynchronous (a fix, a timer, a rider's press) can land between the
+save and the restore.
+
+**233. Working notes that a take depends on do not belong in /tmp.** Take 188
+kept its plan, specs, per-step notes, workflow scripts, a frozen take-187 tree
+and the mockup sources in the session scratchpad under /tmp. Between 2026-09-26
+and 2026-09-30 the cold audit's fix step hit a usage limit mid-work, with 11
+patches applied, untested and uncommitted. The workstation then restarted, /tmp
+was wiped, and all of the above went with it. The repo was intact (v4 at 0cfd9c4
+plus the five uncommitted files). The scratchpad was rebuilt from the agents'
+transcripts, by replaying their Write/Edit calls and heredocs, and the plan came
+from the spec workflow's journal with the orchestrator's eight plan edits
+replayed. Where a rebuilt note and a workflow report differ, the report is taken
+as authoritative, so part of the take's record is now a reconstruction. Rule:
+anything the HANDOFF or a later step will cite (notes, specs, patch scripts,
+measurement JSON) is written outside /tmp as it is written. Take 188 mirrors it
+to a backup directory in the home directory. A companion to landmine 215: what
+/tmp holds survives a turn, not a restart.

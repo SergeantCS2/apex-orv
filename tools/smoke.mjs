@@ -61,7 +61,7 @@ const EXPECT_PARTIAL = (opt("--expect-partial", "") || "").split(",").filter(Boo
 const NO_GPS = args.includes("--no-gps");
 
 let failures = 0;
-const geo = { cb: null, err: null, cleared: 0 };
+const geo = { cb: null, err: null, cleared: 0, seq: 0, id: null, watches: new Map(), clearedIds: [] };
 const protocolsAdded = [];
 const markers = [];
 function ok(cond, msg) {
@@ -113,6 +113,7 @@ class El {
   getBoundingClientRect() { return { left: 0, top: 0, width: 411, height: 40, right: 411, bottom: 40 }; }
   scrollIntoView() { this._scrolledIntoView = true; }
   appendChild() {}
+  getAttribute(n) { const m = /^data-([a-z]+)$/.exec(String(n)); return m && m[1] in this.dataset ? this.dataset[m[1]] : null; }
 }
 
 const byId = new Map();
@@ -132,6 +133,15 @@ const documentStub = {
   getElementById: grab,
   createElement: () => new El(null),
   querySelectorAll: (sel) => {
+    /* take 188 · cold audit · [data-x]: the buttons a card binds by
+       attribute (the loop chooser's distances). The stub answered none, so
+       no drill could choose a loop */
+    const at = String(sel).match(/^\[data-([a-z]+)\]$/);
+    if (at) {
+      const hit = [];
+      for (const el of byId.values()) for (const c of el._children) if (at[1] in c.dataset) hit.push(c);
+      return hit;
+    }
     const cls = (sel.match(/\.([\w-]+)/) || [])[1];
     if (!cls) return [];
     const out = [];
@@ -274,7 +284,11 @@ class MapStub {
        code to read one — the A110 place card — crashed on a real bug the stub
        had been hiding: a click handler that throws takes every other tap with
        it. Faithful stubs, or the harness invents its own bugs (landmine 62). */
-    return (this._hit || []).map((f) =>
+    /* take 188 · a planted hit that carries layer.id (as MapLibre's do) is
+       returned only to a query that asks for that layer; one without a layer
+       answers every query, as it always has */
+    const want = arguments[1] && arguments[1].layers;
+    return (this._hit || []).filter((f) => !want || !f || !f.layer || want.includes(f.layer.id)).map((f) =>
       f && f.geometry ? f : Object.assign({}, f,
         { geometry: { type: "Point", coordinates: this.getCenter
                         ? [this.getCenter().lng, this.getCenter().lat]
@@ -347,9 +361,16 @@ const sandbox = {
     const nav = { vibrate: () => {} };
     if (!NO_GPS) {
       /* real-GPS driver: the harness owns the fix stream */
+      /* take 188 · cold audit · each watch has its own id, and the receiver
+         closes the one it is asked to close, as a browser does. Every watch
+         used to be 42 and any clearWatch emptied the one callback slot, so
+         the harness could not tell the ride's watch from the startup
+         locate's — the very mix-up the app had (landmine 62). geo.cb and
+         geo.err stay the NEWEST watch's, which is what the drills answer;
+         geo.watches holds every watch still open. */
       nav.geolocation = {
-        watchPosition(cb, err) { geo.cb = cb; geo.err = err; return 42; },
-        clearWatch() { geo.cleared++; geo.cb = null; },
+        watchPosition(cb, err) { const id = ++geo.seq; geo.watches.set(id, { cb, err }); geo.cb = cb; geo.err = err; geo.id = id; return id; },
+        clearWatch(id) { geo.cleared++; geo.clearedIds.push(id); geo.watches.delete(id); if (id === geo.id) geo.cb = null; },
       };
     }
     return nav;
@@ -433,6 +454,145 @@ for (const s of ["net", "route", "crumb", "back"])
    CAN see, and the app self-checks the rest at runtime (landmine 47). */
 const netF = record.sources.net.data.features.length;
 ok(netF > 1000, `net source carries real geometry (${netF} features)`);
+/* 2a · take 188 · A202 D7 (G8) · the low-zoom strokes are the drawn edges,
+   chained by class, and nothing else: per class, stroke vertices = edge
+   vertices minus one per join (joins = edges - strokes), and stroke length is
+   at least the edge length and at most 40 m more per join with a gap (the
+   graph puts edge ends up to 36 m off their node; a gap join is counted as an
+   edge end missing from its class's stroke vertices, which can only
+   undercount). Every stroke has no edge id and a class that has edges; every
+   class has a stroke. Run on two planted copies first (landmine 54).
+   Step 9b scoped the chaining to the five designated trail classes; step
+   13b2 extended it, by measurement, to every class Hybrid draws below z11
+   that lost more than 2%; take 188 then scoped two-track and paved back to
+   per-edge (the ten classes cost +3.0/+3.2 s to ready on desktop, and those
+   two were 82% of the stroke vertices). The set is the app's NETLO_CLS, read
+   from the built app.js, not typed here; it must equal what the app reports,
+   contain the casing's designated five, and hold no class of D7_SKIP below.
+   D7_SKIP is recorded HERE, each class with its measured reason, and the
+   app's NETLO_SKIP must name the same classes: every drawn class is either
+   chained or on this list, so a class moved in or out, or one the data gains
+   later, fails until someone measures it and changes both. A stroke of any
+   class outside the set is a failure, and so is a chained class without one
+   (third plant: a stroke moved to a class outside the set). G8s: on Map the
+   style wraps exactly the network layers that can draw a stroke, and leaves
+   every other network filter as take 187 wrote it (two plants). */
+{
+  const d7len = (co) => { let m = 0; for (let k = 1; k < co.length; k++) {
+    const dx = (co[k][0] - co[k - 1][0]) * 79000, dy = (co[k][1] - co[k - 1][1]) * 111320; m += Math.sqrt(dx * dx + dy * dy); } return m; };
+  const unLo = (f) => Array.isArray(f) && f[0] === "all" && f.length === 3
+    && JSON.stringify(f[2]) === JSON.stringify(["!", ["has", "lo"]]) ? f[1] : f;
+  const casL = (record.style.layers || []).find((l) => l.id === "casing") || {};
+  const casF = unLo(casL.filter);
+  const DESIG = Array.isArray(casF) && casF[0] === "in" && Array.isArray((casF[2] || [])[1]) ? casF[2][1].slice() : [];
+  const clsDecl = /NETLO_CLS=\[([^\]]*)\]/.exec(readFileSync(join(WWW, "app.js"), "utf8"));
+  const SCOPE = clsDecl ? (clsDecl[1].match(/'[^']+'/g) || []).map((x) => x.slice(1, -1)) : [];
+  const nlo = sandbox.window.__netLo || {};
+  /* the classes drawn per edge at every zoom, and the measured reason
+     (Hybrid, step 13b2's two cameras per class; unchained share of length
+     kept at z7, and the class's stroke vertices when step 13b2 chained it) */
+  const D7_SKIP = {
+    track: "two-track: 90.1-94.7% kept at z7 unchained, 704,198 stroke vertices (65% of the ten-class strokes)",
+    paved: "paved: 89.6-96.9% kept at z7 unchained, 190,401 stroke vertices (18%)",
+    minor: "minor: Hybrid draws it from z11.5 only, so a stroke could never draw",
+  };
+  const SKIPC = Object.keys(D7_SKIP);
+  const g8set = (sc, app, des) => sc.length > 0 && des.length === 5 && des.every((c) => sc.includes(c)) && !sc.some((c) => SKIPC.includes(c))
+    && JSON.stringify(app.slice().sort()) === JSON.stringify(sc.slice().sort());
+  ok(!g8set(SCOPE.filter((c) => c !== "mccct"), SCOPE.filter((c) => c !== "mccct"), DESIG) && !g8set(SCOPE.concat("minor"), SCOPE.concat("minor"), DESIG)
+     && !g8set(SCOPE.concat("track"), SCOPE.concat("track"), DESIG) && !g8set(SCOPE.concat("paved"), SCOPE.concat("paved"), DESIG)
+     && !g8set(SCOPE, SCOPE.slice(0, -1), DESIG),
+     "G8 · the scope judge rejects a set without a designated class, a set with minor, with track, with paved, and an app that reports a different set");
+  /* every class the net source draws is chained or on D7_SKIP. A class the
+     data gains later is reported here until someone measures it and decides. */
+  const netCls = [...new Set(record.sources.net.data.features.filter((f) => f.properties && f.properties.i !== undefined).map((f) => f.properties.c))];
+  const unchained = (sc) => netCls.filter((c) => !SKIPC.includes(c) && !sc.includes(c));
+  ok(unchained(SCOPE.filter((c) => c !== "fsroad")).join() === "fsroad",
+     "G8 · the coverage judge names fsroad when a planted scope leaves it out");
+  ok(netCls.length > 5 && unchained(SCOPE).length === 0 && SKIPC.every((c) => netCls.includes(c)),
+     `G8 · every drawn network class is chained or recorded per-edge (${netCls.length} classes in the net source; per edge: ${SKIPC.join(", ")})`
+     + (unchained(SCOPE).length ? " — NOT CHAINED AND NOT RECORDED: " + unchained(SCOPE).join(", ") : "")
+     + (SKIPC.every((c) => netCls.includes(c)) ? "" : " — recorded but not in the net source: " + SKIPC.filter((c) => !netCls.includes(c)).join(", ")));
+  ok(g8set(SCOPE, nlo.cls || [], DESIG),
+     `G8 · the chained classes are NETLO_CLS (${SCOPE.join(", ")}): the casing's five (${DESIG.join(", ")}) plus the measured ones, none of ${SKIPC.join("/")}; app says ${(nlo.cls || []).join(", ") || "none"}`);
+  const skipSame = (app) => JSON.stringify((app || []).slice().sort()) === JSON.stringify(SKIPC.slice().sort());
+  ok(!skipSame(SKIPC.filter((c) => c !== "paved")) && !skipSame(SKIPC.concat("fsroad")) && skipSame(nlo.skip),
+     `G8 · the app's NETLO_SKIP names the recorded per-edge classes (${(nlo.skip || []).join(", ") || "none"}); `
+     + "a planted list without paved, or with fsroad, is rejected");
+  for (const c of SKIPC) console.log(`  ..   G8 per edge: ${D7_SKIP[c]}`);
+  const g8 = (feats) => {
+    const E = {}, S = {}, bad = [], key = (p) => p[0] + "," + p[1];
+    for (const f of feats) {
+      const p = f.properties || {}, co = f.geometry.coordinates;
+      if (p.lo === 1) { if (p.i !== undefined) bad.push(`${p.c}: a stroke carries an edge id`);
+        const r = (S[p.c] ||= { n: 0, v: 0, L: 0, pts: new Set() }); r.n++; r.v += co.length; r.L += d7len(co);
+        for (const q of co) r.pts.add(key(q)); }
+      else if (p.i !== undefined) { const r = (E[p.c] ||= { n: 0, v: 0, L: 0, ends: [] }); r.n++; r.v += co.length; r.L += d7len(co);
+        r.ends.push(co[0], co[co.length - 1]); }
+    }
+    for (const c of Object.keys(S)) if (!E[c]) bad.push(`${c}: strokes of a class with no edges`);
+    for (const c of Object.keys(S)) if (!SCOPE.includes(c)) bad.push(`${c}: ${S[c].n} strokes of a class outside the chained set`);
+    const rows = {};
+    for (const c of Object.keys(E)) {
+      if (!SCOPE.includes(c)) continue;
+      const e = E[c], t = S[c];
+      if (!t) { bad.push(`${c}: no stroke`); continue; }
+      const joins = e.n - t.n, gaps = e.ends.filter((q) => !t.pts.has(key(q))).length, dL = t.L - e.L;
+      rows[c] = { edges: e.n, strokes: t.n, gaps, dLm: Math.round(dL), v: t.v };
+      if (t.v !== e.v - joins) bad.push(`${c}: ${t.v} stroke vertices, expected ${e.v} - ${joins} joins = ${e.v - joins}`);
+      if (dL < -1e-6 * e.L || dL > gaps * 40) bad.push(`${c}: stroke length ${Math.round(t.L)} m vs edges ${Math.round(e.L)} m (${gaps} gap joins)`);
+    }
+    return { bad, rows }; };
+  const net = record.sources.net.data.features, nLo = net.filter((f) => f.properties && f.properties.lo === 1).length;
+  if (!nLo) ok(false, "G8 · the net source carries no low-zoom strokes (A202 D7 missing, or its chaining failed)");
+  else {
+    const byC = {}; net.forEach((f, k) => { const p = f.properties; if (p.lo === 1 && (!byC[p.c] || f.geometry.coordinates.length > net[byC[p.c]].geometry.coordinates.length)) byC[p.c] = k; });
+    const cls = Object.keys(byC).sort((a, b) => net[byC[b]].geometry.coordinates.length - net[byC[a]].geometry.coordinates.length)[0];
+    const dropped = net.filter((f, k) => k !== byC[cls]);
+    const other = Object.keys(byC).find((c) => c !== cls);
+    const moved = net.map((f, k) => k === byC[cls] ? { ...f, properties: { ...f.properties, c: other } } : f);
+    const p1 = g8(dropped).bad, p2 = g8(moved).bad;
+    ok(p1.some((x) => x.startsWith(cls + ":")) && p2.some((x) => x.startsWith(cls + ":")) && p2.some((x) => x.startsWith(other + ":")),
+       `G8 names the class when ${cls}'s longest stroke is removed (${p1.length}) and when it is moved to ${other} (${p2.length})`);
+    const outC = net.find((f) => f.properties && f.properties.i !== undefined && !SCOPE.includes(f.properties.c));
+    const outside = outC ? outC.properties.c : "track";
+    const p3 = g8(net.map((f, k) => k === byC[cls] ? { ...f, properties: { ...f.properties, c: outside } } : f)).bad;
+    ok(p3.some((x) => x.startsWith(outside + ":")),
+       `G8 names ${outside} when a stroke is moved outside the chained set (${p3.length})`);
+    const r = g8(net);
+    ok(r.bad.length === 0, `G8 · ${nLo} low-zoom strokes conserve every class's drawn edges (vertices exact, length +0..40 m per gap join)`
+       + (r.bad.length ? " — " + r.bad.slice(0, 4).join("; ") : ""));
+    console.log("  ..   G8 baseline: " + Object.entries(r.rows).map(([c, x]) => `${c} ${x.edges}e/${x.strokes}s/${x.v}v/${x.gaps}g/+${x.dLm}m`).join(" · "));
+  }
+  /* G8s · the style's network layers. A layer whose classes are all chained
+     carries ['all', <class filter>, ['!',['has','lo']]] on Map; any other
+     network layer carries no 'lo' at all; the app's swap table names exactly
+     the wrapped layers. */
+  const g8s = (layers) => {
+    const bad = [], wrapped = [];
+    for (const l of layers) {
+      if (l.source !== "net") continue;
+      const base = unLo(l.filter), isW = base !== l.filter;
+      const cl = Array.isArray(base) && base[0] === "==" ? [base[2]]
+        : Array.isArray(base) && base[0] === "in" && Array.isArray((base[2] || [])[1]) ? base[2][1] : null;
+      if (!cl) { bad.push(`${l.id}: class filter not read`); continue; }
+      const inS = cl.every((c) => SCOPE.includes(c));
+      if (inS && !isW) bad.push(`${l.id}: can draw a stroke but is not wrapped on Map`);
+      if (!inS && /"lo"/.test(JSON.stringify(l.filter))) bad.push(`${l.id}: outside the chained set but its filter reads lo`);
+      if (isW) wrapped.push(l.id);
+    }
+    return { bad, wrapped }; };
+  const LS = record.style.layers || [];
+  const pw = g8s(LS.map((l) => l.id === "casing-track" || l.id === "paved" ? { ...l, filter: ["all", l.filter, ["!", ["has", "lo"]]] } : l)).bad;
+  const pu = g8s(LS.map((l) => l.id === "casing-fsroad" ? { ...l, filter: unLo(l.filter) } : l)).bad;
+  ok(pw.some((x) => x.startsWith("casing-track:")) && pw.some((x) => x.startsWith("paved:")) && pu.some((x) => x.startsWith("casing-fsroad:")),
+     `G8s flags planted wrapped casing-track and paved filters (${pw.length}) and an unwrapped casing-fsroad filter (${pu.length})`);
+  const gs = g8s(LS), tab = (nlo.layers || []).slice().sort();
+  ok(gs.bad.length === 0 && gs.wrapped.length >= 6 && JSON.stringify(gs.wrapped.slice().sort()) === JSON.stringify(tab),
+     `G8s · Map wraps exactly the ${gs.wrapped.length} network layers that can draw a stroke (${gs.wrapped.join(", ")}), `
+     + `every other network filter is take 187's, and the swap table agrees`
+     + (gs.bad.length ? " — " + gs.bad.slice(0, 4).join("; ") : "") + (JSON.stringify(gs.wrapped.slice().sort()) === JSON.stringify(tab) ? "" : ` — table ${tab.join(", ")}`));
+}
 ok(record.sources.places.data.features.length === (manifest.anchors || []).length,
    "places source carries every region anchor");
 const appSrc = readFileSync(join(WWW, "app.js"), "utf8");
@@ -542,7 +702,7 @@ if (AWAY) {
   ok(/\d{2}\.\d{5}/.test(card), "…card shows decimal degrees");
   ok(/from your position/.test(card), "…and distance + bearing from you");
   ok(/pc-route/.test(card) && /pc-home/.test(card) && /pc-start/.test(card),
-     "…and offers Directions / Make home / Start from here");
+     "…and offers Route here / Make home / Start from here");
   /* The HOME spec (take 117): away planning sets the truck as home FIRST —
      exactly what the away banner tells the rider to do. */
   /* The HOME spec (take 117): away planning sets the truck as home FIRST —
@@ -562,16 +722,21 @@ if (AWAY) {
   if (homeMarker) {
     homeMarker.getElement().fire("click", { stopPropagation() {} });
     ok(/Home \/ truck/.test(grab("panel")._html), "tapping the home pin opens its card");
-    ok(/pc-route/.test(grab("panel")._html), "…with Directions to it");
+    ok(/pc-route/.test(grab("panel")._html), "…with Route here to it");
   } else ok(false, "home marker was created with a class we can find");
   theMap.fire("click", { lngLat: { lng: cx, lat: cy }, point: { x: 540, y: 900 } });
 
   /* the action a rider actually wants: route to the thing they tapped */
-  ok(!!grab("pc-route"), "Directions button is addressable");
+  ok(!!grab("pc-route"), "Route here button is addressable");
   grab("pc-route").fire("click");
   flushTimeouts();
   ok(documentStub.querySelectorAll(".rc").length >= 2,
      "…and routes to the dropped pin with multiple profiles");
+  /* take 188 · A217 · the route cards' one primary: Ride it (this pass is
+     --away only; the default and --no-gps passes start their ride from it
+     in section 7) */
+  ok(/id="rc-ride"/.test(grab("panel")._html) && /<span>Ride it<\/span>/.test(grab("panel")._html),
+     "…with Ride it (#rc-ride) under the cards");
   /* and a tap that HITS a trail must still identify it, not move the start */
   theMap._hit = [{ properties: { i: 0 } }];
   theMap.fire("click", { lngLat: { lng: cx, lat: cy }, point: { x: 300, y: 700 } });
@@ -585,12 +750,63 @@ if (AWAY) {
   const pinsBefore = markers.length;
   grab("pc-start").fire("click");
   ok(markers.length === pinsBefore - 1, "using the pin as a start removes the pin marker");
-  ok(/Start is here now/.test(grab("panel")._html), "…and says the ◎ pin holds the spot");
+  ok(/Start is here now/.test(grab("panel")._html), "…and says the start pin holds the spot");
   theMap._hit = [];
   grab("btn-home").fire("click");
   flushTimeouts();
   const pc = documentStub.querySelectorAll(".rc");
   ok(pc.length >= 2, `Return Home still routes from the planned start (${pc.length} profiles)`);
+  /* take 188 · cold audit (F8, F20) · a ride that meets an out-of-region fix
+     ENDS, all of it. Ride starts navigation at the press (the strip, the
+     wake lock); the away branch closed the watch and the flag and left the
+     rest: a strip over no ride, and — mid-ride — a ride sheet whose Stop
+     did nothing, a recording never closed and a trip left resumable. Both
+     ways in: the first fix after the press, and a fix after the ride was
+     recording. The judge is shown each ride's own running state, which it
+     must reject (its control). */
+  {
+    const N = sandbox.window.__nav, RD = sandbox.window.__ride;
+    const awayFix = { coords: { longitude: bb[0] - 1.5, latitude: (bb[1] + bb[3]) / 2, accuracy: 8 } };
+    const state = () => ({ strip: grab("nav").hidden === false, on: !!(N && N.state.on), sheet: grab("hudstats").hidden === false,
+      tape: grab("hudbar").hidden === false, flag: "ride" in grab("shell").dataset, watch: typeof geo.cb === "function",
+      chip: String(grab("c-ride")._html || "").replace(/<[^>]*>/g, ""), chipOff: grab("c-ride").hidden === true });
+    const ended = (x) => !x.strip && !x.on && !x.sheet && !x.tape && !x.flag && !x.watch && /Ride it/.test(x.chip) && !x.chipOff;
+    const say = (x) => `strip ${x.strip}, guidance ${x.on}, sheet ${x.sheet}, tape ${x.tape}, flag ${x.flag}, watch ${x.watch}, chip "${x.chip}"`;
+    /* the first fix after the press */
+    grab("c-ride").fire("click");
+    const pressed = state(), cl1 = geo.cleared;
+    geo.cb && geo.cb(awayFix); flushTimeouts(); frames(1);
+    const a = state(), aCard = grab("panel")._html || "";
+    ok(pressed.strip && pressed.on && pressed.flag && pressed.watch && !ended(pressed)
+       && ended(a) && geo.cleared === cl1 + 1 && /mi from/.test(aCard) && /Planning mode/.test(aCard),
+       `Ride, then a first fix out of region: nothing of the ride is left (${say(a)}) and the card says why; `
+       + `the judge rejects the pressed state (${say(pressed)})`);
+    /* a ride already recording */
+    grab("c-ride").fire("click");
+    for (let i = 0; i < 3; i++)
+      geo.cb && geo.cb({ coords: { longitude: cx + i * 8e-4, latitude: cy + i * 5e-4, accuracy: 5 } });
+    frames(2);
+    const riding = state(), recording = !!(RD && RD.R), trip = !!(N && N.load()), cl2 = geo.cleared, seq2 = geo.seq;
+    geo.cb && geo.cb(awayFix); flushTimeouts(); frames(1);
+    const b = state(), bCard = grab("panel")._html || "";
+    grab("hud-stop").fire("click");                     /* a Stop left behind must start nothing */
+    /* review of the audit fixes · the card: it said only where the rider is
+       and that tracking stays off "until you are in the region" — as if it
+       came back by itself. A ride that ended says so, with what it recorded,
+       and that Ride it must be pressed again; the ride that never recorded
+       is told the last part too. The judge is shown take 187's card. */
+    const told = (h, rec) => /mi from/.test(h) && !/stay off until/.test(h) && /Press <b>Ride it<\/b> again/.test(h)
+      && (!rec || (/Ride ended/.test(h) && /[\d.]+ mi<\/b> recorded/.test(h)));
+    const old187 = "<b>You are about 90 mi from Michigan.</b><br>Planning mode … <br><br>Live tracking and the dispatch card stay off until you are in the region — they must never report a position you are not standing at.";
+    ok(told(aCard, false) && !/Ride ended/.test(aCard) && told(bCard, true) && !told(old187, true) && !told(old187, false),
+       `the away card after a ride says what became of it ("${bCard.replace(/<[^>]*>/g, "").slice(0, 90)}…"; before any fix: no "Ride ended", `
+       + `and Press Ride it again ${/Press <b>Ride it<\/b> again/.test(aCard)}); the judge rejects take 187's card`);
+    ok(riding.sheet && riding.tape && riding.strip && recording && trip && !ended(riding)
+       && ended(b) && geo.cleared === cl2 + 1 && geo.seq === seq2 && !(RD && RD.R) && !(N && N.load())
+       && /mi from/.test(bCard),
+       `a recording ride that leaves the region ends as Stop ends it (${say(b)}; recording closed ${!(RD && RD.R)}, `
+       + `trip closed ${!(N && N.load())}, no new watch ${geo.seq === seq2}); the judge rejects the riding state (${say(riding)})`);
+  }
   console.log(failures ? `\nSMOKE FAILED (${failures})` : "\nSMOKE PASSED");
   process.exit(failures ? 1 : 0);
 }
@@ -713,6 +929,26 @@ ok(/No home set/i.test(grab("panel")._html || ""),
   grab("c-home").fire("click"); flushTimeouts();
   grab("hc-clear").fire("click"); flushTimeouts();
   ok(home() === null && /Home cleared/.test(grab("panel")._html), "Clear home removes it from storage and says so");
+  /* take 188 · A217 · a bare acknowledgement is a toast: the words on
+     #toast, the drawer folded (the map back), the panel still holding the
+     text. Read textContent, not hidden: flushTimeouts has already run the
+     2.4 s hide. The judge fails on an emptied toast (its control). */
+  const acked = (want, t, rail, panel) => want.test(t) && rail === "folded" && want.test(panel);
+  ok(acked(/Home cleared/, grab("toast").textContent, grab("rail").className, grab("panel")._html)
+     && !acked(/Home cleared/, "", grab("rail").className, grab("panel")._html),
+     `Clear home is a toast ("${grab("toast").textContent}", drawer ${grab("rail").className || "OPEN"}); `
+     + "an emptied toast fails the same judge (its control)");
+  /* Remove pin, which smoke never fired before */
+  theMap.fire("contextmenu", { lngLat: { lng: c[0] + 0.015, lat: c[1] - 0.004 } });
+  flushTimeouts();
+  ok(/Dropped pin/.test(grab("panel")._html) && /id="pc-drop"/.test(grab("panel")._html),
+     "a dropped pin's card offers Remove pin");
+  const pinsNow = markers.filter((m) => !m._removed).length;
+  grab("pc-drop").fire("click"); flushTimeouts();
+  ok(acked(/Pin removed/, grab("toast").textContent, grab("rail").className, grab("panel")._html)
+     && !/Dropped pin/.test(grab("panel")._html),
+     `Remove pin is a toast ("${grab("toast").textContent}", drawer ${grab("rail").className || "OPEN"}), `
+     + `and the panel no longer holds the pin's card (${pinsNow} markers before)`);
 }
 {
   /* the rider's path: press-and-hold a spot a few km out, "Make this home" */
@@ -1058,18 +1294,183 @@ ok((record.setData.alt || []).length > 0 &&
 grab("btn-steps").fire("click");
 ok(/steps ·/.test(grab("panel")._html), "turn-by-turn generated");
 
+/* 6a3 · take 188 · cold audit (F9) · Retrace with nothing recorded names
+   ONE way to record: Ride it, with a GPS fix. The line used to offer "Ride
+   it …, or this fills in from GPS on a real ride" — two sources, from when
+   Ride it fell back to the simulator (A223 removed that). The judge is
+   shown that line and must reject it. No ride has run yet in this pass. */
+{
+  const had = sandbox.window.__nav ? sandbox.window.__nav.crumbs() : -1;
+  grab("btn-retrace").fire("click");
+  const t = (grab("panel")._html || "").replace(/<[^>]*>/g, "");
+  const oneWay = (x) => /Nothing recorded yet/.test(x) && /Ride it/.test(x) && /with a GPS fix/.test(x)
+    && !/, or /.test(x) && !/lay a track/.test(x);
+  ok(had >= 0 && had < 2 && oneWay(t)
+     && !oneWay("Nothing recorded yet. Tap Ride it (Ride tab) to lay a track, or this fills in from GPS on a real ride."),
+     `Retrace with nothing recorded (${had} fixes) names one way to record: "${t}"; the judge rejects take 187's two-source line`);
+}
+
+/* 6b · take 188 · A223 · the maintainer, 2026-09-25: "Refuse honestly". A
+   GPS error before the first fix (location off, permission refused) starts
+   NOTHING and says so — take 187 fell back to a simulated ride on the phone.
+   The watch is opened by the Ride chip, the harness answers it with an
+   error, and the app must close it, leave no ride flag, no sheet and no
+   simulator, and put the Ride tab's Ride it back — pressed again, it TRIES
+   AGAIN (a new watch). The route cards are not asserted: the refusal card
+   replaces them, and this stub keeps one element per id, so a detached
+   #rc-ride would still answer here (the review of step 13b1). */
+if (!NO_GPS) {
+  const cl0 = geo.cleared;
+  grab("c-ride").fire("click");
+  ok(typeof geo.cb === "function" && typeof geo.err === "function", "Ride opens a GPS watch (the refusal drill)");
+  geo.err && geo.err({ code: 1, message: "User denied Geolocation" });
+  flushTimeouts(); frames(1);
+  const ph = grab("panel")._html || "";
+  ok(/No GPS fix/.test(ph) && /turn on location and try again/.test(ph) && /Nothing started/.test(ph) && !/simulat/i.test(ph),
+     `a GPS error before the first fix refuses honestly ("${ph.replace(/<[^>]*>/g, "").slice(0, 80)}")`);
+  ok(sandbox.window.__nav.pos() !== "sim" && grab("hudstats").hidden === true,
+     `…and no simulated ride starts (position mode ${sandbox.window.__nav.pos()}, ride sheet hidden ${grab("hudstats").hidden})`);
+  ok(!("ride" in grab("shell").dataset) && /Ride it/.test(grab("c-ride")._html || "") && geo.cleared === cl0 + 1 && geo.cb === null,
+     "…the watch is closed, the ride flag is off and the Ride chip reads Ride it again");
+  ok(grab("c-ride").hidden === false,
+     `…the Ride tab's Ride it is on screen to try again (hidden ${grab("c-ride").hidden})`);
+  /* the retry: the same chip opens a NEW watch; a second error refuses
+     again (the once-per-press latch re-arms on every press) */
+  geo.cb = null; geo.err = null;
+  grab("c-ride").fire("click");
+  const retryOpen = typeof geo.cb === "function" && /Stop \(GPS\)/.test(grab("c-ride")._html || "") && grab("shell").dataset.ride === "1";
+  geo.err && geo.err({ code: 2, message: "Position unavailable" });
+  flushTimeouts(); frames(1);
+  ok(retryOpen && /No GPS fix/.test(grab("panel")._html || "") && geo.cleared === cl0 + 2 && geo.cb === null
+     && /Ride it/.test(grab("c-ride")._html || "") && !("ride" in grab("shell").dataset),
+     `…pressed again it tries again: a new watch opens (${retryOpen}) and a second error refuses again (watches closed ${geo.cleared - cl0})`);
+  /* the review of step 13b1, round 2: a first fix that is only SLOW is a
+     wait, not a refusal (location is on; the refusal would tell the rider
+     to turn it on). The web driver's TIMEOUT (code 3), then the phone's
+     driver — a stand-in Capacitor Geolocation — answering with the
+     plugin's own first-fix timeout ('OS-PLUG-GLOC-0010'): each must leave
+     the chip on Stop (GPS) with the flag on and a NEW watch open, and a
+     denial after it still refuses. The phone's watch must ask for an
+     explicit first-fix timeout far past the plugin's 10 s default (the
+     plugin times the first fix out at 10 s when none is given). */
+  {
+    const cl1 = geo.cleared, waitOk = () => /Stop \(GPS\)/.test(grab("c-ride")._html || "")
+      && grab("shell").dataset.ride === "1" && !/No GPS fix/.test(grab("panel")._html || "");
+    /* round 3: while it waits nothing has been measured, so the nav strip
+       (on screen from the press) may claim no speed and no heading — take
+       187 and rounds 1-2 printed "0 mph · N", or the last ride's values */
+    const spRead = () => ({ shown: grab("nav").hidden === false, t: String(grab("nav-sp").textContent) });
+    const spHonest = (r) => !!r && r.shown && !/\d/.test(r.t) && !/\b(N|NE|E|SE|S|SW|W|NW)\b/.test(r.t);
+    /* the last drill's refusal card is still on the panel: a marker in its
+       place, so "no refusal" is read from this press alone */
+    geo.cb = null; geo.err = null; grab("panel").innerHTML = "(slow-fix drill)";
+    grab("c-ride").fire("click");
+    const cb1 = geo.cb;
+    geo.err && geo.err({ code: 3, message: "Timeout expired" });
+    flushTimeouts(); frames(1);
+    const webWait = waitOk() && typeof geo.cb === "function" && geo.cb !== cb1 && geo.cleared === cl1 + 1;
+    const webSp = spRead();
+    geo.err && geo.err({ code: 1, message: "User denied Geolocation" });
+    flushTimeouts(); frames(1);
+    const webRefuse = /No GPS fix/.test(grab("panel")._html || "") && geo.cleared === cl1 + 2 && !("ride" in grab("shell").dataset);
+    ok(webWait && webRefuse,
+       `a slow first fix waits (web TIMEOUT: chip Stop (GPS), flag on, a new watch opened ${webWait}); a denial after it still refuses (${webRefuse})`);
+    const cap = { opened: 0, cleared: 0, opts: null, cb: null };
+    sandbox.Capacitor = { Plugins: { Geolocation: {
+      watchPosition(o, cb) { cap.opened++; cap.opts = o; cap.cb = cb; return "w" + cap.opened; },
+      clearWatch() { cap.cleared++; } } } };
+    let capWait = false, capRefuse = false, capTimeout = null, capSp = null;
+    try {
+      grab("panel").innerHTML = "(slow-fix drill)";
+      grab("c-ride").fire("click");
+      capTimeout = cap.opts ? cap.opts.timeout : null;
+      cap.cb && cap.cb(null, { code: "OS-PLUG-GLOC-0010", message: "Could not obtain location in time. Try with a higher timeout." });
+      flushTimeouts(); frames(1);
+      capWait = waitOk() && cap.opened === 2 && cap.cleared === 1;
+      capSp = spRead();
+      cap.cb && cap.cb(null, { code: "OS-PLUG-GLOC-0003", message: "Location permission request was denied." });
+      flushTimeouts(); frames(1);
+      capRefuse = /No GPS fix/.test(grab("panel")._html || "") && cap.cleared === 2 && !("ride" in grab("shell").dataset)
+        && /Ride it/.test(grab("c-ride")._html || "");
+    } finally { delete sandbox.Capacitor; }
+    ok(capWait && capRefuse && typeof capTimeout === "number" && capTimeout >= 3600000,
+       `…and on the phone's driver: the plugin's first-fix timeout waits (a new watch, opened ${cap.opened}, closed ${cap.cleared}: ${capWait}), `
+       + `a denial after it refuses (${capRefuse}); the watch asks for a first-fix timeout of ${capTimeout} ms (the plugin's default is 10 s)`);
+    ok(spHonest(webSp) && spHonest(capSp),
+       `…and while it waits the nav strip claims no speed or heading (web: shown ${webSp.shown}, "${webSp.t}"; `
+       + `phone: shown ${capSp ? capSp.shown : "?"}, "${capSp ? capSp.t : "not read"}")`);
+  }
+}
+
 /* 7 · ride → breadcrumb → retrace, the load-bearing path.
    Default: LIVE GPS drives it — the harness emits fixes and the same record
    chain must fire. --no-gps: the simulator path (the pre-take-16 behavior). */
 const clearedBefore = geo.cleared;
-grab("c-ride").fire("click");
+/* take 188 · A217 · the ride starts the V4 way: Return home, then Ride it
+   on the route card (2 taps from the folded drawer; take 187 needed 4).
+   With no #rc-ride the Ride tab's chip starts it, and the assert says so. */
+grab("btn-home").fire("click"); flushTimeouts();
+const viaRcRide = /id="rc-ride"/.test(grab("panel")._html || "");
+/* Ride it acts on the selected card: pick the second option first, as
+   section 5 did, so the ride (and the trip the resume block reloads) is on
+   the same profile it was before Ride it existed */
+{ const all = documentStub.querySelectorAll(".rc"); if (all.length > 1) all[1].fire("click"); }
+ok(viaRcRide, `Return home's route cards offer Ride it (#rc-ride)${viaRcRide ? "" : " — ABSENT: the ride below starts from the Ride tab's chip instead"}`);
+if (viaRcRide) grab("rc-ride").fire("click"); else grab("c-ride").fire("click");
+if (NO_GPS) {
+  /* take 188 · A223 · no location API at all: Ride refuses and starts
+     nothing (take 187 ran the simulator here). The simulator is the
+     deliberate test tool now — its hook starts it, the way render drives it */
+  const ph = grab("panel")._html || "";
+  ok(/reports no GPS receiver/.test(ph) && /Nothing started/.test(ph) && !/simulat/i.test(ph),
+     `with no location API, Ride refuses honestly ("${ph.replace(/<[^>]*>/g, "").slice(0, 80)}")`);
+  ok(!("ride" in grab("shell").dataset) && grab("hudstats").hidden !== false && sandbox.window.__nav.pos() !== "sim",
+     "…nothing starts: no ride flag, no sheet, not the simulator");
+  /* what a rider can tap next: the Ride tab's chip (Ride it switched to the
+     Ride tab), with the route still chosen — the refusal card replaced the
+     route cards, so their Ride it is not asserted (a stale stub would pass) */
+  const plan0 = sandbox.window.__nav.plan();
+  ok(grab("c-ride").hidden === false && /Ride it/.test(grab("c-ride")._html || "") && !!plan0,
+     `…and the Ride tab's Ride it is offered again, the route still chosen (chip hidden ${grab("c-ride").hidden}, plan ${plan0 ? "kept" : "GONE"})`);
+  grab("c-ride").fire("click");
+  const ph2 = grab("panel")._html || "";
+  ok(/reports no GPS receiver/.test(ph2) && !("ride" in grab("shell").dataset) && sandbox.window.__nav.pos() !== "sim",
+     "…pressed again it refuses again, and still nothing starts");
+  sandbox.window.__nav.sim();
+}
+ok(grab("rc-ride").hidden === true,
+   "once the ride runs, the route card's Ride it is gone (it could start nothing now)");
+/* take 188 · landmine 135 · a ride starts with the drawer folded, and the
+   flag that keeps its action row (Dispatch, Retrace, Directions, Return home)
+   one tap is on #shell — a data attribute, never a class (landmine 92) */
+ok(grab("shell").dataset.ride === "1",
+   `a ride sets #shell[data-ride] (${NO_GPS ? "simulator" : "GPS pending"}), so the folded drawer keeps its action row`);
+ok(grab("rail").className === "folded", "a ride starts with the drawer folded (the map clear, the sheet on it)");
 if (!NO_GPS) {
   ok(geo.cb !== null, "ride started a GPS watch");
   const [cx, cy] = [(manifest.bbox[0]+manifest.bbox[2])/2, (manifest.bbox[1]+manifest.bbox[3])/2];
   for (let i = 0; i < 28; i++)
     geo.cb && geo.cb({ coords: { longitude: cx + i*8e-4, latitude: cy + i*5e-4, accuracy: 5 } });
   frames(3);
+  /* take 188 · A217 · a GPS ride: no Wrong turn (the alert fires from the
+     real track), and ONE Stop — the sheet's, so the Ride tab's chip steps
+     aside once the sheet is drawn */
+  ok(grab("c-lost").hidden === true, "Wrong turn is not offered on a GPS ride (the simulator's control only)");
+  ok(grab("hudstats").hidden === false && grab("c-ride").hidden === true,
+     "one Stop on screen while riding: the ride sheet's (the Ride tab's chip steps aside once the sheet is drawn)");
 } else {
+  /* take 188 · A217 · the simulator rides: Wrong turn is its control, on the
+     Ride tab, and the one Stop is the sheet's (read before the ticks: the
+     simulator can reach the end of its path inside them) */
+  ok(grab("c-lost").hidden === false, "Wrong turn shows while the simulator rides, on the Ride tab");
+  ok(grab("hudstats").hidden === false && grab("c-ride").hidden === true,
+     "one Stop on screen while the simulator rides: the ride sheet's");
+  /* take 188 · A222 · read the sheet BEFORE the ticks: the simulator can
+     reach the end of its path inside them, and stopRide hides the sheet */
+  ok(grab("hud-src").hidden === false,
+     "a simulated ride says so on the ride sheet (\"Simulated ride\", posMode sim)");
+  ok(grab("hc-time").hidden === false && grab("hc-spd").hidden === false && grab("hc-togo").hidden === true,
+     "a simulated ride is a free ride on the sheet: Trip, Time, Speed (no guidance runs, so no To go)");
   ticks(300); frames(5);
 }
 const rec = grab("v-rec").textContent;
@@ -1110,6 +1511,33 @@ if (!NO_GPS) {
   frames(1);
   ok(/^20mph|^20<|20/.test(grab("hud-spd")._html || ""),
      `speed shown from the fix: ${(grab("hud-spd")._html || "").replace(/<[^>]*>/g, "")}`);
+  /* take 188 · A222 · the ride sheet after the LAST fix. Trip is the recorded
+     track: the same one-decimal number as the card's Recorded (the sheet was
+     painted before record() and lagged a fix — the review measured 1.4
+     against 2.0 here). Read _html: the value carries its unit span. */
+  const recNow = grab("v-rec").textContent, tripHtml = grab("hud-dist")._html || "";
+  ok(tripHtml.startsWith(recNow + "<span") && /^\d+\.\d$/.test(recNow),
+     `the sheet's Trip equals Recorded after the last fix (${tripHtml.replace(/<[^>]*>/g, " ")} vs ${recNow})`);
+  ok(/^(\d+|&lt;1)<span class="hu"> min<\/span>$|^\d+:\d\d<span class="hu"> h<\/span>$/.test(grab("hud-time")._html || ""),
+     `the sheet's Time reads "<1 min", whole minutes or h:mm, the unit spaced (${(grab("hud-time")._html || "").replace(/<[^>]*>/g, " ")})`);
+  /* a route is selected (section 5) and guidance is on (the GPS ride), so
+     the sheet is the routed one: Trip, To go, Arrive */
+  ok(grab("hc-togo").hidden === false && grab("hc-eta").hidden === false
+     && grab("hc-time").hidden === true && grab("hc-spd").hidden === true,
+     "a routed GPS ride shows Trip, To go and Arrive on the sheet (Time and Speed make way)");
+  ok(/^\d+\.\d<span class="hu"> mi<\/span>$/.test(grab("hud-togo")._html || ""),
+     `To go is the miles left along the route (${(grab("hud-togo")._html || "").replace(/<[^>]*>/g, " ")})`);
+  ok(/^~(\d+<span class="hu"> min<\/span>|\d+:\d\d<span class="hu"> h<\/span>)$/.test(grab("hud-eta")._html || ""),
+     `Arrive is the arrival estimate for what is left (${(grab("hud-eta")._html || "").replace(/<[^>]*>/g, " ")})`);
+  /* take 188 · A217 · ONE arrival estimate: the nav strip prints the same
+     "~N min" as the sheet's Arrive (take 187's strip used the rider's pace
+     while the sheet used the route's estimate: ~4 against ~5 in one shot) */
+  {
+    const sheetEta = (grab("hud-eta")._html || "").replace(/<[^>]*>/g, "");
+    const stripEta = (((grab("nav-g")._html || "").match(/<span class="eta">([^<]*)</) || [])[1] || "").match(/~[\d:]+ (?:min|h)/);
+    ok(!!stripEta && stripEta[0] === sheetEta,
+       `the nav strip and the sheet give one arrival estimate (strip "${stripEta ? stripEta[0] : "none"}", sheet "${sheetEta}")`);
+  }
   const after = [...(grab("hudticks")._html || "")
     .matchAll(/left:([\d.]+)px">([NSEW]{1,2})</g)].map(([, x, t]) => ({ x: +x, t }));
   if (after.length) {
@@ -1122,8 +1550,15 @@ ok((record.setData.crumb || []).length > 0,
    `breadcrumb recorded via ${NO_GPS ? "simulator" : "live GPS"} (${rec} mi shown)`);
 if (!NO_GPS) {
   ok(parseFloat(rec) > 0.5, `distance accumulated from fixes (${rec} mi)`);
-  grab("c-ride").fire("click");
-  ok(geo.cleared === clearedBefore + 1, "stop cleared the GPS watch");
+  /* take 188 · A222 · Stop is the ride sheet's button now — the same state
+     machine as the Ride tab's chip */
+  grab("hud-stop").fire("click");
+  ok(geo.cleared === clearedBefore + 1, "the ride sheet's Stop cleared the GPS watch");
+  ok(!("ride" in grab("shell").dataset), "Stop clears #shell[data-ride] (the action row folds with the drawer again)");
+  /* …and with no ride running it never STARTS one */
+  grab("hud-stop").fire("click");
+  ok(geo.cb === null && geo.cleared === clearedBefore + 1,
+     "the sheet's Stop with no ride running starts nothing (no GPS watch opened)");
   grab("c-ride").fire("click");           /* restart so retrace has a fresh view */
   for (let i = 0; i < 6; i++)
     geo.cb && geo.cb({ coords: { longitude: manifest.bbox[0]+0.05+i*6e-4, latitude: manifest.bbox[1]+0.05, accuracy: 5 } });
@@ -1137,6 +1572,195 @@ if (back && back.features.length) {
   const same = (a, b) => Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9;
   ok(same(coords[0], crumbLine.at(-1)) && same(coords.at(-1), crumbLine[0]),
      "retrace is exactly the recorded track, reversed");
+}
+
+/* 7b · take 188 · landmine 135 · the cards the RIDE raises by itself stay
+   quiet mid-ride. Resume is the rider's own tap on the offer, but "Trip
+   resumed" and the resumed trip's re-planned route are the app's: with the
+   ride running they must leave the drawer folded (the ride sheet's stats on
+   screen), write the card, and say it on the peek bar. The app is killed
+   mid-ride first (state wiped, storage kept), as render's nav drill does. */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav;
+  ok(!!N && typeof N.card === "function", "the trip hooks are exposed");
+  /* An automatic re-route past the fuel range or arriving after dark opens
+     its card mid-ride (7b2). Both warnings depend on things the harness does
+     not otherwise hold still: the chip's range, and the wall clock (step 7's
+     review ran this at 19:45, past sunset). Here the rider sits where the
+     restart above left them, far off the network, so the re-planned route is
+     long. The block therefore runs with the range OFF and on a pinned clock —
+     04:00 at midsummer — so the quiet case has neither warning, and each
+     loud case switches on exactly one: a 0.01 mi range, then a winter night.
+     Only `new Date()` with no argument is pinned; Date.now keeps running,
+     moved on by `skew` ms wherever the re-route's 20-second debounce has to
+     have passed. Range and clock are restored at the end. */
+  const RealDate = sandbox.Date;
+  let pinAt = null, skew = 0;
+  class PinnedDate extends RealDate {
+    constructor(...a) { if (a.length || pinAt === null) super(...a); else super(pinAt); }
+    static now() { return RealDate.now() + skew; }
+  }
+  sandbox.Date = PinnedDate;
+  pinAt = new RealDate(2026, 5, 21, 4, 0).getTime();           /* 04:00, midsummer */
+  const fuel0 = N && N.fuel ? N.fuel() : null;
+  if (N && N.fuel) N.fuel(0);                                  /* range off */
+  if (N && N.card) {
+    N.save(true); N.reset(); sandbox.window.hudShow(false);
+    /* take 188 · cold audit (F17) · Resume pressed and the GPS REFUSES: the
+       refusal card must still be there once the resumed trip's route has
+       been planned. The planner runs on a 30 ms timer, so the denial here
+       lands before it, as a phone with location off answers; 30 ms later
+       the route cards used to replace the refusal, with a live Ride it and
+       nothing saying the trip had not resumed. The route is still chosen
+       and the trip still resumable (the next assert presses Resume again).
+       The judge is shown a panel of route cards, which it must reject. */
+    {
+      /* review of the audit fixes · "opened" was typeof geo.err, which the
+         stub never clears: true once ANY watch had opened, and geo.err then
+         reached the section-7 ride's old handler, whose refusal reads the
+         same. Resume must open ONE new watch, and its own handler refuses */
+      N.card();
+      const s0 = geo.seq;
+      grab("trip-resume").fire("click");
+      const opened = geo.seq === s0 + 1, own = geo.watches.get(geo.id);
+      own && own.err && own.err({ code: 1, message: "User denied Geolocation" });
+      const before = (grab("panel")._html || "").replace(/<[^>]*>/g, "");
+      flushTimeouts(); frames(2);
+      const ph = grab("panel")._html || "";
+      const kept = (h) => /No GPS fix/.test(h) && /Nothing started/.test(h) && !/id="routes"/.test(h) && !/id="rc-ride"/.test(h);
+      ok(opened && /No GPS fix/.test(before) && kept(ph) && !kept('<div id="routes"><div class="rc sel"></div></div><button id="rc-ride"></button>')
+         && !!N.plan() && !("ride" in grab("shell").dataset) && N.load() !== null,
+         `a refused Resume keeps its refusal on the card after the resumed route is planned ("${ph.replace(/<[^>]*>/g, "").slice(0, 70)}"); `
+         + `the route is chosen (${N.plan() ? "planned" : "NOT planned"}), nothing rides, the trip stays resumable; the judge rejects a panel of route cards`);
+    }
+    /* review of the audit fixes (F17's hold) · Resume presses Ride, and the
+       press toggles: with a ride already running (pressed in the 3.2 s
+       before the offer came up) it STOPS it. The hold covered a Resume
+       only when the GPS refused, so 30 ms later the card read "Trip
+       resumed · route to …" with a live Ride it and nothing recording.
+       The trip as saved is put back afterwards (Stop ends it), for the
+       real Resume below. The judge is shown the unheld card. */
+    {
+      const ls = sandbox.window.localStorage, trip0 = ls.getItem("apex.trip.v1");
+      grab("c-ride").fire("click");
+      const running = "ride" in grab("shell").dataset && /Stop \(GPS\)/.test(String(grab("c-ride")._html || ""));
+      grab("trip-resume")._listeners = {};
+      N.card();
+      grab("trip-resume").fire("click");
+      flushTimeouts(); frames(2);
+      const ph = grab("panel")._html || "", pk = String(grab("peek-txt").textContent);
+      const held = (h, p) => !/Trip resumed/.test(h) && !/id="rc-ride"/.test(h) && !/^Trip resumed/.test(p);
+      ok(running && held(ph, pk) && !!N.plan() && !("ride" in grab("shell").dataset)
+         && !held('<div id="routes"><div class="rc sel"></div></div><button id="rc-ride"></button>', "Trip resumed · route to home is on the map"),
+         `a Resume whose Ride press stopped the ride already running keeps the stop's card ("${ph.replace(/<[^>]*>/g, "").slice(0, 60)}"; `
+         + `peek "${pk.slice(0, 40)}"): no "Trip resumed · route to …" with a live Ride it, nothing riding; the judge rejects that card`);
+      if (trip0 !== null) ls.setItem("apex.trip.v1", trip0);
+      N.reset(); sandbox.window.hudShow(false);
+    }
+    /* (a new card's Resume is a new button in a browser; this stub keeps one
+       element per id, so the drill's listener is dropped before the card is
+       drawn again — two would press Ride twice, and the second press stops) */
+    grab("trip-resume")._listeners = {};
+    ok(N.card() === true, "a saved mid-ride trip offers Resume when the app comes back");
+    grab("trip-resume").fire("click");
+    const peekNow = grab("peek-txt").textContent, railNow = grab("rail").className;
+    ok(railNow === "folded" && /Trip resumed/.test(grab("panel")._html || "") && /^Trip resumed/.test(peekNow),
+       `"Trip resumed" is quiet mid-ride: drawer ${railNow || "OPEN"}, peek "${peekNow}"`);
+    flushTimeouts(); frames(2);
+    ok(grab("rail").className === "folded" && /id="routes"/.test(grab("panel")._html || ""),
+       `the resumed trip's re-planned route is quiet too: drawer ${grab("rail").className || "OPEN"}, `
+       + `peek "${grab("peek-txt").textContent}"`);
+    /* …and quiet is never an all-clear the card does not give: whatever the
+       selected option warns (unverified miles, off-network miles) is on the
+       peek line too */
+    {
+      const ph = grab("panel")._html || "", pk = grab("peek-txt").textContent;
+      const selCard = (ph.split('<div class="rc sel"')[1] || "").split('<div class="rc')[0].split("<button")[0];
+      const warns = [...selCard.matchAll(/([\d.]+) mi unverified \(OSM\)|\+([\d.]+) mi off-network/g)].map((m) => m[0]);
+      const est = (selCard.match(/<div class="big">([\d.]+)[\s\S]*?<div class="sub">([^<·]+)/) || []).slice(1).join(" mi, ");
+      ok(!!selCard && warns.every((w) => pk.includes(w)),
+         `a quiet re-route's peek line carries the selected card's warnings (${est}: ${warns.length ? warns.join(", ") : "the card warns of none"}; peek "${pk}")`);
+    }
+    const resumedPeek = grab("peek-txt").textContent;
+    /* take 188 · cold audit (F7) · nothing was re-routed: the line says the
+       trip resumed and where its route goes. It read "Re-routed · the new
+       route is on the map" before the rider had moved. The judge is shown
+       that line. (7b2 below holds a real re-route to "Re-routed".) */
+    {
+      const saysResumed = (p) => /^Trip resumed · route to \S/.test(p) && !/Re-rout/.test(p);
+      ok(saysResumed(resumedPeek) && !saysResumed("Re-routed · the new route is on the map"),
+         `a resumed trip's route is announced as the trip resuming, never a re-route ("${resumedPeek}"); the judge rejects "Re-routed · …"`);
+    }
+    ok(grab("shell").dataset.ride === "1", "the resumed ride keeps #shell[data-ride]");
+    /* A221 · the resumed trip's first fix puts the ride sheet back (the
+       RESUMING branch returned before hudShow on take 187); the ride runs on
+       live GPS into the dispatch check below, as it did before this block */
+    const crumbsBefore = N.crumbs();
+    for (let i = 7; i < 9; i++)
+      geo.cb && geo.cb({ coords: { longitude: manifest.bbox[0]+0.05+i*6e-4, latitude: manifest.bbox[1]+0.05, accuracy: 5 } });
+    frames(2);
+    ok(grab("hudstats").hidden === false && grab("hudbar").hidden === false && N.crumbs() > crumbsBefore,
+       `a resumed trip's first fix shows the ride sheet again and continues the line (${crumbsBefore} -> ${N.crumbs()} fixes)`);
+    /* the route guidance now rides (navPlan's option) is the one the quiet
+       peek line spoke for: the profile the rider was on, selected before the
+       cards were written — not the first option, re-selected afterwards */
+    {
+      const G = N.guide(), o = G && G.o, adv = o && o.s ? o.s.adv : null;
+      ok(adv !== null && (adv <= 0.05 || resumedPeek.includes(adv.toFixed(1) + " mi unverified (OSM)")),
+         `the resumed route being ridden is the one the peek line described (${adv === null ? "no route" : adv.toFixed(1) + " mi unverified"}; peek "${resumedPeek}")`);
+    }
+
+    /* 7b2 · take 188 · an AUTOMATIC re-route (navGuide's off-route branch:
+       three fixes more than 40 m off the line) is quiet only when the option
+       the rider will ride carries no range or darkness warning. On take 187
+       every re-route opened its card; past the fuel range or arriving after
+       dark it still must (the step-7 review: a quiet peek line would read as
+       an all-clear). The fixes go 0.012 deg BEHIND the rider, away from the
+       destination, so they project onto the route's start (no arrival). */
+    const hereAt = sandbox.window.__disp.ME.slice(), trip = N.load() || {};
+    const offRoute = (back = 0.012) => {
+      const me = sandbox.window.__disp.ME, to = trip.to || me;
+      const dx = me[0] - to[0], dy = me[1] - to[1], d = Math.hypot(dx, dy) || 1;
+      const p = [hereAt[0] + dx / d * back, hereAt[1] + dy / d * back];
+      N.rail(false);
+      for (let i = 0; i < 3; i++)
+        geo.cb && geo.cb({ coords: { longitude: p[0] + i * 1e-5, latitude: p[1], accuracy: 5 } });
+      flushTimeouts(); frames(2);
+      return { rail: grab("rail").className, html: grab("panel")._html || "", peek: grab("peek-txt").textContent };
+    };
+    ok(!!trip.to, `the resumed trip has a destination to re-route to (${trip.to ? trip.to.map((v) => v.toFixed(3)) : "none"})`);
+    N.fuel(0.01);                                   /* shorter than any route */
+    skew += 25000;                                  /* past the re-route debounce */
+    const rf = offRoute();
+    ok(/id="routes"/.test(rf.html) && /mi past your range/.test(rf.html) && rf.rail !== "folded",
+       `a re-route past the fuel range opens its card mid-ride: drawer ${rf.rail || "OPEN"}, `
+       + `card ${/mi past your range/.test(rf.html) ? "says" : "does NOT say"} "past your range"`);
+    N.fuel(0);
+    skew += 25000;
+    pinAt = new RealDate(2026, 11, 21, 23, 50).getTime();        /* a winter night */
+    const rd = offRoute();
+    ok(/id="routes"/.test(rd.html) && /arrives after dark/.test(rd.html) && !/mi past your range/.test(rd.html)
+       && rd.rail !== "folded",
+       `a re-route that arrives after dark opens its card mid-ride: drawer ${rd.rail || "OPEN"}, `
+       + `card ${/arrives after dark/.test(rd.html) ? "says" : "does NOT say"} "arrives after dark"`);
+    /* take 188 · A217 · …but only when the warning is NEW. The next re-route
+       on the same winter night arrives after dark too; the rider already
+       rode on under that warning, so it changes nothing they must do: the
+       card stays quiet, and the peek line still says it (never an
+       all-clear). */
+    skew += 25000;
+    const rq = offRoute(0.03);
+    ok(/id="routes"/.test(rq.html) && /arrives after dark/.test(rq.html) && rq.rail === "folded"
+       && /arrives after dark/.test(rq.peek) && /^Re-routed · /.test(rq.peek),
+       `a re-route whose only warning the ridden route already carried stays quiet: drawer ${rq.rail || "OPEN"}, `
+       + `peek "${rq.peek}"`);
+    /* back on the line, so the ride runs on into the dispatch check as before */
+    N.rail(false);
+    geo.cb && geo.cb({ coords: { longitude: hereAt[0], latitude: hereAt[1], accuracy: 5 } });
+    frames(1);
+  }
+  if (N && N.fuel) N.fuel(fuel0);
+  sandbox.Date = RealDate;
 }
 
 /* 7c · ride telemetry: A18 Stage 1 is closed by a real ride, so the ride has to
@@ -1216,12 +1840,143 @@ if (NO_GPS) {
   }
 }
 
-/* 9 · basemap: satellite only when the bundle can place it */
+/* 9 · basemap: imagery only when the bundle can place it. Take 188 (A212):
+   two basemaps, so c-base toggles — tap 1 Hybrid, tap 2 Map, tap 3 Hybrid,
+   the state the rest of this harness has always run on. */
 const satOK = !EXPECT_PARTIAL.includes("imagery");
-grab("c-base").fire("click");
-const satVis = record.layout.filter((l) => l[0] === "sat" && l[1] === "visibility").at(-1);
-if (satOK) ok(satVis && satVis[2] === "visible", "basemap cycles to Satellite");
-else ok(!satVis || satVis[2] === "none", "no imagery → basemap stays on Map");
+const baseTap = () => {
+  grab("c-base").fire("click");
+  const v = record.layout.filter((l) => l[0] === "sat" && l[1] === "visibility").at(-1);
+  const lbl = ((grab("c-base")._html || "").match(/<span>([^<]*)<\/span>/) || [])[1] || "";
+  return { vis: v ? v[2] : null, lbl };
+};
+const bt = [baseTap(), baseTap(), baseTap()];
+if (satOK) {
+  ok(bt[0].vis === "visible" && bt[0].lbl === "Hybrid", `tap 1 shows Hybrid (sat ${bt[0].vis}, chip "${bt[0].lbl}")`);
+  ok(bt[1].vis === "none" && bt[1].lbl === "Map", `tap 2 returns to Map (sat ${bt[1].vis}, chip "${bt[1].lbl}")`);
+  ok(bt[2].vis === "visible" && bt[2].lbl === "Hybrid", `tap 3 is Hybrid again — two states, no third (sat ${bt[2].vis}, chip "${bt[2].lbl}")`);
+} else ok(bt.every((b) => !b.vis || b.vis === "none"), "no imagery → basemap stays on Map");
+
+/* 9a · take 188 · A213 (G11) · one writer of network opacity. Every
+   line-opacity the app wrote on a MACH_LAYERS id is a per-feature case, or a
+   zoom interpolate whose stops are cases — never a plain number, which is
+   the shape that let a basemap switch overwrite the machine's dimming. The
+   list is parsed from the shipped app.js; an empty parse fails. */
+{
+  const mm = appSrc.match(/var\s+MACH_LAYERS\s*=\s*\[([^\]]*)\]/);
+  const MACH = mm ? [...mm[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];
+  const isCase = (v) => Array.isArray(v) && v[0] === "case";
+  const shapeOk = (v) => isCase(v) || (Array.isArray(v) && v[0] === "interpolate"
+    && Array.isArray(v[2]) && v[2][0] === "zoom" && v.length > 4
+    && v.slice(3).every((x, j) => j % 2 === 0 ? typeof x === "number" : isCase(x)));
+  const plain = (paint, L) => paint.filter((p) => L.includes(p[0]) && p[1] === "line-opacity" && !shapeOk(p[2]));
+  const writes = record.paint.filter((p) => MACH.includes(p[0]) && p[1] === "line-opacity").length;
+  const bad = plain(record.paint, MACH);
+  const plantBad = plain(record.paint.concat([["casing-track", "line-opacity", 0.4]]), MACH);
+  ok(MACH.length >= 10 && writes > 0 && bad.length === 0 && plantBad.length === bad.length + 1,
+     `network line-opacity has one writer: ${writes} writes on ${MACH.length} MACH_LAYERS, `
+     + `${bad.length} plain number(s)${bad.length ? " — " + JSON.stringify(bad.slice(0, 3)) : ""}; `
+     + `a planted plain 0.4 on casing-track is ${plantBad.length === bad.length + 1 ? "flagged" : "MISSED"}`);
+}
+
+/* 9a1 · take 188 · A202 D7 (G9) · a tap on a low-zoom stroke names a real
+   edge. The planted hit is a stroke of class C at the first vertex of a
+   per-edge feature of C; it must give that class's edge card and never "Not
+   an ORV route". The control is a show-only hit (no i, no lo), which must
+   give exactly that line — so the assertion can tell the two apart. */
+{
+  const net = record.sources.net.data.features;
+  const edge = net.find((f) => f.properties && f.properties.i !== undefined && f.properties.c === "trail50")
+    || net.find((f) => f.properties && f.properties.i !== undefined);
+  if (!edge || !net.some((f) => f.properties && f.properties.lo === 1)) ok(false, "G9 · no per-edge feature or no low-zoom stroke to tap");
+  else {
+    const C = edge.properties.c, at = edge.geometry.coordinates[0];
+    /* a long press earlier in this run leaves the next click consumed (as on
+       a phone: the press already acted), so an empty tap goes first */
+    theMap._hit = []; theMap.fire("click", { lngLat: { lng: at[0], lat: at[1] }, point: { x: 300, y: 500 } }); flushTimeouts();
+    const tap = (hit) => { theMap._hit = [hit]; grab("panel")._html = "";
+      theMap.fire("click", { lngLat: { lng: at[0], lat: at[1] }, point: { x: 300, y: 500 } }); flushTimeouts();
+      theMap._hit = []; return grab("panel")._html || ""; };
+    const ctl = tap({ properties: { c: "foot", n: "X" }, layer: { id: "foot" } });
+    const lo = tap({ properties: { lo: 1, c: C, s: 0 }, layer: { id: C } });
+    ok(/Not an ORV route/.test(ctl) && !/mi segment/.test(ctl),
+       "G9 control: a show-only hit (no i, no lo) says Not an ORV route"
+       + (/Not an ORV route/.test(ctl) ? "" : " — got: " + ctl.replace(/<[^>]+>/g, " ").slice(0, 160)));
+    ok(/mi segment/.test(lo) && !/Not an ORV route/.test(lo) && /nearest/i.test(lo),
+       `G9 · a tap on a ${C} low-zoom stroke gives the nearest ${C} edge's card, says it is the nearest at this zoom, `
+       + `and never Not an ORV route${/mi segment/.test(lo) ? "" : " — got: " + lo.replace(/<[^>]+>/g, " ").slice(0, 160)}`);
+    /* step 9b review · the nearest-segment note must come BEFORE every tag
+       (source, "closed", "illegal for your machine"), so no tag reads as a
+       fact about the spot tapped; the note says the whole card is about that
+       segment. Every edge card carries the source tag, so the order is
+       testable on any edge. The plant is the card with the note moved after
+       the first tag — the order the card had before this fix. */
+    const noteAt = (h) => h.search(/<div class="sub">The nearest /), tagAt = (h) => h.indexOf('class="tag');
+    const orderOk = (h) => noteAt(h) >= 0 && tagAt(h) >= 0 && noteAt(h) < tagAt(h) && /Everything on this card is about that segment/.test(h);
+    const nm = lo.match(/<div class="sub">The nearest [\s\S]*?<\/div>/);
+    const plantOrder = nm ? (() => { const t = lo.replace(nm[0], ""); const i = t.indexOf('class="tag'); const j = t.indexOf("</span>", i) + 7; return t.slice(0, j) + nm[0] + t.slice(j); })() : "";
+    ok(orderOk(lo) && !orderOk(plantOrder),
+       `G9 · the nearest-segment note precedes every tag on a ${C} lo card (note at ${noteAt(lo)}, first tag at ${tagAt(lo)}) `
+       + `and says the whole card is about that segment; a planted note after the first tag is ${orderOk(plantOrder) ? "MISSED" : "caught"}`);
+    /* step 13b2 · the classes chained by measurement beyond the designated
+       five (forest road and both closed classes since take 188 scoped
+       two-track and paved back to per-edge; read from the built app.js's
+       NETLO_CLS, not typed) take the same path: a stroke tap at one of the
+       class's own edges gives that class's nearest-segment card, never "Not
+       an ORV route" */
+    const NLC9 = (((/NETLO_CLS=\[([^\]]*)\]/.exec(appSrc) || [])[1] || "").match(/'[^']+'/g) || []).map((x) => x.slice(1, -1));
+    const EXT = NLC9.filter((c) => !["route72", "trail50", "moto24", "mccct", "fstrail"].includes(c)), extBad = [];
+    if (!EXT.length) extBad.push("no chained class beyond the designated five read from app.js");
+    for (const X of EXT) {
+      const ex = net.find((f) => f.properties && f.properties.i !== undefined && f.properties.c === X);
+      if (!ex) { extBad.push(X + ": no edge"); continue; }
+      const p0 = ex.geometry.coordinates[0];
+      theMap._hit = [{ properties: { lo: 1, c: X, s: 0 }, layer: { id: X } }]; grab("panel")._html = "";
+      theMap.fire("click", { lngLat: { lng: p0[0], lat: p0[1] }, point: { x: 300, y: 500 } }); flushTimeouts(); theMap._hit = [];
+      const h = grab("panel")._html || "";
+      if (!(/mi segment/.test(h) && /The nearest /.test(h) && !/Not an ORV route/.test(h) && orderOk(h))) extBad.push(X + ": " + h.replace(/<[^>]+>/g, " ").slice(0, 90));
+    }
+    ok(extBad.length === 0, `G9 · a low-zoom stroke tap on each measured class (${EXT.join(", ")}) gives its nearest-segment card, note first`
+       + (extBad.length ? " — " + extBad.join("; ") : ""));
+  }
+}
+
+/* 9a2 · take 188 · A214 · the Pins rows under stubs. There is no canvas
+   here, so makeBadges registers nothing and every row must take the swatch
+   fallback — one data-pk row per kind the mode lists, each with its .sw and
+   no <img (a row pointing at a badge that was never drawn). applyMode builds
+   the panel inside a try, so the rows are read back per mode: a throw would
+   leave the previous mode's rows, and the kind list would not match. */
+{
+  const M = sandbox.window.__mode, was = M && M.get();
+  const rowsOf = (h) => [...String(h).matchAll(/<button class="actrow[^"]*" data-pk="([^"]*)">(.*?)<\/button>/g)]
+    .map((x) => ({ k: x[1], sw: /class="sw[ "]/.test(x[2]), img: /<img/.test(x[2]) }));
+  const judge = (rows, kinds) => rows.length === kinds.length && rows.every((r, i) => r.k === kinds[i] && r.sw && !r.img);
+  /* the mockup's helper line says "Each badge is the one the map draws"; with
+     no drawn badge it must not be there (card text literally honest) */
+  const noted = (h) => /class="pnote"/.test(String(h));
+  const bad = [];
+  let n = 0;
+  /* applyMode rebuilds the panel only while it is open, as a rider reading
+     the rows has it; the stub has no initial hidden, so it read open until
+     a tab switch closed it (take 188: Ride it shows the Ride tab) */
+  const lpWas = grab("lyrpanel").hidden; grab("lyrpanel").hidden = false;
+  for (const md of (M && M.MODES) || []) {
+    M.apply(md.k, { silent: true });
+    const html = grab("lyrpanel")._html, rows = rowsOf(html);
+    n += rows.length;
+    if (!judge(rows, md.kinds || [])) bad.push(md.k + ": " + JSON.stringify(rows.slice(0, 3)));
+    if (noted(html)) bad.push(md.k + ": the helper line claims drawn badges under stubs");
+  }
+  if (M && was) M.apply(was, { silent: true });
+  grab("lyrpanel").hidden = lpWas;
+  const plant = rowsOf('<button class="actrow on" data-pk="fuel"><span class="sw pb"><img class="pbdg" src="x" alt=""></span><span>Fuel</span></button>');
+  const notePlant = noted('<div class="sect">Pins in Camp</div><div class="pnote">Each badge is the one the map draws.</div>');
+  ok(M && M.MODES.length >= 5 && n > 0 && bad.length === 0 && !judge(plant, ["fuel"]) && notePlant,
+     `Pins rows under stubs: ${n} rows across ${M ? M.MODES.length : 0} modes, each a .sw swatch with no <img, and no helper line`
+     + (bad.length ? " — " + bad.slice(0, 2).join("; ") : "")
+     + `; a planted <img row is ${judge(plant, ["fuel"]) ? "MISSED" : "flagged"}; a planted helper line is ${notePlant ? "flagged" : "MISSED"}`);
+}
 
 /* 9b · the app's own self-test, run here too. It was only ever exercised in
    real Chrome; now that the stubs cover its API surface it runs in both, so a
@@ -1245,6 +2000,516 @@ if (!NO_GPS && sandbox.window.__selfTest) {
        + (nonRender.length ? " — " + nonRender[0].g + "·" + nonRender[0].id : ""));
     ok(failed.length === nonRender.length + failed.filter((r) => r.g === "RENDER" || r.g === "PERF").length,
        "render/perf failures under a stub are expected and isolated");
+  }
+}
+
+/* 9c · take 188 · A222 · the ride sheet's Voice note (no speech in this
+   WebView, A218) says only what the strip really does: a road route's strip
+   shows each turn, a river run's shows what is ahead on the river, a free
+   ride has no strip line at all — card text literally honest */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav, V = sandbox.window.__voice;
+  if (N && V && N.chip && N.runSet) {
+    const okWas = V.ok; V.ok = false;
+    /* take 188 · cold audit (F1) · its own route: the Pins drill (9a2) walks
+       every mode, and a mode that changes the machine now clears the route
+       this drill used to borrow from section 7 */
+    grab("btn-home").fire("click"); flushTimeouts();
+    N.start(); N.chip();
+    const road = grab("hud-vnote").textContent;
+    N.runSet("Au Sable River", { n: "Put-in", mi: 0 }, { n: "Take-out", mi: 3 }); N.chip();
+    const river = grab("hud-vnote").textContent;
+    N.stop(); N.chip();
+    const free = grab("hud-vnote").textContent;
+    V.ok = okWas; N.chip();
+    ok(/every turn\.$/.test(road) && /ahead on the river\.$/.test(river) && !/turn/.test(river)
+       && /WebView\.$/.test(free) && grab("hud-vnote").hidden === !!okWas,
+       `the Voice note says only what the strip does — road: "${road}"; river: "${river}"; free: "${free}"`);
+  } else ok(false, "the voice and run hooks are exposed");
+}
+
+/* 7b3 · take 188 · A217 · Clear route is a toast: the drawer folds, the
+   panel holds the words and no stale route cards. Last, because retrace,
+   the resume block and the Voice note (9c) all still need the route. */
+{
+  grab("btn-clear").fire("click"); flushTimeouts();
+  const ph = grab("panel")._html || "";
+  ok(/Route cleared/.test(grab("toast").textContent) && grab("rail").className === "folded"
+     && /Route cleared/.test(ph) && !/id="routes"/.test(ph),
+     `Clear route is a toast ("${grab("toast").textContent}", drawer ${grab("rail").className || "OPEN"}, `
+     + `panel ${/id="routes"/.test(ph) ? "STILL HOLDS the cards" : "holds the words"})`);
+}
+
+/* 11 · take 188 · the cold audit's drills (F1-F4, F13, F15, F19). Last on
+   purpose: each plans or rides for itself, and nothing after it reads the
+   state it leaves. Every judge is shown a planted reading it must reject;
+   each fix was also taken out of a copy of the built app to watch its drill
+   fail (the runs are in the take's audit notes). */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav, R = sandbox.window.__route, M = sandbox.window.__mode, D = sandbox.window.__disp;
+  const text = (id) => String(grab(id)._html || "").replace(/<[^>]*>/g, "");
+  const chipTxt = () => text("c-ride");
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1], accuracy: 5 }, extra || {}) });
+  const deny = () => { geo.err && geo.err({ code: 1, message: "User denied Geolocation" }); flushTimeouts(); frames(1); };
+  /* the ride the run left going ends where riders stand (the declared
+     centre), so the drills start from trail country and off a ride */
+  const c0 = manifest.centre || [anchors[0][1], anchors[0][2]];
+  if (typeof geo.cb === "function") fix(c0);
+  if (flagged()) grab("hud-stop").fire("click");
+  flushTimeouts(); frames(1);
+  ok(!flagged() && Math.abs(D.ME[0] - c0[0]) < 1e-9 && Math.abs(D.ME[1] - c0[1]) < 1e-9,
+     "the cold-audit drills start off a ride, the rider standing at the region's centre (their premise)");
+
+  /* F2 · a loop ends where it starts. Ridden from its own start, the first
+     fix was inside 25 m of the "destination": To go 0.0, Arrive a dash and
+     "You have arrived" for the whole loop, and no turn was ever called.
+     Here the loop is chosen on the chooser, ridden from its first point
+     round to its last, one fix per vertex, and must: not arrive at the
+     start, count To go down, call turns, and arrive at the end — at "the
+     start", not at whatever the last point-to-point route was called.
+     F15 and F3 are read on the way round (below). */
+  {
+    grab("c-loop").fire("click");
+    const pick = documentStub.querySelectorAll("[data-loop]")[0];
+    if (pick) { pick.fire("click"); flushTimeouts(); }
+    const G0 = pick ? N.plan() : null;
+    ok(!!G0 && G0.loop === true && G0.lbl === "the start" && G0.pts.length > 10,
+       `the loop chooser plans a ${pick ? pick.dataset.loop : "?"} mi loop from here (${G0 ? (G0.total / 1609.34).toFixed(1) + " mi, " + G0.pts.length + " points" : "NONE"}), `
+       + `its end named "${G0 ? G0.lbl : "?"}"`);
+    if (G0) {
+      const totalMi = G0.total / 1609.34, pts = G0.pts.slice(), cum = G0.cum.slice(), total = G0.total;
+      const spd = { speed: 8.9408, heading: 90 };
+      const read = () => { const G = N.guide() || {}; return { arrived: !!G.arrived, togo: parseFloat(text("hud-togo")), eta: text("hud-eta"),
+        strip: text("nav-g"), spd: text("hud-spd"), sp: String(grab("nav-sp").textContent), gHidden: grab("nav-g").hidden === true }; };
+      /* the rider stands where the loop was planned (its "destination") */
+      const start = D.ME.slice();
+      grab("c-ride").fire("click");
+      fix(start, spd);                  /* the first fix: the recording starts */
+      fix(start, spd);                  /* …and a second, still at the start */
+      frames(1);
+      const atStart = read();
+      /* To go at the start is the loop less wherever on its first mile the
+         pin is nearest to (the pin is where the rider stands, not always on
+         the line's first vertex) */
+      const under = (r, mi) => !r.arrived && r.togo > 0.2 && r.togo <= mi + 0.15 && r.togo >= mi - 1.15
+        && !/You have arrived/.test(r.strip) && /^~\d/.test(r.eta);
+      ok(under(atStart, totalMi) && !under({ arrived: true, togo: 0, eta: "—", strip: "You have arrived" }, totalMi),
+         `a loop ridden from where it was planned (its "destination", 0 m away) has NOT arrived there: To go ${text("hud-togo")} of ${totalMi.toFixed(1)} mi, `
+         + `Arrive ${atStart.eta}, strip "${atStart.strip.trim().slice(0, 48)}"; the judge rejects take 187's first fix (arrived, To go 0.0, Arrive a dash)`);
+      const iHalf = Math.max(2, cum.findIndex((m) => m >= total / 2));
+      const turns = new Set(); let arrivedAt = null, half = null, paints = null, drop = null;
+      for (let i = 1; i < pts.length; i++) {
+        if (i === iHalf) {
+          fix(pts[i], spd);
+          half = { togo: read().togo, want: (total - cum[i]) / 1609.34 };
+          /* F15 · ONE paint of the ride sheet per fix. hudSet painted it
+             before record() and onFix painted it again after: every fix
+             wrote the sheet twice. Trip's cell is written once per paint,
+             so its writes are counted across one fix; a second paint
+             planted inside the same window must read 2 (the control). */
+          let writes = 0;
+          const cell = grab("hud-dist"), d = Object.getOwnPropertyDescriptor(El.prototype, "innerHTML");
+          Object.defineProperty(cell, "innerHTML", { configurable: true, get() { return d.get.call(this); }, set(v) { writes++; d.set.call(this, v); } });
+          fix(pts[i], spd);
+          const one = writes; sandbox.window.hudPaint();
+          paints = { one, planted: writes };
+          delete cell.innerHTML;
+          /* F3 · a GPS dropout on screen. The sheet repaints on the ride's
+             20 s pulse; speed, To go and Arrive are only ever written by a
+             fix, so with no fix they sat beside the moving clock as if
+             live. 40 s pass with no fix (the clock is moved on, the pulse
+             fires): the three read a dash and the strip says since when
+             there has been no fix; the next fix puts them back. The clock
+             stays moved on: nothing after this block compares it with the
+             harness's own. */
+          const live = read();
+          const Real = sandbox.Date;
+          sandbox.Date = class extends Real {
+            constructor(...a) { if (a.length) super(...a); else super(Real.now() + 40000); }
+            static now() { return Real.now() + 40000; } };
+          ticks(1);
+          const lost = read(); lost.time = text("hud-time");
+          fix(pts[i], spd);
+          drop = { live, lost, back: read() };
+        }
+        fix(pts[i], spd);
+        const tm = String(grab("nav-g")._html || "").match(/<\/span>In [^<]*? · ([^<]*? onto [^<]*)<\/b>/);
+        if (tm) turns.add(tm[1]);
+        if (arrivedAt === null && (N.guide() || {}).arrived) arrivedAt = cum[i];
+      }
+      frames(1);
+      const end = read();
+      ok(!!half && Math.abs(half.togo - half.want) < 0.2,
+         `half way round, To go is what is left of the loop (${half ? half.togo : "?"} mi shown, ${half ? half.want.toFixed(2) : "?"} mi along the line)`);
+      ok(turns.size > 0, `the loop's turns are called on the way round (${turns.size} distinct, e.g. "${[...turns][0] || "NONE"}")`);
+      ok(end.arrived && arrivedAt !== null && arrivedAt > total * 0.5 && /You have arrived/.test(end.strip) && /the start/.test(end.strip)
+         && text("hud-togo").startsWith("0.0"),
+         `…and the loop arrives at its end (after ${arrivedAt === null ? "NEVER" : (arrivedAt / 1609.34).toFixed(1)} of ${totalMi.toFixed(1)} mi): "${end.strip}"`);
+      ok(!!paints && paints.one === 1 && paints.planted === 2,
+         `one GPS fix paints the ride sheet once (Trip written ${paints ? paints.one : "?"}×); a second paint planted in the same window reads ${paints ? paints.planted : "?"} (its control)`);
+      /* review of the audit fixes · the turn banner too: it kept the last
+         fix's "In 400 ft · Turn …" and "2.3 mi remaining · ~14 min" beside
+         the sheet's dashes */
+      const bannerStale = (r) => !r.gHidden && /Waiting for a GPS fix/.test(r.strip) && /No fix since \S/.test(r.strip)
+        && !/remaining|~\d|In \d|\d(\.\d)? mi\b|\d+ ft\b/.test(r.strip);
+      const dashed = (r) => !!r && /^—/.test(r.spd) && isNaN(r.togo) && r.eta === "—" && /^No GPS fix since \S/.test(r.sp) && !/mph/.test(r.sp)
+        && bannerStale(r);
+      const say = (r) => r ? `speed "${r.spd}", To go "${isNaN(r.togo) ? "—" : r.togo}", Arrive "${r.eta}", strip "${r.sp}"` : "not read";
+      ok(!!drop && dashed(drop.lost) && !dashed(drop.live) && !dashed(drop.back) && /mph/.test(drop.live.sp) && /mph/.test(drop.back.sp)
+         && isFinite(drop.back.togo) && /\d/.test(drop.lost.time || "") && /remaining/.test(drop.live.strip) && /remaining/.test(drop.back.strip),
+         `a GPS dropout reads as one: after 40 s with no fix — ${say(drop && drop.lost)}, banner "${drop ? drop.lost.strip : "?"}", while Time still reads "${drop ? drop.lost.time : "?"}"; `
+         + `the next fix puts them back (${say(drop && drop.back)}, banner "${drop ? drop.back.strip : "?"}"); the judge rejects the live reading (${say(drop && drop.live)}) `
+         + `and the old dropout (the sheet dashed, the banner still "${drop ? drop.live.strip : "?"}")`);
+      ok(!!drop && !dashed(Object.assign({}, drop.lost, { strip: drop.live.strip })),
+         `the dropout judge rejects a dashed sheet under a banner that still reads live ("${drop ? drop.live.strip : "?"}")`);
+      grab("hud-stop").fire("click"); flushTimeouts(); frames(1);
+    }
+  }
+
+  /* Review of the audit fixes · three more loop cases, and a request that
+     fails. Shared: a clock an hour ahead (the off-route re-route has a 20 s
+     debounce that earlier sections' re-routes may still hold), and the
+     distance from a point to the loop's first mile. */
+  const Real0 = sandbox.Date;
+  sandbox.Date = class extends Real0 {
+    constructor(...a) { if (a.length) super(...a); else super(Real0.now() + 3600e3); }
+    static now() { return Real0.now() + 3600e3; } };
+  const mOf = (p, q) => { const k = Math.cos(p[1] * Math.PI / 180) * 111320, dx = (q[0] - p[0]) * k, dy = (q[1] - p[1]) * 111320; return Math.hypot(dx, dy); };
+  const segD = (p, a, b) => { const k = Math.cos(p[1] * Math.PI / 180) * 111320;
+    const ax = (a[0] - p[0]) * k, ay = (a[1] - p[1]) * 111320, bx = (b[0] - p[0]) * k, by = (b[1] - p[1]) * 111320;
+    const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy; let t = L ? -(ax * dx + ay * dy) / L : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+    return Math.hypot(ax + t * dx, ay + t * dy); };
+  const offFirstMile = (p, G) => { let best = 1e12; for (let i = 0; i + 1 < G.pts.length && G.cum[i] <= 1609.34; i++) best = Math.min(best, segD(p, G.pts[i], G.pts[i + 1])); return best; };
+  const spd2 = { speed: 8.9408, heading: 90 };
+  const readL = () => { const G = N.guide() || {}; return { loop: !!G.loop, arrived: !!G.arrived, togo: parseFloat(text("hud-togo")), strip: text("nav-g"),
+    panel: text("panel"), peek: String(grab("peek-txt").textContent) }; };
+  const rerouted = (r) => !!r.sawRe || /Re-rout/.test(r.strip) || /^Re-routed/.test(r.peek) || !r.loop;
+  const pickLoop = (mi) => { grab("c-loop").fire("click"); const b = documentStub.querySelectorAll("[data-loop]").find((x) => x.dataset.loop === String(mi))
+      || documentStub.querySelectorAll("[data-loop]")[0];
+    if (b) { b.fire("click"); flushTimeouts(); } return b ? b.dataset.loop : null; };
+  /* the start pin moved by hand, as the pin card's "Start from here" does
+     (planning: the drills are off a ride, so the pin is the rider's to move) */
+  const pinAt = (p) => { N.pos("none"); grab("pc-start")._listeners = {}; theMap._hit = [];
+    theMap.fire("contextmenu", { lngLat: { lng: p[0], lat: p[1] } }); grab("pc-start").fire("click"); flushTimeouts(); };
+
+  /* R1 · the approach. A loop's line starts at the junction nearest the
+     pin, which can be well away from it (the dashed approach). Standing at
+     the pin gearing up, the rider was more than 40 m off the line for three
+     fixes: the loop was re-routed to its start pin — from the pin — and
+     replaced by a route with no steps (no turn ever called, To go frozen).
+     A pin whose distance to the loop's first mile is over 60 m is searched
+     for round the centre (the premise, asserted); four fixes there, then
+     the first points of the line. The judge is shown the re-routed state. */
+  {
+    let P = null, G = null, off = 0, tried = 0;
+    for (const d of [0.0025, 0.004, 0.006, 0.0015]) {
+      for (const [bx, by] of [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, -1]]) {
+        const p = [c0[0] + bx * d / Math.cos(c0[1] * Math.PI / 180), c0[1] + by * d];
+        tried++; pinAt(p);
+        if (Math.abs(D.ME[0] - p[0]) > 1e-9) continue;
+        pickLoop(null);
+        const g = N.plan();
+        if (g && g.loop && g.pts.length > 5 && offFirstMile(p, g) > 60) { P = p; G = g; off = offFirstMile(p, g); break; }
+      }
+      if (P) break;
+    }
+    ok(!!P, `a start pin more than 60 m from its loop's first mile (the premise): ${P ? Math.round(off) + " m off, " + (G.total / 1609.34).toFixed(1) + " mi loop, approach " + Math.round(G.appr) + " m" : "NONE in " + tried + " tries"}`);
+    if (P) {
+      const totalMi = G.total / 1609.34;
+      grab("c-ride").fire("click");
+      /* each fix's banner is read, and the planner's timer run before the
+         next: a re-route shows as "Re-routing" on the fix that starts it */
+      let sawRe = false;
+      for (let i = 0; i < 4; i++) { fix(P, spd2); if (/Re-rout/.test(text("nav-g"))) sawRe = true; flushTimeouts(); }
+      frames(1);
+      const atPin = Object.assign(readL(), { sawRe });
+      for (let i = 0; i < Math.min(4, G.pts.length); i++) fix(G.pts[i], spd2);
+      frames(1);
+      const onLine = readL();
+      const fine = (r) => !rerouted(r) && !r.arrived && r.togo > 0.2 && r.togo <= totalMi + 0.15 && r.togo >= totalMi - 1.15;
+      ok(fine(atPin) && fine(onLine) && !fine({ loop: false, arrived: false, togo: totalMi, strip: "Re-routing", panel: "", peek: "Re-routed · the new route is on the map" })
+         && !fine(Object.assign({}, atPin, { sawRe: true })),
+         `a rider standing at a loop's start pin ${Math.round(off)} m from its line (four fixes) is on the approach, not off route: `
+         + `strip "${atPin.strip.slice(0, 50)}", To go ${atPin.togo}; on the line's first points "${onLine.strip.slice(0, 40)}", To go ${onLine.togo} of ${totalMi.toFixed(1)} mi; `
+         + `the judge rejects the loop re-routed to its own start`);
+      grab("hud-stop").fire("click"); flushTimeouts(); frames(1);
+    }
+    pinAt(c0);
+  }
+
+  /* R7 · the one-mile cap, and R2 · Stop then Ride again mid-loop. A
+     longer loop from the centre. R7: a single fix ON the loop's line more
+     than two miles along, while nothing has been ridden, must not jump the
+     rider there (the cap: a figure-eight's later leg beside the current
+     one); To go stays the loop's. R2: ridden past its first mile and a
+     half, stopped, Ride pressed again — the new guidance started the loop
+     at 0 and the cap held it to the first mile: nearly the whole loop to go
+     and, on the third fix, a re-route to the start. It carries on from
+     where Stop left it. Each judge is shown the old reading. */
+  {
+    const want = pickLoop(15), G = N.plan();
+    const totalMi = G ? G.total / 1609.34 : 0;
+    const pts = G ? G.pts.slice() : [], cum = G ? G.cum.slice() : [];
+    /* the cap reaches to the end of the segment that starts inside it */
+    const jr = G ? cum.findIndex((m) => m > 1609.34) : -1, reachMi = jr > 0 ? cum[jr] / 1609.34 : 1;
+    const vFar = G ? cum.findIndex((m, i) => m > (reachMi + 1.5) * 1609.34 && m < G.total - 3218.7 && offFirstMile(pts[i], G) > 200) : -1;
+    const kStop = G ? cum.findIndex((m) => m >= Math.max(2414, Math.min(4023, G.total * 0.35))) : -1;
+    ok(!!G && G.loop && vFar > 0 && kStop > 0 && cum[kStop] < G.total * 0.5,
+       `a ${want} mi loop long enough for the cap and the restart (${totalMi.toFixed(1)} mi; a point ${vFar > 0 ? (cum[vFar] / 1609.34).toFixed(1) : "?"} mi along, `
+       + `off the first mile; a stop at ${kStop > 0 ? (cum[kStop] / 1609.34).toFixed(1) : "?"} mi)`);
+    if (G && vFar > 0 && kStop > 0) {
+      const start = D.ME.slice();
+      grab("c-ride").fire("click");
+      fix(start, spd2); fix(start, spd2);
+      fix(pts[vFar], spd2); frames(1);
+      const jump = readL(), uncapped = (G.total - cum[vFar]) / 1609.34;
+      const capped = (r) => !r.arrived && r.togo >= totalMi - reachMi - 0.1 && r.togo <= totalMi + 0.15;
+      ok(capped(jump) && !capped({ arrived: false, togo: +uncapped.toFixed(1) }),
+         `a fix on the loop's line ${(cum[vFar] / 1609.34).toFixed(1)} mi along, with nothing ridden, does not jump the rider there: To go ${jump.togo} of ${totalMi.toFixed(1)} mi (the cap reaches ${reachMi.toFixed(2)} mi); `
+         + `the judge rejects the uncapped reading (${uncapped.toFixed(1)} mi)`);
+      grab("hud-stop").fire("click"); flushTimeouts(); frames(1);
+      /* R2 */
+      grab("c-ride").fire("click");
+      fix(start, spd2); fix(start, spd2);
+      for (let i = 1; i <= kStop; i++) fix(pts[i], spd2);
+      frames(1);
+      const before = readL();
+      grab("hud-stop").fire("click"); flushTimeouts(); frames(1);
+      const still = N.guide() === null;
+      grab("c-ride").fire("click");
+      for (let i = 0; i < 3; i++) fix(pts[kStop], spd2);
+      frames(1);
+      const again = readL();
+      for (let i = kStop + 1; i <= Math.min(kStop + 3, pts.length - 1); i++) fix(pts[i], spd2);
+      frames(1);
+      const on = readL(), wantMi = (G.total - cum[kStop]) / 1609.34;
+      const resumed = (r) => !rerouted(r) && !r.arrived && Math.abs(r.togo - wantMi) < 0.2;
+      ok(Math.abs(before.togo - wantMi) < 0.2 && still && resumed(again) && !rerouted(on) && on.togo < again.togo
+         && !resumed({ loop: true, arrived: false, togo: +(totalMi - 0.5).toFixed(1), strip: "", panel: "", peek: "" })
+         && !resumed({ loop: false, arrived: false, togo: wantMi, strip: "Re-routing", panel: "", peek: "Re-routed · the new route is on the map" }),
+         `Stop at ${(cum[kStop] / 1609.34).toFixed(1)} mi into the loop, then Ride again: To go ${again.togo} (${wantMi.toFixed(2)} mi left along the line; `
+         + `${before.togo} before Stop), no re-route ("${again.strip.slice(0, 44)}"), and it counts down on (${on.togo}); `
+         + `the judge rejects the loop restarted at 0 and the re-route to the start`);
+      grab("hud-stop").fire("click"); flushTimeouts(); frames(1);
+    }
+  }
+
+  /* R10 · a request that fails leaves the route that is drawn as it was.
+     A loop (and a point-to-point route) set the start pin, the end and the
+     end's name BEFORE the planner answered: "No loop found" left the route
+     home drawn and ridable, going to "the start" where the rider stood — it
+     "arrived" on its first fix. Two failures are asked for: a loop of 0 mi
+     (the chip's value planted: no loop has that length), and a route for a
+     machine legal on no land line (a kayak, set as the harness sets a
+     machine, then put back). The judge is shown the renamed end. */
+  {
+    grab("btn-home").fire("click"); flushTimeouts();
+    const endOf = () => { const t = N.snapshot(); return { to: t.to ? t.to.slice() : null, lbl: t.lbl }; };
+    const e0 = endOf(), g0 = N.plan();
+    let e1 = null, c1 = "", e2 = null, c2 = "";
+    try {
+      grab("c-loop").fire("click");
+      const chip = documentStub.querySelectorAll("[data-loop]")[0];
+      if (chip) { chip.dataset.loop = "0"; chip.fire("click"); flushTimeouts(); }
+      e1 = endOf(); c1 = text("panel");
+      R.setMachine("kayak");
+      grab("pc-route")._listeners = {}; theMap._hit = [];
+      theMap.fire("contextmenu", { lngLat: { lng: c0[0] + 0.01, lat: c0[1] + 0.004 } });
+      grab("pc-route").fire("click"); flushTimeouts();
+      e2 = endOf(); c2 = text("panel");
+    } finally { R.setMachine("bike"); }
+    const same = (a, b) => !!a && !!b && a.lbl === b.lbl && !!a.to && !!b.to && Math.abs(a.to[0] - b.to[0]) < 1e-9 && Math.abs(a.to[1] - b.to[1]) < 1e-9;
+    const g1 = N.plan();
+    ok(!!g0 && e0.lbl === "home" && /No loop found/.test(c1) && /Nothing legal nearby/.test(c2) && same(e1, e0) && same(e2, e0)
+       && !!g1 && g1.lbl === "home" && !same({ to: D.ME.slice(), lbl: "the start" }, e0),
+       `a loop that is not found and a route with no legal answer leave the drawn route's end as it was ("${e2 ? e2.lbl : "?"}", `
+       + `"${c1.slice(0, 20)}", "${c2.slice(0, 20)}"); the judge rejects the end renamed "the start" where the rider stands`);
+    grab("btn-clear").fire("click"); flushTimeouts();
+    /* …and since routeToPoint now names its end only on success, Resume
+       names the trip's own (tripSave writes it): a resumed trip whose
+       routing fails still knows where it was going. A saved trip for a
+       kayak (no legal land line) is resumed; the ride Resume would start is
+       then started and stopped so its "resuming" state is used up here. */
+    const tp = [c0[0] + 0.02, c0[1] + 0.01];
+    let e3 = null, c3 = "";
+    try {
+      N.resume({ v: 1, to: tp, lbl: "the camp", machine: "kayak", crumbs: [], crumbMi: 0 });
+      flushTimeouts();
+      e3 = endOf(); c3 = text("panel");
+    } finally { R.setMachine("bike"); }
+    grab("c-ride").fire("click"); fix(c0); grab("hud-stop").fire("click"); flushTimeouts(); frames(1);
+    const kept3 = (e) => !!e && e.lbl === "the camp" && !!e.to && Math.abs(e.to[0] - tp[0]) < 1e-9 && Math.abs(e.to[1] - tp[1]) < 1e-9;
+    ok(/Nothing legal nearby/.test(c3) && kept3(e3) && !kept3({ to: e0.to, lbl: "the camp" }),
+       `a resumed trip whose routing fails keeps its destination for the next save ("${e3 ? e3.lbl : "?"}", ${e3 && e3.to ? "to kept" : "to LOST"}; "${c3.slice(0, 24)}"); `
+       + `the judge rejects the end left at the last route's`);
+  }
+  sandbox.Date = Real0;
+
+  /* F1 · a route is planned for ONE machine. A mode that changes the
+     machine (Outdoors and Hunt walk; leaving them rides again) left the
+     route cards up with a live Ride it, which then guided the new machine
+     down a line planned for the old one. Now the mode change clears the
+     route and says so — and, belt and braces, Ride it refuses a selected
+     route with an edge the machine as it is now may not use (made here the
+     only way left: the harness's setMachine, which changes the machine and
+     clears nothing). Controls: the judge is shown an uncleared route; and
+     the same press as the machine the route was planned for DOES start. */
+  {
+    const drawn = () => ((record.setData.route || []).at(-1) || { features: [] }).features.length;
+    const snap = () => ({ plan: !!N.plan(), drawn: drawn(), machine: R.machine, toast: String(grab("toast").textContent),
+      cards: /id="routes"/.test(grab("panel")._html || ""), rail: grab("rail").className });
+    const cleared = (c, was) => !c.plan && c.drawn === 0 && !c.cards && /Route cleared/.test(c.toast) && c.toast.includes(was) && c.rail === "folded";
+    const walkK = (((M && M.MODES) || []).find((m) => m.machine === "walk") || {}).k, homeK = M && M.get();
+    grab("btn-home").fire("click"); flushTimeouts();
+    const p1 = snap();
+    M.apply(walkK); flushTimeouts();
+    const c1 = snap();
+    ok(!!walkK && p1.plan && p1.drawn > 0 && p1.cards && p1.machine === "bike" && c1.machine === "walk" && cleared(c1, "Dirt bike")
+       && !cleared(Object.assign({}, c1, { plan: true, drawn: p1.drawn, cards: true }), "Dirt bike"),
+       `a mode that changes the machine (${homeK} → ${walkK}: ${p1.machine} → ${c1.machine}) clears the route and says so ("${c1.toast}"); `
+       + `the judge rejects a route left planned and drawn`);
+    grab("btn-home").fire("click"); flushTimeouts();
+    const p2 = snap();
+    M.apply(homeK); flushTimeouts();
+    const c2 = snap();
+    ok(p2.plan && p2.drawn > 0 && p2.machine === "walk" && c2.machine === "bike" && cleared(c2, "On foot"),
+       `…and so does leaving it: a route planned on foot does not outlive the walk ("${c2.toast}")`);
+    grab("btn-home").fire("click"); flushTimeouts();
+    const Gp = N.plan(), path = Gp && Gp.o && Gp.o.s ? Gp.o.s.path : [];
+    const unfit = ["sxs", "quad", "kayak"].find((m) => { R.setMachine(m); return path.some((e) => !R.machineLegal(e)); });
+    const seq0 = geo.seq;
+    const press = (id) => { grab(id).fire("click"); flushTimeouts();
+      return { t: text("panel"), opened: geo.seq - seq0, flag: flagged(), chip: chipTxt() }; };
+    const r1 = press("rc-ride"), r2 = press("c-ride");
+    const refusedUnfit = (r) => /not legal for a/.test(r.t) && /Nothing started/.test(r.t) && r.opened === 0 && !r.flag && /Ride it/.test(r.chip);
+    R.setMachine("bike");
+    grab("c-ride").fire("click");
+    const r3 = { t: text("panel"), opened: geo.seq - seq0, flag: flagged(), chip: chipTxt() };
+    deny();
+    ok(!!unfit && path.length > 0 && refusedUnfit(r1) && refusedUnfit(r2) && !refusedUnfit(r3) && r3.opened === 1 && r3.flag && /Stop \(GPS\)/.test(r3.chip),
+       `a selected route with an edge the machine may not use (planned as a dirt bike, the machine now ${unfit || "NONE FOUND"}) is refused by the card's Ride it `
+       + `and by the Ride tab's ("${r1.t.slice(0, 64)}"; watches opened ${r2.opened}); as the dirt bike it was planned for the same press starts (watch opened ${r3.opened === 1}, its control)`);
+  }
+
+  /* F13 · the self-test while Ride waits for its first fix. rideMode is set
+     at the press and the ribbon and sheet only come with the first fix — a
+     wait take 188 made last until Stop — and the self-test's two-state HUD
+     rule called that a broken HUD. It is run here in that very state; its
+     verdict (the app's, __stHud) is also shown the pictures it must fail:
+     the waiting state judged by the old two-state rule, and a waiting
+     state with a ribbon, with no strip, with a sheet. */
+  {
+    const J = sandbox.window.__stHud;
+    grab("c-ride").fire("click");
+    const pend = { flag: flagged(), chip: chipTxt(), strip: grab("nav").hidden === false, tape: grab("hudbar").hidden === false,
+      sheet: grab("hudstats").hidden === false };
+    let st = null, threw = null;
+    try { sandbox.window.__selfTest({ gps: false }, (r) => { st = r; }); } catch (e) { threw = String(e.message); }
+    for (let i = 0; i < 500 && !st && !threw; i++) { frames(2); flushTimeouts(); }
+    const row = st ? (st.results || []).find((r) => r.id === "hud-matches-ride") : null;
+    const still = flagged() && /Stop \(GPS\)/.test(chipTxt());
+    deny();
+    const old2 = J ? J({ rid: true, pend: false, nav: true, bar: false, ctl: false, sheet: false, sts: false }) : null;
+    const bad = J ? [J({ rid: true, pend: true, nav: true, bar: true, ctl: false, sheet: false }),
+                     J({ rid: true, pend: true, nav: false, bar: false, ctl: false, sheet: false }),
+                     J({ rid: true, pend: true, nav: true, bar: false, ctl: true, sheet: true })] : [];
+    ok(pend.flag && /Stop \(GPS\)/.test(pend.chip) && pend.strip && !pend.tape && !pend.sheet && still && !threw
+       && !!row && row.ok === true && /waiting for the first fix/.test(row.d)
+       && !!old2 && old2.ok === false && bad.length === 3 && bad.every((x) => x.ok === false),
+       `the self-test run while Ride waits for its first fix passes hud-matches-ride (${row ? (row.ok ? "pass" : "FAIL") + ": " + row.d : threw || "no such row"}); `
+       + `the two-state rule fails the same picture ("${old2 ? old2.msg : "?"}"), and a waiting state with a ribbon, with no strip or with a sheet fails`);
+  }
+
+  /* F4 · a watch is closed by whoever opened it. The startup locate kept
+     the ONE global watch id and closed whatever it held when its fix (or
+     its 25 s give-up) came — the RIDE's watch, if Ride had been pressed
+     meanwhile: a ride sheet that never moved again, or "Stop (GPS)" for
+     ever. This pass's startup locate has never had a fix (watch 1, still
+     open): Ride is pressed, then the locate gets its fix — it must close
+     watch 1 and leave the ride's. The judge is shown the old outcome. */
+  {
+    const ME0 = D.ME.slice(), bootId = geo.watches.size ? Math.min(...geo.watches.keys()) : null, boot = geo.watches.get(bootId);
+    grab("c-ride").fire("click");
+    const rideId = geo.id, n0 = geo.clearedIds.length;
+    boot && boot.cb({ coords: { longitude: ME0[0], latitude: ME0[1], accuracy: 8 } });
+    flushTimeouts(); frames(1);
+    const w = { closed: geo.clearedIds.slice(n0), rideOpen: geo.watches.has(rideId), cb: typeof geo.cb === "function", chip: chipTxt(), flag: flagged() };
+    const own = (x, mine) => x.closed.length === 1 && x.closed[0] === mine && x.rideOpen && x.cb && /Stop \(GPS\)/.test(x.chip) && x.flag;
+    deny();
+    const after = geo.clearedIds.slice(n0);
+    ok(bootId === 1 && !!boot && rideId !== bootId && own(w, bootId)
+       && !own({ closed: [rideId], rideOpen: false, cb: false, chip: w.chip, flag: true }, bootId)
+       && after.length === 2 && after[1] === rideId && !flagged(),
+       `the startup locate's fix closes its own watch (${bootId}; closed ${JSON.stringify(w.closed)}) and leaves the ride's (${rideId}) open and waiting `
+       + `(chip "${w.chip}"); a refusal then closes the ride's (${JSON.stringify(after)}); the judge rejects the ride's watch closed instead`);
+  }
+
+  /* F4, F19 · the same on the phone's driver (a stand-in Capacitor
+     Geolocation that keeps each watch's id and callback). Off a ride a
+     locate's give-up sent the plugin's id to the WEB clearWatch, so the
+     native watch ran on — for a day, once the ride's first-fix timeout
+     applied to it; and with Ride pressed meanwhile the give-up closed the
+     ride's watch through the plugin. Now: the locate asks the plugin for
+     25 s, its give-up closes its own watch through the plugin, the ride's
+     watch stays open with its own long timeout, and an answer from the
+     closed watch moves nothing. */
+  {
+    const cap = { n: 0, open: new Map(), closed: [], opts: {} };
+    sandbox.Capacitor = { Plugins: { Geolocation: {
+      watchPosition(o, cb) { const id = "w" + (++cap.n); cap.open.set(id, cb); cap.opts[id] = o; return id; },
+      clearWatch(o) { cap.closed.push(o && o.id); cap.open.delete(o && o.id); } } } };
+    const fire25 = () => { for (let i = 0; i < timeouts.length; i++) if (timeouts[i].d === 25000) { const t = timeouts.splice(i, 1)[0]; i--; t.fn(); } };
+    /* locates from earlier sections that never got a fix give up first, so
+       the counts below are this drill's alone; and the chooser's button is
+       a new element each time the card is drawn (one listener, one locate) */
+    fire25();
+    const chooser = () => { grab("hc-me")._listeners = {}; grab("c-home").fire("click"); flushTimeouts(); grab("hc-me").fire("click"); flushTimeouts(); };
+    const ls = sandbox.window.localStorage, home0 = ls.getItem("apex.home.v1"), web0 = geo.cleared;
+    const onlyIts = (closed, id) => closed.length === 1 && closed[0] === id;
+    let a = null, b = null;
+    try {
+      chooser();
+      const id1 = "w" + cap.n, waiting = /Waiting for a GPS fix/.test(text("panel"));
+      fire25();
+      a = { id: id1, waiting, timeout: (cap.opts[id1] || {}).timeout, closed: cap.closed.slice(), open: cap.open.size,
+            web: geo.cleared - web0, card: text("panel") };
+      chooser();
+      const id2 = "w" + cap.n, late = cap.open.get(id2);
+      grab("c-ride").fire("click");
+      const id3 = "w" + cap.n, n0 = cap.closed.length, me0 = D.ME.slice();
+      fire25();
+      late && late({ coords: { longitude: me0[0] + 0.5, latitude: me0[1], accuracy: 5 } });
+      b = { ids: [id2, id3], rideTimeout: (cap.opts[id3] || {}).timeout, closed: cap.closed.slice(n0), rideOpen: cap.open.has(id3),
+            chip: chipTxt(), flag: flagged(), moved: D.ME[0] !== me0[0] };
+      const rcb = cap.open.get(id3);
+      rcb && rcb(null, { code: "OS-PLUG-GLOC-0003", message: "Location permission request was denied." });
+      flushTimeouts(); frames(1);
+      b.after = cap.closed.slice(n0); b.endFlag = flagged();
+      /* review of the audit fixes · the locate's late answer above is also
+         dropped by locateOnce's own `done`; the case gpsWatch's h.dead is for
+         is the RIDE's closed watch answering (the plugin delivering a fix as
+         Stop or a refusal closes it): an in-region fix from it must start no
+         recording, raise no ride and move no pin */
+      const RD = sandbox.window.__ride, me1 = D.ME.slice();
+      rcb && rcb({ coords: { longitude: me1[0] + 0.01, latitude: me1[1] + 0.005, accuracy: 5 } });
+      flushTimeouts(); frames(1);
+      b.late = { cb: typeof rcb === "function", rec: !!(RD && RD.R), flag: flagged(), moved: D.ME[0] !== me1[0] };
+    } finally { delete sandbox.Capacitor; }
+    ok(!!a && a.waiting && a.id === "w1" && a.timeout === 25000 && onlyIts(a.closed, "w1") && a.open === 0 && a.web === 0
+       && /No GPS fix in 25 s/.test(a.card) && ls.getItem("apex.home.v1") === home0 && !onlyIts([], "w1"),
+       `on the phone's driver a locate that gets no fix asks the plugin for ${a ? a.timeout : "?"} ms and closes its watch THROUGH THE PLUGIN `
+       + `(closed ${a ? JSON.stringify(a.closed) : "?"}, still open ${a ? a.open : "?"}, web clearWatch calls ${a ? a.web : "?"}); home is left as it was`);
+    ok(!!b && b.ids[0] !== b.ids[1] && onlyIts(b.closed, b.ids[0]) && !onlyIts([b.ids[1]], b.ids[0]) && b.rideOpen
+       && typeof b.rideTimeout === "number" && b.rideTimeout >= 3600000
+       && /Stop \(GPS\)/.test(b.chip) && b.flag && !b.moved && b.after.length === 2 && b.after[1] === b.ids[1] && !b.endFlag,
+       `…and with Ride pressed while it waits, its give-up closes only its own watch (${b ? JSON.stringify(b.closed) : "?"} of ${b ? b.ids.join(", ") : "?"}): `
+       + `the ride's stays open (chip "${b ? b.chip : "?"}", first-fix timeout ${b ? b.rideTimeout : "?"} ms), an answer from the closed watch moves nothing, `
+       + `and a denial then closes the ride's (${b ? JSON.stringify(b.after) : "?"}); the judge rejects the ride's watch closed instead`);
+    const inert = (x) => !!x && x.cb && !x.rec && !x.flag && !x.moved;
+    ok(!!b && inert(b.late) && !inert({ cb: true, rec: true, flag: false, moved: true }),
+       `…and a fix from the RIDE's watch after the denial closed it starts nothing (recording ${b && b.late ? b.late.rec : "?"}, `
+       + `ride flag ${b && b.late ? b.late.flag : "?"}, pin moved ${b && b.late ? b.late.moved : "?"}); the judge rejects a recording started by it`);
   }
 }
 

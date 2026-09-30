@@ -69,20 +69,49 @@ simulated positions. Please ride it.
   you're going, tilt, and follow as you move — like a navigation app.
 - Does the tilt and zoom feel right at speed? Too close, too far, too
   flat? Tell us; that's a judgment only a real ride can make.
-- Drag the map. Following should pause and a **Re-centre** button should
-  appear. Tap it (or Locate) and it should snap back.
-- Tap **N↑** for north-up. Tap again for heading-up.
+- Drag the map. Following should pause. Tap **Re-centre** in the ride sheet
+  and it should snap back.
+- Tap **North up** in the ride sheet for north-up. Tap again for heading-up.
 - Does the screen stay on while it's following?
 
 **Turn by turn**
 
-- Plan a route first (Return home, or long-press a spot → Start from here /
-  Directions here), then Ride it.
+- Plan a route first (Return home — it sits on the folded drawer at the
+  bottom of the map — or long-press a spot → Route here), then tap **Ride
+  it** under the route options. Take 187 needed four taps for this; it
+  should now be three from a long-press and two from Return home.
+- **Turns** (the drawer's row) lists the route you chose.
 - The strip at the top should name the next turn and count the distance
   down: "In 400 ft · Turn left onto Trail 7". **Does it call a turn that
   isn't there? Miss one that is?** Either is the report we most want.
-- It shows remaining distance and a time based on your own pace. Is the
-  time believable?
+- It shows remaining distance and a time: the route's own estimate
+  until your pace is known (about ten moving fixes), then your pace. The
+  route card gives the whole route's time; the ride sheet's Arrive and
+  the strip count down what is left, and all three read the same "~N
+  min" at the start. Is the time believable?
+- The ride sheet at the bottom: Trip, To go and Arrive on a route; Trip,
+  Time and Speed on a free ride. Time is elapsed time, not moving time —
+  say if you want moving time. Stop is in the sheet; the Ride tab's chip
+  steps aside once the sheet is up, so there is one Stop on screen.
+- **Wrong turn** only appears while the simulator rides (it veers the
+  simulated track) — and the simulator is a test tool now, so on the phone
+  you should never see it. On a real ride the off-route alert fires from
+  your track.
+- While riding, the map is just the map: the compass tape, the turn
+  banner, the ride sheet and the tabs. The floating buttons (Map, HD,
+  Off-road, the activity filter, the scale, and Layers / Locate / Search)
+  hide and come back when you stop. Return home and Dispatch stay in the
+  drawer's row. Is anything missing that you reach for mid-ride?
+- **Turn location off and tap Ride it.** It should say "No GPS fix — turn
+  on location and try again" and start nothing — no pretend ride.
+- **Location ON, deep under trees, phone just switched on.** Tap Ride it.
+  The chip should read Stop (GPS) and wait for as long as the first fix
+  takes — it should NOT tell you to turn location on. Until the fix, the
+  strip at the top should read "—", not a speed. How long did the first
+  fix take?
+- With a route up, tap a different route card. If the chosen card has
+  warnings you cannot see, the line above Save should say how many
+  ("N more warnings below"); if it has none hidden, that line should go.
 - **Miss a turn on purpose.** Within a few seconds it should re-route from
   where you are.
 - Reach the end. It should buzz and say **"You have arrived"** at about
@@ -100,8 +129,9 @@ simulated positions. Please ride it.
 - Open **Tools → Diagnostics → Self-test** and find the **VOICE** line. It
   tells us whether your phone has a voice the app can use. Please send it
   — this is different on every phone and we can't know it from here.
-- If a 🔊 button appears on the strip while following, tap it and take a
-  turn. It should speak the turn once as it becomes next and once more
+- Tap **Voice** in the ride sheet while following (if it is greyed out with a
+  note under it, this phone has no voice; send the Self-test VOICE line) and
+  take a turn. It should speak the turn once as it becomes next and once more
   close in. Never twice in a row for the same turn.
 
 ## 4. On the river
@@ -176,8 +206,8 @@ follows — layers, pins, routing, the machine button.
   HD sheet should say what is downloading and how many tiles are done.
   Does a save feel faster than it did? (It fetches six tiles at a time
   now.)
-- **The tour** (take 182): on first open after this update a six-step
-  tour should appear on its own, ringing the real buttons. Does each
+- **The tour** (take 182; seven steps since take 188, with a Return home
+  step): on first open after this update the tour should appear on its own, ringing the real buttons. Does each
   ring sit on the right button on your screen? Does Not now bring it
   back next launch, and Don't show again stop it? Tools → Take the tour
   replays it.
@@ -187,7 +217,7 @@ follows — layers, pins, routing, the machine button.
   bare map exits, say so: it means the phone's WebView ignores the
   history entry the app keeps, which nothing off a phone can test.
 - A tap outside the Mode, Activity or Layers panel should close it, and
-  Layers now has a Done row.
+  Layers has a Done button at the bottom.
 - **Pins you choose** (take 186): Layers → "Pins in <mode>". Restaurants
   and stores start off in Off-road and Camp; switch Toilets off, kill the
   app, reopen — still off? Reset restores the mode's defaults. Water's

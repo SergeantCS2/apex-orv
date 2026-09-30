@@ -12,4 +12,5 @@ On the phone: Layers → Pins in Camp — switch Toilets off, kill the app,
 reopen: still off? Reset restores? Switch Restaurants on: they appear at
 street zoom? Set home each of the three ways; kill and reopen: does the
 map open at home? Plan a ride in two actions: Set home → my location,
-then press and hold a destination → Directions here.
+then press and hold a destination → Route here (renamed at take 188), then
+Ride it.

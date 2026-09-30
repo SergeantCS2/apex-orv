@@ -145,9 +145,18 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 
 - **Host** `unpkg.com`
 - **Provides** Renderer, vendored into the bundle at build time
-- **Licence** BSD 3-Clause
+- **Licence** BSD 3-Clause (MapLibre contributors; it contains code from Mapbox GL JS, BSD 3-Clause, glfx.js, MIT, and d3-color, BSD 3-Clause). Full text in www/licenses.txt, read from the LICENSE.txt published with 5.24.0; the notice is in Tools -> Data sources
 - **Fetched by** `ci/bundle.sh`
 - **Refresh** on version bump
+- **Note** ci/bundle.sh fetches maplibre-gl@5, so the build floats within 5.x; tools/gate.py check_licences fails if the vendored build stops saying 3-Clause BSD or leaves major 5, and names a minor drift
+
+### Capacitor (the Android app runtime and its plugins)
+
+- **File** `node_modules/@capacitor/{android,core,device,geolocation,haptics,share}` — npm packages at the versions package-lock.json pins
+- **Provides** the native shell that hosts the web app on Android, its bridge, and the Device, Geolocation, Haptics and Share plugins
+- **Licence** MIT (2017-present Drifty Co.; the plugins 2020-present Ionic, Geolocation 2025 Ionic). Full texts in www/licenses.txt; the notice is in Tools -> Data sources
+- **Fetched by** `npm ci` in ci/bundle.sh, from npm's registry like every package in package-lock.json; `npx cap sync android` in ci/apk.sh compiles it into the APK
+- **Refresh** on a package-lock bump: tools/gate.py check_licences compares each package's LICENSE and version with www/licenses.txt
 
 ### bundletool (google/bundletool releases)
 
@@ -166,6 +175,22 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 - **Licence** MIT, text retained at the head of the vendored file
 - **Fetched by** nobody at build time — it is committed, because the data pipeline runs before `npm ci` and must not depend on it
 - **Refresh** only if the parser needs updating; it is a pinned copy
+
+### Lucide icons (pasted, not fetched)
+
+- **File** `src/app.html (LUCIDE)` — 74 inner-SVG strings, one per icon, keyed by Lucide name (tools/gate.py check_icons holds the count to the table)
+- **Provides** the line icons on every control, marker and card, pasted from the lucide-static npm package 1.37.0; tools/gate.py check_icons compares each string to node_modules/lucide-static
+- **Licence** ISC (Lucide Icons and Contributors); the icons derived from Feather are MIT (Cole Bemis). Full texts in www/licenses.txt; the notice is in Tools -> Data sources
+- **Fetched by** nobody at build time — pasted by hand from a script's output; the gate reads the npm package after `npm ci`
+- **Refresh** on a lucide-static bump: re-paste the strings and LUCIDE_V, and check_icons proves them
+
+### Barlow and Barlow Condensed (committed, never fetched)
+
+- **File** `www/fonts/*.woff2, assets/fonts/Barlow-SemiBold.ttf` — six UI cuts and the map-label source, committed
+- **Provides** the app's typeface (six cuts, v1.408) and the map-label glyph pack tools/glyphs.py builds from Barlow SemiBold
+- **Licence** SIL Open Font License 1.1, Copyright 2017 The Barlow Project Authors. Full text in www/licenses.txt; the notice is in Tools -> Data sources
+- **Fetched by** nobody at build time — committed; tools/glyphs.py reads the committed TTF
+- **Refresh** only on a deliberate typeface update; the files are pinned copies
 
 ## Citation-only hosts (displayed, never fetched)
 
