@@ -885,6 +885,24 @@ personal-name sweep of older comments; the inner-screen two-pane layout,
 landscape and a light theme; junk pin names ("A"–"F", "car parking"); the
 fatal screen's malformed font declaration; Play screenshots on the Fold.
 
+AFTER THE MERGE (2026-09-30): CI run 89, on the merge commit 8820be8, went
+RED in the bundle job: RENDER FAILED (1), the 412x915 read "Clear route
+takes the route cards' trim with it" crashing on a null Clear route button.
+Every local run had passed (gate, clean run). The cause is PROVEN by a
+reproduction with the CPU slowed 4x (tools-free script, the same steps): the
+check before it, the self-test drill, moved on at the first "PASS" or after
+15 s while the self-test was still inside its 20-second wait for a GPS fix
+(headless Chrome never gets one); the self-test's own report card then
+landed 11 s later, inside the next check, and replaced its route cards — on
+CI's slower runner between the cards appearing and the click. The test was
+wrong, not the app (landmine 54). Fix (render only, branch take-188-ci): the
+drill waits for the self-test's report itself (up to 90 s) and asserts it
+arrived, with a judge whose control is the real report markup and a running
+line; the Clear-route read names whatever replaced the cards instead of
+crashing. Re-run at CPU x4: the report lands at 36.3 s, the drill moves on
+at 36.6 s, and the route cards stay. Landmine 234. Take 188 is not promoted
+until the run after this fix is green.
+
 ## Take 187 — 2026-09-23 — V4 foundation: tokens proven by a computed-style diff, guards with planted controls (A208); pin anchors and stale stacks (A209); poi-dot's zoom gate (A210); harness blind spots and the inner screen (A211)
 
 Before this take: the V4 design study (A203) — docs/DESIGN-v4.md, AGENDA

@@ -5283,10 +5283,22 @@ await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } cat
     const ch = () => document.getElementById("chips");
     out.hudHiddenAtRest = !!hb().hidden;
     out.chipsShownAtRest = !ch().hidden;
-    // the self-test runs a ride drill; it must put the HUD back
+    // the self-test runs a ride drill; it must put the HUD back.
+    /* take 188 · CI run 89: this loop moved on at the first "PASS" — or
+       after 15 s — while the self-test was still waiting up to 20 s for a
+       GPS fix that headless Chrome never gets. Its final report card then
+       landed in the NEXT check and replaced that check's route cards
+       (reproduced at CPU x4: the report at 36 s, the cards at 25.7 s;
+       landmine 234). Wait for the report itself, and say so. */
+    const done = (h) => /Self-test\s*\u00b7\s*\d+ passed/.test(String(h).replace(/<[^>]*>/g, ""));
+    out.doneJudge = done('<b style="font-size:var(--t-lg)">Self-test \u00b7 <span style="color:var(--ok)">42 passed, 3 failed</span></b>')
+      && !done("Self-test running\u2026 Waiting up to 20s for a GPS fix");
+    const t0 = Date.now();
     document.getElementById("c-selftest").click();
-    for (let i = 0; i < 60 && !/PASS/.test(document.getElementById("panel").innerHTML); i++)
+    for (let i = 0; i < 360 && !done(document.getElementById("panel").innerHTML); i++)
       await sleep(250);
+    out.selftestDone = done(document.getElementById("panel").innerHTML);
+    out.selftestS = Math.round((Date.now() - t0) / 1000);
     out.hudHiddenAfterSelftest = !!hb().hidden;
     out.chipsShownAfterSelftest = !ch().hidden;
     // the compass must say something when it has no heading
@@ -5297,6 +5309,9 @@ await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } cat
     window.hudShow(false);
     return out;
   });
+  ok(r.doneJudge && r.selftestDone,
+     `the self-test drill waits for the self-test's own report (${r.selftestS} s) before the next check — `
+     + `its judge takes the final report and rejects a running one (its control)`);
   ok(r.hudHiddenAtRest, "compass ribbon is off before any ride");
   ok(r.hudHiddenAfterSelftest,
      "self-test leaves the compass ribbon OFF — the drill puts back what it moved");
@@ -5357,7 +5372,11 @@ await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } cat
          inline one) — the same read settles short */
       if (!(await cards())) return Object.assign(out, { error: "no route cards the second time" });
       const g = trim() || "0px";
-      document.getElementById("btn-clear").click(); await settle();
+      /* take 188 · CI run 89: if something replaced the cards, say what */
+      const bc2 = document.getElementById("btn-clear");
+      if (!bc2) return Object.assign(out, { error: "the route cards were replaced before Clear route — the drawer shows: "
+        + (document.getElementById("panel").innerText || "").replace(/\s+/g, " ").slice(0, 90) });
+      bc2.click(); await settle();
       const st = document.createElement("style"); st.textContent = `#railbody{--rc-trim:${g}}`; document.head.appendChild(st);
       out.plant = await openTall(); out.plant.g = g; st.remove();
       window.railSet(false); await settle();

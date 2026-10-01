@@ -143,6 +143,7 @@ Start here. Do not read top to bottom.
 | A mark fails contrast at a ratio the colours it sits on cannot produce | 231 |
 | The ride froze after its first fix; its GPS watch was closed by something else | 232 |
 | Plan, notes or scripts gone after a restart | 233 |
+| A check fails on a card it never opened; the drawer shows another feature's late result | 234 |
 
 ---
 
@@ -3024,3 +3025,16 @@ anything the HANDOFF or a later step will cite (notes, specs, patch scripts,
 measurement JSON) is written outside /tmp as it is written. Take 188 mirrors it
 to a backup directory in the home directory. A companion to landmine 215: what
 /tmp holds survives a turn, not a restart.
+
+**234. A check that moves on at the first sign of progress leaves the job's
+result to land in a later check.** Take 188's self-test drill in render
+waited for the first "PASS" in the drawer, or 15 s, then moved on; the self-
+test itself was still waiting up to 20 s for a GPS fix that headless Chrome
+never gets. Its report card landed about 11 s later, inside the next check,
+and replaced that check's route cards. Locally the timing hid it; CI run
+89's slower runner put the replacement between the cards appearing and the
+click, and render failed on a null button (reproduced at CPU x4: report at
+36 s, cards at 25.7 s). Wait for the job's own completion signal — its final
+report — not for its first line, assert it arrived, and give the judge a
+control built from the real markup (the report puts a <span> between "Self-
+test ·" and the count, so a raw-HTML regex would never match).
