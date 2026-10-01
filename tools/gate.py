@@ -2536,7 +2536,12 @@ def check_render():
     # take 181: 274 checks on the pinned Chrome take ~19-20 min in the build
     # sandbox, which sat exactly at the old 1200 s; the limit exists to catch
     # a HUNG render, and 30 min still does that. CI is faster.
-    r = subprocess.run(["node", rm], capture_output=True, text=True, timeout=1800)
+    # Take 188, CI run 90: CI is not always faster. 607 checks took 34 min 52 s
+    # on run 90's runner (run 89's, about 1.8x as fast, reached the same check
+    # in 15.5 min; here the whole gate, render inside, took 885-928 s), past the
+    # old 1800 s, so the gate's own render could not finish there (INFERRED;
+    # landmine 235). 60 min still catches a hang; the suite must still PASS.
+    r = subprocess.run(["node", rm], capture_output=True, text=True, timeout=3600)
     if r.returncode:
         bad = [l.strip() for l in r.stdout.splitlines() if "FAIL" in l][:2]
         fails.append("render failed: " + ("; ".join(bad) or r.stderr[-700:]))

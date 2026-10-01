@@ -903,6 +903,35 @@ crashing. Re-run at CPU x4: the report lands at 36.3 s, the drill moves on
 at 36.6 s, and the route cards stay. Landmine 234. Take 188 is not promoted
 until the run after this fix is green.
 
+THE SECOND RUN (2026-09-30, evening): CI run 90, on PR #2's merge commit
+bb81701, was CANCELLED at the bundle job's 90-minute limit; no printed check
+failed (the gate's own results never printed). Its log (PROVEN, step
+timestamps): "pipeline complete … in 1470s"; RENDER PASSED after 34 min 52 s,
+the self-test drill waiting 84 s for its report (the run-89 fix holding on
+CI, but 6 s inside its 90 s ceiling); PALETTE PASSED; then gate.py, which
+prints only at its end, ran 29 min until the cancel, with a python3, a node
+and a Chrome still running (the runner's orphan list, PROVEN; that it was the
+gate's render is INFERRED: the gate's only other Chrome, the palette check,
+runs after it). The gate renders again under an 1800 s limit, which that
+runner's 34.9 min render would have crossed (INFERRED; never reached). Run
+90's runner was about 1.8x slower than run 89's on the same cache (PROVEN:
+pipeline 1470 s vs 738 s; the render reached the same check at 27.6 vs 15.5
+min), so the suite's growth (about 318 to 607 checks) and a slow runner
+together crossed the job's limit and would have crossed the gate's. On the
+workstation the whole gate, its render inside, took 885-928 s at take 188
+(499 s at take 187); take 187's whole bundle job took 44 min (job
+timestamps). Fix (branch take-188-ci2, no product change), each limit sized
+from run 90, the slowest runner seen: the gate's render limit 3600 s; the
+bundle job 180 min (both yml files, cmp identical); the self-test drill's
+wait 180 s, still leaving the moment the report lands; and the three page
+loads that rode Chrome's 30 s default (render's two reloads, the palette
+check's load; about 16-23 s on run 90, INFERRED from their sections' times)
+get 120 s. At run 90's speed the job is ~102 min on a cached pipeline; a cold
+pipeline's time at that speed is UNKNOWN, and 180 min leaves it ~100.
+Landmine 235. Take 189's render speed-up (A227, on the take-189 branch) is
+meant to shorten both renders (INFERRED until measured); CI's duration is
+not otherwise a goal (the maintainer, 2026-09-30).
+
 ## Take 187 — 2026-09-23 — V4 foundation: tokens proven by a computed-style diff, guards with planted controls (A208); pin anchors and stale stacks (A209); poi-dot's zoom gate (A210); harness blind spots and the inner screen (A211)
 
 Before this take: the V4 design study (A203) — docs/DESIGN-v4.md, AGENDA

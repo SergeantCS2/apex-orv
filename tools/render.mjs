@@ -5289,13 +5289,16 @@ await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } cat
        GPS fix that headless Chrome never gets. Its final report card then
        landed in the NEXT check and replaced that check's route cards
        (reproduced at CPU x4: the report at 36 s, the cards at 25.7 s;
-       landmine 234). Wait for the report itself, and say so. */
+       landmine 234). Wait for the report itself, and say so.
+       CI run 90: the report took 84 s on a slow runner, 6 s inside the old
+       90 s ceiling, and CI renders twice per run (landmine 235). 180 s; the
+       loop leaves as soon as the report lands, so a fast runner pays nothing. */
     const done = (h) => /Self-test\s*\u00b7\s*\d+ passed/.test(String(h).replace(/<[^>]*>/g, ""));
     out.doneJudge = done('<b style="font-size:var(--t-lg)">Self-test \u00b7 <span style="color:var(--ok)">42 passed, 3 failed</span></b>')
       && !done("Self-test running\u2026 Waiting up to 20s for a GPS fix");
     const t0 = Date.now();
     document.getElementById("c-selftest").click();
-    for (let i = 0; i < 360 && !done(document.getElementById("panel").innerHTML); i++)
+    for (let i = 0; i < 720 && !done(document.getElementById("panel").innerHTML); i++)
       await sleep(250);
     out.selftestDone = done(document.getElementById("panel").innerHTML);
     out.selftestS = Math.round((Date.now() - t0) / 1000);
@@ -5310,7 +5313,7 @@ await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } cat
     return out;
   });
   ok(r.doneJudge && r.selftestDone,
-     `the self-test drill waits for the self-test's own report (${r.selftestS} s) before the next check — `
+     `the self-test drill waits for the self-test's own report (${r.selftestS} s, at most 180 s) before the next check — `
      + `its judge takes the final report and rejects a running one (its control)`);
   ok(r.hudHiddenAtRest, "compass ribbon is off before any ride");
   ok(r.hudHiddenAfterSelftest,
@@ -6029,7 +6032,8 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
      "G6's verdict rejects take 187's restored Water (Map, no photo) and accepts Hybrid with the photo");
   await page.evaluate((t, g) => { try { localStorage.setItem(t, "1"); localStorage.setItem(g, "1");
     localStorage.setItem("apex.mode", "water"); } catch (e) {} }, TOURKEY, GUIDEKEY);
-  await page.reload({ waitUntil: "networkidle0" });
+  // an explicit limit: Chrome's 30 s default left about 1.3-1.9x over run 90's load (INFERRED; landmine 235)
+  await page.reload({ waitUntil: "networkidle0", timeout: 120000 });
   const g6ready = await page.waitForFunction(() => window.map && window.map.loaded && window.map.loaded()
     && !document.getElementById("splash")
     && /\bready\b/.test((document.getElementById("shell") || {}).className || ""), { timeout: 120000 })
@@ -6089,7 +6093,7 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
   await page.evaluate((t, g) => { try { localStorage.clear(); localStorage.setItem(t, "1");
     localStorage.setItem(g, "1"); } catch (e) {} }, TOURKEY, GUIDEKEY);
   await page.setViewport({ width: 411, height: 960, deviceScaleFactor: 2.625 });
-  await page.reload({ waitUntil: "networkidle0" });
+  await page.reload({ waitUntil: "networkidle0", timeout: 120000 }); // landmine 235
   /* landmine 222 — and a page that never gets ready must FAIL here, not have
      its splash screen audited as a clean app */
   const v4ready = await page.waitForFunction(() => window.map && window.map.loaded && window.map.loaded()
