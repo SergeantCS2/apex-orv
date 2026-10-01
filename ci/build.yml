@@ -97,7 +97,13 @@ jobs:
   bundle:
     needs: seed
     runs-on: ubuntu-latest
-    timeout-minutes: 90   # statewide first build ~40-60 min; cached ~10-15
+    # Take 188, run 90: cancelled at 90 min with RENDER PASSED. The job renders
+    # twice (bundle.sh, then inside gate.py). On run 90's runner, the slowest
+    # seen (about 1.8x run 89's): pipeline 24.5 min + render 35 + gate ~40
+    # (INFERRED; it never finished) ~ 102 min cached, which leaves ~100 min
+    # for a cold pipeline (its time at that speed is UNKNOWN). The limit
+    # catches a HANG (landmine 235).
+    timeout-minutes: 180  # cached pipeline 12-25 min (runs 89, 90); first build ~40-60 (take 119)
     steps:
       # ref is REQUIRED here. checkout defaults to the commit that TRIGGERED the
       # run; the seed job pushes a newer one, so a default checkout lands on a

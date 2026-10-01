@@ -53,7 +53,8 @@ page.on("pageerror", (e) => pageErrors.push(String(e).slice(0, 200)));
 page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text().slice(0, 200)); });
 page.on("requestfailed", (r) => consoleErrors.push("REQFAIL " + r.url().slice(-60)));
 await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2.6 });
-await page.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: "networkidle0" });
+// an explicit limit: Chrome's 30 s default left about 1.3-1.9x over run 90's load (INFERRED; landmine 235)
+await page.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: "networkidle0", timeout: 120000 });
 /* Poll for the map to APPEAR and then to load. `networkidle0` fires before the
    app has finished reading its bundle, so window.map does not exist yet — my
    first version assumed it did and threw, accusing a perfectly good page

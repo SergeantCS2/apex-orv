@@ -144,6 +144,7 @@ Start here. Do not read top to bottom.
 | The ride froze after its first fix; its GPS watch was closed by something else | 232 |
 | Plan, notes or scripts gone after a restart | 233 |
 | A check fails on a card it never opened; the drawer shows another feature's late result | 234 |
+| CI cancelled at the job limit after RENDER PASSED, the gate (which prints only at its end) still running | 235 |
 
 ---
 
@@ -3038,3 +3039,24 @@ click, and render failed on a null button (reproduced at CPU x4: report at
 report — not for its first line, assert it arrived, and give the judge a
 control built from the real markup (the report puts a <span> between "Self-
 test ·" and the count, so a raw-HTML regex would never match).
+
+**235. A time limit set from local runs, or from one fast CI runner, stops
+CI once a suite grows.** Take 188 nearly doubled render's checks (about 318
+to 607). On the workstation the gate, its render inside, went from 499 s
+(take 187) to 885-928 s; on run 90's runner the render alone took 34 min
+52 s, and CI renders twice per run: once in ci/bundle.sh and once inside
+gate.py. Runners vary: run 89's, on the same cache, ran the pipeline in 738 s
+against run 90's 1470 s and reached the same render check in 15.5 min against
+27.6. At run 89's speed both old limits would have held (INFERRED: run 89's
+gate never ran; its render ran to its end in 19 min 56 s). At run 90's the
+bundle job's 90 minutes did not: run 90 was cancelled after RENDER PASSED and
+PALETTE PASSED, with the gate (which prints only at its end) still running —
+a node and a Chrome among the runner's orphans (PROVEN); that it was the
+gate's render, which its 1800 s limit (take 181: "CI is faster") would also
+have stopped, is INFERRED. No printed check failed; the clock ran out. Waits
+inside a suite count too: the self-test drill's report took 84 s of its 90 s
+ceiling there, and three page loads rode Chrome's 30 s default. Rule: a
+limit exists to catch a hang, so size it from the slowest runner seen (CI's
+own step timestamps across runs), with margin, and give every wait an
+explicit limit; a take that grows a suite re-reads its own CI run's times,
+waits included, before it is promoted.
