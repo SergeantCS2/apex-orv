@@ -966,7 +966,37 @@ single lock. The tree was then re-verified after each merge group.
   with its fix taken out (28 of 28). Every number is desktop headless;
   the Fold is UNKNOWN.
 
+**Built, take 189 (2026-10-01).** The render speed-up, PARTIAL: −18% to
+−24% against a 30% target (838 → 634 s median for 606 → 608 checks), then
+eroded by the take's 50 new checks (724 s for 658), with `--only` sections
+and a per-section floor guard (A227; the rest is A241). Placeholder pin
+names ship unnamed, labelled by kind, with the source's text on the card
+(A228). The desktop-decidable gaps of take 188: the attribution (i) clear
+of the folded drawer (A229); "Waiting for a GPS fix" on a ride with no fix
+(A230); the Tools panels usable while riding on a small phone (A231);
+"BSD 3-Clause" on one line (A232); the mockup's Ride beside Return home on
+the folded drawer, free ride in 1 tap (A233); a loop's re-route re-joins the
+loop (A234); one river-run estimate (A235); a glyph readback in the
+self-test for the Fold to answer (A236). Found and built in the take: "of
+you" only from a live fix, with Dispatch and Locate on the same reader
+(A237); the dirt bike's route cards whole (A238); render's trails checks
+run (A239); a tapped card no longer folds itself when the drawer's slide
+resizes the map (A240). A cold audit (six finders, two skeptics each) found
+20 findings, none refuted by both; all were fixed, and a fix-checker's two
+more. Every number is desktop headless; the Fold is UNKNOWN.
+
 **What remains for V4.**
+*Take 189 (from 2026-09-30, the maintainer's plan): item 1 below, then the
+desktop-decidable gaps (A228–A236); take 190: the screens the mockup never
+designed, from an extended mockup he approves first; then the Fold session.*
+*After take 189 (2026-10-01): item 1 is PARTIAL (A241), and of item 2's
+candidates the "BSD 3-Clause" wrap and the empty folded-drawer band are
+built (A232, A230). V4 still owes three things: take 190, the screens the
+mockup never designed (the take-190 plan, approved as the V4 mockup's
+artboards 10–23: Plan and Tools as sheets of labelled rows, each tool inside
+the sheet, one primary per screen, Machine as a picker, the first-run tour
+card); the maintainer's Fold session; and one polish take on what the phone
+shows.*
 1. **The render speed-up, first.** Take 188 roughly doubled render: about
    13 min and 606 ok lines, against take 187's 7 min and 317 (the gate
    counted 318). MEASURED from the log files' creation and last-write

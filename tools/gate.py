@@ -2776,6 +2776,99 @@ def check_region_polygon():
             notes.append(f"region polygon: {pin:,} of {len(P):,} places inside")
 
 
+# ── 6c4. Placeholder pin names (take 189, A228) ────────────────────────────
+# Take 187's probe read six information pins near Grayling named "A" to "F";
+# the take-188 bundle also drew info posts named "1" to "42" and car parks
+# named "car parking". tools/poi.py now ships such a pin unnamed, labelled by
+# its kind, with the source's text in `ph`. This holds the SHIPPED bundle to
+# it: no drawn name trips poi.placeholder() unless the pin carries `bn` (the
+# name is its OSM brand, "76"); every `ph` is a placeholder on an unnamed pin
+# (so `ph` can never hide a real name); `bn` only where it exempts; and every
+# POIKIND display name is a kind word for its own kind, so the label the app
+# draws in the name's place can never itself be a placeholder the rule misses.
+def _pin_name_faults(recs, poikind, ph_words, placeholder, norm):
+    bad = []
+    for r in recs:
+        k, n, ph = r.get("k"), r.get("n"), r.get("ph")
+        if n and placeholder(n, k) and not r.get("bn"):
+            bad.append(f"{k} pin drawn as {n!r} ({placeholder(n, k)})")
+        if ph is not None and (n or not placeholder(ph, k)):
+            bad.append(f"{k} pin carries ph {ph!r} with name {n!r} — ph is only for a placeholder on an unnamed pin")
+        if r.get("bn") and not (n and placeholder(n, k)):
+            bad.append(f"{k} pin {n!r} carries bn without a name the rule would catch")
+    for k, f in poikind.items():
+        h = f.get("h") if isinstance(f, dict) else None
+        if h and norm(h) not in ph_words.get(k, ()):
+            bad.append(f"POIKIND {k}'s display name {h!r} is not in poi.py PH_WORDS[{k!r}]")
+    return bad
+
+
+def _pin_h_missing(kinds):
+    """POIKIND kinds (dict-valued) with no display name the parser read. take
+    189 · cold audit: _badge_kinds reads single-quoted values only, and the
+    display-name check skipped a kind whose h it did not read without a word —
+    one written h:"Info point" was checked by nothing, while the note still
+    said every display name is a kind word."""
+    return sorted(k for k, f in kinds.items() if isinstance(f, dict) and not f.get("h"))
+
+
+def check_pin_names():
+    import glob
+    sys.path.insert(0, HERE)
+    import poi
+    src = read("src", "app.html") or ""
+    m = re.search(r"var POIKIND=\{(.*?)\n\};", src, re.S)
+    if not m:
+        return fails.append("pin names (A228): cannot find var POIKIND={ in src/app.html")
+    kinds = _badge_kinds(m.group(1))
+    args = (poi.PH_WORDS, poi.placeholder, poi._ph_norm)
+    # planted controls, every run, each on its own (no real table in them): each
+    # fault kind must be reported, a clean plant must pass
+    plants = [
+        ("a letter", [{"k": "info", "n": "A"}], {}),
+        ("a number", [{"k": "info", "n": "12"}], {}),
+        ("a code", [{"k": "camp", "n": "C1"}], {}),
+        ("a kind word", [{"k": "trailhead", "n": "car parking"}], {}),
+        ("ph on a real name", [{"k": "info", "n": None, "ph": "Trail Map"}], {}),
+        ("ph beside a name", [{"k": "info", "n": "Hartwick Pines", "ph": "A"}], {}),
+        ("bn without cause", [{"k": "fuel", "n": "Shell", "bn": 1}], {}),
+        ("a display name the rule misses", [], {"info": {"h": "Info point"}}),
+    ]
+    missed = [lab for lab, recs, pk in plants if not _pin_name_faults(recs, pk, *args)]
+    clean = [{"k": "info", "n": None, "ph": "A"}, {"k": "fuel", "n": "76", "bn": 1},
+             {"k": "trailhead", "n": "Lot 10"}, {"k": "beach", "n": None}]
+    cf = _pin_name_faults(clean, {"info": {"h": "Information"}}, *args)
+    # the parse-count control: a double-quoted display name is not read, and
+    # must be named; a table whose names all parse names none
+    hplant = _pin_h_missing(_badge_kinds("info:{c:'#fff',s:'drop',h:\"Info point\"},\n"
+                                         "beach:{c:'#000',s:'drop',h:'Beach'}"))
+    hclean = _pin_h_missing(_badge_kinds("info:{c:'#fff',s:'drop',h:'Information'}"))
+    if missed or cf or len(kinds) < 15 or hplant != ["info"] or hclean:
+        return fails.append("check_pin_names failed its own planted controls — missed "
+                            f"{missed}, clean faults {cf}, {len(kinds)} POIKIND kinds parsed "
+                            "(< 15 would make the display-name check vacuous), a double-quoted "
+                            f"display name named {hplant} (want ['info']), a clean table named {hclean}")
+    hmiss = _pin_h_missing(kinds)
+    if hmiss:
+        return fails.append(f"pin names (A228): POIKIND kind(s) {hmiss} carry no display name the "
+                            "gate can read (h:'…', single-quoted) — the display-name check would skip them")
+    nh = sum(1 for f in kinds.values() if isinstance(f, dict) and f.get("h"))
+    bad = _pin_name_faults([], kinds, *args)
+    seen = phs = bns = 0
+    for pj in sorted(glob.glob(os.path.join(ROOT, "bundles", "*", "poi.json"))):
+        recs = json.load(open(pj)).get("p", [])
+        seen += len(recs)
+        phs += sum(1 for r in recs if r.get("ph") is not None)
+        bns += sum(1 for r in recs if r.get("bn"))
+        bad += [f"{os.path.basename(os.path.dirname(pj))}: {b}" for b in _pin_name_faults(recs, {}, *args)]
+    if bad:
+        return fails.append(f"pin names (A228): {len(bad)} fault(s) — " + "; ".join(bad[:8]))
+    notes.append(f"pin names (A228): {seen:,} shipped pins, no placeholder drawn as a name "
+                 f"({phs} shipped unnamed with the source's placeholder, {bns} kept as their "
+                 f"brand); {nh} of {len(kinds)} POIKIND display names read and all are kind words; "
+                 "planted controls caught")
+
+
 # ── 6c2. Input integrity (take 120, landmine 201 addendum) ──────────────────
 # A killed ingest left a 935 KB aoi.json where 543 MB had been, with a fresh
 # timestamp, and every consumer read the stump: 323 summits quietly became
@@ -3046,7 +3139,7 @@ for fn in (check_handoff, check_stamps, check_offline, check_splash, check_scrub
            check_current,
            check_provision,
            check_regions, check_bundles, check_empty_artifacts,
-           check_input_integrity, check_region_polygon,
+           check_input_integrity, check_region_polygon, check_pin_names,
            check_address_coverage,
            check_tools,
            check_manifest, check_play):

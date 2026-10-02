@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 188.*
+*Current as of take 189.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -145,6 +145,18 @@ Start here. Do not read top to bottom.
 | Plan, notes or scripts gone after a restart | 233 |
 | A check fails on a card it never opened; the drawer shows another feature's late result | 234 |
 | CI cancelled at the job limit after RENDER PASSED, the gate (which prints only at its end) still running | 235 |
+| A wait for the map's `idle` takes its whole ceiling on a map that already looks settled | 236 |
+| A check passes in the full render and fails, or silently does not run, under `--only` | 237 |
+| A render reading changed when nothing in the app changed, after a harness speed-up | 238 |
+| A card or panel closes itself just after it opens; the map moved with no gesture | 239 |
+| A drill fails only after some other drill, or a product fix turns green checks red | 240 |
+| A width check reads "N of N px" exactly, and a long line still runs past its box | 241 |
+| A new guard passes the build that has the bug | 242 |
+| An older guard goes quiet after a new state or new wording ships | 243 |
+| "You" / "You are here" on a position that is old, moved by hand or never a fix; a clock reads 1970 | 244 |
+| A lane's run changed the main tree's data, or its gate check read the main tree | 245 |
+| Render time jumps between runs of the same code | 246 |
+| Two layers on one source count different features over the same view | 247 |
 
 ---
 
@@ -3060,3 +3072,215 @@ limit exists to catch a hang, so size it from the slowest runner seen (CI's
 own step timestamps across runs), with margin, and give every wait an
 explicit limit; a take that grows a suite re-reads its own CI run's times,
 waits included, before it is promoted.
+
+**236. Waiting for `map.once('idle')` on a map that is already idle waits out
+the whole ceiling.** MapLibre fires `idle` after a frame it renders, and an
+idle map renders nothing, so no event comes until something changes. Take
+188's render raced `m.once("idle")` against a 6 s timer at seven sites (the
+stack probes, the Pins food read, the head tap, camp, the unnamed read) and
+one against 4 s; whenever the tiles had already settled, each waited the full
+ceiling, and the 300 ms naps after them added more. Take 189's L-render
+profiled every section (render-t189-L-render-prof-1/2/3, PROVEN): the stack
+drills took 97 s and camp 39 s. With a forced repaint before the wait
+(`triggerRepaint`, inside `__rh.idle`, bounded by the old ceiling), the same
+checks took 24 s and 14 s (prof-8, PROVEN), the largest single saving of A227.
+Rule: a wait for a "settled" event first asks for the work that produces it (a
+repaint, a frame) and stays bounded by the old ceiling, so a page that never
+settles is read at the same moment as before. Landmine 224's shape for the
+map's own events. A speed-up also moves every unawaited background job onto
+whichever check now runs next: the field-faults drill's self-test report
+landed on the GPS-refusal read (prof-6), landmine 234's shape; the drill waits
+for the report now.
+
+**237. Under `--only`, a sectioned suite runs a different suite unless every
+check sits inside its own section's guard and every setup is declared.** Take
+189 split render into 31 sections (A227). Shell's two checks sat inside camp's
+guard, so `--only=shell` skipped them in silence and still passed.
+`--only=devices` first failed 8 checks because the full run plans its routes
+for the side-by-side, which only the earlier modes section had chosen
+(prof-5); the odd-numbered split failed 3 (only-1, PROVEN), INFERRED because
+pins needed the stack drills' tiles and shell needed water (L-render's notes
+label both causes INFERRED). Later, `--only=stacks` alone
+failed two checks on unchanged code, because every passing stacks run had
+water before it (render-t189-L-small-only-stacks-1, PROVEN; A244). And two
+lanes raised the same section floor from one base: a textual merge that takes
+either side's number lowers the other lane's floor without a word (resolved by
+hand to 185 + 22 + 5 = 212, then PROVEN equal to the full run's count). What
+caught most of it is the per-section floor guard: every section that runs must
+print at least the checks it prints in a full run, with a planted re-nesting
+that fails "SHORT: shell 8 of 10". Rule: a section's checks go inside its own
+guard and its floor rises with them; a section's setups are declared, and a
+section is run alone at least once before its isolation is trusted; when two
+branches raise one floor, the merge adds the raises. A partial run says
+PARTIAL on its first and last lines, and the full run stays the authority.
+
+**238. Speeding up a page's animations changes orderings, not just
+durations.** Take 189's render sets the DevTools animation playback rate to 10
+(`ANIM_RATE`), so a drawer slide ends in one frame and resizes the map once
+(devices 244 → 194 s, PROVEN). One reading changed: "choosing Stand saves a
+typed waypoint" named the Midland to Mackinaw Boy Scout Trail at rate 1 and a
+coordinate at rate 10 (prof-4 against prof-6 and every later run, PROVEN).
+INFERRED mechanism: at rate 1 the drawer was still sliding, and resizing the
+map, when the 450 ms long press resolved its point; at rate 10 the slide had
+ended and the drop landed where no trail is near. The lane's own code comment
+had said "what a check reads is unchanged". CSS transitions now end before app
+timers they used to outlast, while the app's JavaScript eases and timers keep
+real time, so every timer-against-transition ordering in render differs from
+the Fold's WebView. Rule: a harness that changes the clock of one subsystem
+lists the readings that changed (diff the check texts with digits stripped
+against a run without it) and does not claim the others are unchanged; a check
+that depends on such an ordering is run once at rate 1 before it is trusted.
+
+**239. `moveend` says the camera stopped, not who moved it.** Take 189's A240:
+at 360x800 a tapped pin's card folded itself about 0.5 s after it opened. The
+drawer is a grid row under #stage (`#shell` is `grid-template-rows:1fr auto
+auto`), so its slide shrinks the map; MapLibre's ResizeObserver answers each
+step with `resize()`, which keeps the centre and fires movestart, move, resize
+and moveend with no input event. A pin above the centre rides up by half the
+height lost (182 px at 360x800), and railFoldIfAway, written for "the rider
+panned the subject away", folded the card (PROVEN by reading MapLibre's
+resize, a probe that logged three resize/moveend pairs after one tap, and
+render). The app's own eases fire the same moveend. The follow camera already
+knew this ("carry no originalEvent and never pause it"); the fold did not. The
+harness side bit the same day: a drag built from synthetic MouseEvents moved
+the map but never produced a moveend at all (probe-t189-audit-a240-1, PROVEN),
+so the pan-away drill first failed on the real fix; it had also used a jumpTo,
+the app's move, as its "pan". Rule: a handler that means "the rider moved the
+map" tests `e.originalEvent`; a layout change that resizes the map is a camera
+event; a harness drives gestures with real input (puppeteer's mouse or touch),
+never with jumpTo or synthetic DOM events.
+
+**240. A drill inherits the state the drills before it left.** Take 189 met it
+six times. An earlier drill's long press left the app's `lp.fired` set, and
+the next synthetic click was taken as that press's release and eaten (L-names'
+smoke; the audit's A240 drill, "drawer opened false"; a phone's tap starts
+with a touchstart that clears it, INFERRED from the lp code). A resumed-trip
+drill placed after A230's first drill re-routed off the earlier route, and the
+20 s re-route debounce then held A234's re-join, which failed (L-ride, found
+with `_navReT`). Three render pins checks (the Food read at street zoom, the
+head taps at z11.4 and z15) had leaned on A240's bug: the card opened the
+drawer, the resize folded it again, and the control tap ran on the un-shrunk
+map; fixing the product failed all three (render-t189-audit-full-1, PROVEN).
+Smoke's startup locate never answers and its 25 s give-up lies past the timer
+flush's default, so LOCATE_N stays 1 all run; a drill that flushed 26 s to
+reach it broke three later drills that need that watch open. Smoke's Marker
+stub splices `indexOf(this)` on remove, so removing a marker twice drops the
+list's last one, and by the stop drill the app's me-marker was gone (A244). An
+earlier section's route "to the start" replanned for the kayak and replaced
+the card a resumed-trip drill read after its timers. Rule: a drill sets the
+state it reads (the drawer, the tap's input path, the planner's timers) and
+reads before anything it did not start can run; when a product fix fails green
+checks, read first whether those checks leaned on the bug (landmine 54); a
+drill that needs a side effect gone runs where nothing reads what it leaves.
+
+**241. A flex item in a centring column flexbox is as wide as its text, so a
+width test on it is vacuous and its ellipsis never engages.** Take 189's A230
+judged the folded drawer's peek line "whole" by `scrollWidth <= clientWidth`
+on `#peek-txt`, and printed "276 of 276 px". `#peek` is a column flexbox that
+centres its children, so the span takes the width of its text: it never
+overflows itself and its `text-overflow:ellipsis` never applies. Both of the
+cold audit's skeptics on F12 relied on that line. Measured against #peek's own
+padding box, the widest resumed line is 287 px in a 336 px row (PROVEN, no
+cut), but a long route-warning line was drawn 562 px wide, past the drawer's
+edges. `max-width:100%` on the span makes the ellipsis work, and the judge now
+reads the container's box with a planted over-long line that must be drawn
+inside it. Rule: measure overflow against the box that clips, never against
+the element's own box; an ellipsis needs a width limit the element cannot grow
+past. Landmine 60 is the grid version of the same default.
+
+**242. A new guard is proven on the build that has the bug, not only on a
+plant of its own making.** Take 189 wrote four guards that passed the build
+they were meant to fail, and broke one older guard's plant; none of them
+shipped, each was caught on the take's branch before any push. A238's bike
+pass planned from wherever the earlier drills had left the rider, a different
+route, and passed the pre-fix build (render-t189-L-render-plant-a238-2).
+A234's first judge compared `tail === rest`, a tautology, and passed the
+mutant that re-joins at the loop's end. A229's plant read `out.plant`, which
+carried no `.folded`, so `!good(plant)` was always true (landmine 227's
+shape). Round 2's first "the fit follows its cap" read grew the panel with a
+900 px block that held no text line, so the fit had nothing to cut and the
+refit mutant passed it; and its padding grew `--ride-top` by less than
+planted, because the ride block holds room for the banner. And a gate plant
+that edits "the first occurrence" of a call stopped planting when the audit
+added a second `mk('truck','truck')`: take 188's check_icons plant, which
+caught it as its own failed control (a single `truckPin()` now). Each was
+found by running the pre-fix build or a mutant through the guard, or by a
+reader. Rule: before a guard is called proven, run the build without the fix
+(or a copy with the fix taken out) through it and watch it fail on the real
+defect; measure the plant you got, not the plant you asked for; a plant
+anchored to a site in the code is re-checked when that site gains a twin.
+Landmines 39 and 227, one level up: the drill's premise must be the bug's.
+
+**243. A new state's wording blinds the guards that read the old one.** Take
+189's A234 made an off-route rider on a loop read "Back to the loop" instead
+of "Re-routing". Take 188's R1 and R2 guards decided "was this re-routed?" by
+matching "Re-rout" in the strip and the peek, so a re-join, and the planted
+noappr build the reviewer made, passed them silently (L-ride's lockstep
+review, PROVEN). A re-join now counts as a re-route there (`rj`, "Back to the
+loop", R1's per-fix scan matches both), and both guards reject a planted
+re-joined reading. Rule: a change that adds a state, or new words for an old
+one, greps every harness for the strings and flags of the state it displaces,
+and runs the older guards' mutants against the new build.
+
+**244. "Is there a live fix?" is a question about the fix's age, not about
+whether a watch is open.** Take 189's A237 found every place card measuring
+"of you" from ME, which holds the region centre until a fix (`if(!ME)` never
+fires). Its first reader treated the fix as live while a watch was open and
+not stale; after Stop the watch is closed, ME stays on the last fix and
+posMode stays 'gps', so a dead fix read "of you" and "You are here" hours
+later. Its "last fix" wording then printed `fixClock()`, the ride's FIX_T,
+which a one-shot locate never sets and navStart zeroes: a mutant printed
+"(7:00 PM)", the 1970 epoch in local time, for a 12:17 PM fix (PROVEN, mutant
+7). The cold audit found the same question answered wrong in Dispatch (an old
+fix, or a pin moved by hand, printed as the rider's location; F3) and Locate
+("You are here" at the startup fix all session; F4). Now one reader,
+`liveFix()`, asks whether ME is still the last real fix and whether that fix
+is under GPS_STALE_MS old, and every "you", every clock and Dispatch's
+coordinate read it. Rule: a position is "you" only by its age, read from the
+fix's own timestamp; a clock prints the time of the thing it names, and a zero
+timestamp is "unknown", never a time.
+
+**245. A lane in a git worktree reaches the main tree through a symlink or a
+hard-coded root.** Take 189's lanes-setup.sh symlinked the root
+`*_payload.json` files into every worktree, including a lane with its own
+bundles/ ("+data"): any pipeline step run there would have written the main
+tree's payload through the link. L-names replaced the link with a copy before
+its first poi run, by hand (the setup script still does it). The integration
+then regenerated poi and the bundle in the main tree, and the idle take-188
+hotfix worktree, which symlinked them, silently saw take 189's data (its smoke
+would have failed on it, INFERRED; it was idle and never re-run). And take
+188's gatefn.py hard-coded ROOT to the main tree, so single gate checks run
+"from" a lane read the main tree: a lane's evidence was about the wrong tree
+(INFERRED from the code; every merge re-ran them in the main tree, and nothing
+is known to have escaped). Take 189's gatefn resolves the git top level of the
+directory it runs from and prints the tree it checked. Rule: a lane copies
+what it writes; only read-only inputs are symlinked; a tool that serves
+several trees names the tree in its output, and a reader checks that line
+before trusting the result.
+
+**246. A time measured on a busy workstation measures the host.** Take 189's
+A227 measured −24% (634 s, three runs in a quiet window). The Phase B
+integration then took 849 s with 37 more checks (load average 6.8–8.1), the
+audit's round 1 724 s, and its round 2 1,374 s for the same 658 checks. An A/B
+in one window settled it: `--only=realdom,devices` took 619 s on the round-1
+build and 625 s on the round-2 build, where the same sections had taken 287 s
+earlier that day (PROVEN; the host's slowdown UNKNOWN in cause, INFERRED load
+outside WSL with WSL's CPU idle). Without the A/B the record would have
+charged the slowdown to the round's change. Rule: compare timings only A/B,
+back to back, on the same host state; a speed-up or a slowdown names its runs
+and the load during them; CI estimates scale from a measured ratio and are
+labelled INFERRED.
+
+**247. A viewport census hit-tests strokes: a wider line counts features that
+lie off the canvas.** verify_palette judged "casing covers every fsroad
+feature" as two equal counts from `queryRenderedFeatures({layers})` over the
+whole viewport. MapLibre tests a line by its stroke, so a forest road whose
+geometry lies 1 px past the canvas edge is reported by the casing (about
+2.4 px wide at z13.5, src/app.html:3149 and w() at 2653) and not by the road
+(about 1.3 px). It passed since the check was written (before the repo's
+seed commit) on data that put no road there; take 189's §6b clean run, on
+fresh data, read 25 = 24 with every road cased (PROVEN,
+probe-t189-seal-casing-1.log, twice). Rule: compare
+two layers by feature, not by count, and judge a feature only one of them
+reports by its geometry against the canvas; an inset box does not help,
+because a stroke reaches across any box's edge (A246).

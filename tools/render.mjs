@@ -40,6 +40,55 @@ const opt = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] :
 const wwwArg = opt("--www", "www");
 const WWW = wwwArg.startsWith("/") ? wwwArg : join(ROOT, wwwArg);
 const SHOT = opt("--shot", null);
+/* take 189 · A227 · SECTIONS. `--only=<name,…>` runs the named sections, the
+   sections each needs (its setup: a route on the cards, a home, the V4 clean
+   reload) and the boot, which every run needs; the default run is the full
+   render, unchanged and complete, and the gate and the pipeline never pass
+   --only. A partial run says so in its last line. An unknown name ends the
+   run before a browser starts: a section that silently runs nothing is a
+   check that skips (landmine 53). A group name (v4) stands for its members.
+   A section run alone starts from the boot's state, not the one the sections
+   before it leave. Where its checks lean on that state, the section that
+   makes it is listed as its setup. Run alone, the busy line stayed armed
+   (INFERRED: the drill arms it with no basemap change, and on an idle map
+   nothing renders, so no 'idle' comes; water leaves the map drawing), and
+   the Pins selector's food read and the head tap failed (INFERRED: they lean
+   on the tiles and stack windows the stack drills leave) — take 189's
+   isolated run, render-t189-L-render-only-1.log. Every section was run
+   without its neighbour (only-1, only-2). */
+const SECTIONS = { trails: [], labels: [], modes: [], imagery: [], back: [], water: [], shell: ["water"],
+  stacks: [], pins: ["stacks"], nav: [], camp: [], paddle: [], ui: [], home: [], tools: [], basemap: [],
+  selftest: [], routes: [], devices: ["routes"], faults: [], realdom: ["home", "routes"],
+  clear: ["home", "routes"], tail: [], g6: [], "v4-setup": [], "v4-band": ["v4-setup"],
+  "v4-select": ["v4-setup"], "v4-toast": ["v4-setup"], "v4-audit": ["v4-setup"],
+  "v4-walker": ["v4-setup"], "v4-eta": ["v4-setup", "v4-walker"] };
+const SECTION_GROUPS = { v4: ["v4-band", "v4-select", "v4-toast", "v4-audit", "v4-walker", "v4-eta"] };
+const ONLY = (() => {
+  const a = args.find((x) => x.startsWith("--only="));
+  if (!a) return null;
+  const want = a.slice(7).split(",").map((x) => x.trim()).filter(Boolean);
+  const bad = want.filter((x) => !(x in SECTIONS) && !(x in SECTION_GROUPS));
+  if (!want.length || bad.length) {
+    console.log(`render: --only names ${bad.length ? "unknown sections: " + bad.join(", ") : "no section"}; sections: `
+      + Object.keys(SECTIONS).join(", ") + "; groups: " + Object.keys(SECTION_GROUPS).join(", "));
+    process.exit(2);
+  }
+  const set = new Set(), add = (x) => { if (set.has(x)) return; set.add(x); (SECTIONS[x] || []).forEach(add); };
+  want.forEach((x) => (SECTION_GROUPS[x] || [x]).forEach(add));
+  return set;
+})();
+/* take 189 · A227 fix round 1 · each check is booked to the section whose
+   guard last opened (the boot until the first); the floor guard at the end
+   reads the book */
+let SECTION_AT = "boot";
+const SECTION_N = {};
+const RUN = (name) => {
+  if (!(name in SECTIONS)) throw new Error("render: RUN(" + name + ") names no section");   /* a typo here would skip in silence */
+  const on = !ONLY || ONLY.has(name);
+  if (on) SECTION_AT = name;
+  return on;
+};
+if (ONLY) console.log(`render: --only runs ${[...ONLY].join(", ")} (and the boot) — a PARTIAL render; the gate runs them all`);
 
 let failures = 0;
 /* take 188 · A216 · emoji and text glyphs used as icons: the ranges
@@ -47,7 +96,8 @@ let failures = 0;
    and Latin-1 (· — – … ° × ′ ″) are typography and stay out. */
 const GLYPH_SRC = "[\\u2190-\\u21FF\\u2300-\\u23FF\\u2460-\\u24FF\\u25A0-\\u25FF\\u2600-\\u27BF"
   + "\\u27F0-\\u27FF\\u2900-\\u297F\\u2B00-\\u2BFF\\u{1F000}-\\u{1FAFF}\\uFE0F\\u2139\\u203C\\u2049]";
-const ok = (c, m) => { console.log((c ? "  ok   " : "  FAIL ") + m); if (!c) failures++; };
+const ok = (c, m) => { console.log((c ? "  ok   " : "  FAIL ") + m); if (!c) failures++;
+  SECTION_N[SECTION_AT] = (SECTION_N[SECTION_AT] || 0) + 1; };
 
 /* take 188 · G13 · the tour and guide keys are READ from the built app, never
    typed: they are versioned with their content (A147), and a typed copy goes
@@ -120,6 +170,67 @@ const LAUNCH = {
          "--use-gl=swiftshader", "--enable-unsafe-swiftshader",
          "--disable-dev-shm-usage"],
 };
+/* take 189 · A227 · THE WAITS, one set for every block. A fixed sleep waits
+   the same whether the page settled in 50 ms or never, and a race against
+   m.once("idle") with no repaint waits out its whole ceiling when the map is
+   already idle (no render, no idle event; the stack probes lost up to 6 s
+   each to it). Each helper waits on the real condition and
+   is BOUNDED by the sleep it replaces, so a page that never gets there is
+   read exactly when the old sleep read it; one that gets there early is read
+   in a state at least as settled. Installed on every document (the reloads
+   and the respawn included) as window.__rh:
+     settle(max)  a frame drawn, then frames until no finite animation runs
+                  (landmine 224: a transition stays pending until a frame)
+     idle(m, max) the map at rest: a frame, the camera still and every source
+                  loaded, then an 'idle' (tiles drawn, symbols placed, fades
+                  done) after a forced repaint */
+const RH = () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+  const busy = () => document.getAnimations().some((a) => a.playState === "running" && a.effect
+    && isFinite(a.effect.getComputedTiming().endTime));
+  window.__rh = {
+    sleep, frame,
+    settle: async (max = 3000) => { const t0 = Date.now();
+      do { await frame(); if (!busy()) return true; } while (Date.now() - t0 < max); return false; },
+    idle: async (m, max = 3000) => { const t0 = Date.now(), left = () => max - (Date.now() - t0);
+      await frame();
+      while (left() > 0 && (m.isMoving() || !m.loaded())) await sleep(40);
+      if (left() <= 0) return false;
+      let got = false;
+      await Promise.race([new Promise((r) => { m.once("idle", () => { got = true; r(); }); m.triggerRepaint(); }), sleep(left())]);
+      return got; } };
+};
+/* take 189 · A227 · CSS transitions and animations run ANIM_RATE times faster
+   (the DevTools animation playback rate, the page's document timeline). The
+   drawer is a row of #shell's grid, so every frame of its 260 ms slide resizes
+   the map and MapLibre redraws the whole canvas: 2-4 redraws of 150-550 ms
+   each per slide under SwiftShader at dpr 2.6-3 (measured, bench-t189-L-render-
+   frames-1/3), and the device matrix alone slides the drawer hundreds of
+   times. At ten times the rate a slide ends in one frame. Reads wait for a
+   settled state (landmine 224), the durations a check asserts are the
+   computed ones (a panel's transition-duration reads the same),
+   transitionrun/transitionend still fire once per slide, and MapLibre's
+   camera eases are JavaScript, not CSS, so they run at their own speed.
+   NOT everything a check reads is unchanged: one reading changed. The Stand
+   drill's typed waypoint names coordinates ("Stand · 44.3548, -84.3713")
+   where it named the Midland to Mackinaw Boy Scout Trail (take 189,
+   render-t189-L-render-prof-4 at rate 1 against prof-6 at rate 10, PROVEN);
+   its check reads only the "Stand · " prefix. Mechanism INFERRED: at rate 1
+   the drawer was still sliding, and resizing the map, when the 450 ms long
+   press resolved its point; at rate 10 the slide is over first and the drop
+   lands where no trail is near. Generally: a CSS transition now ends before
+   app JavaScript timers it used to outlast, so timer-versus-transition
+   orderings here are not the Fold WebView's. Applied to every page, and again
+   after a reload. */
+const ANIM_RATE = 10;
+const fastAnim = async (pg) => { const c = await pg.createCDPSession();
+  await c.send("Animation.enable"); await c.send("Animation.setPlaybackRate", { playbackRate: ANIM_RATE }); };
+/* after a viewport change: the resize handled (a frame, no finite animation
+   left) and the map redrawn at its new size, bounded by the fixed sleep it
+   replaces */
+const vpSettle = (max) => page.evaluate(async (max) => { const t0 = Date.now();
+  await window.__rh.settle(max); if (window.map) await window.__rh.idle(window.map, Math.max(0, max - (Date.now() - t0))); }, max);
 let browser = await puppeteer.launch(LAUNCH);
 let page = await browser.newPage();
 // Measure the screen the app RUNS on, not a desktop window. The harness used to
@@ -163,6 +274,8 @@ await page.evaluateOnNewDocument(() => {
       window.__mapErrors.push((e && e.error && e.error.message) || String(e)));
   }, 10);
 });
+await page.evaluateOnNewDocument(RH);
+await fastAnim(page);
 
 await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle0", timeout: 60000 });
 
@@ -194,6 +307,8 @@ async function respawn() {
       window.map.on("error", (e) => window.__mapErrors.push((e && e.error && e.error.message) || String(e)));
     }, 10);
   });
+  await page.evaluateOnNewDocument(RH);
+  await fastAnim(page);
   await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle0", timeout: 60000 });
   await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -328,13 +443,38 @@ ok(layers.labels > 0, `label layers rendered ${layers.labels} features (glyph pa
 const anchors = (manifest.anchors && manifest.anchors.length)
   ? manifest.anchors
   : await page.evaluate(() => (window.PLACES || []).slice());
-const site = (anchors || []).find((a) => a[3] === "site") || (anchors || [])[0];
-const zoomed = await page.evaluate(async (at) => {
+/* take 189 · A239 · TRAIL COUNTRY FROM THE DATA. This section went to the
+   'site' anchor, which statewide is Silver Lake Dunes: an open riding AREA
+   with no trail line by design. The line check was skipped there ("--") and
+   the label line printed "NOT MEASURABLE … see the failure above" with no
+   failure above it (landmine 55's shape), so the trail-name check ran in no
+   take-189 render (L-render's finding). The camera now goes where the
+   bundle draws a NAMED designated trail: the vertex of a named ORV-class
+   stroke (the source lbl-trail labels) nearest the region centre, the rule
+   the app's own stLabels uses, restated on the strokes source — never a
+   typed coordinate (landmine 197). Where nothing can be measured, both
+   checks FAIL rather than skip, and the section floor counts them (2). */
+const centre = manifest.centre || (Array.isArray(manifest.bbox) && manifest.bbox.length === 4
+  ? [(manifest.bbox[0] + manifest.bbox[2]) / 2, (manifest.bbox[1] + manifest.bbox[3]) / 2] : null);
+if (RUN("trails")) {   /* take 189 · A227 · section guards: see SECTIONS */
+const zoomed = await page.evaluate(async (ctr) => {
   const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  if (!m) return { trails: -1, trailLabels: -1, placeLabels: -1 };
+  if (!m) return { trails: -1, trailLabels: -1, placeLabels: -1, at: null };
   const c = m.getCenter();
-  m.jumpTo({ center: at || [c.lng, c.lat], zoom: 14.5 });
-  await sleep(2500);
+  const DES = ["route72", "trail50", "moto24", "mccct", "fstrail"];
+  let feats = [];
+  try { feats = m.getStyle().sources.strokes.data.features || []; } catch (e) { }
+  const from = ctr || [c.lng, c.lat], kx = Math.cos(from[1] * Math.PI / 180);
+  let best = Infinity, at = null, name = null;
+  for (const f of feats) {
+    const pr = f && f.properties, g = f && f.geometry;
+    if (!pr || !g || !DES.includes(pr.c) || !pr.lb) continue;
+    const cs = g.type === "MultiLineString" ? g.coordinates.flat() : g.type === "LineString" ? g.coordinates : [];
+    for (const p of cs) { const dx = (p[0] - from[0]) * kx, dy = p[1] - from[1], d = dx * dx + dy * dy;
+      if (d < best) { best = d; at = p; name = pr.lb; } } }
+  if (!at) return { trails: 0, trailLabels: 0, strokeN: feats.length, at: null };
+  m.jumpTo({ center: at, zoom: 14.5 });
+  await window.__rh.idle(m, 2500);   /* take 189 · A227: was a fixed 2.5 s */
   const q = (ids) => { try { return m.queryRenderedFeatures({ layers: ids }).length; }
                        catch (e) { return -1; } };
   /* The denominator: how many labelable strokes exist at all. A count of placed
@@ -342,29 +482,35 @@ const zoomed = await page.evaluate(async (at) => {
      two to begin with" (landmine 131). */
   let strokeN = -1;
   try { strokeN = m.getStyle().sources.strokes.data.features.length; } catch (e) { }
-  const out = { trailLabels: q(["lbl-trail"]), placeLabels: q(["lbl-place"]),
-                strokeN,
-                trails: q(["trail50", "route72", "moto24", "fstrail", "mccct"]) };
+  let trails = q(["trail50", "route72", "moto24", "fstrail", "mccct"]), trailLabels = q(["lbl-trail"]);
+  /* symbols are placed after the lines draw: when the lines are there and no
+     name is yet, wait for the map at rest once more (bounded, the same
+     2.5 s), then read again — never a pass on the first read alone */
+  if (trails > 0 && trailLabels === 0) { await window.__rh.idle(m, 2500);
+    trails = q(["trail50", "route72", "moto24", "fstrail", "mccct"]); trailLabels = q(["lbl-trail"]); }
+  const out = { trailLabels, placeLabels: q(["lbl-place"]), strokeN, trails,
+                at, name, km: Math.round(Math.sqrt(best) * 111.32 * 10) / 10 };
   m.jumpTo({ center: [c.lng, c.lat], zoom: 11.4 });
-  await sleep(1200);
+  await window.__rh.idle(m, 1200);
   return out;
-}, site ? [site[1], site[2]] : null);
-(site && site[3] === 'site'
-   ? console.log(`  --   ${site[0]}: open riding AREA (dunes), not a trail network — line check skipped; the area polygon has its own check above (A140, take 119)`)
-   : ok(zoomed.trails > 0,
-   `z14.5 at ${site ? site[0] : 'centre'}: ${zoomed.trails} trail segments drawn`));
-/* The escape clause exists because a run where nothing drew must not be read as
-   a labelling failure — the check above already fails on that. But it printed
-   "0 trail NAME labels — a rider can identify the trail", which is an actively
-   wrong sentence to leave in a log someone will read later. Say which case it
-   is (take 87, landmine 55). */
-if (zoomed.trails === 0) {
-  console.log("  ..   z14.5 trail NAME labels: NOT MEASURABLE — no trail geometry "
-              + "drew in this run, see the failure above");
-} else {
+}, centre);
+const trailAt = zoomed.at
+  ? `"${zoomed.name}" (${zoomed.at[1].toFixed(4)}, ${zoomed.at[0].toFixed(4)}; the named ORV trail nearest the region centre, ${zoomed.km} km from it)`
+  : "no named ORV trail in the strokes source";
+ok(zoomed.trails > 0, `z14.5 at ${trailAt}: ${zoomed.trails} trail segments drawn`);
+/* A run where nothing drew must not be read as a labelling failure — but nor
+   may it pass by printing a line (take 189 · A239: it printed "see the
+   failure above" with no failure above it). Say which case it is (take 87,
+   landmine 55), and FAIL: a check that cannot measure has not passed. */
+if (zoomed.trails > 0) {
   ok(zoomed.trailLabels > 0,
-     `z14.5 at ${site ? site[0] : 'centre'}: ${zoomed.trailLabels} trail NAME labels `
+     `z14.5 at "${zoomed.name}": ${zoomed.trailLabels} trail NAME labels `
      + `from ${zoomed.strokeN} labelable strokes — a rider can identify the trail`);
+} else {
+  ok(false, "z14.5 trail NAME labels: NOT MEASURABLE — no trail geometry drew where the data puts a "
+     + "named ORV trail (the failure above); a run that cannot measure them fails");
+}
+
 }
 
 /* A77 · water names must never outrank trail names. MapLibre resolves symbol
@@ -372,16 +518,19 @@ if (zoomed.trails === 0) {
    measured — an empirical count at one zoom on one flaky headless run cannot
    prove it, and I tried (take 87). */
 {
-  const order = await page.evaluate(() =>
+  /* take 189 · A227 · read by the closing checks (labels) and by camp (shell) */
+  let order, iTrail, iLake, iStream, wl, shl;
+  if (RUN("labels")) {
+  order = await page.evaluate(() =>
     window.map.getStyle().layers.map((l) => l.id));
-  const iTrail = order.indexOf("lbl-trail");
-  const iLake = order.indexOf("lbl-lake");
-  const iStream = order.indexOf("lbl-stream");
-  const wl = await page.evaluate(async () => {
+  iTrail = order.indexOf("lbl-trail");
+  iLake = order.indexOf("lbl-lake");
+  iStream = order.indexOf("lbl-stream");
+  wl = await page.evaluate(async () => {
     const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const c = m.getCenter();
     m.jumpTo({ center: [-84.09, 44.57], zoom: 13.2 });
-    await sleep(2600);
+    await window.__rh.idle(m, 2600);
     const q = (id) => { try { return m.queryRenderedFeatures({ layers: [id] })
                                 .map((f) => f.properties.n); } catch (e) { return []; } };
     /* `_data` is private and undefined in MapLibre 5 — the supported route is
@@ -404,10 +553,10 @@ if (zoomed.trails === 0) {
        returned the map to z11.4 first — below lbl-lake's 11.6 minzoom — so this
        reading was guaranteed zero regardless of the product (take 87). */
     m.jumpTo({ center: [-84.10916, 44.66529], zoom: 13.2 });
-    await sleep(2400);
+    await window.__rh.idle(m, 2400);
     const out = { lake: q("lbl-lake"), stream: q("lbl-stream"), srcN, sample };
     m.jumpTo({ center: [c.lng, c.lat], zoom: 11.4 });
-    await sleep(1000);
+    await window.__rh.idle(m, 1000);
     return out;
   });
   /* A110 · places. Centred on the densest cluster in the payload, chosen from
@@ -415,7 +564,7 @@ if (zoomed.trails === 0) {
   const poi = await page.evaluate(async () => {
     const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     m.jumpTo({ center: [-84.13, 44.66], zoom: 13.6 });
-    await sleep(2600);
+    await window.__rh.idle(m, 2600);
     let srcN = -1;
     try { srcN = m.getStyle().sources.poi.data.features.length; } catch (e) { srcN = -2; }
     const q = (id) => { try { return m.queryRenderedFeatures({ layers: [id] }); }
@@ -437,7 +586,7 @@ if (zoomed.trails === 0) {
   const rf = await page.evaluate(async () => {
     const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     m.jumpTo({ center: [-84.12954, 44.58098], zoom: 12.6 });
-    await sleep(2400);
+    await window.__rh.idle(m, 2400);
     let srcN = -1;
     try { srcN = m.getStyle().sources.refs.data.features.length; } catch (e) { srcN = -2; }
     let placed = [];
@@ -488,6 +637,8 @@ if (zoomed.trails === 0) {
     ok(area.n >= 1, `${area.n} DNR scramble area(s) carried in the payload`);
   }
 
+  }
+  if (RUN("modes")) {
   /* A136/A137 · MODES (take 125). Each mode must produce the map it promises,
      measured from resolved style state — not from the table. And Ride must
      be exactly today's map, so a rider who never touches the chip sees no
@@ -797,6 +948,8 @@ if (zoomed.trails === 0) {
        "Water promotes launches and beaches to the first zoom");
   }
 
+  }
+  if (RUN("imagery")) {
   /* A153 · sparse imagery patches (take 127). The proof is not that a file
      exists: it is that at a riding area on Hybrid the patch layer is a
      raster layer, visible, and its source has LOADED tiles — and that a
@@ -1156,6 +1309,8 @@ if (zoomed.trails === 0) {
        `after 60 tiles the card shows a MEASURED time-left (${h2.eta.eta} s remaining at the read)`);
   }
 
+  }
+  if (RUN("back")) {
   /* Take 181 · the first field reports. A192: panels close on an outside tap
      and Layers has a Done. A193: the back button closes what is open, then
      "Back again to exit" — the page half of it; the native half (canGoBack
@@ -1323,6 +1478,8 @@ if (zoomed.trails === 0) {
        `Done sets the flag and hands back the tab the tour started on (${tr.done.tab0})`);
   }
 
+  }
+  if (RUN("water")) {
   /* Takes 147–150 · the tester batch (A163–A166): liveries in Water, boats
      as Water's machine, the run flow reachable and craft-paced, gauges in
      the bundle with live values behind a seam. Every target comes from the
@@ -1425,6 +1582,8 @@ if (zoomed.trails === 0) {
     }
   }
 
+  }
+  if (RUN("shell")) {
   /* Take 156 · A171 · the boot splash. Two things matter and they pull in
      opposite directions: it must cover the ugly boot, and it must GET OUT
      OF THE WAY. By the time every check above has run the map is long
@@ -1488,7 +1647,7 @@ if (zoomed.trails === 0) {
   /* Take 158 · A172 · the shell must be REVEALED and its tokens gone. The
      dangerous failure is the opposite of the ugly one: a shell left at
      opacity 0 is invisible and still tappable. */
-  const shl = await page.evaluate(() => {
+  shl = await page.evaluate(() => {
     const sh = document.getElementById("shell");
     if (!sh) return { missing: true };
     const cs = getComputedStyle(sh);
@@ -1498,6 +1657,8 @@ if (zoomed.trails === 0) {
              btnTokens: [...sh.querySelectorAll("button")]
                .filter((b) => b.innerHTML.indexOf("__IC_") >= 0).length };
   });
+  }
+  if (RUN("stacks")) {
   /* Take 169 · A174 · the clusterer, every zoom, one algorithm. The invariant
      that takes 154/160 violated and this must not: after a pass, no two
      visible things — badge or lone pin — sit within stackRadius of each
@@ -1528,9 +1689,13 @@ if (zoomed.trails === 0) {
         { let w = 0; for (; w < 70; w++) { if (src.loaded() && m.areTilesLoaded()) break; await s(400); } console.debug("APEX-TILEWAIT t1 " + w + "/70"); }
         /* loaded() is the worker; idle is the SCREEN. Under gate starvation
            the floor read 0 badges with 6,410 pins folded — the data was
-           there and the frame was not. */
-        await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]);
-        await s(300);
+           there and the frame was not. take 189 · A227: m.once("idle")
+           without a repaint waited out its whole 6 s whenever the map had
+           gone idle during the tile wait (no render, so no idle event);
+           __rh.idle forces the repaint, so the idle comes with the next
+           complete frame. The 300 ms nap after it is gone: after idle
+           nothing redraws until something changes. */
+        await window.__rh.idle(m, 6000);
         const R = S.radius(zoom);
         let badges = [], pins = [];
         try { badges = m.queryRenderedFeatures({ layers: ["poi-stack-bg"] }); } catch (e) { }
@@ -1670,8 +1835,7 @@ if (zoomed.trails === 0) {
            322 "strays"). Wait for the map to go idle — the final frame with
            every tile drawn — before reading what it shows. */
         { let w = 0; for (; w < 70; w++) { if (src.loaded() && m.areTilesLoaded()) break; await s(400); } console.debug("APEX-TILEWAIT t2 " + w + "/70"); }
-        await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]);
-        await s(300);
+        await window.__rh.idle(m, 6000);
         let b = []; for (let w = 0; w < 30; w++) {
           try { b = m.queryRenderedFeatures({ layers: ["poi-stack-bg"] }); } catch (e) { }
           if (b.length) break; await s(400); }
@@ -1700,7 +1864,7 @@ if (zoomed.trails === 0) {
       m.jumpTo({ center: [-83.5, 42.6], zoom: 10.0 }); await s(350); S.run();   /* take 185: z10 */
       const src = m.getSource("poistack");
       { let w = 0; for (; w < 70; w++) { if (src.loaded() && m.areTilesLoaded()) break; await s(400); } console.debug("APEX-TILEWAIT t3 " + w + "/70"); }
-      await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]);
+      await window.__rh.idle(m, 6000);
       let b = [];
       for (let w = 0; w < 30; w++) { await s(400);
         try { b = m.queryRenderedFeatures({ layers: ["poi-stack-bg"] }); } catch (e) { }
@@ -1895,7 +2059,7 @@ if (zoomed.trails === 0) {
         /* ── guard 4 ── a tray row from a z15 stack */
         const panelTxt = () => ((document.getElementById("panel") || {}).innerText || "");
         const settle = async () => { for (let w = 0; w < 30; w++) { if (!m.isMoving()) break; await s(100); }
-          await Promise.race([new Promise((r) => m.once("idle", r)), s(4000)]); await s(150); };
+          await window.__rh.idle(m, 4000); await s(150); };   /* take 189 · A227: with a repaint (an idle map fires none) */
         const sentinel = () => { const p = document.getElementById("panel"); if (!p) return;
           const i = document.createElement("i"); i.id = "__s8rt"; p.appendChild(i); };
         const tapRow = async (f, pick) => {
@@ -2017,6 +2181,8 @@ if (zoomed.trails === 0) {
       console.log(`       band build: ${ps.stats ? ps.stats.ms + " ms" : "not built"}`);
     }
   }
+  }
+  if (RUN("pins")) {
   /* take 186 · A197 P2 · the Pins selector: per mode, remembered, reset. The
      block resets every mode's choices first and last — the checks above and
      below assume defaults. */
@@ -2106,9 +2272,17 @@ if (zoomed.trails === 0) {
       const foodRow = [...panel.querySelectorAll("[data-pk]")].find((r) => r.dataset.pk === "food"); if (foodRow) foodRow.click(); await s(400);
       const foodAfter = /"food"/.test(ftxt("poi-dot"));
       document.getElementById("c-layers").click(); await s(200);
+      /* take 189 · cold audit · the drawer folded first, as a state this
+         read sets rather than inherits: an earlier drill's card used to
+         fold itself on the map's own resize (A240) and this read leaned on
+         that; with the card left open the map is the stage above it */
+      window.railSet(false);
+      for (let i = 0; i < 60; i++) { await new Promise((r) => requestAnimationFrame(() => r()));
+        if (!document.getAnimations().some((a) => a.playState === "running" && a.effect && isFinite(a.effect.getComputedTiming().endTime))) break; await s(30); }
+      await s(200);
       m.jumpTo({ center: [-83.35, 42.66], zoom: 13.4 }); await s(400); S.run();
       { let w = 0; for (; w < 40; w++) { if (m.areTilesLoaded()) break; await s(300); } console.debug("APEX-TILEWAIT t4 " + w + "/40"); }
-      await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]); await s(300);
+      await window.__rh.idle(m, 6000);
       let foodPins = 0; try { foodPins = m.queryRenderedFeatures({ layers: ["poi-dot"] }).filter((f) => f.properties.k === "food").length; } catch (e) {}
       modes.forEach((k) => P.reset(k));
       M.apply(was, { silent: true }); m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
@@ -2300,9 +2474,19 @@ if (zoomed.trails === 0) {
       const tap = (x, y) => cv.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX: rc.left + x, clientY: rc.top + y }));
       /* the card text is cleared between taps so a name left from an earlier
          card cannot pass the read */
-      const closeCard = async () => { const p = document.getElementById("panel"); if (p) p.innerHTML = ""; await s(150); };
+      /* take 189 · cold audit · …and the drawer FOLDED, its slide and the
+         map's resize over: a card opened by a tap opens the drawer, which
+         shrinks the map (the drawer is a grid row) and moves every pin;
+         until A240 that resize's moveend folded the card again, and the
+         control tap and the point query below leaned on it */
+      const closeCard = async () => { const p = document.getElementById("panel"); if (p) p.innerHTML = ""; window.railSet(false);
+        for (let i = 0; i < 60; i++) { await new Promise((r) => requestAnimationFrame(() => r()));
+          if (!document.getAnimations().some((a) => a.playState === "running" && a.effect && isFinite(a.effect.getComputedTiming().endTime))) break; await s(30); }
+        for (let i = 0; i < 40 && m.isMoving(); i++) await s(50);
+        await s(150); };
       const out = [];
       M.apply("outdoors", { silent: true }); await s(200);
+      await closeCard();
       for (const z of [11.4, 15]) {
         /* the canvas container's own box is 0 px tall (measured); the map
            container holds the size */
@@ -2313,7 +2497,7 @@ if (zoomed.trails === 0) {
           tried++; m.jumpTo({ center: c, zoom: z });
           if (window.__stack) window.__stack.run();
           { let i = 0; for (; i < 40; i++) { if (m.areTilesLoaded()) break; await s(300); } console.debug("APEX-TILEWAIT t5 " + i + "/40"); }
-          await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]); await s(300);
+          await window.__rh.idle(m, 6000);
           if (window.__stack) window.__stack.run(); await s(300);
           const pins = m.queryRenderedFeatures({ layers: ["poi-dot-major", "poi-dot"] })
             .map((f) => ({ k: f.properties.k, n: f.properties.n, p: m.project(f.geometry.coordinates) }));
@@ -2327,10 +2511,13 @@ if (zoomed.trails === 0) {
         await closeCard();
         const had = (document.getElementById("panel") || document.body).innerText.indexOf(t.n) !== -1;
         tap(t.p.x, t.p.y - up);
-        let hit = false, stack = false;
+        let hit = false, stack = false, card = "";
         for (let i = 0; i < 12; i++) { await s(250);
           const tx = (document.getElementById("panel") || document.body).innerText || "";
-          stack = /places here/.test(tx); hit = tx.indexOf(t.n) !== -1 && !stack; if (hit || stack) break; }
+          stack = /places here/.test(tx); hit = tx.indexOf(t.n) !== -1 && !stack; if (hit || stack) { card = tx; break; } }
+        /* take 189 · A237 · the card as the rider got it, and whether the app
+           has a live fix (its one reader) */
+        const live = window.__nav && typeof window.__nav.live === "function" ? !!window.__nav.live() : null;
         await closeCard();
         tap(t.p.x + 70, t.p.y - up); await s(700);
         const ctl = ((document.getElementById("panel") || document.body).innerText || "").indexOf(t.n) !== -1;
@@ -2348,7 +2535,7 @@ if (zoomed.trails === 0) {
         let planted = null, restored = null;
         try { PL.forEach((L) => m.setLayoutProperty(L, "icon-anchor", "center")); await settle(); planted = atHead(); }
         finally { PL.forEach((L, i) => m.setLayoutProperty(L, "icon-anchor", saved[i])); await settle(); restored = atHead(); }
-        out.push({ z, k: t.k, n: t.n, up: Math.round(up * 10) / 10, had, hit, stack, ctl, head, planted, restored });
+        out.push({ z, k: t.k, n: t.n, up: Math.round(up * 10) / 10, had, hit, stack, ctl, head, planted, restored, card, live });
       }
       M.apply(was, { silent: true }); m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
       return { out };
@@ -2362,7 +2549,71 @@ if (zoomed.trails === 0) {
            + `; the control tap 70 px aside ${r.ctl ? "ALSO named it" : "does not"}`
            + `; a point query at the head ${r.head ? "hits" : "MISSES"} the badge, planted centre anchor ${r.planted === false ? "caught" : "MISSED"}`
            + `${r.restored ? "" : " — NOT HIT after restoring the anchor"}`);
+    /* take 189 · A237 · THE DISTANCE LINE WITH NO FIX. Every card said "152
+       mi SSE of you" beside a footer reading "no GPS fix yet": ME is the
+       start pin until a fix. Headless Chrome has no fix, so on the cards the
+       real head taps opened the app's live-fix reader must say none and the
+       line must name the pin it measures from, never "you". Its controls:
+       take 188's line is rejected with no fix, a pin's line accepted, and
+       "of you" accepted only with one. */
+    if (!ht.missing && !ht.err) {
+      const distOk = (card, live) => live ? / mi [NSEW]{1,3} of you\b/.test(card)
+        : / mi [NSEW]{1,3} of the (start pin|simulated position|planning start)\b/.test(card) && !/ of you\b/.test(card);
+      const cards = ht.out.filter((r) => r.hit && r.card);
+      const dCtl = !distOk("Fuel\n152 mi SSE of you", false) && distOk("Fuel\n152 mi SSE of the start pin", false)
+        && distOk("Fuel\n1.2 mi NE of you", true) && !distOk("Fuel\n1.2 mi NE of the start pin", true);
+      const line = (c) => ((c.match(/[^\n]* mi [NSEW]{1,3} of [^\n]*/) || [])[0] || "(no distance line)").trim();
+      ok(cards.length > 0 && cards.every((r) => r.live === false && distOk(r.card, false)) && dCtl,
+         cards.length ? `with no GPS fix, the place cards measure from the start pin, not "you": `
+           + cards.map((r) => `"${r.n}" reads "${line(r.card)}" (live fix ${r.live})`).join("; ")
+           + `; its controls: take 188's "of you" with no fix is rejected, "of you" with a fix accepted (${dCtl})`
+         : "no place card was opened by a head tap — the distance line could not be read");
+    }
+    /* take 189 · A237 · fix round 1 · the dropped pin's card (placeCard, the
+       card a long press opens, and Home / truck's and a waypoint's): it said
+       "N mi DIR (deg°) from your position" with no fix, measured from the
+       start pin. A real long press (touch, the app's own 450 ms timer) with
+       no fix in headless Chrome: the card must name the start pin and the
+       live reader must say none. Its controls: take 188's line with no fix
+       is rejected, "from your position" with a fix accepted. */
+    {
+      const lp = await page.evaluate(async () => { try {
+        const m = window.map, s = (ms) => new Promise((r) => setTimeout(r, ms));
+        if (!window.__nav || typeof window.__nav.live !== "function") return { missing: true };
+        const p0 = document.getElementById("panel"); if (p0) p0.innerHTML = "";
+        const c = m.getCenter(), px = m.project([c.lng + 0.01, c.lat + 0.004]);
+        const cv = m.getCanvasContainer(), r = cv.getBoundingClientRect();
+        const t = new Touch({ identifier: 9, target: cv, clientX: r.left + px.x, clientY: r.top + px.y });
+        cv.dispatchEvent(new TouchEvent("touchstart", { touches: [t], bubbles: true, cancelable: true }));
+        await s(900);
+        cv.dispatchEvent(new TouchEvent("touchend", { touches: [], changedTouches: [t], bubbles: true }));
+        /* the click a real finger's touchend brings, which resets lp.fired (take 137) */
+        cv.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX: r.left + px.x, clientY: r.top + px.y }));
+        let card = "";
+        for (let i = 0; i < 20; i++) { await s(250); const p = document.getElementById("panel");
+          card = p ? p.innerText || "" : ""; if (/Dropped pin/.test(card)) break; }
+        const live = window.__nav.live() !== null, pos = window.__nav.pos();
+        try { const d = document.getElementById("pc-drop"); if (d) d.click(); } catch (e) { }
+        await s(300);
+        return { card, live, pos };
+      } catch (e) { return { err: String(e && e.stack || e) }; } });
+      const fromOk = (card, live) => live ? /\(\d+°\) from your position\b/.test(card)
+        : /\(\d+°\) from the (start pin|simulated position|planning start)\b/.test(card) && !/from your position/.test(card);
+      const fCtl = !fromOk("Dropped pin\n3.21 mi NE (45°) from your position", false)
+        && fromOk("Dropped pin\n3.21 mi NE (45°) from the start pin", false)
+        && fromOk("Dropped pin\n3.21 mi NE (45°) from your position", true)
+        && !fromOk("Dropped pin\n3.21 mi NE (45°) from the start pin", true);
+      const fl = (c) => ((String(c || "").match(/[\d.]+ mi [NSEW]{1,3} \(\d+°\) from [^\n]*/) || [])[0] || "(no distance line)").trim();
+      if (lp.missing) ok(false, "dropped-pin distance check: no __nav.live hook");
+      else if (lp.err) ok(false, "dropped-pin distance check threw: " + lp.err.slice(0, 300));
+      else ok(/Dropped pin/.test(lp.card) && lp.live === false && fromOk(lp.card, false) && fCtl,
+        `with no GPS fix, a long press's dropped-pin card measures from the start pin, not "your position": `
+        + `"${fl(lp.card)}" (position ${lp.pos}, live fix ${lp.live}${/Dropped pin/.test(lp.card) ? "" : ", NO dropped-pin card opened"}); `
+        + `its controls: take 188's "from your position" with no fix is rejected, with a fix accepted (${fCtl})`);
+    }
   }
+  }
+  if (RUN("nav")) {
   /* Take 170 · A187 N1 · the follow camera and trip persistence, driven by
      SYNTHETIC fixes along a bearing so nothing here needs a satellite. */
   {
@@ -2836,6 +3087,8 @@ if (zoomed.trails === 0) {
          `and says each turn at most twice — once when it becomes next, once close in (${hk.saidTurns} spoken, ${hk.distinct} distinct)`);
     }
   }
+  }
+  if (RUN("camp")) {
   /* Take 174 · A186 · Camp mode: a fifth mode in the picker; national forest
      land drawn in Camp and hidden elsewhere; campgrounds carry a type where
      the source recorded one and say so where it did not. */
@@ -2904,7 +3157,7 @@ if (zoomed.trails === 0) {
         m.jumpTo({ center: [-84.45, 44.62], zoom: 11.0 }); await s(400);
         S.run(); const src = m.getSource("poistack");
         { let w = 0; for (; w < 40; w++) { if (src.loaded() && m.areTilesLoaded()) break; await s(400); } console.debug("APEX-TILEWAIT t6 " + w + "/40"); }
-        await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]); await s(300);
+        await window.__rh.idle(m, 6000);
         let pins = 0, inStacks = 0;
         try { pins = m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major"] })
           .filter((f) => f.properties.k === "camp").length; } catch (e) { }
@@ -2956,7 +3209,7 @@ if (zoomed.trails === 0) {
         m.jumpTo({ center: [-83.36, 42.61], zoom: 12.5 }); await s(400); S.run();
         const src = m.getSource("poistack");
         { let w = 0; for (; w < 40; w++) { if (src.loaded() && m.areTilesLoaded()) break; await s(400); } console.debug("APEX-TILEWAIT t7 " + w + "/40"); }
-        await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]); await s(300);
+        await window.__rh.idle(m, 6000);
         let unnamed = 0, named = 0;
         try { m.queryRenderedFeatures({ layers: ["poi-dot", "poi-dot-major"] }).forEach((f) => {
           if (f.properties.k !== "launch" && f.properties.k !== "beach") return;
@@ -3000,6 +3253,45 @@ if (zoomed.trails === 0) {
     ok(src.dnr && src.usfs && src.usgs && src.osm,
        `every government source it republishes is linked (DNR ${src.dnr}, USFS ${src.usfs}, USGS ${src.usgs}, OSM ${src.osm})`);
   }
+  /* take 189 · A232 · at 360 px wide every "BSD 3-Clause" on Data sources
+     stays on one line: take 188's 13b3 shots read "BSD 3-" / "Clause". Read
+     from the text's own line boxes (a Range over each occurrence; one line =
+     one distinct top), after a frame with no animation left (landmine 224).
+     Its control: the same words in a 40 px box read broken. For the record,
+     not the verdict: how many break with the no-wrap taken off. */
+  {
+    const vpWas = page.viewport();
+    await page.setViewport({ width: 360, height: 800, deviceScaleFactor: 3 }); await vpSettle(1200);
+    const bsd = await page.evaluate(async () => {
+      const b = document.getElementById("c-sources"); if (!b) return { missing: true };
+      b.click(); await window.__rh.settle(3000);
+      const P = document.getElementById("panel"); if (!P) return { missing: true };
+      const lines = (root) => { const out = [], w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        for (let n = w.nextNode(); n; n = w.nextNode()) { const re = /BSD 3[-\u2011]Clause/g; let m;
+          while ((m = re.exec(n.data))) { const r = document.createRange(); r.setStart(n, m.index); r.setEnd(n, m.index + m[0].length);
+            out.push(new Set([...r.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size); } }
+        return out; };
+      const got = lines(P);
+      const plant = document.createElement("div"); plant.style.width = "40px"; plant.textContent = "BSD 3-Clause";
+      P.appendChild(plant); const ctl = lines(plant); plant.remove();
+      const nb = [...P.querySelectorAll(".nobr")]; nb.forEach((e) => { e.style.whiteSpace = "normal"; });
+      const bare = lines(P); nb.forEach((e) => { e.style.whiteSpace = ""; });
+      return { got, ctl, bare: bare.filter((n) => n > 1).length, w: Math.round(P.getBoundingClientRect().width) };
+    });
+    await page.setViewport(vpWas); await vpSettle(1200);
+    ok(!bsd.missing && bsd.got.length === 3 && bsd.got.every((n) => n === 1) && bsd.ctl.length === 1 && bsd.ctl[0] > 1,
+       bsd.missing ? "360x800: no Data sources card to read for the licence names"
+       : `360x800: every "BSD 3-Clause" on Data sources stays on one line (${bsd.got.length} found, lines ${bsd.got.join("/")}, `
+         + `card ${bsd.w} px wide); its control, the words in a 40 px box, reads ${bsd.ctl.join("/")} lines; `
+         + `with the no-wrap off, ${bsd.bare} of them break here`);
+  }
+  }
+  /* take 189 · A227 fix round 1 · shell's own judgement, at section level.
+     It sat inside camp's guard, so --only=shell read shl and never judged it
+     (render-t189-L-render-only-3.log: no "shell is revealed" line, RENDER
+     PASSED — landmine 53). Camp reopens below for the tab bar; the full run's
+     order and texts are unchanged. */
+  if (RUN("shell")) {
   if (shl.missing) ok(false, "no #shell to check");
   else {
     ok(shl.ready && shl.opacity === "1",
@@ -3007,6 +3299,8 @@ if (zoomed.trails === 0) {
     ok(shl.tokens === 0 && shl.btnTokens === 0,
        `and no button is left holding a raw token (${shl.btnTokens} of them)`);
   }
+  }
+  if (RUN("camp")) {
 
   /* take 138: the guide rewrite left two stray </div> and the tab bar fell
      out of the layout grid on the Fold. Assert the bar sits inside a phone
@@ -3022,6 +3316,8 @@ if (zoomed.trails === 0) {
      `the tab bar sits inside the viewport below the map (top ${Math.round(tabs.top)}, bottom ${Math.round(tabs.bottom)} of ${tabs.vh}; same parent as #stage: ${tabs.sameParent})`);
 
 
+  }
+  if (RUN("paddle")) {
   /* A115/A112 · the paddle corridor, and the hazards that make it shippable.
      Centred on the Au Sable from the payload, not from where I happen to be
      looking (landmine 130). */
@@ -3274,7 +3570,7 @@ if (zoomed.trails === 0) {
     const seen = { line: 0, index: 0, labels: [] };
     for (const z of [13.6, 14.4, 15.2]) {
       m.jumpTo({ center: [-84.09, 44.57], zoom: z });
-      await sleep(2200);
+      await window.__rh.idle(m, 2200);
       const qq = (id) => { try { return m.queryRenderedFeatures({ layers: [id] }); }
                            catch (e) { return []; } };
       seen.line = Math.max(seen.line, qq("cont-line").length);
@@ -3301,6 +3597,8 @@ if (zoomed.trails === 0) {
        `index contours carry an elevation: ${ct.labels.slice(0, 4).join(", ") || "(none)"}`);
   }
 
+  }
+  if (RUN("ui")) {
   /* Take 115 · THE ACCENT IS A BUDGET, ENFORCED BY COUNT. The T1 rule was
      "orange appears once per screen"; the take-115 audit found .actrow.on still
      glowing full orange because a rule held in memory decays. Counted now: at
@@ -3547,9 +3845,49 @@ if (zoomed.trails === 0) {
     await settle();
     const opened = { folded: rail.className === "folded", body: h(), acts: acts() };
     // pan until it is off screen and the card should go with it
+    /* take 189 · A240 · only the RIDER's camera move folds the card: the
+       app's own move (a jumpTo, as a resize's or a fly-to's moveend) leaves
+       it open even with the place off screen; a real drag on the canvas (a
+       gesture: its moveend carries the input event) that takes the place
+       off screen folds it. This drill used a jumpTo as its "pan" until
+       take 189, which was the app's move, not the rider's. */
+    const still = async () => { for (let i = 0; i < 80 && window.map.isMoving(); i++) await s(50); await s(60); };
     window.map.jumpTo({ center: [at[0] + 0.25, at[1] + 0.25], zoom: 15 });
+    await still(); await settle();
+    const appMove = { folded: rail.className === "folded", off: (() => { const q = window.map.project(at),
+      c = window.map.getContainer().getBoundingClientRect(); return q.x < -40 || q.y < -40 || q.x > c.width + 40 || q.y > c.height + 40; })() };
+    window.map.jumpTo({ center: at, zoom: 15 }); await still(); await settle();
+    /* the drag is REAL input (puppeteer's mouse, outside this evaluate): a
+       synthetic MouseEvent drag moved the map but MapLibre never fired its
+       moveend (PROVEN, probe-t189-audit-a240-1) */
+    const x0p = window.map.project(at).x, rc = window.map.getCanvas().getBoundingClientRect();
+    const cvAt = (x, y) => { const e = document.elementFromPoint(x, y); return !!e && e.tagName === "CANVAS"; };
+    const dx = -(x0p + 90), x0 = rc.left + rc.width * 0.75;
+    const y = [0.5, 0.4, 0.6, 0.3, 0.7].map((f) => rc.top + rc.height * f).find((yy) => cvAt(x0, yy) && cvAt(x0 + dx, yy));
+    window.__drw = { at, cam: _cam };
+    return { atRest, opened, appMove, drag: { x0, y, dx, from: Math.round(x0p) } };
+  });
+  if (drawer.drag && drawer.drag.y !== undefined) {
+    const d = drawer.drag; await page.mouse.move(d.x0, d.y); await page.mouse.down();
+    for (let i = 1; i <= 12; i++) await page.mouse.move(d.x0 + d.dx * i / 12, d.y);
+    await new Promise((r) => setTimeout(r, 150)); await page.mouse.up();
+  }
+  Object.assign(drawer, await page.evaluate(async () => {
+    const s = (ms) => new Promise((r) => setTimeout(r, ms));
+    const rail = document.getElementById("rail");
+    const body = document.getElementById("railbody");
+    const h = () => Math.round(body.getBoundingClientRect().height);
+    const settle = async () => {
+      let last = -1, now = h();
+      for (let i = 0; i < 30 && now !== last; i++) {
+        last = now; await s(60); now = h();
+      }
+      return now;
+    };
+    const { at, cam: _cam } = window.__drw; delete window.__drw;
+    for (let i = 0; i < 80 && window.map.isMoving(); i++) await s(50); await s(60);
     await settle();
-    const panned = { folded: rail.className === "folded" };
+    const panned = { folded: rail.className === "folded", pinX: Math.round(window.map.project(at).x) };
     // the handle
     /* the handle itself, from a KNOWN folded state */
     window.railSet(false); await settle();
@@ -3558,14 +3896,15 @@ if (zoomed.trails === 0) {
     window.railSet(false); await settle();
     const _a = document.getElementById("actions");
     const _b = document.getElementById("railbody");
-    return { atRest, opened, panned, byHand,
+    return { panned, byHand,
              actsPinned: !!(_a && _b && !_b.contains(_a)
                             && document.getElementById("rail").contains(_a)),
              peekVisible: document.getElementById("peek")
                .getBoundingClientRect().height > 10,
              _restored: (() => { window.map.jumpTo(
                { center: [_cam.c.lng, _cam.c.lat], zoom: _cam.z }); return true })() };
-  });
+  }));
+  drawer.panned.from = drawer.drag.from;
   /* The CLASS is asserted, not the animated height. In headless the measured
      height lags the class by a step — railSet(true) reads folded:false h:0, then
      railSet(false) reads folded:true h:84 — and I could not model that
@@ -3582,8 +3921,12 @@ if (zoomed.trails === 0) {
   ok(drawer.actsPinned,
      "the action row sits outside the scrolling body, so a tall card cannot push "
      + "Dispatch and Return home off the bottom");
-  ok(drawer.panned.folded,
-     "panning until the place leaves the screen folds the card with it");
+  ok(drawer.panned.folded && drawer.panned.pinX < -40,
+     `panning until the place leaves the screen folds the card with it (a real drag on the canvas: the place `
+     + `from x ${drawer.panned.from} to ${drawer.panned.pinX} px)`);
+  ok(drawer.appMove.off && !drawer.appMove.folded,
+     `A240 · the app's own camera move (a jumpTo, no input event) leaves the card open with its place off screen `
+     + `(off ${drawer.appMove.off}, folded ${drawer.appMove.folded}) — only the rider's pan folds it`);
   ok(!drawer.byHand.folded, "the handle opens it by hand");
   ok(drawer.peekVisible,
      "the peek strip never leaves, so nothing is unreachable — only folded");
@@ -3610,11 +3953,18 @@ if (zoomed.trails === 0) {
     const ST = typeof window.__st === "function" ? window.__st() : [];
     const d = ST.find((r) => r.id === "dispatch-scan");
     return { hasDisp: !!d, line: d ? `${d.ok === false ? "SLOW " : ""}${d.d}` : "",
-             total: ST.length };
+             total: ST.length, live: !!(window.__nav && window.__nav.live && window.__nav.live()) };
   });
-  ok(perf.hasDisp,
-     `the dispatch timing emits with no GPS (${perf.total} checks): `
-     + `${perf.line || "(absent)"}`);
+  /* take 189 · cold audit · the line names what it measured from in A237's
+     words: "your position" only from a live fix (its `ME&&ME.slice` guard
+     was always true — ME holds the region centre from boot). Its control:
+     take 188's "from your position" with no live fix fails */
+  const fromOkD = (line, live) => live ? /from your position\)/.test(line)
+    : /from (?:the start pin|the planning start|the simulated position|your last GPS fix \([^)]*\))\)/.test(line) && !/from your position\)/.test(line);
+  ok(perf.hasDisp && fromOkD(perf.line, perf.live)
+     && !fromOkD("120 ms of 3010 ms budget (451000 edges, 0.3 µs/edge, from your position) — this is what you wait for after tapping Dispatch", false),
+     `the dispatch timing emits with no GPS (${perf.total} checks, live fix ${perf.live}): `
+     + `${perf.line || "(absent)"}; the judge rejects "from your position" with no live fix`);
 
   /* A119 · the compass must read the magnetometer when standing still, which is
      the case Jacob reported as broken. */
@@ -3785,6 +4135,8 @@ if (zoomed.trails === 0) {
        + `reads ${(fc.plantStale || []).length} back (must fail)` + (fc.error ? " — " + fc.error : ""));
   }
 
+  }
+  if (RUN("home")) {
   /* A119 · the compass. Written AFTER printing the panel and reading it, which
      is the order that caught the useless 0.0 mi rows twice (landmines 163/164). */
   /* Take 117, the HOME spec: home is unset until the rider sets one, so the
@@ -3861,6 +4213,8 @@ if (zoomed.trails === 0) {
   ok(/Marked/.test(cmp.marked), "Mark this spot saves a waypoint in one tap");
   ok(cmp.closed, "leaving Tools closes the compass");
 
+  }
+  if (RUN("tools")) {
   /* A119 · Tools is a bucket now: diagnostics live behind ONE entry, and the
      three buttons still work from wherever they ended up (take 101). */
   const dg = await page.evaluate(async () => {
@@ -4147,6 +4501,8 @@ if (zoomed.trails === 0) {
      + (on.length ? " — " + on.join("; ") : ""));
   ok(/^Map text\b/.test(lyr.rowText) && /Names and numbers/.test(lyr.rowText) && /Pins and the count on a stack stay/.test(lyr.rowText),
      `A226 · the row says what it turns off and what stays: "${lyr.rowText}"`);
+  }
+  if (RUN("labels")) {
   const names = [...new Set([...wl.lake, ...wl.stream])];
   ok(names.length > 0,
      `water is named on the map: ${names.length} label(s) of ${wl.srcN} in the `
@@ -4158,8 +4514,10 @@ if (zoomed.trails === 0) {
   ok(iRef > 0 && iLake > iRef,
      `route numbers outrank water names (lbl-ref ${iRef} < lbl-lake ${iLake}) — `
      + `a road number orients you, a pond does not`);
+  }
 }
 
+if (RUN("basemap")) {
 /* Satellite has never been proven to draw. It is a separate source type (image,
    blob url) from everything above, so it fails independently.
    take 188 · A212 (G1) · two basemaps: c-base toggles Map → Hybrid → Map in
@@ -4192,6 +4550,9 @@ else {
      + (SAT_EXPECT ? "" : " (no imagery: stays on Map)"));
 }
 
+}
+
+if (RUN("selftest")) {
 /* Run the app's OWN self-test here, headless. Same battery Jacob runs by tapping
    one button on the Fold — so anything that differs between the two reports is
    device-specific by construction, which is the only kind of bug I cannot find
@@ -4234,12 +4595,46 @@ else {
      + (stFails.length > real.length
         ? ` (tolerated here: ${stFails.filter((n) => !real.includes(n)).join(", ")})`
         : ""));
+  /* take 189 · A236 · the self-test reads back which font the map's labels
+     draw in: one INFO line naming the APEX stack, the glyph ranges loaded
+     from the pack, failed and pending, and the local font when MapLibre drew
+     locally. Not a verdict on the font — the Fold session answers that —
+     but on the readback: in a real engine it must READ (an UNKNOWN here
+     means the readback is blind, and so would be the phone's). Printed in
+     full. Its controls: no line, and an UNKNOWN line, are rejected. */
+  {
+    /* take 189 · cold audit · and it COUNTED something: the labels have drawn,
+       so every glyph came from the pack or was drawn locally; "0 from the
+       pack, 0 drawn locally" is a reader whose fields matched nothing (the
+       manager's private names), and no line may carry an UNKNOWN */
+    const glOk = (rows) => rows.length === 1 && rows[0].ok === null
+      && /^APEX \(\d+ label layers?\): ranges from the pack .+ · failed .+ · pending .+ · \d+ glyphs from the pack, \d+ drawn locally/.test(rows[0].d)
+      && !/UNKNOWN/.test(rows[0].d)
+      && (() => { const c = /(\d+) glyphs from the pack, (\d+) drawn locally/.exec(rows[0].d); return !!c && (+c[1]) + (+c[2]) > 0; })();
+    const gl = (st.results || []).filter((r) => r.g === "RENDER" && r.id === "glyphs");
+    console.log("  ..   app self-test RENDER/glyphs: " + (gl.length ? gl.map((r) => r.d).join(" | ") : "(no line)"));
+    /* fix round 1 · "no glyph requested yet" is rejected too: by the time this
+       section runs the labels have drawn, so that phrase here can only be a
+       reader whose key matched nothing (landmine 55's shape) */
+    const glCtl = !glOk([]) && !glOk([{ g: "RENDER", id: "glyphs", ok: null, d: "UNKNOWN — this MapLibre build exposes no glyph manager" }])
+      && !glOk([{ g: "RENDER", id: "glyphs", ok: null, d: "APEX (24 label layers): no glyph requested yet" }])
+      && !glOk([{ g: "RENDER", id: "glyphs", ok: null, d: "APEX (24 label layers): UNKNOWN — the glyph manager holds Other, none is APEX" }])
+      && !glOk([{ g: "RENDER", id: "glyphs", ok: null, d: "APEX (24 label layers): ranges from the pack none · failed none · pending none · 0 glyphs from the pack, 0 drawn locally" }])
+      && !glOk([{ g: "RENDER", id: "glyphs", ok: null, d: "APEX (24 label layers): ranges from the pack none · failed 0-255 · pending none · 0 glyphs from the pack, 40 drawn locally ;; Other (1 label layer): UNKNOWN — x" }])
+      && glOk([{ g: "RENDER", id: "glyphs", ok: null, d: "APEX (9 label layers): ranges from the pack none · failed 0-255 · pending none · 0 glyphs from the pack, 40 drawn locally" }]);
+    ok(glOk(gl) && glCtl, `the app's self-test reads back the label font and glyph ranges (one INFO line, a reading, `
+       + `not UNKNOWN, glyphs counted); its controls, no line, an UNKNOWN line, "no glyph requested yet" and a blind `
+       + `"0 from the pack, 0 drawn locally", are rejected (${glCtl})`);
+  }
   if (st.fail > 0)
     for (const line of st.text.split("\n").filter((l) => l.startsWith("  XX")))
       console.log("       " + line.trim());
   if (process.env.RENDER_DEBUG) console.log(st.text.split("\n").map(l=>"       "+l).join("\n"));
 }
 
+}
+
+if (RUN("routes")) {
 /* Route layers must RENDER, not merely receive data. Two features shipped for
    eight takes with their sources fed and no layer to draw them, and every check
    I had written measured setData (take 43). Only a real engine can answer
@@ -4247,6 +4642,14 @@ else {
 /* A harness must survive the broken app it is diagnosing: with an invalid style
    there is no map, and throwing here turns "5 checks failed" into a stack trace
    that says nothing (take 43). */
+/* take 189 · A227 · run without modes (--only), the route is planned for the
+   machine the full run has here: the modes section's walking drill hands the
+   side-by-side back (its own check says so) and nothing after it changes the
+   ride machine before this point. The device matrix judges these cards. */
+if (ONLY && !ONLY.has("modes")) {
+  await page.evaluate(() => { try { window.__route.setMachine("sxs"); } catch (e) {} });
+  console.log("  ..   (--only) the route is planned for the side-by-side, as the full run leaves it");
+}
 const layers2 = await page.evaluate(async () => {
   try {
   const sl = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -4272,6 +4675,8 @@ const layers2 = await page.evaluate(async () => {
 ok(layers2.route > 0, `route line renders ${layers2.route} features`);
 ok(layers2.alt > 0, `dimmed alternates render ${layers2.alt} features`);
 ok(layers2.approach > 0, `dashed off-network legs render ${layers2.approach} features`);
+
+}
 
 /* The same layout checks the on-device self-test runs, across the phone sizes
    people actually own. A control that fits on a 430 px screen and slides off a
@@ -4314,6 +4719,7 @@ const FORCE_RIDE = () => {
       try { if (w.ride === undefined) delete sh.dataset.ride; else sh.dataset.ride = w.ride; } catch (e) {}
     } };
 };
+if (RUN("devices")) {
 await page.evaluate(FORCE_RIDE);
 /* The HUD is a NEW full-width element and the matrix would otherwise measure it
    hidden — a check with nothing to look at reports success (landmine 85). Force
@@ -4323,9 +4729,12 @@ await page.evaluate(() => {
   try { window.hudShow && window.hudShow(true); window.hudSet &&
         window.hudSet(11.2, 48.8, null); } catch (e) {}
 });
+/* take 189 · A238 · the route-card rows read, kept for the dirt bike's
+   pass after the matrix */
+let ROWS_FN = null;
 for (const dev of DEVICES) {
   await page.setViewport({ width: dev.width, height: dev.height, deviceScaleFactor: dev.dpr });
-  await new Promise((r) => setTimeout(r, 1200));
+  await vpSettle(1200);
   await page.evaluate(() => { try { window.hudPaint && window.hudPaint(); } catch (e) {} });
   const fit = await page.evaluate(() => {
     const vw = document.documentElement.clientWidth;
@@ -4416,6 +4825,64 @@ for (const dev of DEVICES) {
   ok(fit.hud.barVisible && fit.hud.barWidth === fit.vw && fit.hud.labels > 0,
      `${dev.name}: ride HUD fits — ribbon ${fit.hud.barWidth}px of ${fit.vw}, `
      + `${fit.hud.labels} labels`);
+  /* take 189 · A229 · THE ATTRIBUTION (i) CLEAR OF THE FOLDED DRAWER. It sat
+     half under #rail's lip (843-867 px against the drawer's top at 857 at
+     411x960, take 188's seal shots), its upper half still taking a tap. Read
+     at every device size with the drawer folded, at rest and riding
+     (#shell[data-ride]: the folded drawer's action row is up): the button
+     drawn, its foot at or above the drawer's top, and a tap at its top,
+     centre and foot landing on it. The drawer is folded by its class with
+     its transitions off, read synchronously and put back the same way, so
+     no slide, rcFit or RAIL_AT change reaches the checks after it. Its plant:
+     the corner put back where MapLibre puts it (bottom 0, the compact
+     margin 10 px), take 188's place, must read covered. */
+  const atb = await page.evaluate(async () => {
+    const sh = document.getElementById("shell"), rail = document.getElementById("rail"),
+          corner = document.querySelector(".maplibregl-ctrl-bottom-right"),
+          btn = document.querySelector(".maplibregl-ctrl-attrib-button"),
+          box = btn ? btn.closest(".maplibregl-ctrl-attrib") : null;
+    if (!sh || !rail || !corner || !btn || !box) return { error: "missing " + [!sh && "#shell", !rail && "#rail",
+      !corner && "the attribution corner", !btn && "its (i) button"].filter(Boolean).join(", ") };
+    await window.__rh.settle(3000);
+    const tr = ["railbody", "actions"].map((id) => document.getElementById(id)).filter(Boolean);
+    const was = { cls: rail.className, ride: sh.dataset.ride, tr: tr.map((e) => e.style.transition) };
+    const read = () => { const b = btn.getBoundingClientRect(), r = rail.getBoundingClientRect(), cs = getComputedStyle(btn);
+      const drawn = b.width >= 1 && b.height >= 1 && cs.display !== "none" && cs.visibility !== "hidden";
+      const taps = [0.15, 0.5, 0.85].map((f) => { const h = document.elementFromPoint(b.left + b.width / 2, b.top + b.height * f);
+        return !!h && btn.contains(h); });
+      return { drawn, clear: b.bottom <= r.top + 0.5, taps: taps.every(Boolean), top: Math.round(b.top),
+               foot: Math.round(b.bottom), rail: Math.round(r.top) }; };
+    tr.forEach((e) => { e.style.transition = "none"; });
+    /* fix round 2 · the drawer really folded, for every read the plant's too */
+    const folded = () => /\bfolded\b/.test(rail.className) && (document.getElementById("railbody") || { getBoundingClientRect: () => ({ height: 99 }) }).getBoundingClientRect().height < 8;
+    const out = {};
+    for (const st of ["rest", "ride"]) {
+      if (st === "ride") sh.dataset.ride = "1"; else delete sh.dataset.ride;
+      rail.className = "folded"; out[st] = read();
+      out[st].folded = folded();
+    }
+    delete sh.dataset.ride; rail.className = "folded";
+    corner.style.bottom = "0px"; box.style.marginBottom = "10px";
+    out.plant = read(); out.plant.folded = folded();
+    corner.style.bottom = ""; box.style.marginBottom = "";
+    rail.className = was.cls;
+    if (was.ride === undefined) delete sh.dataset.ride; else sh.dataset.ride = was.ride;
+    rail.getBoundingClientRect();
+    tr.forEach((e, i) => { e.style.transition = was.tr[i]; });
+    return out;
+  });
+  {
+    const good = (x) => !!x && x.folded && x.drawn && x.clear && x.taps;
+    /* fix round 2 · the plant is judged on its geometry, positively: drawn on
+       a folded drawer and under its lip or missing a tap. "!good(plant)" was
+       true whatever the plant read (it carried no .folded) */
+    const covered = (x) => !!x && x.folded && x.drawn && (!x.clear || !x.taps);
+    const say = (x) => x ? `(i) ${x.top}-${x.foot} px, drawer top ${x.rail}${x.clear ? "" : " — UNDER the drawer"}${x.taps ? "" : " — a tap misses it"}${x.drawn ? "" : " — NOT DRAWN"}` : "?";
+    ok(!atb.error && good(atb.rest) && good(atb.ride) && covered(atb.plant),
+       atb.error ? `${dev.name}: the attribution check found ${atb.error}`
+       : `${dev.name}: the attribution (i) stands clear of the folded drawer and takes its taps — at rest ${say(atb.rest)}; `
+         + `riding ${say(atb.ride)}; its plant, MapLibre's own place (take 188's), reads ${covered(atb.plant) ? "covered: " + say(atb.plant) : "NOT covered — the judge MISSED it: " + say(atb.plant) + (atb.plant && atb.plant.folded ? "" : " (drawer not folded)")}`);
+  }
   /* take 188 · A222 · THE RIDE SHEET, at every size, in the state a rider
      sees: #shell[data-ride] on, so the folded drawer's action row is up.
      Read with the drawer FOLDED four ways — free and routed, and each again
@@ -4478,7 +4945,9 @@ for (const dev of DEVICES) {
     if (lacking.length) return { error: "missing " + lacking.join(", "), reads: [], hadRoute: false };
     const FREE = ["Trip", "Time", "Speed"], ROUTED = ["Trip", "To go", "Arrive"];
     const BTNS = ["hud-stop", "nav-center", "nav-north", "nav-voice"].map((id) => document.getElementById(id));
-    const ACTS = [...document.querySelectorAll("#actions .act")];
+    /* take 189 · A233 · the folded drawer's Ride is not one of the ride's
+       actions (it is not drawn while riding); it is judged on its own below */
+    const ACTS = [...document.querySelectorAll("#actions .act")].filter((a) => a.id !== "btn-ride");
     /* the drawer at its real geometry, no transition to wait out */
     const tr = ["railbody", "actions"].map((id) => document.getElementById(id));
     const trWas = tr.map((e) => e ? e.style.transition : "");
@@ -4557,22 +5026,182 @@ for (const dev of DEVICES) {
        stop under the ride block. The plant is each panel's height rule as
        it was before the fix. */
     const toolsRead = async (panel, chip, tallCss, oldCss) => {
-      const one = async () => {
+      const two = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      /* a text line of the compass box straddling the visible foot (the
+         cue's top when it is drawn): the top of the cut line, or null */
+      const cmpCut = (r) => {
+        const mo = document.getElementById("cmpmore"), mr = mo && vis(mo);
+        const vb = mr ? mr.top : r.top + panel.clientTop + panel.clientHeight, f0 = (document.getElementById("cmpbox") || {}).firstElementChild;
+        const fb = f0 ? f0.getBoundingClientRect().bottom : r.top;
+        const tw = document.createTreeWalker(document.getElementById("cmpbox"), NodeFilter.SHOW_TEXT);
+        const rg = document.createRange(); let n, cut = null;
+        while ((n = tw.nextNode())) { rg.selectNodeContents(n);
+          for (const q of rg.getClientRects()) if (q.height > 0 && q.top >= fb - 0.5 && q.top < vb - 0.5 && q.bottom > vb + 0.5) cut = Math.round(q.top); }
+        return { cut, cue: !!mr }; };
+      /* take 189 · cold audit r2 · scrolled to its end, nothing is below:
+         "More below — scroll" must not be drawn there, and is drawn again
+         back at the top. Its control: the cue held drawn by a plant, which
+         the same read must see at the end */
+      const endRead = async () => {
+        const mo = document.getElementById("cmpmore");
+        const at = async (top) => { panel.scrollTop = top ? 0 : panel.scrollHeight; await two(); await settle();
+          return { end: panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 1, top: panel.scrollTop, cue: !!(mo && vis(mo)) }; };
+        const end = await at(false);
+        const hold = plantCss("#cmpmore{visibility:visible!important}");
+        const endCtl = await at(false); hold.remove();
+        const back = await at(true);
+        return { end, endCtl, back }; };
+      const one = async (wantEnd) => {
         if (panel.hidden) chip.click();
         await settle();
         const r = vis(panel), nr = vis(navEl), gr = vis(ng);
         const res = { drawn: !!r, banner: !!gr, top: r ? Math.round(r.top) : null, h: r ? Math.round(r.height) : 0,
           navBottom: nr ? Math.round(nr.bottom) : null, scrolls: panel.scrollHeight > panel.clientHeight + 1,
           over: r ? [navEl, barEl].filter((e) => { const x = vis(e); return !!x && hit(r, x); }).map((e) => e.id) : [] };
+        /* take 189 · A231 · usable: what the panel is opened for is whole in
+           its visible box — the compass's dial and its heading line (the
+           box's first block), Diagnostics' header and first two actions —
+           and the sheet's Stop and the panel's own chip stay one tap */
+        const blocks = panel === cmp ? [(document.getElementById("cmpbox") || {}).firstElementChild]
+          : [...panel.querySelectorAll(".sect, .chip")].slice(0, 3);
+        const clipB = r ? r.top + panel.clientTop + panel.clientHeight : 0;
+        res.usable = !!r && blocks.length > 0 && blocks.every((b) => { const x = b && b.getBoundingClientRect();
+          return !!x && x.height > 0 && x.top >= r.top - 0.5 && x.bottom <= clipB + 0.5; });
+        res.room = r ? Math.round(panel.clientHeight) : 0; res.need = panel.scrollHeight;
+        res.stop = tapOn(document.getElementById("hud-stop"), 48); res.chip = tapOn(chip, 44);
+        /* take 189 · cold audit · the Tools chips drawn (A231's hiding is for a
+           small phone only), none under the attribution's (i), and the
+           compass box ending on a whole line with its "more below" cue when
+           it scrolls (a text line straddling the visible foot is a cut) */
+        const tchips = [...document.querySelectorAll("#tools .chip[data-tab=\"tools\"]")];
+        res.toolsN = tchips.length;
+        res.chips = tchips.filter((c) => !c.hidden && !!vis(c)).length;
+        const ai = document.querySelector(".maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib"), air = ai && vis(ai);
+        res.attrib = air ? tchips.filter((c) => { const x = !c.hidden && vis(c); return !!x && hit(air, x); }).map((c) => c.id) : [];
+        if (panel === cmp && r) {
+          const cc = cmpCut(r);
+          res.lineCut = cc.cut; res.cue = cc.cue;
+          if (wantEnd && res.scrolls) res.endRd = await endRead();
+        }
         if (!panel.hidden) chip.click();
         await settle();
         return res; };
+      /* take 189 · A231 · the real content first, then the same with the
+         A231 rule taken out of the stylesheet (its control) */
+      const real = await one(true);
+      let ruleFound = false, bare = null;
+      /* take 189 · cold audit · the rule now sits in an @media block: looked
+         for inside grouping rules too */
+      const findRule = (list, owner) => { for (let i = 0; i < list.length; i++) { const q = list[i];
+          if (q.selectorText && q.selectorText.includes("#diagpanel:not([hidden])) #tools")) return { owner, i, txt: q.cssText };
+          if (q.cssRules) { const x = findRule(q.cssRules, q); if (x) return x; } } return null; };
+      for (const sht of document.styleSheets) { let rules = null; try { rules = sht.cssRules; } catch (e) { continue; }
+        const fr = findRule(rules, sht);
+        if (fr) { ruleFound = true; fr.owner.deleteRule(fr.i);
+          try { bare = await one(); } finally { fr.owner.insertRule(fr.txt, fr.i); } break; } }
+      /* its controls: take 189's rule at every size with the (i) held at its
+         unlifted place (the cover screen's shot: the (i) on "Diagnostics");
+         and for the compass, the box's cap as it was before the line fit */
+      const fz = plantCss("#shell[data-ride]:has(#cmppanel:not([hidden]),#diagpanel:not([hidden])) #tools .chip:not(#c-compass):not(#c-markme):not(#c-diag){display:none}"
+        + ".maplibregl-ctrl-bottom-right{bottom:var(--r-lg)!important}");
+      const forced = await one(); fz.remove();
+      /* …and the same forced row with the (i) free: the lift must take it
+         off the chip (the behaviour; the read above is its control) */
+      const fl = plantCss("#shell[data-ride]:has(#cmppanel:not([hidden]),#diagpanel:not([hidden])) #tools .chip:not(#c-compass):not(#c-markme):not(#c-diag){display:none}");
+      const lifted = await one(); fl.remove();
+      /* the compass box at a cap that lands in the MIDDLE of its first text
+         line below the dial and heading (the cap's own --s-4 moved by the
+         difference: what a screen of another height does), read with the
+         line fit (it must end on a whole line, with its cue) and, its
+         control, with the cap before the fit (the line is cut) */
+      let mid = null, midCtl = null, midAt = null;
+      if (panel === cmp) {
+        if (panel.hidden) chip.click();
+        await settle();
+        const bx = document.getElementById("cmpbox"), f0 = bx && bx.firstElementChild, mo = document.getElementById("cmpmore");
+        panel.style.removeProperty("--cmp-trim"); if (mo) mo.hidden = true;
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const pr0 = panel.getBoundingClientRect(), C0 = panel.offsetHeight, bb = parseFloat(getComputedStyle(panel).borderBottomWidth) || 0;
+        const fb = f0 ? f0.getBoundingClientRect().bottom : pr0.top;
+        const tw = document.createTreeWalker(bx, NodeFilter.SHOW_TEXT), rg = document.createRange(); let n, L = null;
+        while ((n = tw.nextNode())) { rg.selectNodeContents(n);
+          for (const q of rg.getClientRects()) if (q.height > 0 && q.top >= fb - 0.5 && (L === null || q.top < L.top)) L = q; }
+        if (!panel.hidden) chip.click();
+        await settle();
+        if (L) { const delta = C0 - ((L.top - pr0.top) + L.height / 2 + bb); midAt = Math.round(L.top - pr0.top);
+          const sp = plantCss(`#cmppanel{--s-4:${(16 + delta).toFixed(1)}px}`);
+          mid = await one(true);
+          const sc = plantCss("#cmppanel{max-height:min(62vh,calc(100% - var(--ride-top) - var(--strip-h,64px) - var(--sheet-h,0px) - var(--s-4)))!important}#cmpmore{display:none!important}");
+          midCtl = await one(); sc.remove(); sp.remove(); } }
+      /* take 189 · cold audit r2 · the fit follows its cap. The box is given
+         thirty planted text lines (so the cap lands in text at every size)
+         and fitted by the app's own cmpFit — the call a content change
+         makes. (1) The ride block grows past the gap the panel keeps under
+         the turn banner (the nav strip padded by a whole number of lines
+         and a half; no text changes, so nothing repaints the compass): the
+         panel must stay under the banner. Its control: the fit as a fixed
+         px max-height (round 1's), which the cap's change does not bound —
+         it lands on the banner. (2) Fitted again while the block is grown
+         (a content change), the block shrinks back: the panel must end on
+         a whole line (a fit left as it was lands mid-line: the cap moved
+         by a line and a half's multiple of the pitch) */
+      let grow = null, growCtl = null;
+      if (panel === cmp) {
+        const g1 = async (pxFit) => {
+          if (panel.hidden) chip.click();
+          await settle();
+          const bx = document.getElementById("cmpbox"), pl = document.createElement("div");
+          pl.id = "v4plant-lines"; pl.innerHTML = Array.from({ length: 30 }, (_, i) => `Planted line ${i + 1} for the cap read`).join("<br>");
+          if (bx) bx.appendChild(pl);
+          const fit = () => { if (typeof window.cmpFit === "function") window.cmpFit(); };
+          fit(); await two(); await settle();
+          const rtv = () => getComputedStyle(document.documentElement).getPropertyValue("--ride-top").trim();
+          const trimv = () => parseFloat(panel.style.getPropertyValue("--cmp-trim")) || 0;
+          /* the line pitch, from the first two planted text nodes */
+          const tops = [...pl.childNodes].filter((x) => x.nodeType === 3).slice(0, 2).map((x) => {
+            const rg = document.createRange(); rg.selectNodeContents(x); const q = rg.getClientRects()[0]; return q ? q.top : NaN; });
+          const pitch = tops.length === 2 && tops[1] - tops[0] > 4 ? tops[1] - tops[0] : NaN;
+          const p0 = vis(panel), n0 = vis(navEl), gap = p0 && n0 ? Math.max(0, p0.top - n0.bottom) : 0;
+          /* the least whole-and-a-half number of lines at least 2 px past
+             the gap (the less it shrinks, the more text lines the fit has
+             to work on in the small panels) */
+          const grownBy = isFinite(pitch) ? Math.round((Math.max(0, Math.ceil((gap + 2 - 0.5 * pitch) / pitch)) + 0.5) * pitch) : 32;
+          const o = { rt0: rtv(), trim0: trimv(), cut0: p0 ? cmpCut(p0).cut : null, gap: Math.round(gap), grownBy,
+            pitch: Math.round(pitch * 10) / 10 };
+          if (pxFit) panel.style.maxHeight = panel.offsetHeight + "px";
+          const gp = plantCss(`#nav{padding-bottom:${grownBy}px!important}`);
+          if (N.publish) N.publish();
+          await two(); await settle();
+          /* the ride block holds room for the banner, so it grows by less
+             than the padding: padded again by the difference, the BLOCK
+             (the cap's input) moves by the line and a half's multiple */
+          const dRt = parseFloat(rtv()) - parseFloat(o.rt0);
+          if (isFinite(dRt) && Math.abs(dRt - grownBy) > 0.5) {
+            o.pad = grownBy + (grownBy - dRt); gp.textContent = `#nav{padding-bottom:${o.pad}px!important}`;
+            if (N.publish) N.publish();
+            await two(); await settle(); }
+          const r = vis(panel), nr = vis(navEl);
+          Object.assign(o, { rt1: rtv(), drawn: !!r, over: !!r && !!nr && hit(r, nr), top: r ? Math.round(r.top) : null,
+            navBottom: nr ? Math.round(nr.bottom) : null });
+          fit(); await two(); await settle();
+          o.trim1 = trimv();
+          gp.remove();
+          if (N.publish) N.publish();
+          await two(); await settle();
+          const r2 = vis(panel), nr2 = vis(navEl);
+          Object.assign(o, { rt2: rtv(), trim2: trimv(), over2: !!r2 && !!nr2 && hit(r2, nr2), lineCut: r2 ? cmpCut(r2).cut : null,
+            kept: !!pl.parentNode });
+          panel.style.maxHeight = ""; pl.remove(); fit();
+          if (!panel.hidden) chip.click();
+          await settle();
+          return o; };
+        grow = await g1(false); growCtl = await g1(true); }
       const tall = plantCss(tallCss);
       const now = await one();
       const old = plantCss(oldCss);
       const was = await one();
       old.remove(); tall.remove();
-      return { now, was }; };
+      return { now, was, real, bare, ruleFound, forced, lifted, mid, midCtl, midAt, grow, growCtl }; };
     const diagEl = document.getElementById("diagpanel"), diagChip = document.getElementById("c-diag");
     if (hadRoute && ng && navEl && barEl && diagEl && diagChip) {
       if (V) V.ok = false; N.pos(posWas); pad.remove(); window.railSet(false);
@@ -4775,6 +5404,63 @@ for (const dev of DEVICES) {
          + `${t ? t.was.over.join(", ") || "NOTHING (not caught)" : "?"} (top ${t ? t.was.top : "?"})`);
     }
   }
+  /* take 189 · A231 · …and USABLE there (take 188 left 73 px at 360 x 800,
+     the compass's dial cut): with their real content, what each is opened
+     for is whole in view under the banner, the sheet's Stop and the
+     panel's chip one tap. Its control: the A231 rule taken out (the strip
+     keeps every row) must fail at 360 x 800; elsewhere it is reported */
+  {
+    const use = (r) => !!r && r.drawn && r.usable && r.stop && r.chip && r.over.length === 0
+      && r.navBottom !== null && r.top >= r.navBottom - 0.5;
+    const tl = sh.tools;
+    for (const [nm, key] of [["compass", "cmp"], ["diagnostics", "diag"]]) {
+      const t = tl && tl[key], rl = (t && t.real) || {}, br = (t && t.bare) || {};
+      const binds = !!t && !!t.bare && !use(t.bare);
+      ok(!!t && t.ruleFound && use(t.real) && (dev.width > 360 || binds),
+         `${dev.name}: A231 · riding on the Tools tab, the ${nm} panel is usable: ${rl.room} px of ${rl.need} shown, `
+         + `what it is opened for whole (${rl.usable}), Stop ${rl.stop}, its chip ${rl.chip}, under the banner (top ${rl.top}, foot ${rl.navBottom}); `
+         + `without the A231 rule (found ${t && t.ruleFound}) ${br.room} px, whole ${br.usable}`
+         + (dev.width > 360 ? (binds ? " — caught here too" : " — not asserted here (it fits without the rule)") : " — caught"));
+    }
+    /* take 189 · cold audit · riding with each panel open: A231 hides chips
+       only on a small phone (elsewhere all seven stay one tap — landmine
+       135 — its control the rule at every size); no Tools chip under the
+       attribution's (i) (its control, at the cover screen where the shot
+       showed it: the rule forced with the (i) unlifted); and the compass
+       box ends on a whole line with its cue when it scrolls (its control at
+       360 x 800: the cap before the fit) */
+    { const c = tl && tl.cmp, d = tl && tl.diag, tight = dev.width <= 400 && dev.height <= 860;
+      const all = (r) => !!r && r.toolsN > 3 && r.chips === r.toolsN, clear = (r) => !!r && r.attrib.length === 0;
+      const whole = (r) => !!r && r.lineCut === null && (r.need <= r.room + 1 || r.cue);
+      /* take 189 · cold audit r2 · scrolled to its end, no "More below" drawn;
+         back at the top, drawn again (when the box scrolls) */
+      const endOk = (r) => !!r && (!r.scrolls || (!!r.endRd && r.endRd.end.end && r.endRd.end.top > 0 && !r.endRd.end.cue && r.endRd.back.cue));
+      const endCtlOk = (r) => !!r && !!r.endRd && r.endRd.endCtl.end && r.endRd.endCtl.cue;   /* the control is SEEN */
+      const grown = (g) => !!g && g.kept && g.drawn && g.cut0 === null && g.pitch > 4 && Math.abs(parseFloat(g.rt1) - parseFloat(g.rt0) - g.grownBy) <= 1
+        && parseFloat(g.rt2) === parseFloat(g.rt0) && g.over === false && g.over2 === false && g.lineCut === null;
+      const E = (r) => !r ? "not read" : !r.scrolls ? "does not scroll" : !r.endRd ? "no end read"
+        : `at its end (${r.endRd.end.top} px) cue ${r.endRd.end.cue ? "DRAWN" : "not drawn"}, back at the top cue ${r.endRd.back.cue ? "drawn" : "NOT drawn"}, held cue seen ${r.endRd.endCtl.cue}`;
+      const G = (g) => !g ? "not read" : `fitted (trim ${g.trim0} px, cut at ${g.cut0}); --ride-top ${g.rt0} → ${g.rt1} (${g.grownBy} px past a ${g.gap} px gap, lines ${g.pitch} px, nav padded ${g.pad || g.grownBy} px): `
+        + `panel top ${g.top} vs banner bottom ${g.navBottom}, over ${g.over}; refitted there (trim ${g.trim1}), back to ${g.rt2}: trim ${g.trim2}, cut at ${g.lineCut}, over ${g.over2}`
+        + `${g.kept ? "" : ", the planted lines REPAINTED AWAY"}`;
+      const R = (r) => r ? `${r.chips} of ${r.toolsN} chips, (i) over ${r.attrib.join("/") || "none"}` : "not read";
+      const cover = dev.width === 411;
+      ok(!!c && !!d && (tight ? c.real.chips === 3 && d.real.chips === 3 && all(c.bare) : all(c.real) && all(d.real) && !all(c.forced) && !all(d.forced))
+         && clear(c.real) && clear(d.real) && clear(c.lifted) && clear(d.lifted) && (!cover || !clear(c.forced) || !clear(d.forced))
+         && whole(c.real) && !!c.mid && whole(c.mid) && !!c.midCtl && !whole(c.midCtl)
+         && endOk(c.real) && !!c.mid.endRd && endOk(c.mid) && endCtlOk(c.mid) && (!c.real.endRd || endCtlOk(c.real))
+         && grown(c.grow) && !!c.growCtl && c.growCtl.over === true,
+         `${dev.name}: riding on Tools with a panel open — compass ${R(c && c.real)}, diagnostics ${R(d && d.real)} `
+         + `(${tight ? "a small phone: the rule binds" : "the rule does not apply here"}); the compass box ends on a whole line `
+         + `(cut at ${c && c.real ? c.real.lineCut : "?"}, cue ${c && c.real ? c.real.cue : "?"}, ${c && c.real ? c.real.room : "?"} of ${c && c.real ? c.real.need : "?"} px); `
+         + `the rule at every size with the (i) free to lift — compass ${R(c && c.lifted)}, diagnostics ${R(d && d.lifted)}; `
+         + `controls: the same, (i) unlifted — compass ${R(c && c.forced)}, diagnostics ${R(d && d.forced)}`
+         + (cover ? " (caught here)" : "") + `; a cap landing mid-line (the line ${c ? c.midAt : "?"} px down): with the fit cut at ${c && c.mid ? c.mid.lineCut : "?"}, `
+         + `cue ${c && c.mid ? c.mid.cue : "?"}; its control, the cap before the fit, cuts the line at ${c && c.midCtl ? c.midCtl.lineCut : "?"}`
+         + `; scrolled — real: ${E(c && c.real)}; mid-line cap: ${E(c && c.mid)}`
+         + `; the ride block taller with the box fitted: ${G(c && c.grow)}; control, the fit as a fixed px height: ${G(c && c.growCtl)}`);
+    }
+  }
   /* take 188 · step 13b · THE ROUTE CARDS ARE NEVER CUT MID-ROW (the
      integration shots: half an icon row under "climb … drop", under the
      pinned Ride it row). With the drawer opened the way a rider opens it
@@ -4786,7 +5472,7 @@ for (const dev of DEVICES) {
      And the drawer's action row: every label on ONE line (RETURN HOME
      wrapped at 360 wide), at the 48 px tap and the text floor, open and
      riding; its control: Return home squeezed to 70 px reads two lines. */
-  const rows = await page.evaluate(async () => {
+  ROWS_FN = async () => {
     try {
     const s = (ms) => new Promise((r) => setTimeout(r, ms));
     const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
@@ -4815,8 +5501,28 @@ for (const dev of DEVICES) {
       [...body.querySelectorAll("#grid .cell"), document.getElementById("coords")].forEach((k) => { if (!k) return;
         const r = k.getBoundingClientRect(); if (r.height <= 0 || getComputedStyle(k).display === "none") return;
         if (r.top < foot - 0.5 && r.bottom > foot + 0.5) cut.push(`${(k.textContent || k.id).trim().slice(0, 24)} ${Math.round(r.top)}-${Math.round(r.bottom)} (after the card)`); });
+      /* take 189 · A238 (the review of lane L-ride, round 1) · a fit that
+         cuts nothing can still be far shorter than the room allows: the
+         lane's first fix floored each line and the bike's box fell from 234
+         to 168 px, three rows lost, and every judge here passed it. The room
+         the fit had is the box plus what rcFit gave back (at rest the
+         drawer's --rc-trim, riding the pinned row's extra margin); from it,
+         every card's rows give the largest line that cuts none (a line on a
+         row's top or bottom, moved up past each row it would cut). `short`
+         is how far the fit falls under that line */
+      let best = null, short = null; const fitPx = parseFloat(R.style.maxHeight);
+      if (isFinite(fitPx)) {
+        const mI = row.style.marginTop; row.style.marginTop = ""; const rm0 = parseFloat(getComputedStyle(row).marginTop) || 0; row.style.marginTop = mI;
+        const give = sh.dataset.ride ? Math.max(0, (parseFloat(mI) || rm0) - rm0) : (parseFloat(body.style.getPropertyValue("--rc-trim")) || 0);
+        const ks = [...R.querySelectorAll(".rc > *")].map((k) => k.getBoundingClientRect()).filter((r) => r.height > 0);
+        let line = fitPx + give, moved = true, it = 0;
+        while (moved && it++ < 80) { moved = false;
+          for (const r of ks) { const kt = r.top - rr.top + R.scrollTop, kb = kt + r.height;
+            if (kt < line - 0.5 && kb > line + 0.5) { line = kt; moved = true; } } }
+        best = Math.round(line * 10) / 10; short = Math.round((line - fitPx) * 10) / 10;
+      }
       return { cut, whole, below, rowAt: [Math.round(rw.top), Math.round(rw.bottom)], bodyAt: [Math.round(br.top), Math.round(br.bottom)], bottom: Math.round(bottom), fit: R.style.maxHeight || "none", boxH: Math.round(rr.height),
-        natural: R.scrollHeight, bodyMax: getComputedStyle(body).maxHeight }; };
+        natural: R.scrollHeight, bodyMax: getComputedStyle(body).maxHeight, best, short }; };
     /* round 2, reported (not judged): the selected card's warnings against
        the pinned row's cue in the state judged here — the judge whose
        controls run in the warnings block below */
@@ -4889,7 +5595,7 @@ for (const dev of DEVICES) {
       out.restored = { cards: document.getElementById("routes") === R, flag: sh.dataset.ride || null, fit: R.style.maxHeight || "none" };
     }
     /* the action row: open (not riding), then riding with the drawer folded */
-    const acts = () => [...document.querySelectorAll("#actions .act")].map((a) => {
+    const acts = () => [...document.querySelectorAll("#actions .act")].filter((a) => a.id !== "btn-ride").map((a) => {
       const r = a.getBoundingClientRect(), rg = document.createRange(); rg.selectNodeContents(a);
       const lines = new Set([...rg.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size;
       return { id: a.id, lines, w: Math.round(r.width), h: Math.round(r.height), fs: parseFloat(getComputedStyle(a).fontSize),
@@ -4902,22 +5608,28 @@ for (const dev of DEVICES) {
     window.railSet(!/\bfolded\b/.test(railWas)); rail.className = railWas; await settle();
     return out;
     } catch (e) { return { error: String((e && e.stack) || e) }; }
-  });
+  };
+  const rows = await page.evaluate(ROWS_FN);
   if (rows.error) ok(false, `${dev.name}: the route-card rows read ran (${rows.error})`);
   else {
-    const rowsOk = (j) => !!j && j.cut.length === 0 && j.whole >= 4;
-    ok(rowsOk(rows.real) && !!rows.plant && !rowsOk(rows.plant),
+    /* take 189 · A238 (fix round 1) · …and the fit is no more than half a
+       row (9 px) under the largest line that cuts nothing */
+    const rowsOk = (j) => !!j && j.cut.length === 0 && j.whole >= 4 && (j.short === null || j.short <= 9);
+    ok(rowsOk(rows.real) && !!rows.plant && !rowsOk(rows.plant) && !rowsOk(Object.assign({}, rows.real, { short: 66 })),
        `${dev.name}: the route cards show whole rows — ${rows.real.whole} whole, ${rows.real.below} below to scroll to, cut `
        + `${rows.real.cut.join("; ") || "none"} (options box ${rows.real.fit} of ${rows.real.natural} px, drawer body ${rows.real.bodyMax}); `
        + `its control, half a row (${rows.plant ? rows.plant.half : "?"} px) past the fit, is flagged (cut ${rows.plant ? rows.plant.cut.join("; ") || "none" : "not run"}); `
-       + `take 187's unfitted box cut ${rows.noFit.cut.join("; ") || "nothing"}; pinned row at ${rows.real.rowAt}, drawer body ${rows.real.bodyAt}`);
+       + `take 187's unfitted box cut ${rows.noFit.cut.join("; ") || "nothing"}; pinned row at ${rows.real.rowAt}, drawer body ${rows.real.bodyAt}; `
+       + `the fit ${rows.real.short === null ? "not set" : rows.real.short + " px under the largest line that cuts nothing (" + rows.real.best + ")"}; `
+       + `a fit 66 px short is flagged`);
     /* take 188 · step 13b1 review · the same judge, RIDING */
     const rs = rows.rideStart || {};
     ok(!rows.rideErr && rs.flag === "1" && rs.sameCards && rowsOk(rows.ride) && !!rows.ridePlant && !rowsOk(rows.ridePlant)
        && !!rows.restored && rows.restored.cards && rows.restored.flag === null,
        `${dev.name}: RIDING (the Ride chip, GPS pending), the route cards opened in the drawer show whole rows — `
        + `${rows.ride ? rows.ride.whole : "?"} whole, ${rows.ride ? rows.ride.below : "?"} below, cut ${rows.ride ? rows.ride.cut.join("; ") || "none" : "not read"} `
-       + `(options box ${rows.ride ? rows.ride.fit : "?"}, drawer body ${rows.ride ? rows.ride.bodyMax : "?"}, pinned row margin ${rows.ride ? rows.ride.margin : "?"}); `
+       + `(options box ${rows.ride ? rows.ride.fit : "?"}, drawer body ${rows.ride ? rows.ride.bodyMax : "?"}, pinned row margin ${rows.ride ? rows.ride.margin : "?"}, `
+       + `${rows.ride && rows.ride.short !== null ? rows.ride.short + " px under the largest line that cuts nothing" : "no fit"}); `
        + `its control, half a row (${rows.ridePlant ? rows.ridePlant.half : "?"} px) past the fit, is flagged (cut ${rows.ridePlant ? rows.ridePlant.cut.join("; ") || "none" : "not run"}); `
        + `flag ${rs.flag}, same cards ${rs.sameCards}, Ride it hidden ${rs.rcRideHidden}; torn down: cards back ${rows.restored && rows.restored.cards}, flag ${rows.restored && rows.restored.flag}`
        + (rows.rideErr ? ` — ${rows.rideErr}` : ""));
@@ -4929,6 +5641,59 @@ for (const dev of DEVICES) {
     ok(actOk(rows.actsOpen) && actOk(rows.actsRide) && !actOk(rows.actsPlant),
        `${dev.name}: the drawer's actions each on one line at the tap and text floors — open: ${fmt(rows.actsOpen)}; `
        + `riding: ${fmt(rows.actsRide)}; control (Return home at 70 px) fails: ${fmt(rows.actsPlant.filter((a) => a.id === "btn-home"))}`);
+  }
+  /* take 189 · A233 · THE FOLDED DRAWER'S RIDE (the V4 mockup's Main
+     board: Return home primary, Ride secondary). At rest with the drawer
+     folded both are drawn on the drawer's one row, each one tap (48 px,
+     inside the screen, the element a tap at its centre lands on), Ride on
+     one line, unclipped and outlined (Return home stays the one accent).
+     With the drawer open, or a ride running, Ride is not drawn (the cards'
+     Ride it; the ride's Stop). Its control: Ride hidden by a planted rule
+     fails the same judge. The tap walker counts its one tap (flow F). */
+  const rb2 = await page.evaluate(async () => {
+    try {
+      const s = (ms) => new Promise((r) => setTimeout(r, ms));
+      const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+      const settle = async () => { for (let i = 0; i < 60; i++) { await frame();
+        if (!document.getAnimations().some((a) => a.playState === "running" && a.effect
+          && isFinite(a.effect.getComputedTiming().endTime))) return true; await s(30); } return false; };
+      const $ = (id) => document.getElementById(id), sh = $("shell"), rail = $("rail");
+      const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+      const vis = (e) => { if (!e || e.hidden) return null;
+        for (let a = e; a && a !== document.documentElement; a = a.parentElement) { const c = getComputedStyle(a);
+          if (c.display === "none" || c.visibility === "hidden" || +c.opacity === 0) return null; }
+        const r = e.getBoundingClientRect(); return r.width >= 1 && r.height >= 1 ? r : null; };
+      const tapOn = (e, min) => { const r = vis(e); if (!r || r.width < min || r.height < min) return false;
+        if (r.left < -1 || r.top < -1 || r.right > vw + 1 || r.bottom > vh + 1) return false;
+        const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!h && e.contains(h); };
+      const lines = (e) => { const rg = document.createRange(); rg.selectNodeContents(e);
+        return new Set([...rg.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size; };
+      const rideWas = sh.dataset.ride, railWas = rail.className;
+      const read = () => { const h = $("btn-home"), r = $("btn-ride"), hr = vis(h), rr = vis(r);
+        return { home: tapOn(h, 48), ride: tapOn(r, 48), lines: rr ? lines(r) : 0, clip: !!rr && r.scrollWidth > r.clientWidth + 1,
+          row: !!(hr && rr && Math.abs(hr.top - rr.top) < 1 && rr.left >= hr.right - 0.5),
+          inRail: !!(rr && rr.top >= rail.getBoundingClientRect().top - 0.5),
+          bg: getComputedStyle(r).backgroundColor, homeBg: getComputedStyle(h).backgroundColor,
+          at: rr ? [Math.round(rr.left), Math.round(rr.top), Math.round(rr.width), Math.round(rr.height)] : null }; };
+      delete sh.dataset.ride; window.railSet(false); await settle();
+      const rest = read();
+      sh.dataset.ride = "1"; await settle(); const riding = !!vis($("btn-ride")); delete sh.dataset.ride;
+      window.railSet(true); await settle(); const open = !!vis($("btn-ride")); window.railSet(false); await settle();
+      const st = document.createElement("style"); st.textContent = "#btn-ride{display:none!important}"; document.head.appendChild(st);
+      await settle(); const plant = read(); st.remove(); await settle();
+      if (rideWas === undefined) delete sh.dataset.ride; else sh.dataset.ride = rideWas;
+      window.railSet(!/\bfolded\b/.test(railWas)); rail.className = railWas; await settle();
+      return { rest, riding, open, plant };
+    } catch (e) { return { error: String((e && e.stack) || e) }; }
+  });
+  {
+    const restOk = (r) => !!r && r.home && r.ride && r.lines === 1 && !r.clip && r.row && r.inRail && r.bg !== r.homeBg;
+    const R0 = rb2.rest || {};
+    ok(!rb2.error && restOk(rb2.rest) && rb2.riding === false && rb2.open === false && !restOk(rb2.plant),
+       `${dev.name}: A233 · the folded drawer at rest holds Return home and Ride on one row, each one tap (${R0.home}/${R0.ride}), `
+       + `Ride on ${R0.lines} line at ${R0.at}, clipped ${R0.clip}, outlined (${R0.bg}; Return home ${R0.homeBg}); `
+       + `not drawn riding (${rb2.riding}) or with the drawer open (${rb2.open}); its control, Ride hidden, fails`
+       + (rb2.error ? ` — ${rb2.error}` : ""));
   }
   /* take 188 · step 13b1 review · A ROUTE CARD'S WARNINGS ARE IN VIEW. The
      cards end on a whole row and scroll for the rest, so a warning below the
@@ -4952,9 +5717,9 @@ for (const dev of DEVICES) {
     const DEST = { lng: -84.10724, lat: 44.55265 };      /* the Route layers drill's destination */
     const reroute = async () => { const R0 = document.getElementById("routes");
       m.fire("contextmenu", { lngLat: DEST });
-      for (let i = 0; i < 25 && !document.getElementById("pc-route"); i++) await s(200);
+      for (let i = 0; i < 100 && !document.getElementById("pc-route"); i++) await s(50);   /* take 189 · A227: 5 s in 50 ms steps */
       const b = document.getElementById("pc-route"); if (!b) return false; b.click();
-      for (let i = 0; i < 120; i++) { const R = document.getElementById("routes"); if (R && R !== R0) break; await s(250); }
+      for (let i = 0; i < 600; i++) { const R = document.getElementById("routes"); if (R && R !== R0) break; await s(50); }
       const R = document.getElementById("routes"); if (!R || R === R0) return false;
       window.railSet(false); await settle(); window.railSet(true); await s(50); await settle(); await s(50);
       body.scrollTop = 0; R.scrollTop = 0; await settle(); return true; };
@@ -5229,8 +5994,16 @@ for (const dev of DEVICES) {
       const s = (ms) => new Promise((r) => setTimeout(r, ms));
       const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
       const vw = document.documentElement.clientWidth;
-      const read = async (t) => {
+      const read = async (t, open) => {
         document.querySelector(`#tabs .tab[data-go="${t}"]`).click(); await frame(); await frame(); await s(80);
+        /* take 189 · cold audit · with the drawer OPEN to its cap (a tall
+           card; the slide ends and the cap is re-measured before the read,
+           landmine 224): at 360 x 800 Tools' four rows rose under the left
+           column and "Take the tour" was not to be seen */
+        if (open) { window.showQuiet('<div id="v4plant-tallcard3" style="height:2000px">A tall card (render)</div>', ""); window.railSet(true);
+          for (let i = 0; i < 60; i++) { await frame(); if (!document.getAnimations().some((a) => a.playState === "running"
+            && a.effect && isFinite(a.effect.getComputedTiming().endTime))) break; await s(30); }
+          await s(120); await frame(); await frame(); }
         const railTop = document.getElementById("rail").getBoundingClientRect().top, tools = document.getElementById("tools");
         const chips = [...document.querySelectorAll(".chip[data-tab]")]
           .filter((c) => !c.hidden && getComputedStyle(c).display !== "none");
@@ -5238,12 +6011,25 @@ for (const dev of DEVICES) {
         for (const c of chips) { const r = c.getBoundingClientRect();
           if (r.left < -0.5 || r.right > vw + 0.5 || r.top < 0 || r.bottom > railTop + 0.5) { bad.push(c.id + " off screen"); continue; }
           const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-          if (!h || !(h === c || c.contains(h))) bad.push(c.id + " under " + (h ? (h.id || String(h.className).split(" ")[0] || h.tagName) : "nothing")); }
+          if (!h || !(h === c || c.contains(h))) bad.push(c.id + " under " + (h ? (h.id || String(h.className).split(" ")[0] || h.tagName) : "nothing"));
+          /* take 189 · cold audit · and no part of it under the attribution's (i) */
+          const ai = document.querySelector(".maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib"), q = ai && ai.getBoundingClientRect();
+          if (q && q.width > 0 && q.height > 0 && r.left < q.right && r.right > q.left && r.top < q.bottom && r.bottom > q.top) bad.push(c.id + " under the attribution"); }
         return { n: chips.length, bad, stripH: Math.round(tools.getBoundingClientRect().height),
                  rows: new Set(chips.map((c) => Math.round(c.getBoundingClientRect().top))).size,
                  overflow: tools.scrollWidth > tools.clientWidth + 1 };
       };
       for (const t of ["map", "plan", "ride", "tools"]) out.tabs[t] = await read(t);
+      out.open = {};
+      /* the panel's own nodes (the route cards the matrix reads next, with
+         their listeners) are kept and put back after the tall card */
+      const pnl = document.getElementById("panel"), keepN = [...pnl.childNodes], keepC = pnl.className;
+      for (const t of ["map", "plan", "ride", "tools"]) out.open[t] = await read(t, true);
+      if (narrow) { const st = document.createElement("style"); st.id = "v4plant-restcap";
+        st.textContent = "#railbody{max-height:calc(38vh - var(--rc-trim,0px))!important}"; document.head.appendChild(st);
+        out.plants.restcap = await read("tools", true); st.remove(); }
+      window.railSet(false); await frame(); await s(300);
+      pnl.replaceChildren(...keepN); pnl.className = keepC;
       const tl = document.getElementById("tools");
       const p8 = document.createElement("button"); p8.className = "chip"; p8.dataset.tab = "tools";
       p8.id = "v4plant-chip8"; p8.innerHTML = "<span>Plant</span>"; tl.appendChild(p8);
@@ -5269,9 +6055,76 @@ for (const dev of DEVICES) {
   for (const [t, x] of Object.entries(dc.tabs))
     ok(destOk(x), `${dev.name}: ${t} holds ${x.n} (at most 7), all on screen in ${x.rows} row(s), strip ${x.stripH} px`
        + (x.bad.length ? " — " + x.bad.join(", ") : "") + (x.overflow ? " — the strip scrolls sideways" : ""));
+  { const op = dc.open || {}, rc = dc.plants.restcap;
+    ok(!dc.error && ["map", "plan", "ride", "tools"].every((t) => destOk(op[t])) && (dev.width > 360 || (!!rc && !destOk(rc))),
+       `${dev.name}: with the drawer open to its cap every tab's chips are on screen, one tap, clear of the left column and the (i) — `
+       + ["map", "plan", "ride", "tools"].map((t) => `${t} ${op[t] ? op[t].n + (op[t].bad.length ? " (" + op[t].bad.join(", ") + ")" : "") : "?"}`).join(", ")
+       + (dev.width <= 360 ? `; its control, take 188's 38vh cap at rest on Tools: ${rc ? rc.bad.join(", ") || "NOT CAUGHT" : "?"}` : "")); }
+}
+/* take 189 · A238 · THE DIRT BIKE'S ROUTE CARDS. The matrix reads the
+   side-by-side's cards (the machine the full run plans for here). Planned
+   for the dirt bike the same route's cards put neighbouring cards' rows a
+   row apart, and rcFit's fit cut one by a fraction of a pixel at 4 of 5
+   sizes (render-t189-L-render-prof-5.log; PROVEN in probe at 412 x 915).
+   The same rows read, at every size, on the bike's cards — at rest and
+   riding, each with its half-row control — then the side-by-side's cards
+   are planned again for what follows. */
+{
+  /* the start pin is put where the Route layers drill put it (the forced
+     rides above moved the rider along the route), and afterwards back where
+     it was, so what follows is planned from the same place as before */
+  const ME0 = await page.evaluate(() => window.__route.ME.slice());
+  const replan = (mach, start) => page.evaluate(async (mach, start) => {
+    const s = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      window.__route.setMachine(mach);
+      const m = window.map, R0 = document.getElementById("routes");
+      m.fire("contextmenu", { lngLat: { lng: start[0], lat: start[1] } });
+      for (let i = 0; i < 100 && !document.getElementById("pc-start"); i++) await s(50);
+      const st = document.getElementById("pc-start"); if (!st) return { ok: false, why: "no pc-start" };
+      st.click(); await s(200);
+      const me = window.__route.ME;
+      if (Math.abs(me[0] - start[0]) > 1e-6 || Math.abs(me[1] - start[1]) > 1e-6) return { ok: false, why: "the start pin did not move: " + me };
+      m.fire("contextmenu", { lngLat: { lng: -84.10724, lat: 44.55265 } });   /* the Route layers drill's destination */
+      for (let i = 0; i < 100 && !document.getElementById("pc-route"); i++) await s(50);
+      const b = document.getElementById("pc-route"); if (!b) return { ok: false, why: "no pc-route" };
+      b.click();
+      for (let i = 0; i < 600; i++) { const R = document.getElementById("routes"); if (R && R !== R0) break; await s(50); }
+      const R = document.getElementById("routes");
+      const hard = R ? [...R.querySelectorAll(".rc .sub")].map((x) => x.textContent.trim()).find((t) => /^hardest/.test(t)) : null;
+      return { ok: !!R && R !== R0, machine: window.__route.machine, cards: R ? R.querySelectorAll(".rc").length : 0, hard: hard || "" };
+    } catch (e) { return { ok: false, why: String(e) }; } }, mach, start);
+  const bk = await replan("bike", [-84.12855, 44.53949]);   /* the Route layers drill's start */
+  ok(bk.ok && bk.machine === "bike" && bk.cards >= 2,
+     `A238 · the route planned again for the dirt bike: ${bk.cards} cards, "${bk.hard}"` + (bk.why ? ` — ${bk.why}` : ""));
+  /* fix round 1 · whole rows, AND no more than half a row (9 px) under the
+     largest line that cuts nothing (the lane's first fix kept the rows
+     whole by giving up three of them: 168 px of 234). Its control: the
+     reading with the fit 66 px short, as that build left it */
+  const rowsOk = (j) => !!j && j.cut.length === 0 && j.whole >= 4 && (j.short === null || j.short <= 9);
+  for (const dev of DEVICES) {
+    await page.setViewport({ width: dev.width, height: dev.height, deviceScaleFactor: dev.dpr });
+    await vpSettle(800);
+    const rows = bk.ok ? await page.evaluate(ROWS_FN) : { error: "the bike's route was not planned" };
+    const J = (j) => j ? `${j.whole} whole, cut ${j.cut.join("; ") || "none"} (box ${j.fit}, ${j.short === null ? "no fit" : j.short + " px under " + j.best})` : "not read";
+    ok(!rows.error && !rows.rideErr && rowsOk(rows.real) && !!rows.plant && !rowsOk(rows.plant)
+       && !!rows.real && !rowsOk(Object.assign({}, rows.real, { short: 66 }))
+       && rowsOk(rows.ride) && !!rows.ridePlant && !rowsOk(rows.ridePlant) && !!rows.restored && rows.restored.cards,
+       `${dev.name}: A238 · the dirt bike's route cards show whole rows — at rest ${J(rows.real)}; riding ${J(rows.ride)}; `
+       + `each half-row control flagged (${rows.plant ? rows.plant.cut.length : "?"}, ${rows.ridePlant ? rows.ridePlant.cut.length : "?"} cut), and a fit 66 px short`
+       + (rows.error || rows.rideErr ? ` — ${rows.error || rows.rideErr}` : ""));
+  }
+  const sx = await replan("sxs", ME0);
+  ok(sx.ok && sx.machine === "sxs" && sx.cards >= 2, `A238 · the side-by-side's route planned again for what follows, `
+     + `from where the start pin was (${ME0.map((v) => v.toFixed(5)).join(", ")}): ${sx.cards} cards` + (sx.why ? ` — ${sx.why}` : ""));
+  const lastDev = DEVICES[DEVICES.length - 1];
+  await page.setViewport({ width: lastDev.width, height: lastDev.height, deviceScaleFactor: lastDev.dpr });
+  await vpSettle(800);
 }
 await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } catch (e) {} });
+}
 
+if (RUN("faults")) {
 /* Field faults from Jacob's take-82 ride, asserted where `hidden` is REAL.
    The smoke stub does not model the initial hidden attribute, so the same
    checks there passed vacuously — false before, false after (landmine 85). */
@@ -5325,6 +6178,9 @@ await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } cat
   ok(r.hintHiddenWithHeading, "with a heading the hint gets out of the way");
 }
 
+}
+
+if (RUN("realdom")) {
 /* take 188 · step 13b1 review · TWO REAL-DOM READS.
    (1) --rc-trim goes with the route cards. Clear route is an ack(): the
    drawer folds, and a trim left on made the next card's drawer open short
@@ -5391,12 +6247,12 @@ await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } cat
      card order trimmed 0 px at 360 x 800) */
   let tr = null, trAt = "";
   for (const [w, h, d] of [[412, 915, 2.625], [360, 800, 3], [749, 832, 2]]) {
-    await page.setViewport({ width: w, height: h, deviceScaleFactor: d }); await new Promise((r) => setTimeout(r, 800));
+    await page.setViewport({ width: w, height: h, deviceScaleFactor: d }); await vpSettle(800);
     tr = await page.evaluate(trRead); trAt = `${w}x${h}`;
     if (tr.error || parseFloat(tr.before) > 0) break;
   }
   await page.setViewport({ width: 360, height: 800, deviceScaleFactor: 3 });
-  await new Promise((r) => setTimeout(r, 800));
+  await vpSettle(800);
   const trimOk = (r) => !!r && r.runs === 1 && Math.abs(r.max - tr.vh38) <= 1;
   ok(!tr.error && parseFloat(tr.before) > 0 && tr.afterClear === "" && trimOk(tr.real) && !trimOk(tr.plant),
      `${trAt}: Clear route takes the route cards' trim with it — trim ${tr.before || "none"} with the cards up, `
@@ -5442,6 +6298,38 @@ await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } cat
       mode = "pending";
       document.getElementById("c-ride").click(); await s(300); await settle();
       out.pending = read();
+      /* take 189 · A230 · this same press, GPS still pending: the strip and
+         the folded drawer's peek line say it is waiting; the peek line is
+         whole (not cut by its ellipsis) above the action row. Its control:
+         take 188's lone "—" over an empty band, set by hand, fails */
+      /* take 189 · cold audit · "whole" read the span against ITSELF: #peek is a
+         column flexbox centring its items, so the span is as wide as its text
+         and scrollWidth never passed clientWidth (the take's own control read
+         "287 of 287 px" for a line it called cut). Whole now means inside the
+         peek row (#peek's padding box) and not ellipsed */
+      const wr = () => { const sp = document.getElementById("nav-sp"), pk = document.getElementById("peek-txt"),
+          ar = document.getElementById("actions").getBoundingClientRect(), pr = pk.getBoundingClientRect();
+        const pe = document.getElementById("peek").getBoundingClientRect(), pcs = getComputedStyle(document.getElementById("peek"));
+        const inL = pe.left + (parseFloat(pcs.paddingLeft) || 0), inR = pe.right - (parseFloat(pcs.paddingRight) || 0);
+        return { strip: sp.textContent, stripDrawn: vis(sp), peek: pk.textContent, peekDrawn: vis(pk),
+          whole: pk.scrollWidth <= pk.clientWidth + 1 && pr.left >= inL - 0.5 && pr.right <= inR + 0.5 && pr.right <= document.documentElement.clientWidth + 0.5,
+          room: Math.round(inR - inL), w: Math.round(pr.width), folded: /\bfolded\b/.test(document.getElementById("rail").className),
+          aboveRow: pr.bottom <= ar.top + 0.5 }; };
+      out.wait = wr();
+      const spE = document.getElementById("nav-sp"), pkE = document.getElementById("peek-txt"), sp0 = spE.textContent, pk0 = pkE.textContent;
+      spE.textContent = "\u2014"; pkE.textContent = "";
+      out.waitPlant = wr();
+      /* fix round 1 · a resumed trip's form of the line, at its longest,
+         its width at 360 (smoke 11b reads what the app writes; this string
+         is the app's shape, set by hand). take 189 · cold audit · JUDGED
+         now, at the widest three-digit figure (4 is Barlow's widest digit:
+         "444.4"; the reported "99.9" was not the longest), against the peek
+         row (see wr). Its control: a line longer than the row */
+      pkE.textContent = pk0.replace(/nothing recorded yet$/, "444.4 mi recorded, kept");
+      out.waitLong = Object.assign(wr(), { sw: pkE.scrollWidth, cw: pkE.clientWidth });
+      pkE.textContent = pk0.replace(/nothing recorded yet$/, "444.4 mi recorded, kept, a line planted longer than the drawer is wide");
+      out.waitLongPlant = Object.assign(wr(), { sw: pkE.scrollWidth, cw: pkE.clientWidth });
+      spE.textContent = sp0; pkE.textContent = pk0;
     } catch (e) { out.error = String((e && e.stack) || e); }
     try { if (document.getElementById("shell").dataset.ride) N.stopReal(); } catch (e) {}
     geo.watchPosition = gw; geo.clearWatch = gc;
@@ -5459,10 +6347,109 @@ await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } cat
      + `pressed again (the Ride tab's chip): ${rf.w2}/${rf.c2}, ${refOk(rf.second) ? "refuses again" : "DOES NOT refuse again: " + fr(rf.second)}; `
      + `its control, GPS held pending, fails the judge (${rf.pending ? `copy ${rf.pending.copy}, flag ${rf.pending.flag}` : "not run"})`
      + (rf.error ? ` — ${rf.error}` : ""));
+  const waitOk = (w) => !!w && w.stripDrawn && /^Waiting for a GPS fix$/.test(w.strip) && w.peekDrawn
+    && /^Waiting for a GPS fix\b/.test(w.peek) && w.whole && w.folded && w.aboveRow;
+  const W = rf.wait || {};
+  ok(!rf.error && waitOk(rf.wait) && !waitOk(rf.waitPlant),
+     `360x800 (real DOM): A230 · Ride pressed with GPS pending — the strip reads "${W.strip}", the folded drawer's peek line `
+     + `"${W.peek}" (drawn ${W.peekDrawn}, whole ${W.whole}, above the action row ${W.aboveRow}); its control, take 188's `
+     + `"\u2014" over an empty band, fails`);
+  { const L = rf.waitLong || {}, LP = rf.waitLongPlant || {};
+    const longOk = (w) => !!w && w.whole && w.aboveRow && w.peekDrawn;
+    /* and a line longer than the row ends in its ellipsis INSIDE the row
+       (the span's max-width: it ran past the drawer's edges) */
+    ok(!rf.error && longOk(rf.waitLong) && !longOk(rf.waitLongPlant) && LP.w <= LP.room + 0.5,
+       `360x800 (real DOM): A230 · a resumed trip's longest peek line "${L.peek}" is whole (${L.w} px in a ${L.room} px row); `
+       + `its control, a line longer than the row (${LP.sw} px of text), is not (${LP.w} px drawn, whole ${LP.whole})`); }
+
+  /* take 189 · A240 · a tapped place card at 360x800 stays open. The pin is
+     put 24 px under the map's top (70 px rode up only to -21: the stage
+     lost 182 px) and tapped (a real click on the canvas);
+     the drawer opens, the stage shrinks under it (#shell is a grid: the
+     drawer is a row), and MapLibre's resize() keeps the centre, so the pin
+     rides up past the old rule's -40 px edge. The judge: after the slide
+     and every resize (a frame drawn before the read, landmine 224) the
+     card is open, its pin sits where the old rule folded it (y < -40),
+     and the map did resize. Its planted control: the OLD rule (every
+     moveend treated as the rider's) registered beside the app's, the same
+     tap from the same camera — the card folds, and the judge fails it. */
+  const rf2 = await page.evaluate(async () => {
+    const s = (ms) => new Promise((r) => setTimeout(r, ms));
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    const settle = async () => { for (let i = 0; i < 60; i++) { await frame();
+      if (!document.getAnimations().some((a) => a.playState === "running" && a.effect
+        && isFinite(a.effect.getComputedTiming().endTime))) return true; await s(30); } return false; };
+    const m = window.map, rail = document.getElementById("rail"), out = {};
+    const still = async () => { for (let i = 0; i < 80 && m.isMoving(); i++) await s(50);
+      await Promise.race([new Promise((r) => m.once("idle", r)), s(4000)]); await frame(); await frame(); };
+    const LAY = ["poi-dot", "poi-dot-major"];
+    try {
+      const tb = document.querySelector('#tabs .tab[data-go="map"]'); if (tb) tb.click();
+      window.railSet(false); await settle(); await still();
+      /* a trailhead (every mode draws one), the camera on it, polled until
+         its pin draws (the take-109 drill's way) */
+      const src = m.getStyle().sources.poi.data.features;
+      const pk = src.find((f) => f.properties.k === "trailhead") || src[0];
+      const cam0 = { c: m.getCenter(), z: m.getZoom() };
+      m.jumpTo({ center: pk.geometry.coordinates, zoom: 14 }); await still();
+      let hits = [];
+      for (let i = 0; i < 30 && !hits.length; i++) { hits = m.queryRenderedFeatures({ layers: LAY }); if (!hits.length) await s(300); }
+      if (!hits.length) return { error: "no pin drawn to tap" };
+      hits.sort((x, y) => (y.properties.k === "trailhead") - (x.properties.k === "trailhead"));
+      const at = hits[0].geometry.coordinates.slice();
+      out.cam0 = cam0;
+      const cv = m.getCanvas(), rc = cv.getBoundingClientRect();
+      const p0 = m.project(at); m.panBy([p0.x - rc.width / 2, p0.y - 24], { duration: 0 }); await still();
+      const cam = { c: m.getCenter(), z: m.getZoom() };
+      let resizes = 0; const onRz = () => { resizes++; }; m.on("resize", onRz);
+      const tap = async () => { const p = m.project(at), r = cv.getBoundingClientRect();
+        const y0 = Math.round(p.y);
+        /* a phone's tap starts with a touch: the app's long-press watch
+           (touchstart) clears its "the long press already acted" flag,
+           which an earlier drill's touch long press left set — a bare
+           mouse click then went to that flag (seen: the first run of this
+           drill, drawer never opened) */
+        try { const tc = new Touch({ identifier: 7, target: cv, clientX: r.left + p.x, clientY: r.top + p.y });
+          m.getCanvasContainer().dispatchEvent(new TouchEvent("touchstart", { bubbles: true, cancelable: true, touches: [tc], targetTouches: [tc], changedTouches: [tc] }));
+          m.getCanvasContainer().dispatchEvent(new TouchEvent("touchend", { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [tc] }));
+        } catch (e) { }
+        for (const t of ["mousedown", "mouseup", "click"])
+          cv.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, clientX: r.left + p.x, clientY: r.top + p.y }));
+        await s(30); const openedAt = !/\bfolded\b/.test(rail.className);
+        await s(70); await settle(); await still(); await s(600); await settle(); await still();
+        const q = m.project(at);
+        return { y0, openedAt, y: Math.round(q.y), folded: /\bfolded\b/.test(rail.className),
+          card: (document.getElementById("panel").innerText || "").replace(/\s+/g, " ").trim().slice(0, 60),
+          mapH: Math.round(m.getContainer().getBoundingClientRect().height), resizes };
+      };
+      out.real = await tap();
+      window.railSet(false); await settle(); await still();
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z }); await still();
+      resizes = 0;
+      const plant = (e) => window.railFoldIfAway({ originalEvent: (e && e.originalEvent) || { type: "planted" } });
+      m.on("moveend", plant);
+      out.plant = await tap();
+      m.off("moveend", plant); m.off("resize", onRz);
+      window.railSet(false); await settle();
+      m.jumpTo({ center: [cam0.c.lng, cam0.c.lat], zoom: cam0.z });
+    } catch (e) { out.error = String((e && e.stack) || e); }
+    return out;
+  });
+  const keepOk = (r) => !!r && r.openedAt && !r.folded && r.y < -40 && r.resizes > 0 && r.card.length > 0;
+  { const R = rf2.real || {}, P = rf2.plant || {};
+    ok(!rf2.error && keepOk(rf2.real) && !keepOk(rf2.plant) && P.folded,
+       `360x800 (real DOM): A240 · a tapped pin card stays open while the drawer's slide resizes the map — `
+       + `pin tapped at y ${R.y0} (drawer opened ${R.openedAt}), after ${R.resizes} resize(s) it sits at y ${R.y} (the old rule folded below -40), `
+       + `map ${R.mapH} px tall, drawer ${R.folded ? "FOLDED" : "open"} ("${R.card}"); its control, the old rule `
+       + `(every moveend the rider's), folds the same tap (opened ${P.openedAt}, folded ${P.folded}, y ${P.y}, ${P.resizes} resize(s))`
+       + (rf2.error ? ` — ${rf2.error}` : "")); }
   await page.setViewport(vp0);
-  await new Promise((r) => setTimeout(r, 600));
+  await vpSettle(600);
 }
 
+}
+
+if (RUN("clear")) {
 /* Clearing a route must clear every line the rider can see. */
 {
   const r = await page.evaluate(async () => {
@@ -5500,6 +6487,9 @@ await page.evaluate(() => { try { window.hudShow && window.hudShow(false); } cat
   ok(r.after === 0, `Clear route removes the line (${r.before} -> ${r.after})`);
 }
 
+}
+
+if (RUN("tail")) {
 /* Machine legality on the map (take 80, A86). Assert the PAINT the browser
    actually resolved, per machine, not that a function ran. */
 await respawn();
@@ -5609,7 +6599,7 @@ const mach = await page.evaluate(async () => {
       const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       const lbl = () => ((document.querySelector("#c-base span") || {}).textContent || "").trim();
       const to = async (want) => { for (let i = 0; i < 4 && lbl() !== want; i++) {
-        document.getElementById("c-base").click(); await sleep(900); } return lbl() === want; };
+        document.getElementById("c-base").click(); await window.__rh.settle(900); } return lbl() === want; };
       const f = m.getStyle().sources.net.data.features
         .find((x) => x.properties && x.properties.c === "trail50" && x.properties.i !== undefined);
       const pick = f && f.geometry && f.geometry.coordinates[0];
@@ -5709,13 +6699,18 @@ const mach = await page.evaluate(async () => {
     ? Object.keys(x).sort().reduce((o, k) => { o[k] = canon(x[k]); return o; }, {}) : x;
   const J = (x) => JSON.stringify(canon(x));
 
+  /* take 189 · A227 · the readings here are style properties, which the app
+     sets synchronously (setBasemap, applyMachine, applyAct): the fixed sleeps
+     between them are a frame now, bounded by the old sleep. A mode apply
+     restacks on a 60 ms timer (repin), so it keeps an 80 ms sleep: timers
+     fire in deadline order, so the restack has run when it returns. */
   const hyb = await page.evaluate(async (MACH) => {
     const out = { err: null };
     try {
       const m = window.map, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       const lbl = () => ((document.querySelector("#c-base span") || {}).textContent || "").trim();
       const to = async (want) => { for (let i = 0; i < 4 && lbl() !== want; i++) {
-        document.getElementById("c-base").click(); await sleep(900); } return lbl() === want; };
+        document.getElementById("c-base").click(); await window.__rh.settle(900); } return lbl() === want; };
       const snap = () => { const o = {}; for (const L of m.getStyle().layers) o[L.id] = { type: L.type,
         paint: L.paint || {}, layout: L.layout || {}, filter: L.filter === undefined ? null : L.filter,
         minzoom: L.minzoom === undefined ? 0 : L.minzoom, maxzoom: L.maxzoom === undefined ? 24 : L.maxzoom };
@@ -5726,37 +6721,37 @@ const mach = await page.evaluate(async () => {
       out.satOk = !!(window.__sat && window.__sat.ok);
       out.minZ = m.getMinZoom();
       await to("Map");
-      window.__mode.apply("ride", { silent: true }); await sleep(500);
-      window.__mach.set("bike"); await sleep(400);
+      window.__mode.apply("ride", { silent: true }); await sleep(80); await window.__rh.settle(420);
+      window.__mach.set("bike"); await window.__rh.settle(400);
       out.map0 = snap();
-      out.toHyb = await to("Hybrid"); await sleep(600);
+      out.toHyb = await to("Hybrid"); await window.__rh.settle(600);
       out.hyb = snap();
-      window.__mach.set("sxs"); await sleep(400); out.a = reading();          // (a) Hybrid, then sxs
-      window.__mach.set("bike"); await sleep(400); out.hybBike = reading();
-      await to("Map"); await sleep(600);
+      window.__mach.set("sxs"); await window.__rh.settle(400); out.a = reading();          // (a) Hybrid, then sxs
+      window.__mach.set("bike"); await window.__rh.settle(400); out.hybBike = reading();
+      await to("Map"); await window.__rh.settle(600);
       out.map1 = snap();                                                        // G3: after the round trip
-      window.__mach.set("sxs"); await sleep(400);
-      await to("Hybrid"); await sleep(600); out.c = reading();                  // (c) Map → Hybrid with sxs
-      window.__mach.set("bike"); await sleep(400);
-      window.__mode.apply("water", { silent: true }); await sleep(800); out.bWater = reading();   // (b)
-      window.__mode.apply("ride", { silent: true }); await sleep(800); out.bRide = reading();
-      await to("Map"); window.__mach.set("bike"); await sleep(400);
+      window.__mach.set("sxs"); await window.__rh.settle(400);
+      await to("Hybrid"); await window.__rh.settle(600); out.c = reading();                  // (c) Map → Hybrid with sxs
+      window.__mach.set("bike"); await window.__rh.settle(400);
+      window.__mode.apply("water", { silent: true }); await sleep(80); await window.__rh.settle(720); out.bWater = reading();   // (b)
+      window.__mode.apply("ride", { silent: true }); await sleep(80); await window.__rh.settle(720); out.bRide = reading();
+      await to("Map"); window.__mach.set("bike"); await window.__rh.settle(400);
       /* G7 · every activity row, clicked as a rider would, on Map */
       const vis = (id) => { try { return m.getLayoutProperty(id, "visibility") === "none" ? "none" : "visible"; } catch (e) { return "err"; } };
       const panel = document.getElementById("actpanel");
-      document.getElementById("c-act").click(); await sleep(300);
+      document.getElementById("c-act").click(); await window.__rh.settle(300);
       const keys = [...panel.querySelectorAll("[data-k]")].map((b) => b.dataset.k);
       out.acts = [];
       for (const k of keys) {
-        if (panel.hidden) { document.getElementById("c-act").click(); await sleep(300); }
+        if (panel.hidden) { document.getElementById("c-act").click(); await window.__rh.settle(300); }
         const b = panel.querySelector('[data-k="' + k + '"]'); if (!b) { out.acts.push({ k, missing: true }); continue; }
-        b.click(); await sleep(300);
+        b.click(); await window.__rh.settle(300);
         const v = {};
         for (const id of ["casing", "casing-track", "track", "route72", "trail50", "moto24", "mccct", "fstrail"]) v[id] = vis(id);
         out.acts.push({ k, v });
       }
-      if (panel.hidden) { document.getElementById("c-act").click(); await sleep(300); }
-      const all = panel.querySelector('[data-k="all"]'); if (all) all.click(); await sleep(300);
+      if (panel.hidden) { document.getElementById("c-act").click(); await window.__rh.settle(300); }
+      const all = panel.querySelector('[data-k="all"]'); if (all) all.click(); await window.__rh.settle(300);
       if (!panel.hidden) { document.getElementById("c-act").click(); }
     } catch (e) { out.err = String(e && e.message || e); }
     return out;
@@ -5977,7 +6972,7 @@ const mach = await page.evaluate(async () => {
      `G7 · casings follow their lines on Map for ${(hyb.acts || []).length} activity rows${b7.length ? " — " + b7.join("; ") : ""}`);
 }
 await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2.6 });
-await new Promise((r) => setTimeout(r, 800));
+await vpSettle(800);
 
 /* Pixel evidence. Feed the screenshot BACK into the page as an <img>, draw it to
    a 2D canvas and read it there: reading the WebGL canvas directly always
@@ -6018,6 +7013,9 @@ ok(px.dominant < 0.90,
    `busiest colour covers ${(100 * px.dominant).toFixed(1)}% — under 90% means terrain and trails drew`);
 console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).toFixed(0)} KB)`);
 
+}
+
+if (RUN("g6")) {
 /* take 188 · A213 (G6) · a restored Water opens as Water. Take 187's load
    handler forced Map after the mode restore, so a rider who left the app in
    Water came back to Water's pins on the Map basemap with the kayak's dimming
@@ -6034,6 +7032,7 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
     localStorage.setItem("apex.mode", "water"); } catch (e) {} }, TOURKEY, GUIDEKEY);
   // an explicit limit: Chrome's 30 s default left about 1.3-1.9x over run 90's load (INFERRED; landmine 235)
   await page.reload({ waitUntil: "networkidle0", timeout: 120000 });
+  await fastAnim(page);
   const g6ready = await page.waitForFunction(() => window.map && window.map.loaded && window.map.loaded()
     && !document.getElementById("splash")
     && /\bready\b/.test((document.getElementById("shell") || {}).className || ""), { timeout: 120000 })
@@ -6064,6 +7063,8 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
      + (g6ready ? "" : " — the page never got ready") + (r6 && r6.err ? " — " + r6.err : ""));
 }
 
+}
+
 /* take 187 · A208 · the V4 guards (docs/DESIGN-v4.md §11): tap targets on every
    interactive element, a text-size floor and contrast against what is really
    behind the text — measured in the states a rider reaches (landmine 111),
@@ -6073,7 +7074,7 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
    for marks that carry meaning (icons, selected states, the grabber, the
    needle). The offender lists are exact: a fixed offender leaves its list in
    the same change, and one the audit cannot see is a coverage loss. */
-{
+if (RUN("v4-setup")) {
   const V4_TAP = [];
   const V4_TEXT = [];
   /* take 188 · A216 · emoji or text glyphs on screen, per state: none */
@@ -6094,6 +7095,7 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
     localStorage.setItem(g, "1"); } catch (e) {} }, TOURKEY, GUIDEKEY);
   await page.setViewport({ width: 411, height: 960, deviceScaleFactor: 2.625 });
   await page.reload({ waitUntil: "networkidle0", timeout: 120000 }); // landmine 235
+  await fastAnim(page);
   /* landmine 222 — and a page that never gets ready must FAIL here, not have
      its splash screen audited as a clean app */
   const v4ready = await page.waitForFunction(() => window.map && window.map.loaded && window.map.loaded()
@@ -6150,10 +7152,11 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
       if (!(await settleDrawer())) continue;
       last = await bandRead(open); if (last.folded === !open && last.agrees) return last; }
     return Object.assign(last || {}, { unsettled: true }); };
+  if (RUN("v4-band")) {
   /* its planted controls, at 360x800: (a) the mode chip made 248 px tall must
      put the folded band under its floor; (b) a drawer whose class says folded
      while its body is held open must fail the agreement check */
-  await page.setViewport({ width: 360, height: 800, deviceScaleFactor: 3 }); await new Promise((x) => setTimeout(x, 1200));
+  await page.setViewport({ width: 360, height: 800, deviceScaleFactor: 3 }); await vpSettle(1200);
   await page.evaluate(() => { const c = document.getElementById("c-mode"); if (c) c.style.minHeight = "248px"; });
   const plantA = await bandAt(false);
   await page.evaluate(() => { const c = document.getElementById("c-mode"); if (c) c.style.minHeight = ""; });
@@ -6170,7 +7173,7 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
      + `reads class≠geometry (body ${plantB.bodyH} px, agrees ${plantB.agrees})`);
   const bands = {};
   for (const [w, h, dpr] of [[411, 960, 2.625], [360, 800, 3], [749, 832, 2.625]]) {
-    await page.setViewport({ width: w, height: h, deviceScaleFactor: dpr }); await new Promise((x) => setTimeout(x, 1200));
+    await page.setViewport({ width: w, height: h, deviceScaleFactor: dpr }); await vpSettle(1200);
     const k = `${w}x${h}`, f = await bandAt(false), o = await bandAt(true); bands[k] = { folded: f, open: o };
     ok(!f.unsettled && f.band >= BAND_FLOOR[k],
        `${k}: the clear band, drawer folded, is ${f.band} of the screen (floor ${BAND_FLOOR[k]}, take 187's), `
@@ -6180,8 +7183,10 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
        + `from ${o.topBy} at ${o.top} px to ${o.bottomBy} at ${o.bottom} px` + (o.unsettled ? " — the drawer never settled open" : ""));
   }
   await page.evaluate(() => { try { window.railSet(false); } catch (e) {} });
-  await page.setViewport({ width: 411, height: 960, deviceScaleFactor: 2.625 }); await new Promise((x) => setTimeout(x, 800));
+  await page.setViewport({ width: 411, height: 960, deviceScaleFactor: 2.625 }); await vpSettle(800);
 
+  }
+  if (RUN("v4-select")) {
   /* the bundled faces are loaded and applied; a family that does not exist is not */
   const font = await page.evaluate(() => {
     const has = (fam) => [...document.fonts].some((f) => f.family.replace(/["']/g, "") === fam && f.status === "loaded");
@@ -6304,12 +7309,14 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
        + `(caught: ${selRes.anatPlant})` + (Object.values(A).every(Boolean) ? "" : " — " + JSON.stringify(A)));
   }
 
+  }
+  if (RUN("v4-toast")) {
   /* take 188 · A216 · THE TOAST: a live status line (role=status,
      aria-live=polite) that wraps inside the screen and sits above the tool
      strip by the measured dock height, with the drawer folded and open, at
      360x800. Plants: the dock height forced to 0 must put it over the strip,
      and nowrap must run it wider than the screen allows. */
-  await page.setViewport({ width: 360, height: 800, deviceScaleFactor: 3 }); await new Promise((x) => setTimeout(x, 1200));
+  await page.setViewport({ width: 360, height: 800, deviceScaleFactor: 3 }); await vpSettle(1200);
   const toastAt = async (open) => { await page.evaluate((o) => { try { window.railSet(o); } catch (e) {} }, open);
     await settleDrawer();
     return page.evaluate(async () => {
@@ -6337,11 +7344,13 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
      + `strip: folded ${tf.real.left}–${tf.real.right} px, bottom ${tf.real.bottom} over the strip at ${tf.real.tools} (dock ${tf.dock}); `
      + `open bottom ${to.real.bottom} over ${to.real.tools}; a dock height forced to 0 (bottom ${tf.pDock.bottom}) and nowrap `
      + `(runs past its box: ${tf.pWrap.over}) are caught`);
-  await page.setViewport({ width: 411, height: 960, deviceScaleFactor: 2.625 }); await new Promise((x) => setTimeout(x, 800));
+  await page.setViewport({ width: 411, height: 960, deviceScaleFactor: 2.625 }); await vpSettle(800);
 
+  }
+  if (RUN("v4-audit")) {
   /* 2 · the audit walks states that change the page, so it goes last */
   await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2.6 });
-  await new Promise((x) => setTimeout(x, 1200));
+  await vpSettle(1200);
   const aud = await page.evaluate(async (GS, EXEMPT) => {
     try {
     const G = new RegExp(GS, "u");
@@ -6692,6 +7701,8 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
      + "is reported in each list (its negative control)" + (gone.length ? " — not seen: " + gone.join(", ") : ""));
   }
 
+  }
+  if (RUN("v4-walker")) {
   /* take 188 · A217 · THE TAP WALKER. The V4 study's tap counts (§7) as
      ceilings, walked the way a rider walks them: from a clean page, every
      step is a tap on a control that is really there to tap — on screen, not
@@ -6798,6 +7809,12 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
               else if (await tap(fl, "hc-tap")) fl.done = await until(() => /\barm\b/.test($("c-home").className), 2000); }
           } else if (F === "D") {
             if (await tap(fl, '#tabs .tab[data-go="ride"]') && await tap(fl, "c-ride")) fl.done = await until(riding, 3000);
+          } else if (F === "F") {
+            /* take 189 · A233 · free ride from the FOLDED drawer: its Ride,
+               one tap; done when the ride waits and the Ride tab's Stop
+               (GPS), then the only Stop, is on screen */
+            try { window.railSet(false); } catch (e) {} tabTo("map"); await settle();
+            if (await tap(fl, "btn-ride")) fl.done = await until(() => riding() && tappable($("c-ride")) === null, 3000);
           } else if (F === "E") {
             $("btn-home").click();             /* setup: the route cards on screen */
             if (!(await until(() => !!document.querySelector(".rc"), 60000))) fl.blocked = "btn-steps (no route cards)";
@@ -6821,7 +7838,8 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
     return out;
   };
   /* WALKER-END */
-  const WALK_CEIL = { A: 3, B: 2, C: 3, D: 2, E: 1 };
+  /* take 189 · A233 · F: free ride from the folded drawer (its Ride) <= 1 */
+  const WALK_CEIL = { A: 3, B: 2, C: 3, D: 2, E: 1, F: 1 };
   /* the judge: done, not blocked, within the ceiling. Its control: the same
      flow with one planted extra step fails it (A at 4 > 3) */
   const walkOk = (F, fl) => !!fl && fl.done && !fl.blocked && fl.taps <= WALK_CEIL[F];
@@ -6829,8 +7847,8 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
   /* a dropped pin stays on the map, and a long-press on it is a tap on the
      pin: each run presses a spot of its own, ~150 m apart */
   const WALK_DEST = { "411": [-84.1175, 44.5465], plant: [-84.1195, 44.5455], "360": [-84.1155, 44.5475] };
-  for (const [w, h, dpr, flows] of [[411, 960, 2.625, ["A", "B", "C", "D", "E"]], [360, 800, 3, ["A", "B"]]]) {
-    await page.setViewport({ width: w, height: h, deviceScaleFactor: dpr }); await new Promise((x) => setTimeout(x, 1000));
+  for (const [w, h, dpr, flows] of [[411, 960, 2.625, ["A", "B", "C", "D", "E", "F"]], [360, 800, 3, ["A", "B", "F"]]]) {
+    await page.setViewport({ width: w, height: h, deviceScaleFactor: dpr }); await vpSettle(1000);
     const wk = await page.evaluate(WALKER, Object.assign({}, WALK_PTS, { flows, setup: w === 411, plants: w === 411, dest: WALK_DEST[w] }));
     ok(!wk.error && (w !== 411 || (wk.setup && wk.setup.home && wk.setup.start)),
        `${w}x${h}: the tap walker ran (${wk.error || "ok"}; setup ${JSON.stringify(wk.setup || {})})`);
@@ -6856,8 +7874,10 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
          `with Ride it hidden (a planted rule), flow A reports BLOCKED at ${pA.blocked || "nothing"} (its control)`);
     }
   }
-  await page.setViewport({ width: 411, height: 960, deviceScaleFactor: 2.625 }); await new Promise((x) => setTimeout(x, 800));
+  await page.setViewport({ width: 411, height: 960, deviceScaleFactor: 2.625 }); await vpSettle(800);
 
+  }
+  if (RUN("v4-eta")) {
   /* take 188 · A217 · ONE ARRIVAL ESTIMATE. The route card, the ride
      sheet's Arrive and the nav strip give the same "~N min" for the same
      route: at its start, with no pace yet, all three are the route's own
@@ -6994,6 +8014,55 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
     ok(!stripFits(stripR.stale), `its control (stale): --strip-h put back to ${(stripR.stale || {}).css} px over a ${(stripR.stale || {}).strip} px strip fails`);
     ok(!stripFits(stripR.flip), `its control (flip): c-ride's flag flipped by hand with no re-measure fails (${(stripR.flip || {}).css} px vs ${(stripR.flip || {}).strip})`);
   }
+  /* take 189 · A235 · ONE ARRIVAL ESTIMATE FOR A RIVER RUN. The run card
+     (planned in Water), the ride sheet's Arrive and the strip give the same
+     "~N" at the put-in — take 188 printed the card's range, the sheet's
+     midpoint and the strip's range. The rider's path: the run card, then
+     Navigate this run (GPS held by a stand-in watch), one fix on the river
+     line at the put-in through the app's own guidance. The reader rejects
+     each value planted different. Torn down: the ride, the watch, the mode */
+  const rEta = await page.evaluate(async () => {
+    const s = (ms) => new Promise((r) => setTimeout(r, ms));
+    const N = window.__nav, M = window.__mode, P = window.__paddle, out = {};
+    const geo = navigator.geolocation, gw = geo && geo.watchPosition, gc = geo && geo.clearWatch, pm0 = N.pos(), was = M.get();
+    const ETA = /~[\d:]+ (?:min|h)\b/;
+    try {
+      if (geo) { geo.watchPosition = () => 4400; geo.clearWatch = () => {}; }
+      M.apply("water", { silent: true }); await s(250);
+      const c = (P.data.c || []).find((x) => x.n === "Au Sable River");
+      const named = c ? c.f.filter((f) => f.n && f.p && (f.k === "access" || f.k === "launch")) : [];
+      let a = null, b = null;
+      for (let i = 0; i < named.length && !b; i++) for (let j = i + 1; j < named.length; j++) {
+        const d = named[j].mi - named[i].mi; if (d >= 3 && d <= 8) { a = named[i]; b = named[j]; break; } }
+      if (!a) throw new Error("no Au Sable run of 3-8 mi between named accesses");
+      out.run = a.n + " to " + b.n;
+      P.run(a, b, c.n); await s(150);
+      out.card = ((document.getElementById("panel").textContent || "").match(ETA) || [null])[0];
+      document.getElementById("pd-nav").click(); await s(200);
+      const L = N.riverLine(c.n), mm = a.mi * 1609.34; let i = 0;
+      while (i < L.cum.length - 2 && L.cum[i + 1] < mm) i++;
+      const t = (mm - L.cum[i]) / Math.max(1, L.cum[i + 1] - L.cum[i]);
+      N.fix([L.pts[i][0] + (L.pts[i + 1][0] - L.pts[i][0]) * t, L.pts[i][1] + (L.pts[i + 1][1] - L.pts[i][1]) * t], 12, 1.4, 0);
+      await s(300);
+      const he = document.getElementById("hud-eta"), g = document.querySelector("#nav-g .eta");
+      out.sheet = he ? he.textContent.replace(/^~(\S+?) ?(min|h)$/, "~$1 $2") : null;
+      out.strip = g ? (g.textContent.match(ETA) || [null])[0] : null; out.stripText = g ? g.textContent : null;
+    } catch (e) { out.error = String((e && e.stack) || e); }
+    try { N.stopReal(); } catch (e) {} try { N.reset(); N.end(); } catch (e) {}
+    if (geo) { geo.watchPosition = gw; geo.clearWatch = gc; }
+    try { N.pos(pm0); M.apply(was, { silent: true }); window.hudShow(false); window.railSet(false); } catch (e) {}
+    return out;
+  });
+  {
+    const rAgree = (r) => !!r && !!r.card && r.card === r.sheet && r.sheet === r.strip;
+    const bump = (x) => x ? x.replace(/~(\d+)/, (m0, v) => "~" + (parseInt(v, 10) + 16)) : x;
+    ok(!rEta.error && rAgree(rEta) && !rAgree(Object.assign({}, rEta, { card: bump(rEta.card) }))
+       && !rAgree(Object.assign({}, rEta, { sheet: bump(rEta.sheet) })) && !rAgree(Object.assign({}, rEta, { strip: bump(rEta.strip) })),
+       `A235 · one arrival estimate for a river run (${rEta.run}) at its put-in: card "${rEta.card}", sheet "${rEta.sheet}", `
+       + `strip "${rEta.strip}" ("${(rEta.stripText || "").trim().slice(0, 70)}"); the reader rejects a card, a sheet and a strip planted different`
+       + (rEta.error ? ` — ${rEta.error}` : ""));
+  }
+  }
 
   await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2.6 });
 }
@@ -7011,7 +8080,52 @@ console.log(`       screenshot -> ${SHOT || "(not saved)"} (${(png.length/1024).
     + Object.entries(bySite).map(([k, r]) => `${k} max ${r.max}/${r.cap} (${r.n}×)`).join(", "));
 }
 
+/* take 189 · A227 fix round 1 · SECTION FLOORS. A section that runs prints
+   at least the checks it prints in a full run. --only=shell once read the
+   shell and never judged it — its two checks sat inside camp's guard
+   (render-t189-L-render-only-3.log, RENDER PASSED; landmine 53) — and a
+   partial run's PASSED is only worth the checks that ran. In the full run the
+   same floors catch a check that went missing. The floors are a full run's
+   counts (render-t189-L-render-fix1-cal-1.log); a section that gains checks
+   may raise its floor, never lower it (landmine 54). take 189 · lane L-ride
+   raised devices 185 -> 207 (A231, A233, A238), realdom 2 -> 3 (A230),
+   v4-walker 13 -> 15 (A233's flow F), v4-eta 8 -> 9 (A235). take 189 · L-small:
+   trails 0 -> 2 (A239: its line and label checks run where a named trail
+   draws, and fail where they cannot measure), pins +2 (A237: the POI
+   cards and, fix round 1, the dropped pin's card), camp +1
+   (A232), selftest +1 (A236), devices +5 (A229, one per size). Merged:
+   devices 185 + 22 (L-ride) + 5 (L-small) = 212. take 189 · cold audit: ui
+   +1 (A240: the app's own camera move leaves a card open), realdom +2
+   (A240 at 360; the resumed peek line's widest form judged, was reported),
+   devices +10 (per size: riding with a panel open — A231 only on a small
+   phone, no chip under the (i), the compass box's whole line; and every
+   tab with the drawer open to its cap). The judge proves itself on
+   planted books first (its control: shell booked 11 of 13, a section with no
+   floor). */
+{
+  SECTION_AT = "(floor guard)";
+  const SECTION_FLOOR = {
+  boot: 13, trails: 2, labels: 11, modes: 33, imagery: 31, back: 14, water: 11, shell: 10,
+  stacks: 48, pins: 21, nav: 31, camp: 15, paddle: 25, ui: 34, home: 7, tools: 26, basemap: 2,
+  selftest: 2, routes: 3, devices: 222, faults: 6, realdom: 5, clear: 3, tail: 30, g6: 2,
+  "v4-setup": 1, "v4-band": 7, "v4-select": 6, "v4-toast": 1, "v4-audit": 11, "v4-walker": 15,
+  "v4-eta": 9 };
+  const short = (got, floor, ran) => ran.filter((x) => !(x in floor) || (got[x] || 0) < floor[x]);
+  const ran = ["boot"].concat(Object.keys(SECTIONS).filter((x) => !ONLY || ONLY.has(x)));
+  const got = Object.assign({}, SECTION_N);
+  const ctl = short({ shell: 11 }, { shell: 13 }, ["shell"]).length === 1
+    && short({ shell: 13 }, { shell: 13 }, ["shell"]).length === 0
+    && short({ x: 1 }, {}, ["x"]).length === 1;
+  const miss = short(got, SECTION_FLOOR, ran);
+  console.log("  ..   checks per section: " + ran.map((x) => `${x} ${got[x] || 0}`).join(", "));
+  ok(ctl && !miss.length,
+     `every section that ran (${ran.length}) printed at least the checks it prints in a full run — `
+     + `its control: a section booked short, or with no floor, is caught (${ctl})`
+     + (miss.length ? " — SHORT: " + miss.map((x) => `${x} ${got[x] || 0} of ${x in SECTION_FLOOR ? SECTION_FLOOR[x] : "no floor"}`).join(", ") : ""));
+}
+
 await browser.close();
 server.close();
-console.log(failures ? `\nRENDER FAILED (${failures})` : "\nRENDER PASSED");
+console.log((failures ? `\nRENDER FAILED (${failures})` : "\nRENDER PASSED")
+  + (ONLY ? ` — PARTIAL: --only ran ${[...ONLY].join(", ")}; the full render is the gate's` : ""));
 process.exit(failures ? 1 : 0);

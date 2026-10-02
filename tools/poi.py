@@ -63,6 +63,126 @@ KINDS = [
 ]
 
 
+# take 189 · A228 · PLACEHOLDER NAMES. Take 187's probe found six Off-road
+# information pins near Grayling named "A" to "F"; the built bundle of take
+# 188 also carried info posts named "1" to "42", car parks named "car
+# parking" and launches named "Boat Launch". A name like that is not a name:
+# it is a designator or the kind said again, and the map label read "A" where
+# every other pin reads a place. The maintainer (2026-09-30): "clean them up".
+# The rule never guesses a better name: the pin keeps its place, its kind and
+# its badge, ships UNNAMED (so the app labels it by kind from POIKIND — the
+# one table of display names) and carries the source's text as `ph`, so the
+# card can say literally what the source called it. Four rules, first match
+# wins, each counted in the log:
+#   letter    — one letter and nothing else: "A", "f"
+#   number    — no letter at all: "12", "#3", "08-911", "#41.75"
+#   code      — one letter with one to three digits: "C1", "4A", "10A", "#7B"
+#   kind word — the whole name, normalised, is a generic word for its own
+#               kind (PH_WORDS): "car parking", "Restrooms", "Boat Launch"
+# Not placeholders, on purpose: a word plus a designator ("Lot 10", "Site 12",
+# "Pavilion 2") names one of several on the ground; a word that says MORE
+# than the kind ("Vault Toilet", "Trail Map", "Visitor Center"); and a name
+# equal to the element's OSM brand tag ("76" is Phillips 66's fuel brand) —
+# the brand exemption is applied in main() against every brand the extract's
+# places carry, and ships as `bn: 1`.
+# tools/gate.py check_pin_names holds the built bundle to this and checks
+# that every POIKIND display name is in its kind's PH_WORDS.
+PH_WORDS = {
+    "trailhead": {"trailhead", "trail head", "parking", "car parking", "parking lot",
+                  "parking area", "car park", "public parking", "public parking lot",
+                  "public parking area", "trailhead parking", "trail head parking",
+                  "trail parking", "trailhead lot"},
+    "launch": {"boat launch", "launch", "boat ramp", "ramp", "slipway", "public boat launch",
+               "public launch", "public boat ramp", "boat access", "public boat access",
+               "boat launch site"},
+    "lighthouse": {"lighthouse", "light house"},
+    "marina": {"marina"},
+    "livery": {"livery", "canoe livery", "kayak livery", "canoe rental", "kayak rental",
+               "boat rental", "canoe and kayak rental", "canoe and kayak livery"},
+    "camp": {"campground", "camp ground", "campsite", "camp site", "campsites", "camping",
+             "camping area", "camp"},
+    "beach": {"beach", "public beach", "swimming beach", "swim beach", "beach area"},
+    "dayuse": {"day use", "day use area", "picnic area", "picnic site", "picnic",
+               "picnic grounds"},
+    "view": {"viewpoint", "view point", "view", "scenic view", "scenic viewpoint", "overlook",
+             "scenic overlook", "lookout", "scenic lookout", "vista", "scenic vista"},
+    "fuel": {"fuel", "gas", "gas station", "fuel station", "filling station",
+             "petrol station", "gasoline"},
+    "store": {"store", "shop", "convenience store", "general store", "grocery",
+              "grocery store", "supermarket", "market"},
+    "food": {"food", "restaurant", "cafe", "café", "coffee shop"},
+    "info": {"information", "info", "information board", "info board", "information kiosk",
+             "info kiosk", "kiosk", "information sign", "sign", "signboard", "board",
+             "visitor information", "information point", "information center",
+             "information centre", "tourist information"},
+    "water": {"drinking water", "water", "water fountain", "drinking fountain", "fountain",
+              "potable water"},
+    "toilet": {"toilets", "toilet", "restroom", "restrooms", "rest room", "rest rooms",
+               "bathroom", "bathrooms", "washroom", "washrooms", "privy", "outhouse",
+               "latrine", "public toilet", "public toilets", "public restroom",
+               "public restrooms", "comfort station"},
+    "shelter": {"shelter", "pavilion", "picnic shelter", "picnic pavilion", "shelter house"},
+    "system": {"trail system", "trail", "trails", "pathway"},
+    "mtb": {"mtb trail system", "mtb trail", "mtb trails", "mountain bike trail",
+            "mountain bike trails", "bike trail", "bike trails"},
+    "ski": {"ski and snowboard hill", "ski hill", "ski area", "ski resort"},
+}
+
+
+def _ph_norm(s):
+    """Lower case, '&' read as 'and', punctuation to spaces, spaces collapsed."""
+    s = s.lower().replace("&", " and ")
+    s = "".join(ch if ch.isalnum() else " " for ch in s)
+    return " ".join(s.split())
+
+
+def placeholder(name, kind):
+    """The A228 rule a pin name trips, or None. Never a guess: it only says
+    whether the source's text is a placeholder, not what the place is."""
+    if not name:
+        return None
+    t = name.strip()
+    letters = [ch for ch in t if ch.isalpha()]
+    if len(t) == 1 and t.isalpha():
+        return "letter"
+    if not letters:
+        return "number"
+    core = t.lstrip("#").strip()
+    digits = [ch for ch in core if ch.isdigit()]
+    if (len(letters) == 1 and 1 <= len(digits) <= 3 and len(core) == len(digits) + 1
+            and (core[0].isalpha() or core[-1].isalpha())):
+        return "code"
+    if _ph_norm(t) in PH_WORDS.get(kind, ()):
+        return "kind word"
+    return None
+
+
+def _selftest():
+    """Planted names, every run of poi.py: each rule must fire on its plant and
+    stay quiet on its look-alike, or the step refuses to write anything."""
+    want = [("A", "info", "letter"), ("f", "info", "letter"), ("12", "info", "number"),
+            ("#3", "shelter", "number"), ("08-911", "info", "number"),
+            ("#41.75", "info", "number"), (".", "trailhead", "number"),
+            ("C1", "camp", "code"), ("4A", "camp", "code"), ("10A", "camp", "code"),
+            ("#7B", "camp", "code"),
+            ("car parking", "trailhead", "kind word"), ("Car  Parking", "trailhead", "kind word"),
+            ("Restrooms", "toilet", "kind word"), ("Boat Launch", "launch", "kind word"),
+            ("Information", "info", "kind word"), ("Picnic Area", "dayuse", "kind word"),
+            ("Canoe & Kayak Livery", "livery", "kind word"),
+            # look-alikes that are names and must survive
+            ("BP", "fuel", None), ("UF", "fuel", None), ("Lot 10", "trailhead", None),
+            ("Site 12", "camp", None), ("Vault Toilet", "toilet", None),
+            ("Trail Map", "info", None), ("Boat Launch", "trailhead", None),
+            ("Parking", "info", None), ("A1B", "camp", None), ("1234A", "camp", None),
+            ("Bull Gap Trailhead", "trailhead", None), ("Cafe 106", "food", None),
+            ("", "info", None), (None, "info", None)]
+    bad = [(n, k, placeholder(n, k), w) for n, k, w in want if placeholder(n, k) != w]
+    if bad:
+        sys.exit(f"poi: A228 placeholder self-test FAILED — (name, kind, got, want) {bad}")
+    print(f"poi: A228 placeholder self-test — {len(want)} planted names, every rule "
+          f"fired on its plant and stayed quiet on its look-alike")
+
+
 def centre(e):
     """A node has lat/lon; a way has geometry. Overpass `nwr ... out geom`
     produces both shapes and osm_local.py matches it, so handle both here."""
@@ -84,6 +204,7 @@ def classify(t):
 
 
 def main():
+    _selftest()
     if not os.path.exists("aoi.json"):
         print("poi: no aoi.json — OSM was unavailable at ingest. "
               "Skipping places; the bundle will be PARTIAL and the app "
@@ -120,6 +241,11 @@ def main():
                         return True
         return False
     _private = 0
+    # A228: every OSM brand a classified place carries ("76" is Phillips 66's
+    # fuel brand; measured take 189, 14 of the 15 places named "76" carry
+    # brand=76 and one store does not) — a name that IS a brand is a name,
+    # whatever it looks like.
+    _brands = set()
     for e in els:
         tags = e.get("tags", {})
         if e.get("type") == "way" and tags.get("highway") in TRAILWAYS:
@@ -135,6 +261,8 @@ def main():
         kind, unnamed_ok = classify(tags)
         if not kind:
             continue
+        if (tags.get("brand") or "").strip():
+            _brands.add(tags["brand"].strip().lower())
         nm = (e.get("tags", {}).get("name") or "").strip()
         if not nm and not unnamed_ok:
             continue
@@ -348,6 +476,36 @@ def main():
         out = [r for r in out if statemask.inside(r["p"][0], r["p"][1])]
         if before != len(out):
             print(f"poi: clip — {before - len(out)} place(s) outside {R.name} dropped")
+    # take 189 · A228 · placeholder names (the rule and its reasons sit with
+    # PH_WORDS above). The pin keeps its place and kind and ships unnamed with
+    # the source's text in `ph`; a name that is a brand ships as `bn`. A
+    # lake-borrowed name (`w`) is not the source's text, so a placeholder
+    # there is dropped with its flag and carries no `ph`.
+    ph_w = [0]
+    def _ph_apply(r):
+        rule = placeholder(r.get("n"), r["k"])
+        if not rule:
+            return
+        if not r.get("w") and r["n"].strip().lower() in _brands:
+            r["bn"] = 1      # shipped, so the gate can tell a brand from a placeholder
+            return
+        if r.get("w"):
+            r.pop("w"); ph_w[0] += 1
+        else:
+            r["ph"] = r["n"]
+        r["n"] = None
+        if r["k"] in ("launch", "beach"):
+            r["pri"] = 2     # the unnamed rank (A151), like any unnamed launch
+    # Launches and beaches FIRST, here, before the A151 and A188 passes below:
+    # a "Boat Launch" beside Rogers City Marina is an unnamed launch in the
+    # shadow of a named destination, the same place twice, and goes the way
+    # every unnamed launch does (render's A188 check found two shadows when
+    # this pass ran last). Lake naming leaves a `ph` pin alone: its card says
+    # what the source called it, and "the source has no name for this spot"
+    # would not be true of it.
+    for r in out:
+        if r["k"] in ("launch", "beach"):
+            _ph_apply(r)
     # A151 (take 123) · PROMINENCE. Jacob's field verdict on take 121: the
     # pins "pop in/out like crazy". Cause: 670 destination badges in one
     # 10-mile view handed to a collision solver whose answer changes with
@@ -394,6 +552,7 @@ def main():
                     break
             if id(r) in drop:
                 break
+    ph_shadow = sum(1 for r in out if id(r) in drop and r.get("ph") is not None)
     if drop:
         print(f"poi: launches — {len(drop)} unnamed within ~200 m of another launch "
               f"collapsed (A151)")
@@ -430,6 +589,7 @@ def main():
                         shadow.add(id(r)); break
                 if id(r) in shadow: break
             if id(r) in shadow: break
+    ph_shadow += sum(1 for r in out if id(r) in shadow and r.get("ph") is not None)
     out = [r for r in out if id(r) not in shadow]
     print(f"poi: {len(shadow)} unnamed launches/beaches within 300 m of a named destination dropped (shadows)")
     named_by_water = 0
@@ -448,7 +608,7 @@ def main():
                 for v in ring[::max(1, len(ring) // 60)]:
                     wg.setdefault((round(v[0], 2), round(v[1], 2)), []).append((nm_, ring))
             for r in out:
-                if r.get("n") or r["k"] not in ("launch", "beach"):
+                if r.get("n") or r["k"] not in ("launch", "beach") or r.get("ph") is not None:
                     continue
                 best = None; seen = set()
                 for dx in (-0.01, 0, 0.01):
@@ -496,8 +656,26 @@ def main():
                 if hit: break
             if hit: break
         if hit: shadow2.add(id(r))
+    ph_shadow += sum(1 for r in out if id(r) in shadow2 and r.get("ph") is not None)
     out = [r for r in out if id(r) not in shadow2]
     print(f"poi: {len(shadow2)} unnamed shadows of lake-named pins dropped")
+    # A228 for every other kind, last, so no earlier pass sees a changed name
+    # (and a lake-borrowed launch name is checked too); then the counts, read
+    # from what ships.
+    for r in out:
+        _ph_apply(r)
+    from collections import Counter as _C
+    ph_rule = _C(placeholder(r["ph"], r["k"]) for r in out if r.get("ph") is not None)
+    ph_kind = _C(r["k"] for r in out if r.get("ph") is not None)
+    print(f"poi: A228 placeholder names — {sum(ph_rule.values())} shipped unnamed, "
+          "labelled by kind: " + " · ".join(f"{k} {ph_rule[k]}" for k in
+                                            ("letter", "number", "code", "kind word")) +
+          f"; {ph_shadow} launches/beaches collapsed into a neighbour or dropped as a shadow "
+          "(A151, A188, as every unnamed one is); "
+          f"{sum(1 for r in out if r.get('bn'))} kept as their OSM brand; "
+          f"{ph_w[0]} lake-borrowed")
+    if ph_kind:
+        print("  by kind: " + " · ".join(f"{k} {v}" for k, v in ph_kind.most_common()))
     still = sum(1 for r in out if not r.get("n") and r["k"] in ("launch", "beach"))
     print(f"poi: {still} launches/beaches remain unnamed (stepped back outside Water in the app)")
     out.sort(key=lambda r: (r["k"], r["n"] or ""))

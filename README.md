@@ -176,8 +176,8 @@ River, fits the whole river on screen, and points you at the run planner.
 ## Built for the bad day
 
 - **Dispatch card**: your position as coordinates *and* nearest address,
-  written to be read aloud to a county dispatcher — and it refuses to print
-  a coordinate it can't stand behind
+  written to be read aloud to a county dispatcher — it says when a fix is
+  old, and it refuses to print a coordinate it can't stand behind
 - Breadcrumb trail, lossless retrace, truck pin, compass, mark-this-spot
 - Ride recording with a compass ribbon and a ride sheet — trip, to go and
   arrive on a route; trip, time and speed on a free ride
@@ -215,8 +215,8 @@ is named there as excluded.
 record of every take since the first; `docs/LANDMINES.md` numbers 200+
 known failure modes so they are stepped around instead of rediscovered;
 `docs/AGENDA.md` carries every decision with what was *ruled out* and why.
-The build gates on all of it: over 450 smoke assertions across five passes,
-about 600 checks in a real browser, and a final gate that has
+The build gates on all of it: nearly 500 smoke assertions across five passes,
+about 650 checks in a real browser, and a final gate that has
 refused seals for a stale document stamp, a missing ruled-out line, and a
 URL that hadn't been declared — each time correctly.
 

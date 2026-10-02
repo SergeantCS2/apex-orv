@@ -1,4 +1,4 @@
-# APEX ORV — NEW CHAT BRIEF · V4 (rewritten 2026-09-23 at take 186, brought to take 188)
+# APEX ORV — NEW CHAT BRIEF · V4 (rewritten 2026-09-23 at take 186, brought to take 189)
 
 Read this first, then CLAUDE.md (how work happens on the workstation),
 then the newest HANDOFF entries. PROTOCOL is the law; LANDMINES §0 is the
@@ -14,22 +14,26 @@ It is tested on the maintainer's Samsung Galaxy Z Fold and, since take
 sandbox and seed zips). Stack: Capacitor 8 + MapLibre GL 5 + an offline
 bundle; a Python pipeline over the Geofabrik Michigan extract, DNR/USFS
 ArcGIS layers, USGS DEM and imagery; a harness of smoke, render and the
-gate; append-only ledgers. The counts on take 188's last build before its
-seal (PROVEN, `~/apex-logs/smoke5-t188-review-4.log` and
-`render-t188-review-2.log`): smoke 464 assertions over 5 passes, and
-render 606 checks. The gate has 44 checks at take 187, plus five new at
-188: scale, badges, icons, glyphs, licences. At take 187 the counts were
-smoke 319 and render 318.
+gate; append-only ledgers. The counts on take 189's last build before its
+seal (PROVEN, `~/apex-logs/smoke5-t189-audit2-3.log` and
+`render-t189-audit2-full-1.log`): smoke 497 assertions over 5 passes, and
+render 658 checks. The gate runs 47 checks at take 189 (the loop at
+tools/gate.py:3127): 41 at take 187, five new at 188 (scale, badges, icons,
+glyphs, licences) for 46, and check_pin_names new at 189. At take 188's
+seal the counts were smoke 464 and render
+606; at take 187, smoke 319 and render 318.
 
-## Where it stands at take 188
+## Where it stands at take 189
 
 **Play:** take 176 is the production baseline — `com.apexoffroad.app`,
-closed testing since 2026-09-02. Takes 183–187 each went green in CI
-(`gh run list`, PROVEN), and t184–t187 are pushed; t183 stays local. None
-was promoted: the A183 device check is open, and take 186 is the Play
-candidate once it passes. **Take 188 is on the local branch `v4`, not
-pushed.** main and t187 sit at 63f1676. The take goes to the maintainer
-as a pull request, and CI has not built it yet.
+closed testing since 2026-09-02. Takes 183–188 each went green in CI
+(`gh run list`, PROVEN), and t184–t188 are pushed; t183 stays local. None
+was promoted to Play: the A183 device check is open, and take 186 is the
+Play candidate once it passes. Take 188 reached main through pull requests
+(PR #1, then two CI fixes, PR #2 and PR #3); CI run 91 on the PR #3 merge
+46fc298 was green and t188 is tagged there. **Take 189 was built on the
+local branch `v5`** and goes to the maintainer as one commit on a branch
+`take-189`, opened as a pull request; CI builds it at the merge.
 
 Since the V3 brief (take 180):
 - **181** — the first field reports: panels close on an outside tap and
@@ -67,6 +71,23 @@ Since the V3 brief (take 180):
   - Marinas by water body: ruled out, "Marinas can stay as they are"
     (A219).
   - Every number is desktop headless; the Fold is UNKNOWN.
+- **189** — V4's cap-off: what desktop Chrome could settle, after a
+  render speed-up.
+  - Render −18% to −24% (838 → 634 s), PARTIAL against its 30% target and
+    eroded by 50 new checks; `--only=<sections>` with per-section floors
+    (A227; the rest is A241).
+  - Placeholder pin names ("A"–"F", "11", "car parking") ship unnamed,
+    labelled by kind, the source's text on the card (A228).
+  - The attribution (i) clear of the drawer (A229); "Waiting for a GPS
+    fix" (A230); Tools panels on a small phone while riding (A231); the
+    licence on one line (A232); Ride beside Return home, free ride in one
+    tap (A233); a loop re-joins itself (A234); one river-run estimate
+    (A235); a glyph readback for the Fold (A236).
+  - "Of you" only from a live fix, and Dispatch and Locate say when a fix
+    is old (A237); the bike's route cards whole (A238); render's trails
+    checks run (A239); a tapped card no longer folds itself (A240).
+  - A cold audit's 20 findings, all fixed. Every number is desktop
+    headless; the Fold is UNKNOWN.
 
 ## V4 — the presentation overhaul (A203)
 
@@ -90,13 +111,19 @@ decisions:
 - 2026-09-25 and 2026-09-30: D7 "Accept the cost", then "Trails + forest
   roads only".
 
-What remains for V4: a render speed-up first (take 188 roughly doubled
-render, to about 13 min and 606 checks), then polish takes after the
-maintainer's verdict on the Fold (DESIGN-v4 §12).
+Take 189 capped off what desktop Chrome could decide (DESIGN-v4 §12).
+What remains for V4: take 190, the screens the mockup never designed —
+the take-190 plan, approved as the V4 mockup's artboards 10–23 (Plan and
+Tools as sheets of labelled rows, each tool inside the sheet with a back
+arrow, one primary per screen, Machine a picker and fuel range a stepper,
+Search, Loop, Saved, Compass, HD imagery, Mark this spot, Diagnostics,
+Data sources, Turns, the Ride tab before a ride, the first-run tour card);
+then the maintainer's Fold session; then one polish take on what the phone
+shows.
 
 The screens are outside the repo: the "before" screens in
-`~/apex-shots/v4-baseline/`, take 187's in `~/apex-shots/t187/` and take
-188's in `~/apex-shots/t188/`.
+`~/apex-shots/v4-baseline/`, take 187's in `~/apex-shots/t187/`, take
+188's in `~/apex-shots/t188/` and take 189's in `~/apex-shots/t189/`.
 
 ## What only the phone can answer
 
@@ -114,6 +141,10 @@ The screens are outside the repo: the "before" screens in
   - D7's cost at start-up (the self-test's `RENDER/net-lo` line);
   - the pin-band build (the `stack-build` row);
   - whether the faint too-wide two-track on Hybrid still reads.
+- Take 189 on the phone: the self-test's `RENDER · glyphs` line (A236:
+  in headless no label glyph loads from the pack; on the Fold, UNKNOWN —
+  the fix waits on it); a ride started under trees ("Waiting for a GPS
+  fix"); a loop left and re-joined (A234).
 
 ## How work happens (since take 183)
 
@@ -153,22 +184,43 @@ The screens are outside the repo: the "before" screens in
   - judge a mark's contrast against the surface it is drawn on (231);
   - close a GPS watch through the handle that opened it (232);
   - working notes a take depends on do not belong in /tmp (233).
-- At this brief: take 188, agenda A226, landmine 233.
+- Take 189: the same lanes, under `~/apex-t189-work`; lanes run render's
+  `--only=<sections>` plus their declared setups, and the full render at
+  every merge and at the gate stays the authority. Single gate checks:
+  `python3 ~/apex-t189-work/gatefn.py check_a check_b` from the tree to
+  check (it prints the tree it read).
+- New at take 189:
+  - an idle wait with no repaint runs to its ceiling (236);
+  - under `--only`, declare every check's section and every setup (237);
+  - speeding animations changes orderings (238);
+  - moveend says the camera stopped, not who moved it (239);
+  - a drill inherits the state earlier drills left (240);
+  - a flex item's width test is vacuous (241);
+  - prove a new guard on the build that has the bug (242);
+  - a new state's wording blinds older guards (243);
+  - a live fix is a question of its age (244);
+  - a worktree lane reaches the main tree through a symlink (245);
+  - compare timings only A/B in one window (246).
+- At this brief: take 189 built, agenda A244, landmine 246. Next numbers:
+  take 190, agenda A245, landmine 247.
 
-## Order (as of 2026-09-30)
+## Order (as of 2026-10-01)
 
 1. **Tester field reports** as they arrive — each an agenda item, and in
    a take.
 2. **A183** — the device check; take 186 is the Play candidate.
 3. **V4 (A203)** — `docs/DESIGN-v4.md`. Take 187 built the foundation,
-   and take 188 built the rest as one take (not yet pushed or promoted).
-   Next is the render speed-up, then polish takes after the Fold verdict.
+   take 188 the rest as one take, and take 189 the desktop-decidable
+   gaps. Next is take 190 (the take-190 plan, approved as the V4 mockup's
+   artboards 10–23), then the maintainer's Fold session and one polish
+   take.
 4. **A189** — the "Road hazards" layer, designed at take 180; build after
    A183, on approval. How it ranks against V4 is the maintainer's call
    (not yet made).
 5. **Production listing** when the tester round is clean.
 
-Also open: A207 (CI's compute steps never skip), A201's fix, the Play
+Also open: A207 (CI's compute steps never skip), A201's fix, A241 (the
+rest of the render speed-up), A242–A244 (found in take 189), the Play
 screenshots taken on the Fold.
 
 ## Standing rules

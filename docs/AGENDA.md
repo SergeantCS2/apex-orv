@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 188.* Ranked by blocking-ness, not by interest.
+*Current as of take 189.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -4372,6 +4372,13 @@ renamed, A113's five-on-screen rule re-decided with a counter.
   route card — one primary under the cards rides the selected card, and
   three would spend the accent three times (the walker counts at most 1 at
   the route cards); "Moving time" on the sheet — nothing records it (A222).
+- **Note (2026-10-01, take 189):** the folded "Ride" secondary ruled out
+  above is built by A233. Take 188's own seal listed the mockup's Ride
+  beside Return home on the folded drawer as N34, drawn and not built, and
+  the maintainer's approved take-189 plan (2026-09-30) builds it from the
+  mockup's Main screen: outlined, beside the one accent, drawn only folded
+  at rest; free ride from the folded drawer is 1 tap (A233). The line above
+  stays as the record of take 188's reading.
 
 ## A218 — Spoken turn-by-turn is silent on the Fold: its WebView has no Web Speech API · FOUND 2026-09-23 (field, take-186 self-test) · OPEN, design first
 The maintainer's self-test on the Fold (take 186; Android 16, WebView
@@ -4753,3 +4760,437 @@ with the take-187 path run live as its control.
   is rejected, as are a planted text left drawn and a planted ON showing
   county and contour labels. Gate `check_layer_control` holds the row (5
   planted controls). The Fold: UNKNOWN.
+
+## A227 — Render takes about 13 min for 606 checks: speed it up without losing a check · FOUND take 188 (MEASURED) · BUILT take 189 (PARTIAL: −18% to −24% against a 30% target, then 724 s for 658 checks at audit round 1, about −14%; the remainder is A241)
+Take 188's seal: render roughly doubled — about 13 min and 606 ok lines
+against take 187's 7 min and 317 (docs/DESIGN-v4.md §12, MEASURED from the
+logs' times). Every lane, merge and gate waits on it, and the gate runs it
+again (885 s at take 188's seal). The maintainer, 2026-09-30: the speed-up
+first ("the render speedup can come after take 188"). The build profiles
+every section, replaces fixed sleeps with waits on the real condition (a
+frame drawn, finite animations done, the element present, the map idle —
+landmine 224's helpers), removes redundant reloads, and adds
+`--only=<sections>` if sections separate cleanly. Done when three
+consecutive full renders are green with the same ok lines, every planted
+control still fails, and the median time drops by at least 30%.
+- **Ruled out:** dropping, merging or weakening a check to save time
+- **Ruled out:** a GPU renderer: CI renders without one, and local must match what CI sees
+- **Ruled out:** several Chromes inside one render: the one-render rule exists because
+  timing-sensitive checks went flaky under load
+- **Built, take 189 (PARTIAL; L-render, tools/render.mjs only, no product
+  change):** waits bounded by the sleeps they replace (`__rh.settle`,
+  `__rh.idle`, `vpSettle`); seven `map.once('idle')` waits that ran to their
+  ceiling on an idle map now force a repaint (landmine 236: stacks 97 → 24 s,
+  camp 39 → 14 s); animation playback rate 10 (`ANIM_RATE`; devices 244 →
+  194 s); `--only=<sections>` (31 sections and the group v4, declared setups,
+  a PARTIAL verdict) with a per-section floor guard (planted re-nesting
+  caught: "SHORT: shell 8 of 10"). Before: 837, 838, 944 s, 606 ok, median
+  838 s. After: 634, 639, 632 s, 608 ok, median 634 s, −24.3% (round 0:
+  688 s, −17.9%; the range −18% to −24%), 154 plant lines, the same check
+  texts but one (all PROVEN, ~/apex-logs/render-t189-L-render-*). Not met:
+  587 s. With the take's 50 new checks: 849 s for 645 (Phase B
+  integration), 724 s for 658 (audit round 1), 1,374 s for 658 on a host
+  that had slowed for every build (an A/B: 619 s and 625 s for the two
+  builds' `--only=realdom,devices`, 287 s earlier the same day; PROVEN).
+  CI at take 188's ratio of about 2.6: about 31 min for 724 s (INFERRED).
+- **Changed reading (ANIM_RATE):** "choosing Stand saves a typed waypoint"
+  names a coordinate instead of a trail (PROVEN prof-4 vs prof-6); the check
+  reads only its prefix (landmine 238). Kept by default.
+- **Ruled out, measured:** the vsync and frame-rate flags (no effect);
+  removing a reload (none is redundant); shortening the boot window, the
+  respawn, G6's wait, the V4 audit's per-state wait, the walker or the fix
+  pacing (each changes what a check covers).
+
+## A228 — Junk and placeholder pin names ("A"–"F", "car parking") · FOUND take 187 (seen in probe reads) · DECIDED 2026-09-30 (the maintainer) · BUILT take 189
+Take 187's A210 read found six Off-road info pins near Grayling named "A" to
+"F"; the V4 study listed "junk and borrowed pin names" as deferred (§13).
+The maintainer, 2026-09-30: "Yes, clean them up." The pipeline
+(tools/poi.py) replaces a placeholder name — a single letter, digits only,
+or a generic word that only repeats the kind ("parking", "car parking",
+"toilet", "information") — with the kind's display name, never a guessed
+name, with a count per rule in the poi log and the source totals before and
+after (landmine 76); a gate check with planted names holds it.
+- **Ruled out:** editing names by hand in the bundle: the next build would bring them back
+- **Ruled out:** hiding the pins: they are real places, only their names are placeholders
+- **Built, take 189 (L-names):** tools/poi.py `placeholder()` — a single
+  letter, no letter, one letter with 1–3 digits, or a kind word
+  (`PH_WORDS`); a placeholder pin ships `n: null` with the source's text in
+  `ph`, labelled by POIKIND's display name, its card saying "The source names
+  it only “…”"; a brand tag counts as a name ("76", `bn`). Before (take 188):
+  895 named pins trip a rule. After: 878 unnamed (letter 26, number 699, code
+  83, kind word 70), 2 launches dropped as shadows of a named place, 15
+  brands; 25,357 pins; one unnamed beach returns (PROVEN, poi log). Source
+  totals: 1,002 caught names in 24,487 classified (988 placeholders, 14
+  brand); 678 of 779 information placeholders are guideposts or route
+  markers. Guards: poi `_selftest` (32 names), gate check_pin_names (eight
+  plants), smoke's two card taps; every mutant caught (PROVEN).
+- **Corrected (the cold audit, F13):** check_pin_names had no control that it
+  read each display name; `_pin_h_missing()` fails a POIKIND kind with no
+  readable `h` (the pre-fix gate passed a double-quoted `h` and claimed 19,
+  PROVEN).
+- **For the maintainer:** guidepost numbers show on the card only, the map
+  says "Information"; "Lot 10"-style names (209) and coordinate names are
+  left as they are.
+- **Ruled out (take 189):** writing the display name into `n` (a second copy
+  of POIKIND's table).
+
+## A229 — The attribution (i) button sits half under the folded drawer · FOUND take 188 (seal shots, PROVEN by eval) · BUILT take 189
+Take 188's final shots: the drawer's top (857 css px at 411x960) cuts the
+843-867 px attribution button; its top half still takes a tap. It moves
+clear of the folded drawer at every device size, with a render overlap check
+and a planted control.
+- **Ruled out:** removing or hiding the attribution: the data and map licences need it
+  reachable
+- **Built, take 189 (L-small):** the attribution control stands on the
+  drawer's lip (`bottom:calc(var(--r-lg) + var(--attrib-lift,0px))`,
+  src/app.html:543; the lift is 0 unless `attribLift`, src/app.html:7509,
+  sets it, F16; margin `--s-1`, src/app.html:544). The
+  (i)'s foot sits 4 px above the folded drawer at every size, at rest and
+  riding (360x800 693/697, 411x960 853/857, 749x832 725/729; PROVEN), where
+  take 188's read 843–867 against 857. Cost: 14 px of map while riding on an
+  empty strip (`--strip-h` 44 → 58 px). Render checks each size with a plant
+  at MapLibre's place.
+- **Corrected (fix round 2):** the plant could never fail (`out.plant` had no
+  `.folded`, landmine 227's shape); judged positively now, a fixed-place
+  plant fails 5 of 5 (PROVEN).
+- **Corrected (the cold audit, F16):** riding at 411 with a panel open the
+  (i) sat over Diagnostics; `attribLift()` (app.html:7509) lifts it 8 px
+  above any chip within 8 px (no read state needs it after F18; forced, its
+  control "(i) over c-diag" is caught).
+
+## A230 — A ride with no fix yet: the folded drawer shows an empty band and the banner a lone "—" · FOUND take 188 (seal shots) · BUILT take 189
+Take 188 made the strip read "—" until the first fix (13b1) and dashes the
+sheet in a dropout (F3); before a first fix the folded drawer is an empty
+dark band and the banner a single dash, which reads as broken. Both say what
+is happening ("Waiting for GPS…"), in the mockup's style, and change on the
+first fix.
+- **Ruled out:** a fake "0 mph" or the last ride's values: nothing the app cannot stand
+  behind (take 188 F3, 13b1)
+- **Built, take 189 (L-ride):** the strip and the folded drawer say "Waiting
+  for a GPS fix" (`GPS_WAIT`, src/app.html:9728); the peek adds "— nothing
+  recorded yet" on a new ride and "— N mi recorded, kept" on a resumed trip
+  (the lane's first wording told a resumed trip "nothing recorded yet"; the
+  review caught it). Smoke 11b and render realdom; mutants a230 and
+  a230resume caught (PROVEN).
+- **Corrected (the cold audit, F5, F6, F7, F8, F9, F12, F14):** Resume said
+  "Trip resumed · recording" before a fix (F5); RESUMING outlived Stop and
+  the self-test (F6); a resumed first fix said "Truck pinned where you are"
+  and drew no truck, then (round 2) "0.0 mi N" beside it — now "Trip resumed
+  — you are at the truck, where it was pinned. Ride." within 0.02 mi, feet
+  under 320 m (F7, app.html:7034); the peek said "Recording · live GPS"
+  through a dropout, now "No GPS fix since h:mm" (F8); Stop before a fix said
+  "Recording stopped. 3.42 mi", now "Stopped before the first GPS fix —
+  nothing was recorded" (F9, app.html:6956); the peek width guard measured
+  the span against itself and the ellipsis never engaged (F12, landmine 241;
+  the finding's premise of a cut was wrong, PROVEN 287 of 336 px);
+  docs/TESTING.md said "—" (F14). Eleven smoke mutants caught.
+- **For the maintainer:** Stop on a resumed trip before its first fix ends
+  the trip (as Stop did); keeping it resumable is not built.
+
+## A231 — While riding at 360 px wide, the Compass and Diagnostics panels are 55 px tall · FOUND take 188 (audit fix F18) · BUILT take 189
+Take 188's F18 capped the Tools panels under the turn banner while riding
+(they had covered it); at 360x800 that leaves 55 px, scrolling. They get a
+usable height on the small phone without covering the banner again.
+- **Ruled out:** covering the turn banner again (take 188 F18)
+- **Built, take 189 (L-ride):** while a Tools panel is open on a ride, the
+  Tools strip keeps Compass, Mark this spot and Diagnostics and the panel
+  takes the rows' room: at 360x800 the compass 165 px (dial and heading
+  whole) and diagnostics 165 of 190, from 73 (PROVEN). Render per size and
+  panel: usable, Stop one tap, under the banner.
+- **Corrected (the cold audit, F18):** the rule applied at every width,
+  hiding four chips where the panels fit without it (landmine 135); it is
+  now `@media (max-width:400px) and (max-height:860px)` (app.html:441).
+- **Corrected (the cold audit, F19, and round 2):** the compass at 360
+  riding was cut mid-line; `cmpFit()` (app.html:2315) ends it on a whole line
+  with a "More below — scroll" cue, hidden at the scroll end, the fit a trim
+  under the live cap and refitted when the cap moves.
+- **Corrected (the cold audit, F17, at rest):** at 360 with the drawer open
+  on Tools, "Everything ridable" covered "Take the tour" (and Plan's machine
+  chip); the at-rest drawer body is capped by the measured `--ride-cap` less
+  the route-card trim. Filed here as the Tools strip at 360.
+- **For the maintainer:** three chips kept, not two (two gives 56 px more);
+  at 360 riding with the drawer OPEN on Tools the dial is still cut (take
+  190's compass-in-sheet).
+
+## A232 — "BSD 3-Clause" breaks at its hyphen at 360 px wide · FOUND take 188 (13b3 shots) · BUILT take 189
+On Data sources at 360 wide the MapLibre licence name wraps as "BSD 3-" /
+"Clause". It stays on one line (a non-breaking hyphen or no-wrap), with a
+render check at 360.
+- **Ruled out:** shortening or renaming the licence
+- **Built, take 189 (L-small):** `.nobr{white-space:nowrap}`
+  (src/app.html:816) on the three "BSD 3-Clause" spans; the text is
+  unchanged. Render camp at 360x800: 3 of 3 on one line; without the
+  no-wrap in the same run 2 of 3 break (PROVEN). A non-breaking hyphen was
+  ruled out: it changes the licence text the checks pin, and its glyph in
+  the offline Barlow is UNKNOWN.
+
+## A233 — The mockup's Ride beside Return home on the folded drawer (N34) · DESIGNED (the V4 mockup) · BUILT take 189
+The V4 mockup's Main screen puts Return home (primary) and Ride (secondary)
+on the folded drawer; take 188 built Return home only (N34 "not built"). The
+maintainer: the mockup is the look reference for everything it shows. Ride
+starts a free ride in one tap from the folded drawer; the tap walker's
+ceilings hold.
+- **Ruled out:** making free ride longer than two taps (landmine 135)
+- **Built, take 189 (L-ride):** `#btn-ride` (src/app.html:1163), outlined,
+  drawn only folded at rest; it opens the Ride tab and presses its Ride
+  chip. Free ride from the folded drawer: 1 tap (walker flow F, ceiling 1, at
+  411x960 and 360x800; take 188: 2); every other ceiling held (PROVEN).
+  Render per size, smoke (one watch, a refusal on denial); mutant a233
+  caught. A217's Ruled-out line about a folded Ride secondary carries a
+  dated note.
+
+## A234 — A loop's off-route re-route re-plans point-to-point to its start · FOUND take 188 (review of the audit fixes) · BUILT take 189
+Take 188 kept take 187's behaviour: a rider who leaves a loop is re-routed
+by the shortest path to the loop's start, so the rest of the loop is lost.
+The re-route re-joins the loop ahead of the rider (or re-plans the loop)
+with honest copy, with a smoke drill and a planted control.
+- **Ruled out:** re-routing a loop to where the rider stands (take 188's R1)
+- **Built, take 189 (L-ride):** `loopRejoin` (src/app.html:6667): the
+  loop's own nodes from 100 m ahead of the rider's progress to 2 mi beyond
+  that (`REJOIN_MIN_M` 100, `REJOIN_WIN_M` 3,219 m; the rest of the loop
+  when that window holds no node, src/app.html:6675–6676; never the final
+  node), nearest
+  first, up to four tries (`REJOIN_TRY`); the leg plus the loop's remaining
+  edges, "Back to the loop", the card naming what is skipped; take 188's
+  re-route only when none is found. Smoke: a 15.6 mi loop, three fixes
+  501 m off, re-joined 1.26 mi ahead keeping 37 of 43 edges (PROVEN). The
+  lane's first judge was a tautology (landmine 242), and the re-join first
+  blinded take 188's R1/R2 (landmine 243); both fixed, mutants caught.
+- **Corrected (the cold audit, F1, F2, F15):** the leg could U-turn along
+  the loop (1.80 mi with an edge ridden twice); it is cut at the first loop
+  node 100 m ahead (0 twice, 1.30 mi, PROVEN); "0.0 mi to it" holds the gap
+  in feet; a failed search is not repeated. Mutants caught.
+- **For the maintainer:** the window (from 100 m ahead to 2 mi beyond
+  that, the rest of the loop when it holds no node, src/app.html:6675–6676)
+  and four tries are the lane's numbers.
+
+## A235 — The river-run arrival estimate is not the one rule the route card, sheet and strip use · FOUND take 188 (step 13) · BUILT take 189
+Take 188's A217 made one arrival estimate for routes (card, sheet and strip
+agree); river runs kept their own. They use the same rule, and the
+render/smoke agreement check covers them.
+- **Ruled out:** a second estimate rule
+- **Built, take 189 (L-ride):** `navEta` (src/app.html:5971): a run's own
+  estimate prorated, then the paddler's pace after NAV_PACE_N moving fixes,
+  floored at the craft's slow end; card, sheet and strip read "~1:19 h" at
+  the put-in, the card keeping its range. Smoke: ten fixes at 1.0 m/s read
+  the floor, ten at 1.8 m/s "~51 min" (against 82.3 and 68.6); render v4-eta
+  on the real DOM; four mutants caught (PROVEN). The lane first called the
+  pace read PROVEN when its drill read only the floor.
+- **For the maintainer:** a run planned outside Water states "at 2–3 mph" on
+  its card while Navigate rides Water's kayak, so the two can differ, each
+  naming its assumption (PROVEN ~1:34 h vs ~1:19 h).
+
+## A236 — Map labels: glyph range 0-255 fails in headless Chrome, and labels draw in a local font · FOUND take 188 (step 3, PROVEN in headless) · BUILT take 189 (readback only; the fix waits for the Fold)
+Take 188 step 3: MapLibre fails to load glyph range 0-255, so Latin labels
+are drawn with a local font (PROVEN in headless Chrome; the Fold UNKNOWN).
+Take 189 adds a self-test line reading which font the label layers resolve
+to and whether the glyph ranges loaded, so the maintainer's Fold session
+answers it; the fix waits for that answer.
+- **Ruled out:** guessing a fix before the phone shows whether it happens
+- **Built, take 189 (L-small):** `stGlyphs()` (src/app.html:8874), one INFO
+  self-test line "RENDER · glyphs" per text-font stack: ranges loaded,
+  failed, pending; glyphs from the pack and drawn locally; the canvas font.
+  Headless Chrome 138 (PROVEN): ranges from the pack none, failed 0-255,
+  8192-8447, 9472-9727; 0 glyphs from the pack, 79 drawn locally in "48px
+  APEX, sans-serif". The Fold: UNKNOWN.
+- **Corrected (fix round 1, the cold audit F11):** the render judge accepted
+  "no glyph requested yet" and a blind all-zero line; it needs pack + local
+  above 0 and no UNKNOWN, with plants. The app's UNKNOWN branch for a
+  renamed glyph-manager field has no real-engine drill (UNKNOWN).
+
+## A237 — A place card says "152 mi SSE of you" before any GPS fix · FOUND take 189 (integration shots, PROVEN) · BUILT take 189
+Every pin card's distance line reads "N mi <direction> of you" while the
+same card's footer says "MAP CENTRE · no GPS fix yet". placeDist() guards
+`if(!ME)`, but ME holds the region centre until a fix arrives, so the guard
+never fires (the same dead guard as take 190's Mark this spot). Take 189
+measures "of you" from a live fix only; without one the line names what it
+is measured from, or is absent. One reader of "is there a live fix" serves
+both this card and take 190's Mark.
+- **Ruled out:** a distance "of you" from a point that is not the rider; dropping the distance when a live fix exists
+- **Built, take 189 (L-small):** one reader, `liveFix()` (src/app.html:6839):
+  ME on the last real in-region fix, and that fix under GPS_STALE_MS (15 s)
+  old; `meNoun()` names the point every place card measures from ("of you",
+  "of your last GPS fix (h:mm)", "of the simulated position", "of the
+  planning start", "of the start pin"); "You are here" only from a live fix.
+  Routing unchanged. Render with no GPS: "147 mi SSE of the start pin";
+  smoke: "99 mi SE of you", "of the start pin", "of your last GPS fix
+  (12:18 PM)" (PROVEN). The line names the start pin, not the plan's "map
+  centre": the distance is measured from ME, the start pin. Fix round 2
+  bounded "of you" by the fix's age, not by an open watch, and printed the
+  fix's own clock (the first clock read FIX_T and printed 1970; landmine
+  244).
+- **Corrected (the cold audit, F3, F4, F10, F20; the live-fix readers):**
+  Dispatch printed an old fix or a hand-moved pin as the rider's location —
+  with no live fix it prints the last real fix with its time and age and
+  says so, and refuses with none (src/app.html:6163–6218); Locate said "You
+  are here" at the startup fix all session — it flies only to a live fix,
+  otherwise names the last fix and takes a fresh one; the self-test's
+  dispatch-scan noun; the footer's "DD" is "DD · MAP CENTRE"
+  (app.html:9887). Mutants caught.
+- **For the maintainer:** the 15 s bound also applies after a one-shot
+  Locate; the no-fix wording "of the start pin" (or no line); Dispatch takes
+  no fresh fix first.
+
+## A238 — Route cards cut a row when the route is planned for the dirt bike · FOUND take 189 (L-render, PROVEN at 4 of 5 sizes) · BUILT take 189
+With the route planned for the dirt bike, render's "the route cards show
+whole rows" failed at 412, 430, 411 and 749 wide: the row "hardest ORV trail
+50"" was cut by the options box (render-t189-L-render-prof-5.log). The full
+render plans for the side-by-side only, so it never read this card; a bike
+rider sees it. Take 189 reproduces it, fixes the fit, and makes render read
+the bike's cards too.
+- **Ruled out:** reading only the side-by-side's cards; shrinking the row below the type and tap floors
+- **Built, take 189 (L-ride):** rcFit keeps the fractional line and sets the
+  box to it, unfloored (0.69 px of row was cut at 412x915, PROVEN). The
+  bike's box: 234.797 px at mid, large and cover, 168.797 at small and inner,
+  no row cut, at rest and riding (PROVEN). Render plans the bike's route from
+  the routes drill's start and reads its cards at five sizes, with a judge
+  that fails a fit more than 9 px short of the largest uncut line. The
+  lane's first fix floored the line and cost three rows (234 → 168 px), and
+  its first bike pass read a different route and passed the pre-fix build
+  (landmine 242); both now fail at 3 of 5 (PROVEN).
+
+## A239 — Render's trails section prints no check; its label line names a failure that does not exist · FOUND take 189 (L-render, PROVEN) · BUILT take 189
+At the trails section's anchor (Silver Lake Dunes, an open riding area) no
+trail line draws at z14.5, so the line check prints "--" (skipped) and the
+trail-name label check prints "NOT MEASURABLE — no trail geometry drew in
+this run, see the failure above" with no failure above it (landmine 55's
+shape). The trail-name label check has not run in any take-189 render. Take
+189 reads it where trail geometry draws, and a run where it cannot be
+measured fails rather than skips; the section floor counts it.
+- **Ruled out:** leaving the section's floor at 0; a log line that names a failure that did not happen
+- **Built, take 189 (L-small):** the camera goes to the named designated
+  stroke nearest the region centre (the app's stLabels rule, no typed
+  coordinate); "WHR", 40 trail segments, 5 trail-name labels (PROVEN). A run
+  where nothing draws fails both checks; the floor is 2. Plants: printed
+  instead of judged → "SHORT: trails 0 of 2"; the dunes camera → both FAIL
+  (PROVEN).
+
+## A240 — At 360 px wide a tapped place card folds itself about 0.5 s after it opens · FOUND take 189 (Phase B integration probe, PROVEN) · BUILT take 189
+After a tap on a pin at 360x800 the drawer opens, MapLibre's own resize()
+fires 3-5 times, and on a later resize's moveend railFoldIfAway() — the
+only fold on moveend — folds the drawer: the rider's card is gone before
+it can be read. PROVEN identical on the pre-lane build 85f337d
+(~/apex-logs/probe-t189-integrate-L-ride-L-small-refold2-*.log). A camera
+move the rider did not make must not fold a card the rider just opened.
+Why the map resizes (cold audit, PROVEN by code read and a probe): the drawer
+is a grid row under #stage (#shell is `grid-template-rows:1fr auto auto`),
+so its slide shrinks the stage, MapLibre's ResizeObserver answers each step
+with resize(), which keeps the centre and fires moveend with no input event;
+a pin above the centre rides up by half the height lost (182 px at 360x800:
+a pin at 70 px went to -21, one at 24 px to past -40). Built (cold audit):
+railFoldIfAway folds only on a moveend that carries an input event (a drag,
+pinch, wheel, keys or double-tap: the rider's), the follow camera's existing
+rule; the app's own eases no longer fold a card either. Render: realdom
+taps a pin 24 px under the map's top at 360x800 (its control, the old rule,
+folds it) and ui's pan-away drill is a real drag (it was a jumpTo).
+- **Ruled out:** removing the fold-when-panned-away rule (take 188: a rider who pans away gets the map back); a timer that ignores moveend for a fixed time after a card opens
+- **Built, take 189 (the cold audit):** railFoldIfAway returns unless the
+  moveend carries an input event (src/app.html:9772). Render realdom taps a
+  pin 24 px under the top at 360x800 and the card stays open (control, the
+  old rule: folded); ui's pan-away drill is a real drag and still folds
+  (x 206 → −90); the app's own jumpTo leaves the card open (PROVEN). Three
+  pins drills had leaned on the self-fold and were fixed to fold the drawer
+  themselves (landmine 240); a synthetic MouseEvent drag gives no moveend
+  (landmine 239).
+- **For the maintainer:** the app's own eases (Locate, a search fly-to, the
+  follow camera) no longer fold a card either.
+
+## A241 — Render's remaining time: what A227 did not reach · FOUND take 189 (L-render's profile) · OPEN (option (a) declined by the maintainer, 2026-10-02)
+A227 reached −18% to −24% against a 30% target (634 s against 587 s for
+608 checks, PROVEN), and the take's 50 new checks took it back toward the
+baseline (724 s for 658, PROVEN, one run). What is left, from L-render's
+final profile (INFERRED): four app loads, about 25 s each (boot, respawn,
+G6, V4); the app's own self-test three times, about 80 s, two of them
+through its fixed 20 s GPS window; the nav drills' camera eases, about 64 s
+(900 ms per fix); the device matrix, about 155 s, mostly MapLibre redraws
+when the drawer resizes the map (each 0.2–0.6 s at dpr 2.6–3 under
+SwiftShader). Option (a): re-trigger rcFit with a `resize` event instead of
+closing and reopening the drawer 35 times, about −35 s (INFERRED); it
+changes the trigger path of take-188 guards, so it waited for the
+maintainer; on 2026-10-02 he accepted A227's −24% and asked for the rest to
+stay open, without option (a). Timings are compared only A/B in one window
+(landmine 246).
+- **Ruled out:** dropping, merging or weakening checks; a GPU renderer;
+  several Chromes in one render (A227's own list).
+- **Ruled out:** rendering at pixelRatio 1 in DOM-only blocks (it changes what
+  draws and can hide dpr bugs); dropping the respawn (take 173's memory risk,
+  and the tail would start from another state); the vsync and frame-rate
+  flags (measured, no effect).
+
+## A242 — The self-test's safety drill leaves its truck marker and breadcrumb line on the map · FOUND take 189 (the cold audit, code read) · OPEN
+stSafety (src/app.html:8623) runs a 25-fix drill through startRecording
+and record, then puts back TRUCK, crumbs, crumbMi, posMode, ME, RIDE and the
+resume flags as values. It does not move the truck's map marker back or
+reset the breadcrumb line's map source, so after a self-test the map can
+show the drill's truck pin at the region centre and its 25-point track
+until something redraws them (INFERRED from the code; not observed in a
+render or on the phone). Take 84's rule — a drill puts back everything it
+moved — covers it.
+- **Ruled out:** skipping the drill (the self-test is the field check of
+  recording); running it on the rider's real track (it would write into the
+  rider's ride).
+
+## A243 — The elevation readouts show the map centre's elevation with no word saying so · FOUND take 189 (the cold audit, beside F20) · OPEN
+refreshReadout (src/app.html:9872) fills `#ro-elev` ("N ft elevation",
+under the scale) and the ride sheet's Elevation cell `#v-elev` from
+`map.getCenter()`. While following, the centre is near the rider; panned,
+or before a fix, it is wherever the map is. The footer's coordinate now says
+MAP CENTRE (F20); these two say nothing (INFERRED: a rider reads the ride
+sheet's Elevation as their own).
+- **Ruled out:** labelling the ride sheet's cell with a guess of the rider's
+  elevation from a stale fix; dropping the readout (take 65 made it say
+  which number it is).
+
+## A244 — Two harness defects found in take 189 and not fixed · FOUND take 189 · OPEN
+(1) `--only=stacks` alone fails two checks on unchanged code ("the same town
+inside band 14 …" and "the same camera stacks different things per mode")
+— every passing stacks run had water before it, so SECTIONS' `stacks: []`
+is an undeclared setup (PROVEN, render-t189-L-small-only-stacks-1; INFERRED
+fix `["water"]`, not tried). Lanes touching stacks or pins pass `water` until
+it is declared (landmine 237). (2) smoke's Marker stub `remove()` splices
+`indexOf(this)` without checking for −1, so removing a marker already
+removed drops the list's last marker; by the stop drill it had dropped the
+app's me-marker (PROVEN, smoke5-t189-L-small-fix2-1; the drill reads a new
+never-spliced list). Other counts that read the list may be off (UNKNOWN).
+- **Ruled out:** declaring every section dependent on every earlier one (it
+  makes `--only` the full run); loosening the two stacks checks.
+
+## A245 — A cold build during a USGS outage ships without gauges, and render then fails it · FOUND take 189 (the seal's §6b clean run, PROVEN) · OPEN
+The clean run's gauges step met NWIS answering HTTP 503 twice; with no
+earlier payload in an empty directory, tools/gauges.py omitted the inventory
+as A191 designed ("payload omitted, the card simply offers no conditions
+button"), the bundle built without gauges.json (optional), and render's
+paddle check "the bundle carries the USGS gauge inventory" failed: 657 ok, 1
+FAIL in 758 s (PROVEN, ~/apex-logs/pipeline-t189-seal-clean-1.log lines
+41–45 and render-t189-seal-clean-1.log). NWIS answered HTTP 200 when the
+seal resumed the next morning; the gauges, bundle, build_app and smoke
+steps rerun in the clean directory gave 244 sites, as the main tree has,
+and render passed 658/0
+(render-t189-seal-clean-2.log). The build's honest omission and the render's
+demand disagree: a CI run with a cold region cache during an outage would be
+red for a layer the product is designed to do without (INFERRED; CI restores
+the previous payload from its cache, so a warm runner keeps building). Which
+of the two is right is the maintainer's call.
+- **Ruled out:** loosening render's gauge check without his word (it is how a
+  silently lost layer is caught); failing the build on the omission (A191
+  chose to keep building through one public service's refusal).
+
+## A246 — The palette check counted the fsroad casing over the whole viewport · FOUND take 189 (the seal's §6b clean run, PROVEN) · BUILT take 189
+verify_palette's "casing covers every fsroad feature" compared two counts
+from viewport-wide queryRenderedFeatures. That query hit-tests a line by its
+stroke, so a forest road lying wholly off the canvas, 1 px past its edge, is
+reported by the casing (about 2.4 px wide at z13.5) and not by the road
+(about 1.3 px). The clean run's
+fresh data put edge 142782 there: 25 casings for 24 roads, every road cased
+(PROVEN, ~/apex-logs/probe-t189-seal-casing-1.log, twice on the clean data;
+the main tree's older data read 12 = 12). The judge is now by feature, both
+ways (tools/verify_palette.mjs section 4): every road drawn has its casing,
+and a casing the road does not report must be a forest road lying wholly
+off the canvas. Its plants (a road with its casing removed, a casing on the
+canvas the road does not draw, an off-canvas casing of another class) fail
+it, and the geometry test reads the drawn roads' casings as on the canvas
+(PROVEN, palette-t189-seal-fix-1.log; 31 checks, was 30). CI builds the same
+fresh data, so the old judge would have been red there too (INFERRED).
+- **Ruled out:** `casing >= fsroad` (it passes a casing drawn where no road
+  is); moving the test's centre (the next data change can put a road on the
+  new edge); querying an inset box (a stroke reaches across any box's edge).
