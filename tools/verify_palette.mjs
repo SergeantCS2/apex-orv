@@ -201,18 +201,59 @@ ok(floor48(rows.out),
    `every real control is >= 48 px for gloves (smallest ${Math.min(...rows.out.filter(r => !r.tier).map(r => r.height))} px)`);
 
 console.log("\n4 · the fsroad casing draws");
+/* take 189 seal · the judge was `casing count === fsroad count` over the whole
+   viewport. queryRenderedFeatures hit-tests a line by its stroke, so a forest
+   road lying wholly off the canvas, 1 px past its edge, is reported by the
+   wider casing (about 2.4 px at z13.5) and not by the 1.3 px road: the §6b clean
+   run's fresh data put edge 142782 there and read 25 = 24 with every road
+   cased (PROVEN at the seal, twice; landmine 247, A246).
+   The claim is unchanged and judged by feature, both ways: every road drawn
+   has its casing, and a casing the road does not report must be a forest
+   road lying wholly off the canvas. Its three plants must fail first. */
 const drew = await page.evaluate(() => {
   window.map.jumpTo({ center: window.PALTEST_CENTRE || [-84.09, 44.57], zoom: 13.5 });
   return new Promise((r) => window.map.once("idle", () => {
-    const q = (id) => { try { return window.map.queryRenderedFeatures({ layers: [id] }).length; } catch { return -1; } };
-    r({ fsroad: q("fsroad"), casing: q("casing-fsroad"),
-        track: q("track"), casingTrack: q("casing-track") });
+    const m = window.map, W = m.getCanvas().clientWidth, H = m.getCanvas().clientHeight;
+    const q = (id) => { try { return m.queryRenderedFeatures({ layers: [id] }); } catch { return null; } };
+    const key = (f) => (f.properties.c || "") + "|" + (f.properties.i ?? "") + "|" + JSON.stringify(f.geometry.coordinates);
+    /* does the feature's geometry touch the canvas? a vertex inside, or a
+       segment crossing one of its four edges (both ends outside) */
+    const inR = (p) => p.x >= 0 && p.y >= 0 && p.x <= W && p.y <= H;
+    const cross = (a, b) => { const ts = [];
+      if (a.x !== b.x) ts.push((0 - a.x) / (b.x - a.x), (W - a.x) / (b.x - a.x));
+      if (a.y !== b.y) ts.push((0 - a.y) / (b.y - a.y), (H - a.y) / (b.y - a.y));
+      return ts.some((t) => t >= 0 && t <= 1 && inR({ x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) })); };
+    const touches = (f) => { const g = f.geometry, L = g.type === "LineString" ? [g.coordinates]
+        : g.type === "MultiLineString" ? g.coordinates : null; if (!L) return true;
+      for (const line of L) { const P = line.map((c) => m.project(c));
+        for (let i = 0; i < P.length; i++) { if (inR(P[i])) return true; if (i && cross(P[i - 1], P[i])) return true; } }
+      return false; };
+    const F = q("fsroad"), C = q("casing-fsroad");
+    r({ fsroad: F ? F.length : -1, casing: C ? C.length : -1,
+        fsK: (F || []).map(key), cas: (C || []).map((f) => ({ k: key(f), c: f.properties.c, on: touches(f) })) });
   }));
 });
+/* judge: a multiset of road keys against the casing list */
+const casingJudge = (fsK, cas) => {
+  const left = new Map(); for (const c of cas) left.set(c.k, (left.get(c.k) || 0) + 1);
+  let missing = 0; for (const k of fsK) { const n = left.get(k) || 0; if (n) left.set(k, n - 1); else missing++; }
+  const extra = cas.filter((c) => { const n = left.get(c.k) || 0; if (n) { left.set(c.k, n - 1); return true; } return false; });
+  const stray = extra.filter((c) => c.c !== "fsroad" || c.on);
+  return { missing, extra: extra.length, stray: stray.length, ok: missing === 0 && stray.length === 0 };
+};
 ok(drew.fsroad > 0, `fsroad draws ${drew.fsroad} features`);
 ok(drew.casing > 0, `casing-fsroad draws ${drew.casing} features`);
-ok(drew.casing === drew.fsroad,
-   `casing covers every fsroad feature (${drew.casing} = ${drew.fsroad})`);
+{ const one = drew.cas.findIndex((c) => drew.fsK.includes(c.k));
+  const pMiss = drew.cas.filter((_, i) => i !== one);
+  const pOn = drew.cas.concat([{ k: "fsroad|planted|on", c: "fsroad", on: true }]);
+  const pCls = drew.cas.concat([{ k: "track|planted|off", c: "track", on: false }]);
+  /* and the geometry test is live: the casings of roads drawn on screen read as on the canvas */
+  const onN = drew.cas.filter((c) => drew.fsK.includes(c.k) && c.on).length;
+  ok(one >= 0 && onN > 0 && !casingJudge(drew.fsK, pMiss).ok && !casingJudge(drew.fsK, pOn).ok && !casingJudge(drew.fsK, pCls).ok,
+     `the casing judge rejects its plants (a road with its casing removed, a casing on the canvas the road does not draw, an off-canvas casing of another class); ${onN} drawn roads' casings read as on the canvas`); }
+const cj = casingJudge(drew.fsK, drew.cas);
+ok(cj.ok,
+   `casing covers every fsroad feature (${drew.fsroad} roads, ${cj.missing} without a casing; ${cj.extra} more casing feature(s), ${cj.stray} of them on the canvas or of another class)`);
 
 await browser.close();
 srv.close();

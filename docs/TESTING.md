@@ -73,6 +73,9 @@ simulated positions. Please ride it.
   and it should snap back.
 - Tap **North up** in the ride sheet for north-up. Tap again for heading-up.
 - Does the screen stay on while it's following?
+- For a ride with no route, tap **Ride** beside Return home on the folded
+  drawer: one tap. It should open the Ride tab and start recording on the
+  first GPS fix.
 
 **Turn by turn**
 
@@ -107,8 +110,9 @@ simulated positions. Please ride it.
 - **Location ON, deep under trees, phone just switched on.** Tap Ride it.
   The chip should read Stop (GPS) and wait for as long as the first fix
   takes — it should NOT tell you to turn location on. Until the fix, the
-  strip at the top should read "—", not a speed. How long did the first
-  fix take?
+  strip at the top should read "Waiting for a GPS fix", never a speed, and
+  the folded drawer's line "Waiting for a GPS fix — nothing recorded yet"
+  ("— N mi recorded, kept" on a resumed trip). How long did the first fix take?
 - With a route up, tap a different route card. If the chosen card has
   warnings you cannot see, the line above Save should say how many
   ("N more warnings below"); if it has none hidden, that line should go.
@@ -146,6 +150,9 @@ simulated positions. Please ride it.
   the next access or campground. If a dam you know about is *not* called,
   report that first.
 - Reach the take-out: it should say so.
+- The run's card, the ride sheet and the strip should give the same time
+  at the put-in; after about ten moving fixes it follows your own pace. Is
+  it believable?
 
 ## 5. Routing — check it against the ground
 
@@ -193,6 +200,14 @@ follows — layers, pins, routing, the machine button.
   way until you're zoomed well in — except in Water mode, where a paddler
   wants every launch. Does the map now read clean where it used to be a
   pile? Is anything you rely on gone?
+- Some pins are labelled only by what they are ("Information",
+  "Trailhead"): the source gave them a placeholder name such as "A" or a
+  post number, and the card shows it ("The source names it only “11”").
+  If that number is what you navigate by, tell us.
+- Tap a pin: its card stays open (at 360 px wide it used to fold itself),
+  and its distance reads "of you" only while the phone has a live GPS fix.
+  Without one it says what it measured from: "of the start pin", or "of
+  your last GPS fix (time)".
 
 ## 8. Imagery
 
@@ -246,9 +261,15 @@ follows — layers, pins, routing, the machine button.
 
 - **Dispatch card**: your coordinates *and* the nearest address. Read it
   against your maps app. **If the address is wrong, report it with the
-  coordinates.** This is the feature meant to work when you're hurt.
+  coordinates.** This is the feature meant to work when you're hurt. With
+  no live fix it prints your last GPS fix with its time and age and says
+  it is not a live position; with no fix at all it prints no coordinate.
+- **Locate**: it should fly to you only on a live fix. Otherwise it says
+  when your last fix was and tries for a new one.
 - **Compass**, **Mark this spot**, **breadcrumb trail**, **truck pin**: do
-  they do what they say?
+  they do what they say? On a small phone, opening Compass or Diagnostics
+  while riding hides four of the Tools chips until you close it (Compass,
+  Mark this spot and Diagnostics stay), so the panel has room.
 - **Self-test**: run it and send anything that fails. It should also report
   zero remote requests.
 

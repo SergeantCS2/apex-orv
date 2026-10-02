@@ -309,10 +309,11 @@ function strokeLen(pts){
 
  
  
+ 
 function placeDist(p){
   if(!ME)return '';
   var d=mi(ME,p);
-  return d.toFixed(d<10?1:0)+' mi '+compass(bearing(ME,p))+' of you';}
+  return d.toFixed(d<10?1:0)+' mi '+compass(bearing(ME,p))+' of '+meNoun();}
 
  
 function chainStrokes(key,geo){
@@ -533,7 +534,9 @@ var poif=((POIS&&POIS.p)||[]).map(function(r,i){
     properties:{i:i,k:r.k,h:k.h,c:k.c,r:k.r,d:k.d?1:0,pri:(r.pri==null?3:r.pri),
       ct:r.ct?JSON.stringify(r.ct):'',w:r.w?1:0,
        
-      n:r.n||k.h,named:r.n?1:0,mi:r.mi||0},
+      n:r.n||k.h,named:r.n?1:0,mi:r.mi||0,
+       
+      ph:(typeof r.ph==='string')?r.ph:''},
     geometry:{type:'Point',coordinates:r.p}}});
 
  
@@ -576,10 +579,15 @@ var PADKIND={};
  
 var PADDLE_MPH=2.5, PADDLE_SPREAD=0.5;
 
+ 
+function paddlePace(){var mc=MACHINE[machine]||{};
+  return mc.mph?{mph:mc.mph,spr:mc.spread||PADDLE_SPREAD,craft:mc.lbl}:{mph:PADDLE_MPH,spr:PADDLE_SPREAD,craft:null}}
+ 
+function paddleMin(miles){return miles/paddlePace().mph*60}
 function paddleHours(miles){
    
-  var mc=MACHINE[machine]||{};
-  var mph=mc.mph||PADDLE_MPH, spr=mc.mph?(mc.spread||PADDLE_SPREAD):PADDLE_SPREAD;
+  var pp=paddlePace();
+  var mph=pp.mph, spr=pp.spr;
   var slow=miles/(mph-spr), fast=miles/(mph+spr);
   var fmt=function(h){
     if(h<1)return Math.round(h*60)+' min';
@@ -729,7 +737,47 @@ function cmpPaint(){
     '</div></div>'+
     (rows.length?'<div style="margin-top:9px;line-height:1.7">'+rows.join('<br>')+'</div>'
      :'<div class="sub" style="margin-top:9px">Nothing to take a bearing to yet — '+
-      'pin the truck, set home, or save a waypoint.</div>')}
+      'pin the truck, set home, or save a waypoint.</div>');
+   
+  var k=(hdg===null?'n'+MAG_OK:'h'+(H&&H.src))+'|'+rows.join('|');
+  if(k!==CMP_KEY){CMP_KEY=k;cmpFit()}}
+var CMP_KEY='';
+ 
+function cmpFit(){try{
+  var p=el('cmppanel'),b=el('cmpbox'),mo=el('cmpmore');
+  if(!p||!b||!p.getBoundingClientRect)return;
+  p.style.removeProperty('--cmp-trim');if(mo){mo.hidden=true;mo.style.visibility=''}
+  CMP_GEO=cmpGeo();
+  if(p.hidden||!(p.offsetHeight>0))return;
+  if(p.scrollHeight<=p.clientHeight+1)return;
+  if(mo)mo.hidden=false;
+  var f=b.firstElementChild,trim=0;
+  for(var pass=0;pass<3;pass++){
+    var pr=p.getBoundingClientRect(),sc=pr.height/(p.offsetHeight||1)||1,
+        off=function(y){return (y-pr.top)/sc},
+        vb=(mo&&!mo.hidden)?off(mo.getBoundingClientRect().top):p.clientTop+p.clientHeight,
+        fb=f?off(f.getBoundingClientRect().bottom):0,cut=null,
+        tw=document.createTreeWalker(b,4,null,false),n,rg=document.createRange();
+    while((n=tw.nextNode())){rg.selectNodeContents(n);
+      var rs=rg.getClientRects();
+      for(var i=0;i<rs.length;i++){var t0=off(rs[i].top),t1=off(rs[i].bottom);
+        if(rs[i].height>0&&t0>=fb-0.5&&t0<vb-0.5&&t1>vb+0.5)cut=cut===null?t0:Math.min(cut,t0)}}
+    if(cut===null)break;
+     
+    trim+=p.offsetHeight-Math.floor(p.offsetHeight-(vb-cut));
+    p.style.setProperty('--cmp-trim',trim+'px')}
+  cmpCue()}catch(e){}}
+ 
+function cmpCue(){try{
+  var p=el('cmppanel'),mo=el('cmpmore');
+  if(!p||!mo||mo.hidden)return;
+  mo.style.visibility=(p.scrollTop+p.clientHeight>=p.scrollHeight-1)?'hidden':''}catch(e){}}
+try{el('cmppanel').addEventListener('scroll',cmpCue)}catch(e){}
+ 
+var CMP_GEO='';
+function cmpGeo(){try{var c=document.documentElement.style;
+  return [c.getPropertyValue('--ride-top'),c.getPropertyValue('--sheet-h'),c.getPropertyValue('--strip-h'),
+    window.innerHeight].join('|')}catch(e){return ''}}
 
 function runCard(a,b,riv){
   var c=null,i;
@@ -765,12 +813,13 @@ function runCard(a,b,riv){
     rows.push('<span class="sub">Tapped in the other order — a river only runs '+
       'one way, so this is the run.</span>');
   var _mc=MACHINE[machine]||{}, _craft=_mc.mph?_mc.lbl:null;
-  rows.push('Roughly <b>'+paddleHours(hi-lo)+'</b> of paddling'+
+   
+  rows.push('About <b>~'+etaTxt(paddleMin(hi-lo))+'</b> of paddling'+
     (dams.length?' plus the portage'+(dams.length>1?'s':''):'')+
-    ' <span class="sub">'+(_craft?'as a '+_craft.toLowerCase()+' at '+
+    ' <span class="sub">('+paddleHours(hi-lo)+' '+(_craft?'as a '+_craft.toLowerCase()+' at '+
       (_mc.mph-_mc.spread)+'\u2013'+(_mc.mph+_mc.spread)+' mph, calibrated '
       :'at 2\u20133 mph, which is what these floats work out at ')+
-    'against the liveries\u2019 own times</span>');
+    'against the liveries\u2019 own times)</span>');
   logAct('act  run '+nm(putIn)+' -> '+nm(takeOut));
   show('<div class="tn">The run \u2014 <span class="sub">'+riv+'</span></div>'+
     rows.join('<br>')+
@@ -2236,8 +2285,8 @@ function buildSavedPanel(){
 var last=null,sel=null;
  
  
-function routeAuto(auto){return (auto&&typeof auto==='object')?{k:auto.k||null,resume:!!auto.resume}
-  :{k:typeof auto==='string'?auto:null,resume:false}}
+function routeAuto(auto){return (auto&&typeof auto==='object')?{k:auto.k||null,resume:!!auto.resume,rejoin:auto.rejoin||null}
+  :{k:typeof auto==='string'?auto:null,resume:false,rejoin:null}}
 function routeToPoint(dest,label,auto){
   logAct('route to '+(label||'?'));
    
@@ -2333,15 +2382,17 @@ function fitLoop(start,targetMi,base,bearing){
   }
   return best}
 
+ 
+var LOOP_SHAPES=[
+  {h:'Loop · most trail',k:'ltrail',f:function(e){
+      return e.L*(DESIG[e.c]?0.55:DIRT[e.c]?1.3:8)}},
+  {h:'Loop · fastest',k:'lfast',f:function(e){return e.L/spd(e)}}
+];
 function buildLoops(startNode,targetMi){
   var out=[];
    
    
-  var shapes=[
-    {h:'Loop · most trail',k:'ltrail',f:function(e){
-        return e.L*(DESIG[e.c]?0.55:DIRT[e.c]?1.3:8)}},
-    {h:'Loop · fastest',k:'lfast',f:function(e){return e.L/spd(e)}}
-  ];
+  var shapes=LOOP_SHAPES;
   shapes.forEach(function(sh){
     var best=null;
     for(var b=0;b<360;b+=90){
@@ -2356,6 +2407,12 @@ function buildLoops(startNode,targetMi){
 el('btn-home').addEventListener('click',function(){
   if(!HOME)return homeCard('<b>No home set.</b> ');    
   routeToPoint(HOME,'home')});
+ 
+el('btn-ride').addEventListener('click',function(){
+  if(rideMode||riding)return;
+  logAct('act  ride (folded drawer)');
+  showTab('ride');
+  el('c-ride').click()});
 
  
 function rcFit(){try{
@@ -2382,6 +2439,7 @@ function rcFit(){try{
       var room=mh-top-rowH,foot=Infinity;
       if(rr.height>room+0.5){
         foot=room;
+         
         var kids=R.querySelectorAll('.rc > *'),line=room,moved=true,it=0;
         while(moved&&it++<40){moved=false;
           for(var i=0;i<kids.length;i++){var k=kids[i].getBoundingClientRect();if(k.height<=0)continue;
@@ -2390,8 +2448,8 @@ function rcFit(){try{
          
         var c0=R.querySelector('.rc.sel')||R.querySelector('.rc'),k2=c0&&c0.children[1],
             need=k2?k2.getBoundingClientRect().bottom-rr.top+R.scrollTop:1;
-        if(line>0&&line>=need-0.5){R.style.maxHeight=Math.floor(line)+'px';foot=Math.floor(line);
-          var g=Math.ceil(room-Math.floor(line));
+        if(line>0&&line>=need-0.5){R.style.maxHeight=line+'px';foot=line;
+          var g=Math.ceil(room-line);
           if(riding){if(row)row.style.marginTop=(rm+g)+'px'}else tn=g}}
       var ws=R.querySelectorAll('.rc.sel .warn');
       for(var w=0;w<ws.length;w++){var wr=ws[w].getBoundingClientRect();
@@ -2425,6 +2483,8 @@ function renderRoutes(out,auto){
       '<div class="big">'+s.mi.toFixed(1)+' <span class="sub">mi</span></div>'+
       '<div class="sub">~'+etaTxt(s.hrs*60)+
         ' · '+s.off.toFixed(1)+' mi off-pavement</div>'+
+       
+      (o.note?'<div class="sub">'+o.note+'</div>':'')+
        
       (overFuel?'<div class="sub warn">'+ic('fuel')+(s.mi-fuel).toFixed(1)+' mi past your range</div>':'')+
       (dark?'<div class="sub warn">'+ic('dark')+'arrives after dark</div>':'')+
@@ -2465,13 +2525,17 @@ function renderRoutes(out,auto){
     if(w.fuel)bits.push(w.fuel.toFixed(1)+' mi past your range');
     if(w.dark)bits.push('arrives after dark');
     if(w.adv)bits.push(w.adv.toFixed(1)+' mi unverified (OSM)');
-    if(w.snap)bits.push('+'+w.snap.toFixed(1)+' mi off-network');
+     
+    if(w.snap)bits.push(ra.rejoin?w.snap.toFixed(1)+' mi of it off-network':'+'+w.snap.toFixed(1)+' mi off-network');
      
     if(!rideMode&&!riding){
       logAct('route cards held: the ride they were for is not running');return}
     if((w.fuel&&!(w0&&w0.fuel))||(w.dark&&!(w0&&w0.dark)))show(html,'');
     else rideCard(html,'',ra.resume
-      ?'Trip resumed \u00b7 route to '+(DESTLBL||'there')+(bits.length?' \u00b7 '+bits.join(' \u00b7 '):' is on the map')
+      ?(rideWaiting()?GPS_WAIT:'Trip resumed')+' \u00b7 route to '+(DESTLBL||'there')+(bits.length?' \u00b7 '+bits.join(' \u00b7 '):' is on the map')
+       
+      :ra.rejoin?'Back to the loop \u00b7 '+navFmt(ra.rejoin.leg*1609.34)+' to it, '+ra.rejoin.rest.toFixed(1)+' mi of it left'+
+        (bits.length?' \u00b7 '+bits.join(' \u00b7 '):'')
       :'Re-routed \u00b7 '+(bits.length?bits.join(' \u00b7 '):'the new route is on the map'))}
   else show(html,'');
    
@@ -3211,7 +3275,7 @@ function rideStart(at){
   RIDE.pulse=setInterval(function(){
     if(!RIDE)return;
      
-    try{hudPaint();if(NAV.on)navChip()}catch(e){}
+    try{hudPaint();if(NAV.on)navChip();peekGps()}catch(e){}
      
     if(++RIDE.ticks%3===1)batteryNow().then(function(b){
       if(RIDE&&b){RIDE.batt1=b.lvl;RIDE.chg=RIDE.chg||b.chg}});
@@ -3235,6 +3299,15 @@ var FIX_T=0,GPS_STALE_MS=15000;
 function fixStale(){return posMode==='gps'&&FIX_T>0&&Date.now()-FIX_T>GPS_STALE_MS}
 function fixClock(){try{return new Date(FIX_T).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
   catch(e){return 'the last one'}}
+ 
+var PEEK_LIVE='Recording \u00b7 live GPS';
+function peekGpsText(){return fixStale()?'No GPS fix since '+fixClock():PEEK_LIVE}
+function peekGps(){var t=el('peek-txt');if(!t||!gotFix)return;
+  var cur=String(t.textContent||''),lost=cur.indexOf('No GPS fix since ')===0;
+   
+  if(cur!==PEEK_LIVE&&!lost&&cur.indexOf('Truck ')!==0)return;
+  var w=fixStale()?peekGpsText():lost?(railPeekText()||PEEK_LIVE):cur;
+  if(cur!==w)t.textContent=w}
 
 function hudSet(mps,deg,at,quiet){
    
@@ -3296,7 +3369,9 @@ function ridePublish(){try{
   if(fr&&fr.height>0&&rb&&isFinite(low)){
     var cap=rb.getBoundingClientRect().height+fr.top-low-GAP;
     if(isFinite(cap)){var cv=Math.floor(cap)+'px';
-      if(de.style.getPropertyValue('--ride-cap')!==cv){de.style.setProperty('--ride-cap',cv);rcFit()}}}}catch(e){}}
+      if(de.style.getPropertyValue('--ride-cap')!==cv){de.style.setProperty('--ride-cap',cv);rcFit()}}}}catch(e){}
+   
+  if(CMP_ON&&cmpGeo()!==CMP_GEO)cmpFit()}
 
 function hudPaint(){
   var b=el('hudbar');
@@ -3356,13 +3431,14 @@ function clockParts(ms){
 var NAV_PACE_N=10;
 function etaParts(min){return clockParts(Math.max(1,Math.round(min))*60000)}
 function etaTxt(min){var c=etaParts(min);return c[0]+' '+c[1]}
-function navEta(remainM,G){
+ 
+function navEta(remainM,hrs,totalM,river){
   if(_navSpd.length>=NAV_PACE_N){
     var spd=_navSpd.reduce(function(a,b){return a+b},0)/_navSpd.length;
-    spd=Math.max(spd,((MACHINE[machine]||{}).spd||3)*0.44704);
+    var pp=river?paddlePace():null;
+    spd=Math.max(spd,(river?pp.mph-pp.spr:((MACHINE[machine]||{}).spd||3))*0.44704);
     return remainM/spd/60}
-  var hrs=(G&&G.o&&G.o.s&&isFinite(G.o.s.hrs))?G.o.s.hrs:null;
-  return (hrs!==null&&G.total>0)?hrs*60*remainM/G.total:null}
+  return (hrs!==null&&isFinite(hrs)&&totalM>0)?hrs*60*remainM/totalM:null}
  
 var HUDG=null;
 function hudRouted(){return !!(NAV.on&&(RUN||(last&&sel!==null)))}
@@ -3421,11 +3497,17 @@ function rideReport(R){
   L.push('--- end ---');
   return L.join('\n')}
 
+ 
+function truckPin(){
+  if(!tM)tM=new maplibregl.Marker({element:mk('truck','truck')}).setLngLat(TRUCK).addTo(map);
+  else tM.setLngLat(TRUCK)}
 function startRecording(at){
    
   if(RESUMING){RESUMING=false;
     if(!crumbs.length){crumbs=[at.slice()];crumbMi=0}
     if(!TRUCK)TRUCK=(crumbs[0]||at).slice();
+     
+    truckPin();
     rideStart(at);
     if(RESUMED_RIDE){RIDE.t0=RESUMED_RIDE.t0;RIDE.mi0=RESUMED_RIDE.mi0||0;RESUMED_RIDE=null}
      
@@ -3434,8 +3516,7 @@ function startRecording(at){
   TRUCK=at.slice(); crumbs=[at.slice()]; crumbMi=0;
   rideStart(at);
   hudShow(true);
-  if(!tM)tM=new maplibregl.Marker({element:mk('truck','truck')}).setLngLat(TRUCK).addTo(map);
-  else tM.setLngLat(TRUCK);
+  truckPin();
   map.getSource('back').setData({type:'FeatureCollection',features:[]});
   syncSafety()}
 
@@ -3530,10 +3611,19 @@ el('btn-disp').addEventListener('click',function(){
     'This card exists to read your <i>actual</i> location to dispatch, so it '+
     'will not print a coordinate you are not standing at. The map centre is '+
     'shown in the readout above if you want a planning reference.','fail');
+   
+  var lf=liveFix(),FX=lf?lf.at:ME_FIX?ME_FIX.at.slice():null;
+  if(!FX)return show('<b>No GPS fix yet.</b><br>The start pin is not a position: this card '+
+    'reads your <i>actual</i> location to dispatch, so it will not print a coordinate you '+
+    'are not standing at.','fail');
+  var old=lf?'':(function(){var m=Math.floor((Date.now()-ME_FIX.t)/60000);
+    return '<b>Last GPS fix '+meClock()+'</b> ('+(m<1?'under a minute':m+' min')+' ago) \u2014 '+
+      'not a live position: you may have moved since.<br>'})();
   show('Locating you on the network…','');
   setTimeout(function(){
+    var ME=FX;
     var ne=nearestEdge(ME), nj=nearestJunction(ME);
-    var out='<span class="tn">'+ME[1].toFixed(5)+'  '+ME[0].toFixed(5)+'</span>'+
+    var out=old+'<span class="tn">'+ME[1].toFixed(5)+'  '+ME[0].toFixed(5)+'</span>'+
       '<span class="meta">decimal degrees</span><br>';
     var bits=[];
      
@@ -3556,8 +3646,9 @@ el('btn-disp').addEventListener('click',function(){
     var np=nearestPavement(ME);
     if(np.p)bits.push('Nearest pavement <b>'+np.d.toFixed(2)+' mi '+
       compass(bearing(ME,np.p))+'</b>'+(np.e&&np.e.n?' — '+np.e.n:''));
-    bits.push(ad?'Read the coordinates first, then the address, then the junction.'
-                :'Read the coordinates first, then the junction.');
+    bits.push((ad?'Read the coordinates first, then the address, then the junction.'
+                :'Read the coordinates first, then the junction.')+
+      (old?' Say they are your last GPS fix, from '+meClock()+'.':''));
     show(out+bits.join('<br>'),'')},20)});
 
  
@@ -3652,9 +3743,12 @@ function tripResumeCard(){
     '<button class="chip" id="trip-discard">'+ic('del')+'<span>Discard</span></button>','');
   el('trip-resume').addEventListener('click',function(){
      
+     
     if(tripResume(t)){el('c-ride').click();if(rideMode||riding)
-      rideCard('<b>Trip resumed</b><div class="sub">Recording continues from your last fix.</div>','',
-        'Trip resumed \u00b7 recording')}});
+      rideCard(rideWaiting()?'<b>Trip resumed</b><div class="sub">Recording continues from the next GPS fix; the '+
+          crumbMi.toFixed(1)+' mi recorded are kept.</div>'
+        :'<b>Trip resumed</b><div class="sub">Recording continues from your last fix.</div>','',
+        rideWaiting()?railPeekText():'Trip resumed \u00b7 recording')}});
   el('trip-discard').addEventListener('click',function(){tripEnd();ack('Trip discarded.')});
   return true}
 
@@ -3680,7 +3774,8 @@ function navChip(){
   n.hidden=false;
   var dirs=['N','NE','E','SE','S','SW','W','NW'];
    
-  el('nav-sp').textContent=!NAV.lastAt?'\u2014':fixStale()?'No GPS fix since '+fixClock()
+   
+  el('nav-sp').textContent=!NAV.lastAt?GPS_WAIT:fixStale()?'No GPS fix since '+fixClock()
     :(Math.round(NAV.mps*2.237)+' mph \u00b7 '+dirs[Math.round(((NAV.brg%360)+360)%360/45)%8]);
   navGStale();
   hudBtns()}
@@ -3735,6 +3830,7 @@ function runSet(riv,a,b){
   var fix=function(x){if(x&&!x.p&&c){var f=c.f.filter(function(q){return Math.abs(q.mi-x.mi)<0.01})[0];
     if(f)x=Object.assign({},x,{p:f.p})}return x};
   RUN={riv:riv,a:fix(a),b:fix(b)};_rmHist=[];NAV.riverBrg=null;
+  _navSpd=[];    
   logAct('act  navigate run '+riv)}
 function runNavClear(){RUN=null;HUDG=null;NAV.riverBrg=null;_rmHist=[]}
 function corridorByName(riv){
@@ -3770,7 +3866,7 @@ function navRiver(at){
   var brg=bearing(L.pts[bi],L.pts[Math.min(L.pts.length-1,bi+1)]);
   NAV.riverBrg=off<250?brg:null;
   return {rm:rm,off:off,brg:brg,seg:bi}}
-function navRiverGuide(at,acc,st){
+function navRiverGuide(at,acc,st,mps){
   var g=el('nav-g');if(!g||!RUN)return false;
   var L=riverLine(RUN.riv);if(!L)return false;
   var lo=Math.min(RUN.a.mi,RUN.b.mi),hi=Math.max(RUN.a.mi,RUN.b.mi),bmi=RUN.b.mi;
@@ -3802,10 +3898,13 @@ function navRiverGuide(at,acc,st){
   else line1='<b><span class="arw">'+ic('downstream')+'</span>Downstream to '+(RUN.b.n||'take-out')+'</b>';
   var craft=(MACHINE[machine]&&MACHINE[machine].mph)?MACHINE[machine].lbl.toLowerCase():null;
    
-  HUDG={togo:Math.max(0,remain),min:Math.max(0,remain)/(((MACHINE[machine]||{}).mph)||PADDLE_MPH)*60};
+  if(mps>0.6){_navSpd.push(mps);if(_navSpd.length>60)_navSpd.shift()}
+  var runMi=Math.abs(RUN.b.mi-RUN.a.mi),left=Math.max(0,remain);
+  var etaMin=navEta(left*1609.34,paddleMin(runMi)/60,runMi*1609.34,true);
+  HUDG={togo:left,min:etaMin};
   g.hidden=false;
-  g.innerHTML=line1+'<span class="eta">'+Math.max(0,remain).toFixed(1)+' mi to '+(RUN.b.n||'take-out')+
-    ' \u00b7 ~'+paddleHours(Math.max(0,remain))+(craft?' as a '+craft:'')+
+  g.innerHTML=line1+'<span class="eta">'+left.toFixed(1)+' mi to '+(RUN.b.n||'take-out')+
+    (etaMin!==null?' \u00b7 ~'+etaTxt(etaMin):'')+(craft?' as a '+craft:'')+
     ' \u00b7 mile '+st.rm.toFixed(1)+
     (st.off>250?' \u00b7 off the mapped river':'')+(up?' \u00b7 heading UPSTREAM':'')+'</span>';
   ridePublish();return true}
@@ -3816,19 +3915,20 @@ function navPlan(){
   if(!last||sel===null||!last[sel])return null;
   var o=last[sel],steps=directions(o.s.path,o.na);
   if(!steps.length)return null;
-  var pts=[],cum=[0],legs=[],cur=o.na;
+  var pts=[],cum=[0],legs=[],ends=[],cur=o.na;
   for(var i=0;i<o.s.path.length;i++){var e=o.s.path[i],g=decode(GR.g[e.i]);
     if(e.a!==cur)g=g.slice().reverse();cur=(e.a===cur)?e.b:e.a;
     for(var j=(pts.length?1:0);j<g.length;j++){
       if(pts.length)cum.push(cum[cum.length-1]+mi(pts[pts.length-1],g[j])*1609.34);
       pts.push(g[j])}
-    legs.push(pts.length-1)}
+    legs.push(pts.length-1);ends.push(cur)}
    
   var marks=[];for(var k=0;k<steps.length;k++){var li=steps[k].at;
     marks.push(li===0?0:cum[legs[li-1]])}
    
    
-  var pv=NAVG,lp=o.na===o.nb,base=0,odo0=crumbMi,sg=0;
+   
+  var pv=NAVG,lp=o.na===o.nb||!!o.rj,base=0,odo0=crumbMi,sg=0;
   if(lp&&pv&&pv.loop&&pv.set===last){odo0=pv.odo0;base=pv.base||0}
   else if(lp&&LOOPWAS&&LOOPWAS.set===last)base=LOOPWAS.rid;
   if(lp){var r0=base+Math.max(0,crumbMi-odo0)*1609.34;
@@ -3836,7 +3936,8 @@ function navPlan(){
   var dst=RTO||pts[pts.length-1];
   NAVG={o:o,steps:steps,marks:marks,pts:pts,cum:cum,total:cum[cum.length-1],
     dest:dst,lbl:DESTLBL,seg:sg,arrived:false,key:sel+'|'+(o.k||''),
-    loop:lp,set:last,odo0:odo0,base:base,rid:base,appr:lp?mi(dst,pts[0])*1609.34:0};
+    loop:lp,set:last,odo0:odo0,base:base,rid:base,appr:(lp&&!o.rj)?mi(dst,pts[0])*1609.34:0,
+    legs:legs,ends:ends};
   return NAVG}
  
 function navProject(at,lim,want){
@@ -3858,6 +3959,51 @@ function navProject(at,lim,want){
       if(dd<bd){bd=dd;bi=ci;bt=cand[c+1]}}}
   var seglen=G.cum[bi+1]-G.cum[bi];
   return {seg:bi,prog:G.cum[bi]+bt*seglen,off:Math.sqrt(best)*111320}}
+ 
+var REJOIN_MIN_M=100,REJOIN_WIN_M=3219,REJOIN_TRY=4;
+function loopRejoin(at,G,pr){try{
+  var o=G.o,path=o.s.path,L=G.legs,E=G.ends;
+  if(!o||!path||!L||!E||path.length<2)return false;
+  var a=nearestNode(at);if(a<0)return false;
+  var near=function(lo,hi){var c=[];
+    for(var i=0;i<path.length-1;i++){var m=G.cum[L[i]];
+      if(m<lo||m>hi)continue;c.push({i:i,n:E[i],m:m,d:mi(at,NODES[E[i]])})}
+    c.sort(function(x,y){return x.d-y.d});return c};
+  var c=near(pr.prog+REJOIN_MIN_M,pr.prog+REJOIN_MIN_M+REJOIN_WIN_M);
+  if(!c.length)c=near(pr.prog+REJOIN_MIN_M,Infinity);
+  var sh=null;LOOP_SHAPES.forEach(function(x){if(x.k===o.k)sh=x});
+  var cost=sh?sh.f:LOOP_SHAPES[0].f;
+   
+  var ahead={},S=E[path.length-1];
+  for(var j=0;j<path.length-1;j++)
+    if(G.cum[L[j]]>=pr.prog+REJOIN_MIN_M&&!ahead.hasOwnProperty(E[j]))ahead[E[j]]=j;
+  for(var t=0;t<Math.min(REJOIN_TRY,c.length);t++){
+    var leg=(a===c[t].n)?[]:route(a,c[t].n,cost);
+     
+    if(!leg)break;
+    var cut=-1,k=0,cur=a;
+    for(;;){if(ahead.hasOwnProperty(cur)){cut=ahead[cur];break}
+      if(cur===S&&k>0)break;
+      if(k>=leg.length)break;
+      cur=(leg[k].a===cur)?leg[k].b:leg[k].a;k++}
+    if(cut<0)continue;
+    leg=leg.slice(0,k);
+    var rest=path.slice(cut+1),np=leg.concat(rest);if(!np.length)continue;
+    var legMi=0,restMi=0;leg.forEach(function(e){legMi+=e.L});rest.forEach(function(e){restMi+=e.L});
+    legMi/=1609.34;restMi/=1609.34;
+    var skip=Math.max(0,(G.cum[L[cut]]-pr.prog)/1609.34);
+     
+    var snap=snapMiles(at,a),toIt=legMi+snap;
+    var opt={h:'Back to the loop',k:o.k,s:summarise(np),snap:snap,na:a,nb:o.nb,
+      rj:{leg:toIt,snap:snap,rest:restMi,skip:skip},
+      note:navFmt(toIt*1609.34)+' back to the loop, then the rest of it to the start ('+restMi.toFixed(1)+' mi)'+
+        (skip>=0.1?' \u00b7 '+skip.toFixed(1)+' mi of it skipped':'')};
+    logAct('nav  rejoin loop '+toIt.toFixed(2)+' mi back ('+snap.toFixed(2)+' off-network), '+restMi.toFixed(2)+' mi left, '+skip.toFixed(2)+' skipped');
+    RFROM=at.slice();
+    presentRoutes([opt],{k:o.k,rejoin:opt.rj});
+    NAVG=null;
+    return true}
+  return false}catch(e){return false}}
 function navFmt(m){return m<320?(Math.round(m*3.281/50)*50)+' ft':(m/1609.34).toFixed(1)+' mi'}
 function navGuide(at,acc,mps){
   if(!NAV.on)return;
@@ -3889,6 +4035,9 @@ function navGuide(at,acc,mps){
   if(pr.off>40&&!onAppr){_navOff++}else _navOff=0;
   if(_navOff>=3&&Date.now()-_navReT>20000&&RTO){
     _navReT=Date.now();_navOff=0;
+     
+    if(G.loop&&loopRejoin(at,G,pr)){
+      g.innerHTML='<b><span class="arw">'+ic('reroute')+'</span>Back to the loop</b>';g.hidden=false;ridePublish();return}
     var keep=last[sel].k;
     logAct('nav  reroute '+Math.round(pr.off)+' m off');
     routeToPoint(RTO,DESTLBL,keep||true);
@@ -3899,7 +4048,7 @@ function navGuide(at,acc,mps){
    
   var ni=-1;for(var k=1;k<G.marks.length;k++){if(G.marks[k]>pr.prog+8){ni=k;break}}
    
-  var etaMin=navEta(remain,G);
+  var etaMin=navEta(remain,(G.o&&G.o.s)?G.o.s.hrs:null,G.total);
   HUDG={togo:remain/1609.34,min:etaMin};
   var line1=ni<0
     ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(remain)+' to '+(G.lbl||'destination')+'</b>'
@@ -3917,6 +4066,26 @@ document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='visible')WAKE.resume()});
  
 var posMode='none',awayMi=0;
+ 
+var ME_FIX=null;
+function meFix(at){ME_FIX={at:at.slice(),t:Date.now()};
+   
+  YOU=at.slice();YOU_T=ME_FIX.t;if(youM)try{youM.setLngLat(YOU)}catch(e){}}
+ 
+function meOnFix(){return posMode==='gps'&&!!ME_FIX&&!!ME&&ME[0]===ME_FIX.at[0]&&ME[1]===ME_FIX.at[1]}
+ 
+function liveFix(){
+  if(!meOnFix()||Date.now()-ME_FIX.t>GPS_STALE_MS)return null;
+  return {at:ME_FIX.at.slice(),t:ME_FIX.t,age:Date.now()-ME_FIX.t}}
+ 
+function meClock(){try{return new Date(ME_FIX.t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
+  catch(e){return 'time unknown'}}
+ 
+function meIs(){return liveFix()?'you':meOnFix()?'last':posMode==='sim'?'sim':posMode==='away'?'away':'pin'}
+ 
+function meNoun(own){var k=meIs();
+  return k==='you'?(own?'your position':'you'):k==='last'?'your last GPS fix ('+meClock()+')':
+    {sim:'the simulated position',away:'the planning start',pin:'the start pin'}[k]}
 function inRegion(at){var b=BUNDLE.bbox;if(!b)return true;
   return at[0]>=b[0]-0.02&&at[0]<=b[2]+0.02&&at[1]>=b[1]-0.02&&at[1]<=b[3]+0.02}
 function classifyFix(at){
@@ -3977,11 +4146,19 @@ function gpsStart(onFix,onFail){
 function gpsStop(){
   if(watchId===null)return;
   gpsClear(watchId);watchId=null}
-function stopReal(){gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=false;
+function stopReal(){var had=gotFix,wasRes=RESUMING;
+  gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=false;
+   
+  RESUMING=false;RESUMED_RIDE=null;
   navStop();tripEnd();runNavClear();
   hudShow(false);
   setChip('c-ride','ride','Ride it');rideFlag();
   var R=rideStop();
+   
+  if(!R&&!had)return show('<b>Stopped before the first GPS fix</b> \u2014 nothing was recorded'+
+    (wasRes?' on this ride. The resumed trip ends here':'')+'.'+
+    (crumbs.length>1?(wasRes?' Its ':' The last ')+'track ('+crumbMi.toFixed(2)+
+      ' mi) is still on the map; <b>Retrace</b> follows it back.':''),'');
   if(!R)return show('Recording stopped. <b>'+crumbMi.toFixed(2)+
     ' mi</b> on the track. <b>Retrace</b> follows it back.','');
   logAct('ride end '+(R.hrs*60).toFixed(0)+'min '+R.fixes+' fixes');
@@ -4027,14 +4204,22 @@ function onFix(at,acc,mps,deg){
    
   navFollow(at,mps,deg);
    
-  try{if(!(NAV.on&&_rs&&navRiverGuide(at,acc,_rs)))navGuide(at,acc,mps)}catch(e){}
+  try{if(!(NAV.on&&_rs&&navRiverGuide(at,acc,_rs,mps)))navGuide(at,acc,mps)}catch(e){}
    
   if(posMode==='gps')hudSet(mps,deg,at,true);
-  if(!gotFix){gotFix=true;startRecording(at);ME=at.slice();mM.setLngLat(ME);
+  if(!gotFix){gotFix=true;startRecording(at);ME=at.slice();mM.setLngLat(ME);meFix(ME);
     if(!NAV.on)map.easeTo({center:ME,zoom:14.5,duration:600});
      
-    showQuiet('<span class="tn">Recording</span><span class="meta">live GPS</span><br>Truck pinned where you are. Ride.','Recording \u00b7 live GPS');return}
-  ME=at.slice();mM.setLngLat(ME);record(ME);checkOffRoute();
+     
+    var tk=!TRUCK||(TRUCK[0]===at[0]&&TRUCK[1]===at[1]);
+     
+    var tkd=tk?0:mi(ME,TRUCK);
+    showQuiet('<span class="tn">Recording</span><span class="meta">live GPS</span><br>'+
+      (tk?'Truck pinned where you are. Ride.'
+       :tkd<0.02?'Trip resumed \u2014 you are at the truck, where it was pinned. Ride.'
+       :'Trip resumed \u2014 the truck stays where it was pinned, '+
+        navFmt(tkd*1609.34)+' '+compass(bearing(ME,TRUCK))+'. Ride.'),PEEK_LIVE);return}
+  ME=at.slice();mM.setLngLat(ME);meFix(ME);record(ME);checkOffRoute();peekGps();
    
   hudPaint();
   fixN++;
@@ -4060,7 +4245,10 @@ el('c-ride').addEventListener('click',function(){
       if(m){rideMode=m;logAct('ride gps first fix slow: still waiting');return}}
     refused=true;gpsRefuse('fail')};
   rideMode=gpsStart(onFix,onGpsFail);
-  if(rideMode){setChip('c-ride','stop','Stop (GPS)',1);navStart();rideFlag();return}
+  if(rideMode){setChip('c-ride','stop','Stop (GPS)',1);navStart();rideFlag();
+     
+    var pw=el('peek-txt');if(pw&&/\bfolded\b/.test(el('rail').className))pw.textContent=railPeekText();
+    return}
   if(!refused){refused=true;gpsRefuse('none')}});
  
 var GPS_REFUSED=false;
@@ -4317,9 +4505,9 @@ function sourcesCard(){
     '\u00a9 2017 The Barlow Project Authors.<br><b>Map renderer</b> \u2014 MapLibre GL JS'+
      
     (window.maplibregl&&typeof maplibregl.getVersion==='function'?' '+maplibregl.getVersion():'')+
-    ', BSD 3-Clause licence, \u00a9 2023 MapLibre contributors; it contains code from Mapbox GL JS '+
-    '(BSD 3-Clause, \u00a9 2020 Mapbox), glfx.js (MIT, \u00a9 2011 Evan Wallace) and d3-color '+
-    '(BSD 3-Clause, \u00a9 2010-2016 Mike Bostock).<br><b>App runtime</b> \u2014 Capacitor 8 with its '+
+    ', <span class="nobr">BSD 3-Clause</span> licence, \u00a9 2023 MapLibre contributors; it contains code from Mapbox GL JS '+
+    '(<span class="nobr">BSD 3-Clause</span>, \u00a9 2020 Mapbox), glfx.js (MIT, \u00a9 2011 Evan Wallace) and d3-color '+
+    '(<span class="nobr">BSD 3-Clause</span>, \u00a9 2010-2016 Mike Bostock).<br><b>App runtime</b> \u2014 Capacitor 8 with its '+
     'Device, Geolocation, Haptics and Share plugins, MIT licence, \u00a9 2017-present Drifty Co.; '+
     'the plugins \u00a9 2020-present Ionic (Geolocation \u00a9 2025 Ionic).'+
     '<br>The full licence texts are included in the app package.</div>'+
@@ -4351,7 +4539,9 @@ var PANELS=PICKERS.concat(['diagpanel','cmppanel']);
 var PANEL_CHIP={modepanel:'c-mode',actpanel:'c-act',lyrpanel:'c-layers',diagpanel:'c-diag',cmppanel:'c-compass'};
 function panelOpen(list){list=list||PANELS;for(var i=0;i<list.length;i++){var p=el(list[i]);if(p&&!p.hidden)return list[i]}return null}
 function panelsClose(list){list=list||PANELS;var n=0;list.forEach(function(id){var p=el(id);if(p&&!p.hidden){p.hidden=true;n++;
-  if(id==='cmppanel')CMP_ON=false}});return n}
+  if(id==='cmppanel')CMP_ON=false}});
+  if(n){stripH();ridePublish()}    
+  return n}
 function within(t,node){while(t){if(t===node)return true;t=t.parentNode}return false}
 try{document.addEventListener('click',function(e){
   if(!panelOpen(PICKERS))return;
@@ -4387,15 +4577,27 @@ function onBack(){
   logAct('back armed');return 'armed'}
 try{window.addEventListener('popstate',function(){onBack()});backPush()}catch(e){}
  
-function stripH(){try{var t=el('tools');if(t){var h=t.offsetHeight;
+function stripH(){attribLift();try{var t=el('tools');if(t){var h=t.offsetHeight;
    
   var up=stripAttribUp();if(up>0)h+=up;
   document.documentElement.style.setProperty('--strip-h',h+'px')}}catch(e){}
+  if(CMP_ON)cmpFit();
    
   try{var d=el('tools'),r=d&&d.getBoundingClientRect?d.getBoundingClientRect():null,
     vh=window.innerHeight||document.documentElement.clientHeight;
     if(r&&r.height>0&&isFinite(vh-r.top))document.documentElement.style
       .setProperty('--dock-h',Math.max(0,Math.round(vh-r.top+Math.max(0,stripAttribUp())))+'px')}catch(e){}}
+ 
+function attribLift(){try{
+  var a=document.querySelector('.maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib'),t=el('tools'),de=document.documentElement;
+  if(!a||!t||!a.getBoundingClientRect||!t.querySelectorAll)return;
+  var L=parseFloat(de.style.getPropertyValue('--attrib-lift'))||0,ar=a.getBoundingClientRect(),G=8,hit=false;
+  if(!(ar.height>0)){if(L)de.style.removeProperty('--attrib-lift');return}
+  var top=ar.top+L,bot=ar.bottom+L;
+  Array.prototype.forEach.call(t.querySelectorAll('.chip'),function(c){var r=c.getBoundingClientRect();
+    if(r.width>0&&r.height>0&&r.left<ar.right+G&&r.right>ar.left-G&&r.top<bot+G&&r.bottom>top-G)hit=true});
+  var tr=t.getBoundingClientRect(),w=hit?Math.max(0,Math.ceil(bot-tr.top+G)):0;
+  if(w!==L){if(w)de.style.setProperty('--attrib-lift',w+'px');else de.style.removeProperty('--attrib-lift')}}catch(e){}}
  
 function stripAttribUp(){try{var t=el('tools'),a=document.querySelector('.maplibregl-ctrl-bottom-right');
   if(!t||!a||!t.getBoundingClientRect||!a.getBoundingClientRect)return 0;
@@ -4441,6 +4643,8 @@ el('guide').addEventListener('click',function(e){
 el('c-compass').addEventListener('click',function(){
   var p=el('cmppanel');CMP_ON=p.hidden;p.hidden=!p.hidden;
   if(CMP_ON){magStart();el('diagpanel').hidden=true;cmpPaint()}
+   
+  stripH();ridePublish();cmpFit();
   logAct('tap  c-compass')});
 
  
@@ -4463,7 +4667,7 @@ el('peek').addEventListener('click',function(){
   logAct('tap  rail '+(folded?'open':'fold'))});
 
 el('c-diag').addEventListener('click',function(){
-  var p=el('diagpanel');p.hidden=!p.hidden;logAct('tap  c-diag')});
+  var p=el('diagpanel');p.hidden=!p.hidden;stripH();ridePublish();logAct('tap  c-diag')});
 
 el('c-layers').addEventListener('click',function(){
   var p=el('lyrpanel');buildLyrPanel();p.hidden=!p.hidden;
@@ -4574,6 +4778,10 @@ map.on('load',function(){var k='ride';
 
  
 function flyToYou(){
+   
+  var lf=liveFix();
+  if(lf){YOU=lf.at;YOU_T=lf.t;if(youM)youM.setLngLat(YOU)}
+  if(YOU&&!(Date.now()-YOU_T<=GPS_STALE_MS))return false;
   if(YOU){
     var far=!inRegion(YOU);
     map.easeTo({center:YOU,zoom:far?7.2:14.5,duration:900,essential:true});
@@ -4707,8 +4915,9 @@ function placeCard(at,kind,title){
   rows.push('<span class="mono" style="font-size:var(--t-lg)">'+at[1].toFixed(5)+' '+
     at[0].toFixed(5)+'</span> <span class="unit">DD'+
     (e!==null?' · '+ft(e)+' ft':'')+'</span>');
+   
   if(kind!=='me')rows.push('<span class="unit">'+d.toFixed(2)+' mi '+b.pt+
-    ' ('+b.deg+'°) from your position</span>');
+    ' ('+b.deg+'°) from '+meNoun(true)+'</span>');
   var ad=addressAt(at)||addressAt(at,true);
   if(ad)rows.push('<span style="color:var(--text-1)">'+ad.txt+'</span>');
   if(ne)rows.push('<span class="unit">nearest: '+(ne.e.n||label(ne.e.c))+
@@ -4790,7 +4999,8 @@ function dropPin(at){
 
 try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.paddleCard=paddleCard;window.PADDLE_MPH=PADDLE_MPH;
-    window.headingNow=headingNow;window.railSet=railSet;
+    window.headingNow=headingNow;window.railSet=railSet;window.railFoldIfAway=railFoldIfAway;
+    window.cmpFit=cmpFit;    
     window.guideShow=guideShow;window.guideClose=guideClose;
     window.showQuiet=showQuiet;
     window.railState=function(){var b=el('railbody');
@@ -4877,7 +5087,13 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         runSet:runSet,run:function(){return RUN},river:navRiver,riverLine:riverLine,
         pos:function(v){if(v!==undefined)posMode=v;return posMode},
          
-        reset:function(){gotFix=false;rideMode=null;crumbs=[];crumbMi=0;RIDE=null;NAV.on=false;NAV.lastAt=null},
+        live:function(){return liveFix()},
+         
+        dist:function(p){return placeDist(p)},
+         
+        reset:function(full){gotFix=false;rideMode=null;crumbs=[];crumbMi=0;RIDE=null;NAV.on=false;NAV.lastAt=null;
+           
+          if(full){TRUCK=null;if(tM){try{tM.remove()}catch(e){}tM=null}}},
         crumbs:function(){return crumbs.length},
         stopReal:stopReal,rail:function(on){try{railSet(!!on)}catch(e){}},
         save:tripSave,load:tripLoad,resume:tripResume,end:tripEnd,card:tripResumeCard,
@@ -5058,7 +5274,7 @@ function stLayout(){
       stAdd('PERF','dispatch-scan',ms<budget,
         Math.round(ms)+' ms of '+budget+' ms budget ('+EDGES.length+
         ' edges, '+(ms*1000/EDGES.length).toFixed(1)+' µs/edge, from '+
-        ((ME&&ME.slice)?'your position':'the region centre')+
+        meNoun(true)+
         ') — this is what you wait for after tapping Dispatch');
     }catch(e){stInfo('PERF','dispatch-scan','could not time: '+e)}
   })();
@@ -5104,7 +5320,7 @@ function stLayout(){
    
   var _r=el('rail'),_rb=el('railbody');
   var _folded=!_rb||_rb.getBoundingClientRect().height<8;
-  var LIST=_folded?['peek','btn-home','c-ride','c-locate']
+  var LIST=_folded?['peek','btn-home','btn-ride','c-ride','c-locate']
                   :['btn-home','btn-disp','btn-steps','btn-retrace','c-ride','c-locate'];
   LIST.forEach(function(id){
     var e=el(id);if(!e)return;var r=e.getBoundingClientRect();
@@ -5248,10 +5464,13 @@ function stRouting(){
 function stSafety(){
    
    
+   
   var save={T:TRUCK,c:crumbs.slice(),m:crumbMi,p:posMode,me:ME.slice(),
+            rs:RESUMING,rr:RESUMED_RIDE,
             ride:RIDE,lastride:LASTRIDE,
             hud:!!(el('hudbar')&&el('hudbar').hidden),
             chips:!!(el('chips')&&el('chips').hidden)};
+  RESUMING=false;RESUMED_RIDE=null;
   try{
     var c=CTR,pts=[];
     for(var i=0;i<25;i++)pts.push([c[0]+i*0.0008,c[1]+i*0.0005]);
@@ -5274,6 +5493,7 @@ function stSafety(){
   if(RIDE&&RIDE!==save.ride){try{clearInterval(RIDE.pulse)}catch(e){}}
   RIDE=save.ride;LASTRIDE=save.lastride;
   TRUCK=save.T;crumbs=save.c;crumbMi=save.m;posMode=save.p;ME=save.me;
+  RESUMING=save.rs;RESUMED_RIDE=save.rr;
   hudShow(!save.hud);
   if(el('chips'))el('chips').hidden=save.chips;
   try{syncSafety()}catch(e){}
@@ -5439,6 +5659,39 @@ function stHaptics(){
       :'no voices reported — strip stays silent'));
 }
 
+ 
+function stGlyphs(){
+  var stacks={},order=[],num=function(a,b){return a-b},
+      rg=function(r){return (r*256)+'-'+(r*256+255)},
+      list=function(a){return a.length?a.sort(num).map(rg).join(', '):'none'};
+  try{map.getLayersOrder().forEach(function(id){
+    var L=map.getLayer(id);if(!L||L.type!=='symbol')return;
+    var f=map.getLayoutProperty(id,'text-font');if(!f||!f.join)return;
+    var k=f.join(',');if(!stacks[k]){stacks[k]=[];order.push(k)}stacks[k].push(id)})}catch(e){}
+  if(!order.length)return stInfo('RENDER','glyphs','UNKNOWN \u2014 no label layer with a text-font was found');
+  var gm=null;try{gm=map.style&&map.style.glyphManager}catch(e){}
+  if(!gm||!gm.entries)return stInfo('RENDER','glyphs','UNKNOWN \u2014 this MapLibre build exposes no glyph '+
+    'manager; label layers use '+order.join(' / '));
+  stInfo('RENDER','glyphs',order.map(function(k){
+    var e=gm.entries[k],n=stacks[k].length,who=k+' ('+n+' label layer'+(n===1?'':'s')+')';
+     
+    if(!e){var ks=Object.keys(gm.entries);
+      return who+(ks.length?': UNKNOWN \u2014 the glyph manager holds '+ks.join(' / ')+', none is '+k:
+        ': no glyph requested yet')}
+     
+    if(!e.glyphs||typeof e.glyphs!=='object'||!e.ranges||typeof e.ranges!=='object'||
+       !e.requests||typeof e.requests!=='object')
+      return who+': UNKNOWN \u2014 the glyph manager\'s '+k+' entry has no glyphs / ranges / requests to read';
+    var loaded=[],failed=[],pending=[],local=0,pack=0,lr={};
+    Object.keys(e.glyphs||{}).forEach(function(id){var g=e.glyphs[id];if(!g)return;
+      if(g.metrics&&g.metrics.isDoubleResolution){local++;lr[Math.floor(+id/256)]=1}else pack++});
+    Object.keys(e.ranges||{}).forEach(function(r){if(e.ranges[r])loaded.push(+r)});
+    Object.keys(e.requests||{}).forEach(function(r){r=+r;if(loaded.indexOf(r)>=0)return;
+      (lr[r]?failed:pending).push(r)});
+    var font=null;try{font=e.tinySDF&&e.tinySDF.ctx&&e.tinySDF.ctx.font}catch(x){}
+    return who+': ranges from the pack '+list(loaded)+' \u00b7 failed '+list(failed)+
+      ' \u00b7 pending '+list(pending)+' \u00b7 '+pack+' glyphs from the pack, '+local+
+      ' drawn locally'+(font?' in "'+font+'"':'')}).join(' ;; '))}
 function stReport(){
   var pass=0,fail=0,info=0;
   ST.forEach(function(r){if(r.ok===null)info++;else if(r.ok)pass++;else fail++});
@@ -5534,6 +5787,7 @@ function selfTest(opts,done){
     try{window.__selfTestReport=rep}catch(e){}
     if(done)done(rep);return rep};
   stLabels(function(){
+  stGlyphs();
   stPerf(function(){
     if(opts.gps===false)return finish();
     show('<b>Self-test running…</b><br>Waiting up to 20s for a GPS fix. '+
@@ -5578,8 +5832,9 @@ el('c-selftest').addEventListener('click',function(){
 
 [[hM,'home',function(){return HOME},function(){return 'Home / truck'}],
  [mM,'me',function(){return ME},function(){
-    return posMode==='gps'?'You are here':posMode==='sim'?'Simulated position':
-           posMode==='away'?'Planning start':'Start pin'}]
+     
+    return {you:'You are here',last:'Last GPS fix ('+meClock()+')',sim:'Simulated position',
+      away:'Planning start',pin:'Start pin'}[meIs()]}]
 ].forEach(function(t){
   try{t[0].getElement().addEventListener('click',function(ev){
     ev.stopPropagation();placeCard(t[2](),t[1],t[3]())})}catch(e){}});
@@ -5832,15 +6087,15 @@ map.on('load',function(){makeBadges();setBasemap(bmi);wpDraw();showTab('map');
   else locateOnce()});
 
  
-var YOU=null,youM=null,LOCATE_N=0,LOCATE_MS=25000;
+var YOU=null,YOU_T=0,youM=null,LOCATE_N=0,LOCATE_MS=25000;
 function locateOnce(cb){
    
   var handle=function(at,acc){
-    YOU=at.slice();
+    YOU=at.slice();YOU_T=Date.now();
     if(!youM){var d=mk('you');youM=new maplibregl.Marker({element:d}).setLngLat(YOU).addTo(map)}
     else youM.setLngLat(YOU);
     classifyFix(at);
-    if(posMode==='away')showAway(acc); else{posMode='gps';ME=at.slice();mM.setLngLat(ME);paint();syncSafety()}
+    if(posMode==='away')showAway(acc); else{posMode='gps';ME=at.slice();mM.setLngLat(ME);meFix(ME);paint();syncSafety()}
     drawCoverage();
     if(cb)try{cb(at)}catch(e){}};
    
@@ -5959,7 +6214,9 @@ map.on('click',function(e){
     show('<b>'+(pr.named?pr.n:pr.h)+'</b>'+
       (pr.named?'<div class="sub">'+pr.h+(pr.mi?' \u00b7 '+pr.mi+' mi of trail':'')+
           (pr.w?' \u00b7 named for the lake it is on; the source has no name for this spot':'')+'</div>':
-                '<div class="sub">Unnamed in the source \u2014 shown by what it is</div>')+
+                '<div class="sub">'+(pr.ph?'The source names it only \u201c'+
+                  String(pr.ph).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+
+                  '\u201d \u2014 shown by what it is':'Unnamed in the source \u2014 shown by what it is')+'</div>')+
       campLine+
       (pr.named?photoHTML(pr.k,pr.n,pp):'')+
        
@@ -6059,7 +6316,13 @@ map.on('click',function(e){
 var RAIL_AT=null;           
 var RAIL_MANUAL=false;      
 
+ 
+var GPS_WAIT='Waiting for a GPS fix';
+function rideWaiting(){return !!(rideMode&&!gotFix&&!riding)}
 function railPeekText(){
+  if(rideWaiting())return GPS_WAIT+' \u2014 '+(RESUMING?crumbMi.toFixed(1)+' mi recorded, kept':'nothing recorded yet');
+   
+  if(gotFix&&fixStale())return 'No GPS fix since '+fixClock();
   if(TRUCK&&ME){
     var d=mi(ME,TRUCK);
     return 'Truck '+(d<10?d.toFixed(1):Math.round(d))+' mi '+compass(bearing(ME,TRUCK))}
@@ -6083,8 +6346,10 @@ function railSet(open,at){
    
   rcFit()}
 
-function railFoldIfAway(){
+function railFoldIfAway(e){
    
+   
+  if(!e||!e.originalEvent)return;
   if(RAIL_MANUAL||!RAIL_AT)return;
   try{
     var p=map.project(RAIL_AT),b=map.getContainer().getBoundingClientRect();
@@ -6127,6 +6392,14 @@ try{map.addControl(new maplibregl.ScaleControl({maxWidth:96,unit:'imperial'}),'b
 el('c-locate').addEventListener('click',function(){
   if(NAV.on){NAV.follow=true;navChip()}
   if(flyToYou())return;
+   
+  if(YOU){var was=new Date(YOU_T).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+    show('<b>Waiting for a GPS fix\u2026</b><br>Your last fix was at '+was+
+      '; the map moves to you when a new one arrives.','');
+    return locateOnce(function(at,why){
+      if(at){flyToYou();return}
+      show('<b>No new GPS fix.</b><br>Your last fix was at '+was+' \u2014 you may have '+
+        'moved since. Try again in the open.','')})}
   locateOnce();
   setTimeout(function(){if(!flyToYou())geo.trigger()},1200)});
 geo.on('error',function(){show('Location unavailable — this phone did not give a position (location permission off, or no fix yet). Place yourself by hand with <b>I&#39;m here</b> on the Plan tab.','fail')});
@@ -6155,7 +6428,8 @@ function refreshReadout(){
 
 function paint(){var c=map.getCenter();
   var e=elevAt([c.lng,c.lat]);
-  var tag=posMode==='gps'?'DD':posMode==='sim'?'DD · SIMULATED TRACK':
+   
+  var tag=posMode==='gps'?'DD · MAP CENTRE':posMode==='sim'?'DD · MAP CENTRE · simulated ride':
     posMode==='away'?
       'DD · MAP CENTRE · you are '+Math.round(awayMi)+' mi away':
       'DD · MAP CENTRE · no GPS fix yet';

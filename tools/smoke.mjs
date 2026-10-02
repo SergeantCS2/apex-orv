@@ -64,6 +64,9 @@ let failures = 0;
 const geo = { cb: null, err: null, cleared: 0, seq: 0, id: null, watches: new Map(), clearedIds: [] };
 const protocolsAdded = [];
 const markers = [];
+/* take 189 · fix round 2 · every Marker ever made, never spliced: the A237
+   stop drill finds the app's me-marker here (see remove() below) */
+const everyMarker = [];
 function ok(cond, msg) {
   if (cond) { console.log(`  ok   ${msg}`); }
   else { failures++; console.log(`  FAIL ${msg}`); }
@@ -312,7 +315,7 @@ const maplibregl = {
      wrapped in try/catch and silently never registered here — the harness
      quietly declining to test a feature (landmine 39). */
   Marker: class {
-    constructor(o) { this._el = (o && o.element) || new El(null); markers.push(this); }
+    constructor(o) { this._el = (o && o.element) || new El(null); markers.push(this); everyMarker.push(this); }
     setLngLat(ll) { this._ll = ll; return this; }
     addTo(m) { this._map = m; if (markers.indexOf(this) < 0) markers.push(this); /* re-attach re-registers, like real MapLibre (take 117) */ return this; }
     getElement() { return this._el; }
@@ -595,7 +598,93 @@ ok(netF > 1000, `net source carries real geometry (${netF} features)`);
 }
 ok(record.sources.places.data.features.length === (manifest.anchors || []).length,
    "places source carries every region anchor");
+/* take 189 · A237 · fix round 1 · the place card's (placeCard: a dropped
+   pin, Home / truck, a waypoint) "N mi DIR (deg°) from …" names the point
+   ME is, judged from the app's live reader and position mode, not from the
+   card: "your position" only with a live fix; else the start pin, the
+   simulated position, the planning start (away), or on a ride whose fix has
+   gone stale, the last GPS fix. Take 188's "from your position" with no fix
+   is rejected (each caller shows the judge that control). */
+function fromOk(card, live, pos) {
+  const h = String(card || "");
+  if (live) return /\(\d+°\) from your position</.test(h);
+  const want = pos === "sim" ? "the simulated position" : pos === "away" ? "the planning start"
+    : pos === "gps" ? "(the start pin|your last GPS fix \\([^)<]+\\))" : "the start pin";
+  return new RegExp("\\(\\d+°\\) from " + want + "<").test(h) && !/from your position/.test(h);
+}
+const fromLine = (h) => ((String(h || "").match(/[\d.]+ mi [NSEW]{1,3} \(\d+°\) from [^<]*/) || [])[0] || "(no distance line)");
+const fromCtl = () => !fromOk('<span class="unit">3.21 mi NE (45°) from your position</span>', false, "none")
+  && !fromOk('<span class="unit">3.21 mi NE (45°) from your position</span>', false, "away")
+  && fromOk('<span class="unit">3.21 mi NE (45°) from the start pin</span>', false, "none")
+  && fromOk('<span class="unit">3.21 mi NE (45°) from your position</span>', true, "gps")
+  && !fromOk('<span class="unit">3.21 mi NE (45°) from the start pin</span>', true, "gps");
 const appSrc = readFileSync(join(WWW, "app.js"), "utf8");
+/* take 189 · cold audit · A234's re-join on a PLANTED graph. The shipped
+   loopRejoin — with route, mi, snapMiles, navFmt and LOOP_SHAPES, sliced
+   from the built app.js — runs on a 2 x 2 mi square loop (16 nodes, 0.5 mi
+   apart, start L0) with a parallel trail L4 > A > B > C > L8 and a
+   two-node trail no legal edge joins to anything. Three readings:
+   (U) a rider on the parallel trail beside the loop: the crow-nearest loop
+   node ahead (L7) is reachable only through the junction ahead (L8); the
+   re-join must stop at the first loop node it reaches — no edge ridden
+   twice (the audit's harness: B > C > L8 > L7 > L8, 0.5 mi twice, a U-turn).
+   (G) a rider 145 m off the loop beside a node ahead: "to it" holds the
+   gap, never "0.0 mi" (the leg alone was empty).
+   (I) a rider whose nearest legal node cannot reach the loop: ONE search,
+   not one per candidate (every candidate is a node of one connected loop).
+   Each judge rejects its planted reading. */
+if (!DEAD_RENDER && !AWAY) {
+  const fnOf = (name) => { const i = appSrc.indexOf("function " + name + "("); if (i < 0) return "";
+    let k = appSrc.indexOf("{", i), d = 0; for (; k < appSrc.length; k++) { if (appSrc[k] === "{") d++; else if (appSrc[k] === "}" && !--d) break; }
+    return appSrc.slice(i, k + 1); };
+  const between = (a, b) => { const i = appSrc.indexOf(a), j = appSrc.indexOf(b, i); return i >= 0 && j > i ? appSrc.slice(i, j) : ""; };
+  const parts = { route: fnOf("route"), mi: fnOf("mi"), snapMiles: fnOf("snapMiles"), navFmt: fnOf("navFmt"),
+    shapes: between("var LOOP_SHAPES=[", "function buildLoops("), rejoin: between("var REJOIN_MIN_M=", "function navFmt(") };
+  const missing = Object.keys(parts).filter((k) => !parts[k] || (k === "rejoin" && !/function loopRejoin\(/.test(parts[k])));
+  const rjRun = (rider, progMi) => {
+    const cosl = 0.714, P = (x, y) => [-84 + x / (69 * cosl), 45 + y / 69];
+    const NODES = [], EDGES = [], ADJ = [];
+    const N = (x, y) => { NODES.push(P(x, y)); ADJ.push([]); return NODES.length - 1; };
+    const E = (a, b) => { const L = Math.hypot((NODES[a][0] - NODES[b][0]) * 69 * cosl, (NODES[a][1] - NODES[b][1]) * 69) * 1609.34;
+      const e = { i: EDGES.length, a, b, c: "trail50", L }; EDGES.push(e); ADJ[a].push(e); ADJ[b].push(e); return e; };
+    const sq = []; for (let i = 0; i < 4; i++) sq.push([i * 0.5, 0]); for (let i = 0; i < 4; i++) sq.push([2, i * 0.5]);
+    for (let i = 0; i < 4; i++) sq.push([2 - i * 0.5, 2]); for (let i = 0; i < 4; i++) sq.push([0, 2 - i * 0.5]);
+    const loop = sq.map((q) => N(q[0], q[1])), path = [];
+    for (let i = 0; i < 16; i++) path.push(E(loop[i], loop[(i + 1) % 16]));
+    const A = N(2.3, 0), B = N(2.3, 1.2), C = N(2.3, 2); E(loop[4], A); E(A, B); E(B, C); E(C, loop[8]);
+    const X1 = N(3.5, 1), X2 = N(3.6, 1); E(X1, X2);
+    const cx = vm.createContext({ Math, Float64Array, Int32Array, Uint8Array, Infinity, isFinite, NODES, EDGES, ADJ,
+      ROUTE_CAP: 1e6, DESIG: { trail50: 1 }, DIRT: {}, spd: () => 14, machineLegal: () => true, RFROM: null, NAVG: {},
+      nearestNode: (ll) => { let b = -1, bd = 1e9; NODES.forEach((n, i) => { const d = Math.hypot(n[0] - ll[0], n[1] - ll[1]); if (d < bd) { bd = d; b = i; } }); return b; },
+      summarise: (p) => ({ path: p, mi: p.reduce((t, e) => t + e.L, 0) / 1609.34 }),
+      presentRoutes: (o) => { cx.__out = o; }, logAct: () => {} });
+    vm.runInContext([parts.route, parts.mi, parts.snapMiles, parts.navFmt, parts.shapes, parts.rejoin].join("\n"), cx);
+    let calls = 0; const r0 = cx.route; cx.route = function () { calls++; return r0.apply(null, arguments); };
+    const legs = [], ends = [], cum = [0]; let cur = loop[0];
+    path.forEach((e, i) => { cum.push(cum[cum.length - 1] + e.L); legs.push(i + 1); cur = e.a === cur ? e.b : e.a; ends.push(cur); });
+    const G = { o: { k: "ltrail", na: loop[0], nb: loop[0], s: { path } }, legs, ends, cum };
+    const ret = cx.loopRejoin(P(rider[0], rider[1]), G, { prog: progMi * 1609.34 });
+    const o = cx.__out && cx.__out[0];
+    const ids = o ? o.s.path.map((e) => e.i) : [];
+    return { ret, calls, o, twice: ids.length - new Set(ids).size, note: o ? o.note : "", leg: o ? o.rj.leg : -1 };
+  };
+  if (missing.length) ok(false, `A234 · the re-join on a planted graph: could not slice ${missing.join(", ")} from app.js`);
+  else {
+    const U = rjRun([2.3, 1.0], 3.0), Gp = rjRun([1.0, 2.09], 4.2), I = rjRun([3.45, 1.0], 3.0);
+    const uOk = (r) => r.ret === true && !!r.o && r.twice === 0 && r.leg > 0 && r.leg < 1.5;
+    const gOk = (r) => r.ret === true && r.leg * 1609.34 >= 100 && !/^0\.0 mi\b/.test(r.note);
+    const iOk = (r) => r.ret === false && r.calls === 1;
+    ok(uOk(U) && !uOk({ ret: true, o: {}, twice: 1, leg: 1.8 }),
+       `A234 · a rider on a trail that meets the loop ahead re-joins at the first loop node the leg reaches: no edge ridden twice `
+       + `(${U.twice}), ${U.leg.toFixed(2)} mi to it — "${U.note}"; the judge rejects the U-turn reading (one edge twice, 1.8 mi)`);
+    ok(gOk(Gp) && !gOk({ ret: true, leg: 0, note: "0.0 mi back to the loop, then the rest of it to the start (6.3 mi)" }),
+       `A234 · a rider 145 m off the loop beside a node ahead: "to it" holds the gap (${(Gp.leg * 1609.34).toFixed(0)} m) — "${Gp.note}"; `
+       + `the judge rejects "0.0 mi back to the loop"`);
+    ok(iOk(I) && !iOk({ ret: false, calls: 4 }),
+       `A234 · a rider whose nearest legal node cannot reach the loop: ${I.calls} search(es), re-join ${I.ret}; `
+       + `the judge rejects one search per candidate (4)`);
+  }
+}
 ok(/queryRenderedFeatures/.test(appSrc), "app self-checks that something rendered");
 ok(/window\.__selfTest/.test(appSrc), "app exposes a runnable self-test");
 ok(/c-selftest/.test(readFileSync(join(WWW, "index.html"), "utf8")),
@@ -700,7 +789,13 @@ if (AWAY) {
   const card = grab("panel")._html;
   ok(/Dropped pin/.test(card), "long press drops a pin with a card");
   ok(/\d{2}\.\d{5}/.test(card), "…card shows decimal degrees");
-  ok(/from your position/.test(card), "…and distance + bearing from you");
+  {
+    const N7 = sandbox.window.__nav, live7 = N7 && typeof N7.live === "function" ? N7.live() : undefined,
+      pos7 = N7 && typeof N7.pos === "function" ? N7.pos() : "?";
+    ok(live7 !== undefined && fromOk(card, !!live7, pos7) && fromCtl(),
+       `…and distance + bearing from the point it measures from (position ${pos7}, live fix ${!!live7}): "${fromLine(card)}"; `
+       + `its control rejects take 188's "from your position" with no fix (${fromCtl()})`);
+  }
   ok(/pc-route/.test(card) && /pc-home/.test(card) && /pc-start/.test(card),
      "…and offers Route here / Make home / Start from here");
   /* The HOME spec (take 117): away planning sets the truck as home FIRST —
@@ -950,6 +1045,83 @@ ok(/No home set/i.test(grab("panel")._html || ""),
      `Remove pin is a toast ("${grab("toast").textContent}", drawer ${grab("rail").className || "OPEN"}), `
      + `and the panel no longer holds the pin's card (${pinsNow} markers before)`);
 }
+/* take 189 · A237 · a place card's distance line names what it measures
+   from: "of you" only from a live fix (the app's one reader, liveFix), the
+   start pin otherwise — every card said "152 mi SSE of you" before any fix,
+   because ME holds the region centre until one. Here, where the home drill
+   above has just taken a real in-region fix through the locate path (the
+   live-GPS passes), a tapped pin reads "of you"; with position mode put
+   back to no fix, the same pin reads "of the start pin" and the reader says
+   none; mode restored, the reader is back. Its controls: take 188's line is
+   rejected with no fix, and "of the start pin" with one. */
+{
+  const N = sandbox.window.__nav, PO = sandbox.POIS;
+  const PF = record.sources.poi && record.sources.poi.data && record.sources.poi.data.features;
+  const r0 = PO && Array.isArray(PO.p) ? PO.p.find((r) => r.n && Array.isArray(r.p)) : null;
+  if (!N || typeof N.live !== "function" || !r0 || !Array.isArray(PF) || PF.length !== PO.p.length) {
+    ok(false, `the A237 drill has its hooks and a pin to tap (live reader ${!!(N && N.live)}, pin ${!!r0}, `
+       + `features ${Array.isArray(PF) ? PF.length : "none"})`);
+  } else {
+    const tap = () => { const f = PF[PO.p.indexOf(r0)];
+      theMap._hit = [Object.assign({ layer: { id: "poi-dot" } }, f)];
+      theMap.fire("click", { lngLat: { lng: r0.p[0], lat: r0.p[1] }, point: { x: 300, y: 700 } });
+      theMap._hit = []; flushTimeouts(); return grab("panel")._html || ""; };
+    const distOk = (h, live) => live ? /\d mi [NSEW]{1,3} of you</.test(h)
+      : /\d mi [NSEW]{1,3} of the (start pin|simulated position|planning start)</.test(h) && !/ of you</.test(h);
+    const line = (h) => ((h.match(/[\d.]+ mi [NSEW]{1,3} of [a-z ]+/) || [])[0] || "(no distance line)");
+    tap();   /* a throwaway: an earlier long press leaves lp.fired set (see 5x) */
+    const posWas = N.pos(), liveNow = N.live(), hNow = tap();
+    N.pos("none"); const liveNone = N.live(), hNone = tap();
+    N.pos(posWas); const liveBack = N.live();
+    /* fix round 2 · the same locate fix 40 s on (past GPS_STALE_MS, no watch
+       open): it is where the rider WAS, so the pin reads "of your last GPS
+       fix (h:mm)", never "of you"; the clock put back, live again */
+    let aged = null;
+    if (liveNow) {
+      const RA = sandbox.Date;
+      sandbox.Date = class extends RA { constructor(...a) { if (a.length) super(...a); else super(RA.now() + 40000); }
+        static now() { return RA.now() + 40000; } };
+      try { aged = { live: N.live(), h: tap() }; } finally { sandbox.Date = RA; }
+      aged.back = N.live();
+      /* the clock it must print: the locate fix's own time (a past ride's
+         FIX_T, or 0 = 1970, would be a confident wrong time) */
+      aged.want = new RA(liveNow.t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
+    const agedOk = (a) => !!a && a.live === null && /\d mi [NSEW]{1,3} of your last GPS fix \(\d{1,2}:\d\d[^)]*\)</.test(a.h)
+      && a.h.includes(" of your last GPS fix (" + a.want + ")<") && !/ of you</.test(a.h);
+    const agedCtl = !agedOk({ live: null, want: "10:42 AM", h: "<div class=\"sub\">1.2 mi NE of you</div>" })
+      && !agedOk({ live: {}, want: "10:42 AM", h: "<div class=\"sub\">1.2 mi NE of your last GPS fix (10:42 AM)</div>" })
+      && !agedOk({ live: null, want: "10:42 AM", h: "<div class=\"sub\">1.2 mi NE of your last GPS fix (7:00 PM)</div>" })
+      && agedOk({ live: null, want: "10:42 AM", h: "<div class=\"sub\">1.2 mi NE of your last GPS fix (10:42 AM)</div>" });
+    ok(NO_GPS ? aged === null : (agedOk(aged) && aged.back !== null && agedCtl),
+       NO_GPS ? "an aged locate fix: no receiver on this pass, so no fix to age (the live-GPS passes judge it)"
+       : `a locate fix 40 s old (no watch open) is not "you": "${r0.n}" reads "${aged ? (aged.h.match(/[\d.]+ mi [NSEW]{1,3} of [^<]*/) || ["(no distance line)"])[0] : "?"}" `
+         + `(live ${aged ? aged.live !== null : "?"}, the fix's own clock ${aged ? aged.want : "?"}); the clock put back, live ${aged ? aged.back !== null : "?"}; `
+         + `its controls reject "of you", a live reader and another clock time (${agedCtl})`);
+    /* fix round 1 · the dropped pin's card (placeCard) in the same two
+       states: "from your position" only with the live fix */
+    const cA = manifest.centre || [anchors[0][1], anchors[0][2]];
+    const press = () => { theMap._up = [cA[0] + 0.03, cA[1] - 0.004];
+      theMap.getCanvasContainer().fire("touchstart", { touches: [{ clientX: 220, clientY: 420 }] });
+      flushTimeouts(); return grab("panel")._html || ""; };
+    const pNow = press(), pLive = N.live();
+    N.pos("none"); const pNoneLive = N.live(), pNone = press();
+    N.pos(posWas);
+    ok(/Dropped pin/.test(pNow) && /Dropped pin/.test(pNone) && !!pLive === !!liveNow && pNoneLive === null
+       && fromOk(pNow, !!pLive, posWas) && fromOk(pNone, false, "none") && fromCtl(),
+       `a dropped pin's card measures "from your position" only from a live fix: `
+       + `(position ${posWas}, live ${!!pLive}) "${fromLine(pNow)}"; with no fix "${fromLine(pNone)}" (live ${pNoneLive !== null}); `
+       + `its control rejects take 188's line with no fix (${fromCtl()})`);
+    const ctl = !distOk("<div class=\"sub\">152 mi SSE of you</div>", false)
+      && !distOk("<div class=\"sub\">1.2 mi NE of the start pin</div>", true)
+      && distOk("<div class=\"sub\">1.2 mi NE of you</div>", true);
+    ok((NO_GPS || !!liveNow) && distOk(hNow, !!liveNow) && liveNone === null && distOk(hNone, false)
+       && !!liveBack === !!liveNow && ctl,
+       `a place card measures "of you" only from a live fix: ${NO_GPS ? "no receiver" : "after the locate fix"} `
+       + `(position ${posWas}, live ${!!liveNow}) "${r0.n}" reads "${line(hNow)}"; with no fix it reads "${line(hNone)}" `
+       + `(live ${liveNone !== null}); mode restored, live ${!!liveBack}; its controls (${ctl})`);
+  }
+}
 {
   /* the rider's path: press-and-hold a spot a few km out, "Make this home" */
   const c = manifest.centre || [anchors[0][1], anchors[0][2]];
@@ -1019,11 +1191,46 @@ ok((record.setData.alt || []).length > 0 &&
        put a boat in is a destination whether or not OSM names it (A146; 66 of
        Waterford's 81 slipways were nameless and invisible). The check moves
        with the policy: these two kinds and no others. */
+    /* Take 189 · A228: a pin whose source name is a placeholder ("A", "12",
+       "car parking") ships unnamed with that text in `ph`, whatever its
+       kind; the gate's check_pin_names proves every `ph` IS a placeholder,
+       so this cannot pass a real name dropped by mistake. */
     const unnamed = P.p.filter((r) => !r.n);
     const exempt = new Set(["beach", "launch"]);
-    ok(unnamed.every((r) => exempt.has(r.k)),
-       `only beaches and launches ship unnamed (${unnamed.length} unnamed, `
-       + `${[...new Set(unnamed.map((r) => r.k))].sort().join(" + ")})`);
+    const phd = unnamed.filter((r) => typeof r.ph === "string" && r.ph.length > 0);
+    ok(unnamed.every((r) => exempt.has(r.k) || phd.includes(r)),
+       `only beaches, launches and placeholder-named pins ship unnamed (${unnamed.length} unnamed, `
+       + `${[...new Set(unnamed.filter((r) => !phd.includes(r)).map((r) => r.k))].sort().join(" + ")}; `
+       + `${phd.length} placeholders)`);
+    /* …and a placeholder pin's card says literally what the source called it,
+       under the kind's name; a bare unnamed launch or beach still says it is
+       unnamed. Taps the app's own features (the poi source it handed the
+       map), not hand-made ones. */
+    const PF = record.sources.poi && record.sources.poi.data && record.sources.poi.data.features;
+    const tapPin = (r) => {
+      const f = PF[P.p.indexOf(r)];
+      theMap._hit = [Object.assign({ layer: { id: "poi-dot" } }, f)];
+      theMap.fire("click", { lngLat: { lng: r.p[0], lat: r.p[1] }, point: { x: 300, y: 700 } });
+      theMap._hit = [];
+      return grab("panel")._html || "";
+    };
+    const php = phd.find((r) => r.k === "info") || phd[0];
+    const bare = unnamed.find((r) => !phd.includes(r));
+    if (php && bare && Array.isArray(PF) && PF.length === P.p.length) {
+      /* the first tap is a throwaway: an earlier long-press drill leaves the
+         app's lp.fired set, and the next click is (rightly) taken as that
+         press's release — the first run of this check read the route panel */
+      const h0 = tapPin(bare), hp = tapPin(php), hb = tapPin(bare);
+      console.log(`  ..   placeholder card: settle tap ${/Unnamed in the source/.test(h0) ? "opened a card" : "was absorbed"}`);
+      const kh = PF[P.p.indexOf(php)].properties.h;
+      ok(hp.includes(`<b>${kh}</b>`) && hp.includes(`The source names it only \u201c${php.ph}\u201d`)
+         && !hp.includes("Unnamed in the source"),
+         `a placeholder pin's card reads "${kh}" and "the source names it only \u201c${php.ph}\u201d"`);
+      ok(hb.includes("Unnamed in the source") && !hb.includes("The source names it only"),
+         `an unnamed ${bare.k}'s card still says it is unnamed in the source`);
+    } else {
+      ok(!phd.length, `placeholder card check: ${phd.length} placeholder pins but no features to tap`);
+    }
     ok(P.p.every((r) => Array.isArray(r.p) && r.p.length === 2
                         && r.p[0] >= manifest.bbox[0] && r.p[0] <= manifest.bbox[2]
                         && r.p[1] >= manifest.bbox[1] && r.p[1] <= manifest.bbox[3]),
@@ -1664,8 +1871,18 @@ if (!NO_GPS) {
     ok(N.card() === true, "a saved mid-ride trip offers Resume when the app comes back");
     grab("trip-resume").fire("click");
     const peekNow = grab("peek-txt").textContent, railNow = grab("rail").className;
-    ok(railNow === "folded" && /Trip resumed/.test(grab("panel")._html || "") && /^Trip resumed/.test(peekNow),
-       `"Trip resumed" is quiet mid-ride: drawer ${railNow || "OPEN"}, peek "${peekNow}"`);
+    /* take 189 · cold audit · no fix has come yet: nothing records (the
+       first fix starts it), so the card and the peek line say the GPS is
+       awaited and the miles kept — never "Trip resumed · recording" (the
+       judge is shown that line, and the old card body) */
+    const waitKept = (p, h) => /^Waiting for a GPS fix — [\d.]+ mi recorded, kept$/.test(p) && /Trip resumed/.test(h)
+      && /next GPS fix/.test(h) && !/continues from your last fix/.test(h);
+    ok(railNow === "folded" && waitKept(peekNow, grab("panel")._html || "")
+       && !waitKept("Trip resumed · recording", "<b>Trip resumed</b><div class=\"sub\">Recording continues from the next GPS fix</div>")
+       && !waitKept(peekNow, "<b>Trip resumed</b><div class=\"sub\">Recording continues from your last fix.</div>"),
+       `"Trip resumed" is quiet mid-ride and says what is happening: drawer ${railNow || "OPEN"}, peek "${peekNow}", `
+       + `card "${(grab("panel")._html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 90)}"; `
+       + `the judge rejects "Trip resumed · recording" before any fix`);
     flushTimeouts(); frames(2);
     ok(grab("rail").className === "folded" && /id="routes"/.test(grab("panel")._html || ""),
        `the resumed trip's re-planned route is quiet too: drawer ${grab("rail").className || "OPEN"}, `
@@ -1687,9 +1904,14 @@ if (!NO_GPS) {
        route is on the map" before the rider had moved. The judge is shown
        that line. (7b2 below holds a real re-route to "Re-routed".) */
     {
-      const saysResumed = (p) => /^Trip resumed · route to \S/.test(p) && !/Re-rout/.test(p);
-      ok(saysResumed(resumedPeek) && !saysResumed("Re-routed · the new route is on the map"),
-         `a resumed trip's route is announced as the trip resuming, never a re-route ("${resumedPeek}"); the judge rejects "Re-routed · …"`);
+      /* take 189 · cold audit · and while the GPS still waits (no fix yet
+         here) the line says so — "Trip resumed · route to … is on the map"
+         said nothing of a ride that was not recording */
+      const saysResumed = (p) => /^Waiting for a GPS fix · route to \S/.test(p) && !/Re-rout/.test(p);
+      ok(saysResumed(resumedPeek) && !saysResumed("Re-routed · the new route is on the map")
+         && !saysResumed("Trip resumed · route to home is on the map"),
+         `a resumed trip's route is announced as the trip resuming, never a re-route, and says the GPS is awaited ("${resumedPeek}"); `
+         + `the judge rejects "Re-routed · …" and "Trip resumed · route to … is on the map" before any fix`);
     }
     ok(grab("shell").dataset.ride === "1", "the resumed ride keeps #shell[data-ride]");
     /* A221 · the resumed trip's first fix puts the ride sheet back (the
@@ -2000,6 +2222,14 @@ if (!NO_GPS && sandbox.window.__selfTest) {
        + (nonRender.length ? " — " + nonRender[0].g + "·" + nonRender[0].id : ""));
     ok(failed.length === nonRender.length + failed.filter((r) => r.g === "RENDER" || r.g === "PERF").length,
        "render/perf failures under a stub are expected and isolated");
+    /* take 189 · A236 · the line the Fold session reads: which font the
+       labels draw in and which glyph ranges loaded. INFO, never a verdict;
+       the stub map has no glyph manager and no layer types, so here it must
+       say UNKNOWN rather than a reading it did not make (render reads the
+       real one) */
+    const gl = (st.results || []).filter((r) => r.g === "RENDER" && r.id === "glyphs");
+    ok(gl.length === 1 && gl[0].ok === null && /^UNKNOWN \u2014 /.test(gl[0].d),
+       `the self-test carries the glyph readback line, INFO, and under the stubs it says UNKNOWN: "${gl.length ? gl[0].d : "(missing)"}"`);
   }
 }
 
@@ -2124,14 +2354,22 @@ if (!NO_GPS) {
              stays moved on: nothing after this block compares it with the
              harness's own. */
           const live = read();
+          /* take 189 · A237 · fix round 1 · the place cards in the same
+             dropout: "of you" while the fixes come, not once the strip says
+             there has been none (the last fix is miles behind at riding
+             speed), and back with the next fix */
+          const lv = () => ({ live: N.live && N.live() !== null, dist: N.dist ? N.dist(pts[0]) : "(no hook)",
+            card: (sandbox.window.placeCard(pts[0], "drop", "Dropped pin"), grab("panel")._html || "") });
+          const lvLive = lv();
           const Real = sandbox.Date;
           sandbox.Date = class extends Real {
             constructor(...a) { if (a.length) super(...a); else super(Real.now() + 40000); }
             static now() { return Real.now() + 40000; } };
           ticks(1);
           const lost = read(); lost.time = text("hud-time");
+          const lvLost = lv();
           fix(pts[i], spd);
-          drop = { live, lost, back: read() };
+          drop = { live, lost, back: read(), lv: { live: lvLive, lost: lvLost, back: lv() } };
         }
         fix(pts[i], spd);
         const tm = String(grab("nav-g")._html || "").match(/<\/span>In [^<]*? · ([^<]*? onto [^<]*)<\/b>/);
@@ -2161,9 +2399,115 @@ if (!NO_GPS) {
          `a GPS dropout reads as one: after 40 s with no fix — ${say(drop && drop.lost)}, banner "${drop ? drop.lost.strip : "?"}", while Time still reads "${drop ? drop.lost.time : "?"}"; `
          + `the next fix puts them back (${say(drop && drop.back)}, banner "${drop ? drop.back.strip : "?"}"); the judge rejects the live reading (${say(drop && drop.live)}) `
          + `and the old dropout (the sheet dashed, the banner still "${drop ? drop.live.strip : "?"}")`);
+      {
+        const youOk = (r) => !!r && r.live === true && / of you$/.test(r.dist) && fromOk(r.card, true, "gps");
+        const lastOk = (r) => !!r && r.live === false && / of your last GPS fix \(\S[^)]*\)$/.test(r.dist) && !/ of you$/.test(r.dist)
+          && /\(\d+°\) from your last GPS fix \(\S[^)]*\)</.test(r.card) && fromOk(r.card, false, "gps");
+        const L = drop && drop.lv;
+        const lCtl = !lastOk({ live: false, dist: "1.2 mi NE of you", card: '<span class="unit">1.20 mi NE (45°) from your position</span>' })
+          && !lastOk({ live: true, dist: "1.2 mi NE of your last GPS fix (10:42 AM)", card: '<span class="unit">1.20 mi NE (45°) from your last GPS fix (10:42 AM)</span>' })
+          && lastOk({ live: false, dist: "1.2 mi NE of your last GPS fix (10:42 AM)", card: '<span class="unit">1.20 mi NE (45°) from your last GPS fix (10:42 AM)</span>' });
+        ok(!!L && youOk(L.live) && lastOk(L.lost) && youOk(L.back) && lCtl,
+           `a GPS dropout is no live fix for the place cards either: riding, "${L ? L.live.dist : "?"}" / "${L ? fromLine(L.live.card) : "?"}"; `
+           + `40 s with no fix (live ${L ? L.lost.live : "?"}), "${L ? L.lost.dist : "?"}" / "${L ? fromLine(L.lost.card) : "?"}"; `
+           + `the next fix, "${L ? L.back.dist : "?"}"; its control rejects the fix-round-0 "of you" in the dropout (${lCtl})`);
+      }
       ok(!!drop && !dashed(Object.assign({}, drop.lost, { strip: drop.live.strip })),
          `the dropout judge rejects a dashed sheet under a banner that still reads live ("${drop ? drop.live.strip : "?"}")`);
       grab("hud-stop").fire("click"); flushTimeouts(); frames(1);
+      /* take 189 · A237 · fix round 2 · a STOPPED ride: Stop leaves position
+         mode 'gps' and ME on the ride's last fix, with no watch open. Just
+         after Stop that fix is live ("of you", "You are here"); 40 s on, past
+         GPS_STALE_MS by the fix's own clock, it is where the rider WAS: the
+         place cards and the me-marker name the last GPS fix and its clock
+         time, never "you" (fix round 1 judged the dropout only while the
+         ride's watch ran, so hours after Stop it still read "of you") */
+      {
+        /* the app's me-marker, from every marker made: the stub's markers
+           list can lose it (remove() on a marker already removed splices the
+           list's last entry) */
+        const meM = everyMarker.filter((m) => /(^|\s)me(\s|$)/.test(m._el.className || "")).pop() || null;
+        const st = () => { let title = "(no me-marker)";
+          if (meM) { meM.getElement().fire("click", { stopPropagation() {} }); flushTimeouts();
+            title = ((grab("panel")._html || "").match(/<span class="tn">([^<]*)<\/span>/) || [, "(no title)"])[1]; }
+          const far = pts[Math.floor(pts.length / 2)];
+          return { live: N.live() !== null, pos: N.pos(), dist: N.dist(far),
+            card: (sandbox.window.placeCard(far, "drop", "Dropped pin"), grab("panel")._html || ""), title }; };
+        const s0 = st(), t0 = N.live() ? N.live().t : null;
+        const R1 = sandbox.Date;
+        const want = t0 === null ? "(no live fix)" : new R1(t0).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        sandbox.Date = class extends R1 { constructor(...a) { if (a.length) super(...a); else super(R1.now() + 40000); }
+          static now() { return R1.now() + 40000; } };
+        let s1 = null;
+        try { s1 = st(); } finally { sandbox.Date = R1; }
+        const youOk = (r) => !!r && r.live === true && / of you$/.test(r.dist) && fromOk(r.card, true, "gps") && r.title === "You are here";
+        const wasOk = (r, w) => !!r && r.live === false && r.pos === "gps" && / of your last GPS fix \(\d{1,2}:\d\d[^)]*\)$/.test(r.dist)
+          && r.dist.endsWith(" of your last GPS fix (" + w + ")") && r.card.includes(" from your last GPS fix (" + w + ")<") && r.title === "Last GPS fix (" + w + ")"
+          && /\(\d+°\) from your last GPS fix \(\d{1,2}:\d\d[^)]*\)</.test(r.card) && fromOk(r.card, false, "gps")
+          && /^Last GPS fix \(\d{1,2}:\d\d[^)]*\)$/.test(r.title);
+        const cw = (t) => ({ live: false, pos: "gps", dist: `1.2 mi NE of your last GPS fix (${t})`,
+          card: `<span class="unit">1.20 mi NE (45°) from your last GPS fix (${t})</span>`, title: `Last GPS fix (${t})` });
+        const sCtl = !wasOk({ live: false, pos: "gps", dist: "1.2 mi NE of you", card: '<span class="unit">1.20 mi NE (45°) from your position</span>', title: "You are here" }, "10:42 AM")
+          && !wasOk(Object.assign(cw("10:42 AM"), { title: "You are here" }), "10:42 AM")
+          && !wasOk(cw("7:00 PM"), "10:42 AM")
+          && wasOk(cw("10:42 AM"), "10:42 AM");
+        ok(youOk(s0) && wasOk(s1, want) && sCtl,
+           `a stopped ride's last fix is "you" only while it is fresh: just after Stop (position ${s0.pos}, live ${s0.live}) "${s0.dist}", me-marker "${s0.title}"; `
+           + `40 s on (live ${s1 ? s1.live : "?"}) "${s1 ? s1.dist : "?"}" / "${s1 ? fromLine(s1.card) : "?"}", me-marker "${s1 ? s1.title : "?"}" (the fix's own clock ${want}); `
+           + `its controls reject "of you", "You are here" and another clock time on the aged fix (${sCtl})`);
+        /* take 189 · cold audit · the same stopped ride, read by Dispatch,
+           Locate and the coordinate footer. Dispatch printed ME, whatever
+           its age, as "your actual location"; Locate said "You are here" at
+           the startup fix all session; the footer labelled the map centre a
+           bare "DD". Just after Stop: Dispatch prints the fix as it did, the
+           footer says MAP CENTRE. 40 s on: Dispatch names the last fix, its
+           clock time and age BEFORE the coordinate; Locate says it is
+           waiting and names the last fix, never "You are here" — and once
+           its own watch answers, it is live again. Then the start pin moved
+           by hand ("Start from here"): Dispatch prints the FIX, never the
+           pin. Each judge rejects its planted reading. */
+        {
+          const fx = sandbox.window.__disp.ME.slice(), C5 = (p) => p[1].toFixed(5) + "  " + p[0].toFixed(5);
+          const disp = () => { grab("btn-disp").fire("click"); flushTimeouts(); return grab("panel")._html || ""; };
+          const dLive = disp();
+          theMap.fire("move"); const foot = grab("coords")._html || "";
+          sandbox.Date = class extends R1 { constructor(...a) { if (a.length) super(...a); else super(R1.now() + 40000); }
+            static now() { return R1.now() + 40000; } };
+          let dOld = "", lOld = "";
+          try { dOld = disp(); grab("c-locate").fire("click"); lOld = grab("panel")._html || ""; } finally { sandbox.Date = R1; }
+          geo.cb && geo.cb({ coords: { longitude: fx[0], latitude: fx[1], accuracy: 5 } }); flushTimeouts();
+          const lNew = grab("panel")._html || "";
+          const tNew = N.live() ? N.live().t : null;
+          const wNew = tNew === null ? "(no live fix)" : new R1(tNew).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+          const pin = [fx[0] + 0.01, fx[1] + 0.004];
+          /* the startup locate's watch is still "open" here (the harness
+             never answers it; later drills need it so), and Start from here
+             rightly refuses while a locate runs: the pin is moved in
+             planning mode and position mode put back to 'gps' — the state a
+             phone reaches once its locate has given up */
+          const movePin = (p) => { N.pos("none"); grab("pc-start")._listeners = {}; theMap._hit = [];
+            theMap.fire("contextmenu", { lngLat: { lng: p[0], lat: p[1] } }); grab("pc-start").fire("click"); flushTimeouts(); N.pos("gps"); };
+          movePin(pin);
+          const moved = sandbox.window.__disp.ME[0] === pin[0];
+          const dPin = disp();
+          movePin(fx);
+          const liveD = (h, at) => h.includes(C5(at)) && !/Last GPS fix/.test(h) && /Read the coordinates first/.test(h);
+          const oldD = (h, at, w) => { const i = h.indexOf("Last GPS fix " + w), j = h.indexOf(C5(at));
+            return i >= 0 && j > i && /min ago|under a minute ago/.test(h) && /Say they are your last GPS fix, from /.test(h); };
+          const footOk = (h) => /MAP CENTRE/.test(h);
+          const waitL = (h, w) => !/You are here/.test(h) && /Waiting for a GPS fix/.test(h) && h.includes("Your last fix was at " + w);
+          const bare = `<span class="tn">${C5(fx)}</span><span class="meta">decimal degrees</span><br>Read the coordinates first, then the junction.`;
+          const dctl = !oldD(bare, fx, want) && !waitL("<b>You are here.</b> Inside the downloaded area.", want)
+            && !footOk("44.63159 -84.62272 <span class=\"unit\">DD · 1217 ft</span>") && !oldD(dPin.replace(C5(fx), C5(pin)), fx, want);
+          ok(liveD(dLive, fx) && footOk(foot) && oldD(dOld, fx, want) && waitL(lOld, want) && /You are here/.test(lNew)
+             && moved && oldD(dPin, fx, wNew) && !dPin.includes(C5(pin)) && dctl,
+             `Dispatch, Locate and the footer on a stopped ride's fix: just after Stop Dispatch prints the fix (${liveD(dLive, fx)}), the footer `
+             + `"${foot.replace(/<[^>]*>/g, "").slice(0, 60)}"; 40 s on Dispatch reads "${dOld.replace(/<[^>]*>/g, "").slice(0, 70)}…", `
+             + `Locate "${lOld.replace(/<[^>]*>/g, "").slice(0, 60)}…", and on a new fix "${lNew.replace(/<[^>]*>/g, "").slice(0, 30)}"; `
+             + `the start pin moved by hand (${moved}): Dispatch prints the fix, not the pin (${!dPin.includes(C5(pin))}); `
+             + `the judges reject a bare coordinate, "You are here" on the old fix, a bare "DD" and the pin's coordinate (${dctl})`);
+        }
+      }
     }
   }
 
@@ -2182,9 +2526,16 @@ if (!NO_GPS) {
     return Math.hypot(ax + t * dx, ay + t * dy); };
   const offFirstMile = (p, G) => { let best = 1e12; for (let i = 0; i + 1 < G.pts.length && G.cum[i] <= 1609.34; i++) best = Math.min(best, segD(p, G.pts[i], G.pts[i + 1])); return best; };
   const spd2 = { speed: 8.9408, heading: 90 };
+  /* take 189 · A234 (the review of lane L-ride, round 1) · a loop's
+     off-route re-route now RE-JOINS the loop: it reads "Back to the loop"
+     and stays a loop (o.rj), so the readings below took it for "not
+     re-routed" and R1 passed a build that re-joined a rider standing at the
+     start pin (PROVEN, a planted build without the approach rule). A re-join
+     counts as a re-route here */
   const readL = () => { const G = N.guide() || {}; return { loop: !!G.loop, arrived: !!G.arrived, togo: parseFloat(text("hud-togo")), strip: text("nav-g"),
-    panel: text("panel"), peek: String(grab("peek-txt").textContent) }; };
-  const rerouted = (r) => !!r.sawRe || /Re-rout/.test(r.strip) || /^Re-routed/.test(r.peek) || !r.loop;
+    panel: text("panel"), peek: String(grab("peek-txt").textContent), rj: !!((G.o || {}).rj) }; };
+  const rerouted = (r) => !!r.sawRe || !!r.rj || /Re-rout|Back to the loop/.test(r.strip) || /^(?:Re-routed|Back to the loop)/.test(r.peek) || !r.loop;
+  const REJOINED = { rj: true, peek: "Back to the loop · 0.6 mi to it, 1.2 mi of it left" };
   const pickLoop = (mi) => { grab("c-loop").fire("click"); const b = documentStub.querySelectorAll("[data-loop]").find((x) => x.dataset.loop === String(mi))
       || documentStub.querySelectorAll("[data-loop]")[0];
     if (b) { b.fire("click"); flushTimeouts(); } return b ? b.dataset.loop : null; };
@@ -2221,7 +2572,7 @@ if (!NO_GPS) {
       /* each fix's banner is read, and the planner's timer run before the
          next: a re-route shows as "Re-routing" on the fix that starts it */
       let sawRe = false;
-      for (let i = 0; i < 4; i++) { fix(P, spd2); if (/Re-rout/.test(text("nav-g"))) sawRe = true; flushTimeouts(); }
+      for (let i = 0; i < 4; i++) { fix(P, spd2); if (/Re-rout|Back to the loop/.test(text("nav-g"))) sawRe = true; flushTimeouts(); }
       frames(1);
       const atPin = Object.assign(readL(), { sawRe });
       for (let i = 0; i < Math.min(4, G.pts.length); i++) fix(G.pts[i], spd2);
@@ -2229,10 +2580,10 @@ if (!NO_GPS) {
       const onLine = readL();
       const fine = (r) => !rerouted(r) && !r.arrived && r.togo > 0.2 && r.togo <= totalMi + 0.15 && r.togo >= totalMi - 1.15;
       ok(fine(atPin) && fine(onLine) && !fine({ loop: false, arrived: false, togo: totalMi, strip: "Re-routing", panel: "", peek: "Re-routed · the new route is on the map" })
-         && !fine(Object.assign({}, atPin, { sawRe: true })),
+         && !fine(Object.assign({}, atPin, { sawRe: true })) && !fine(Object.assign({}, atPin, REJOINED)),
          `a rider standing at a loop's start pin ${Math.round(off)} m from its line (four fixes) is on the approach, not off route: `
          + `strip "${atPin.strip.slice(0, 50)}", To go ${atPin.togo}; on the line's first points "${onLine.strip.slice(0, 40)}", To go ${onLine.togo} of ${totalMi.toFixed(1)} mi; `
-         + `the judge rejects the loop re-routed to its own start`);
+         + `the judge rejects the loop re-routed to its own start, and re-joined from it`);
       grab("hud-stop").fire("click"); flushTimeouts(); frames(1);
     }
     pinAt(c0);
@@ -2287,10 +2638,11 @@ if (!NO_GPS) {
       const resumed = (r) => !rerouted(r) && !r.arrived && Math.abs(r.togo - wantMi) < 0.2;
       ok(Math.abs(before.togo - wantMi) < 0.2 && still && resumed(again) && !rerouted(on) && on.togo < again.togo
          && !resumed({ loop: true, arrived: false, togo: +(totalMi - 0.5).toFixed(1), strip: "", panel: "", peek: "" })
-         && !resumed({ loop: false, arrived: false, togo: wantMi, strip: "Re-routing", panel: "", peek: "Re-routed · the new route is on the map" }),
+         && !resumed({ loop: false, arrived: false, togo: wantMi, strip: "Re-routing", panel: "", peek: "Re-routed · the new route is on the map" })
+         && !resumed(Object.assign({}, again, REJOINED)),
          `Stop at ${(cum[kStop] / 1609.34).toFixed(1)} mi into the loop, then Ride again: To go ${again.togo} (${wantMi.toFixed(2)} mi left along the line; `
          + `${before.togo} before Stop), no re-route ("${again.strip.slice(0, 44)}"), and it counts down on (${on.togo}); `
-         + `the judge rejects the loop restarted at 0 and the re-route to the start`);
+         + `the judge rejects the loop restarted at 0, the re-route to the start and a re-join`);
       grab("hud-stop").fire("click"); flushTimeouts(); frames(1);
     }
   }
@@ -2511,6 +2863,353 @@ if (!NO_GPS) {
        `…and a fix from the RIDE's watch after the denial closed it starts nothing (recording ${b && b.late ? b.late.rec : "?"}, `
        + `ride flag ${b && b.late ? b.late.flag : "?"}, pin moved ${b && b.late ? b.late.moved : "?"}); the judge rejects a recording started by it`);
   }
+}
+
+/* 11b · take 189 · lane L-ride: a ride with no fix says so (A230), the
+   folded drawer's Ride (A233), a loop's re-route re-joins the loop (A234),
+   one arrival estimate for a river run (A235). After section 11 on purpose:
+   each drill rides for itself and nothing after reads what it leaves. Every
+   judge is shown a planted reading it must reject; each fix was also taken
+   out of a copy of the built app to watch its drill fail (the lane's notes). */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav, D = sandbox.window.__disp, P = sandbox.window.__paddle;
+  const text = (id) => String(grab(id)._html || "").replace(/<[^>]*>/g, "");
+  const chipTxt = () => text("c-ride");
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1], accuracy: 5 }, extra || {}) });
+  const deny = () => { geo.err && geo.err({ code: 1, message: "User denied Geolocation" }); flushTimeouts(); frames(1); };
+  const stop = () => { if (flagged()) grab("hud-stop").fire("click"); if (flagged()) grab("c-ride").fire("click"); flushTimeouts(); frames(1); };
+  const c0 = manifest.centre || [anchors[0][1], anchors[0][2]];
+  stop();
+  /* the off-route re-route waits 20 s after the last one: a clock two hours
+     on, put back at the end */
+  const Real1 = sandbox.Date;
+  sandbox.Date = class extends Real1 {
+    constructor(...a) { if (a.length) super(...a); else super(Real1.now() + 7200e3); }
+    static now() { return Real1.now() + 7200e3; } };
+  try {
+    /* A230 · Ride pressed, no fix yet: the strip and the folded drawer's peek
+       line say "Waiting for a GPS fix" (take 188: a lone "—" and an empty
+       band); the first fix replaces both. */
+    {
+      const rd = () => ({ shown: grab("nav").hidden === false, strip: String(grab("nav-sp").textContent),
+        peek: String(grab("peek-txt").textContent), folded: /\bfolded\b/.test(grab("rail").className) });
+      grab("c-ride").fire("click"); flushTimeouts(); frames(1);
+      const w0 = Object.assign(rd(), { chip: chipTxt(), flag: flagged() });
+      fix(c0, { speed: 6, heading: 45 }); flushTimeouts(); frames(1);
+      const w1 = rd();
+      stop();
+      const says = (r) => !!r && r.shown && r.folded && /^Waiting for a GPS fix$/.test(r.strip)
+        && /^Waiting for a GPS fix\b/.test(r.peek) && !/\d/.test(r.strip + r.peek);
+      ok(says(w0) && /Stop \(GPS\)/.test(w0.chip) && w0.flag && !says(w1) && /^Recording/.test(w1.peek) && !/Waiting/.test(w1.strip)
+         && !says({ shown: true, folded: true, strip: "—", peek: "" }),
+         `A230 · Ride pressed with no fix: the strip reads "${w0.strip}", the folded drawer's peek line "${w0.peek}" (chip "${w0.chip}"); `
+         + `the first fix replaces both ("${w1.strip}", "${w1.peek}"); the judge rejects take 188's "—" over an empty band`);
+    }
+
+    /* A233 · the folded drawer's Ride is the Ride tab's Ride it, in one tap:
+       it opens a watch and waits (Stop (GPS), the ride flag), refuses
+       honestly on a denial, and starts nothing while a ride runs */
+    {
+      const w0 = geo.seq;
+      grab("btn-ride").fire("click"); flushTimeouts(); frames(1);
+      const a = { chip: chipTxt(), flag: flagged(), opened: geo.seq - w0, cb: typeof geo.cb === "function" };
+      grab("btn-ride").fire("click"); flushTimeouts(); frames(1);
+      const b = { flag: flagged(), opened: geo.seq - w0 };
+      deny();
+      const c = { flag: flagged(), refused: /No GPS fix/.test(text("panel")), chip: chipTxt() };
+      const rides = (x) => /Stop \(GPS\)/.test(x.chip) && x.flag && x.opened === 1 && x.cb;
+      ok(rides(a) && b.flag && b.opened === 1 && !c.flag && c.refused && /Ride it/.test(c.chip)
+         && !rides({ chip: "Ride it", flag: false, opened: 0, cb: false }),
+         `A233 · the folded drawer's Ride starts the Ride tab's ride in one tap (chip "${a.chip}", flag ${a.flag}, watches opened ${a.opened}); `
+         + `pressed again while it waits it opens no second watch (${b.opened}); a denial refuses as Ride it does (${c.refused}, chip "${c.chip}"); `
+         + `the judge rejects a press that started nothing`);
+    }
+
+    /* A234 · a loop's off-route re-route re-joins the loop AHEAD of the
+       rider and keeps the rest of it. A 15 mi loop from the centre, ridden
+       a mile and a half, then three fixes ~450 m off its line: the new
+       option must be the "Back to the loop" re-join — the loop's own edges
+       from a node ahead of the rider to its start, unchanged, after a leg
+       from the rider — guided as a loop (no arrival at the start on its
+       first fixes). Take 187-188's point-to-point route to the start is the
+       planted reading the judge rejects. */
+    {
+      const mOf = (p, q) => { const k = Math.cos(p[1] * Math.PI / 180) * 111320; return Math.hypot((q[0] - p[0]) * k, (q[1] - p[1]) * 111320); };
+      grab("c-loop").fire("click");
+      const b15 = documentStub.querySelectorAll("[data-loop]").find((x) => x.dataset.loop === "15") || documentStub.querySelectorAll("[data-loop]")[0];
+      if (b15) { b15.fire("click"); flushTimeouts(); }
+      const G = N.plan();
+      const pts = G ? G.pts.slice() : [], cum = G ? G.cum.slice() : [], path0 = G ? G.o.s.path.map((e) => e.i) : [];
+      const k1 = G ? cum.findIndex((m) => m >= 2414) : -1;
+      ok(!!G && G.loop && k1 > 0 && cum[k1] < G.total * 0.5,
+         `A234 · a loop to leave (${G ? (G.total / 1609.34).toFixed(1) + " mi, " + path0.length + " edges" : "NONE"}; ridden to ${k1 > 0 ? (cum[k1] / 1609.34).toFixed(2) : "?"} mi)`);
+      if (G && k1 > 0) {
+        const spd = { speed: 8.9408, heading: 90 };
+        grab("c-ride").fire("click");
+        fix(pts[0], spd); fix(pts[0], spd);
+        for (let i = 1; i <= k1; i++) fix(pts[i], spd);
+        frames(1);
+        /* off the line: a point ~450 m to the side of the line a little ahead */
+        const ka = Math.min(pts.length - 2, cum.findIndex((m) => m >= cum[k1] + 300));
+        const dx = pts[ka + 1][0] - pts[ka][0], dy = pts[ka + 1][1] - pts[ka][1], L = Math.hypot(dx, dy) || 1;
+        const off = [pts[ka][0] - (dy / L) * 0.0045 / Math.cos(pts[ka][1] * Math.PI / 180), pts[ka][1] + (dx / L) * 0.0045];
+        for (let i = 0; i < 3; i++) fix(off, spd);
+        flushTimeouts(); frames(1);
+        const peek = String(grab("peek-txt").textContent), panel = text("panel"), strip = text("nav-g");
+        const G2 = N.plan();
+        const p2 = G2 ? G2.o.s.path.map((e) => e.i) : [];
+        let tail = 0; while (tail < p2.length && tail < path0.length && p2[p2.length - 1 - tail] === path0[path0.length - 1 - tail]) tail++;
+        /* where on the loop the re-join lands: the end of the loop's edge just before the kept tail */
+        const jEdge = path0.length - tail - 1, jMark = G && jEdge >= 0 ? cum[G.legs[jEdge]] : -1;
+        const r = { rj: !!(G2 && G2.o.rj), loop: !!(G2 && G2.loop), sameEnd: !!(G2 && G2.o.nb === G.o.nb), tail, rest: path0.length - jEdge - 1,
+          ahead: jMark - cum[k1], peek, card: /Back to the loop/.test(panel) && /then the rest of it to the start/.test(panel), appr: G2 ? G2.appr : -1 };
+        /* ride the first points of the re-join: it guides, it has not arrived */
+        for (let i = 0; i < Math.min(3, G2 ? G2.pts.length : 0); i++) fix(G2.pts[i], spd);
+        frames(1);
+        const on = { arrived: !!((N.guide() || {}).arrived), togo: parseFloat(text("hud-togo")), total: G2 ? G2.total / 1609.34 : 0 };
+        stop();
+        /* ahead: at least the app's 100 m past where the rider was placed on
+           the loop, and inside its window (2 mi past that, from a point the
+           off fixes project to at most ~300 m further on): never the loop's
+           start, the old re-route's end */
+        const rejoined = (x) => x.rj && x.loop && x.sameEnd && x.tail >= 1 && x.ahead >= 100 && x.ahead <= 3700 && x.appr === 0
+          && /^Back to the loop/.test(x.peek) && x.card;
+        ok(rejoined(r) && !on.arrived && on.togo > 0.2 && on.togo <= on.total + 0.15
+           && !rejoined({ rj: false, loop: false, sameEnd: true, tail: 0, rest: 0, ahead: -1, appr: 0, peek: "Re-routed · the new route is on the map", card: false })
+           && !rejoined(Object.assign({}, r, { ahead: G.total - cum[k1] - 50, tail: 1 })),
+           `A234 · three fixes ${Math.round(mOf(off, pts[ka]))} m off the loop re-join it ${r.ahead >= 0 ? (r.ahead / 1609.34).toFixed(2) : "?"} mi ahead of the rider, `
+           + `keeping the loop's last ${r.tail} of ${path0.length} edges to its start (rest ${r.rest}); "${r.peek}"; guided as a loop (approach ${r.appr}), `
+           + `not arrived on its first points (To go ${on.togo} of ${on.total.toFixed(1)} mi); the judge rejects the point-to-point route to the start, `
+           + `and a re-join at the loop's own end`);
+      }
+    }
+
+    /* A235 · ONE arrival estimate for a river run: the run card, the ride
+       sheet's Arrive and the strip give the same "~N" at the put-in (take
+       188: the card's and the strip's ranges, the sheet's midpoint); after
+       ten moving fixes the sheet and the strip read the paddler's own pace,
+       still one figure. The same reader rejects planted mismatches. */
+    {
+      const ETA = /~[\d:]+ (?:min|h)\b/;
+      const c = ((P && P.data && P.data.c) || []).find((x) => x.n === "Au Sable River");
+      const named = c ? c.f.filter((f) => f.n && f.p && (f.k === "access" || f.k === "launch")) : [];
+      let a = null, b = null;
+      for (let i = 0; i < named.length && !b; i++) for (let j = i + 1; j < named.length; j++) {
+        const d = named[j].mi - named[i].mi; if (d >= 3 && d <= 8) { a = named[i]; b = named[j]; break; } }
+      ok(!!a && !!b, `A235 · an Au Sable run of 3-8 mi between named accesses (${a ? a.n + " to " + b.n : "NONE"})`);
+      if (a && b) {
+        /* planned in Water, where the run card's craft is the one Navigate rides
+           with (planned in another mode the card names its own 2-3 mph) */
+        sandbox.window.__mode.apply("water", { silent: true }); flushTimeouts();
+        P.run(a, b, c.n); flushTimeouts();
+        const card = (text("panel").match(ETA) || [null])[0];
+        grab("pd-nav").fire("click"); flushTimeouts(); frames(1);
+        const Lr = N.riverLine(c.n);
+        const atMile = (mi) => { const mm = mi * 1609.34; let i = 0; while (i < Lr.cum.length - 2 && Lr.cum[i + 1] < mm) i++;
+          const t = (mm - Lr.cum[i]) / Math.max(1, Lr.cum[i + 1] - Lr.cum[i]);
+          return [Lr.pts[i][0] + (Lr.pts[i + 1][0] - Lr.pts[i][0]) * t, Lr.pts[i][1] + (Lr.pts[i + 1][1] - Lr.pts[i][1]) * t]; };
+        const read = () => ({ card, sheet: text("hud-eta").replace(/^~(\S+?) ?(min|h)$/, "~$1 $2"),
+          strip: ((text("nav-g").match(ETA)) || [null])[0], stripText: text("nav-g") });
+        fix(atMile(a.mi), { speed: 1.4, heading: 0 }); flushTimeouts(); frames(1);
+        const r0 = read();
+        /* ten moving fixes downstream at 1.0 m/s, slower than a kayak's
+           range: the FLOOR case (the put-in's 1.4 and these average under
+           the kayak's 2.5 mph), the same on the sheet and the strip. The
+           paddler's own pace above the floor is the second run below */
+        for (let k = 1; k <= 10; k++) fix(atMile(a.mi + k * 0.05), { speed: 1.0, heading: 0 });
+        flushTimeouts(); frames(1);
+        const r1 = read();
+        /* what the pace rule gives here, from the app's own numbers: the
+           miles left at the slow end of the kayak's range (the paddler's
+           1.0 m/s is under it); and what the run's own estimate would say */
+        const K = sandbox.window.__route.MACHINE.kayak, left = b.mi - N.river(atMile(a.mi + 0.5)).rm;
+        const wantPace = left * 1609.34 / Math.max(1.0, (K.mph - K.spread) * 0.44704) / 60, wantPlan = left / K.mph * 60;
+        const minOf = (t) => { const m = /~(\d+)(?::(\d\d))? (min|h)/.exec(t || ""); return !m ? NaN : m[3] === "min" ? +m[1] : +m[1] * 60 + +(m[2] || 0); };
+        r1.min = minOf(r1.sheet);
+        stop();
+        /* the paddler's OWN pace (the review of lane L-ride, round 1: the
+           floor case above passed a build that never used the measured
+           pace). The run again, put-in and ten fixes all at 1.8 m/s (~4.0
+           mph, faster than the kayak's whole 2.5-3.5): the sheet and the
+           strip read the miles left at 1.8 m/s, not the floor's figure nor
+           the plan's */
+        P.run(a, b, c.n); flushTimeouts();
+        grab("pd-nav").fire("click"); flushTimeouts(); frames(1);
+        fix(atMile(a.mi), { speed: 1.8, heading: 0 }); flushTimeouts(); frames(1);
+        for (let k = 1; k <= 10; k++) fix(atMile(a.mi + k * 0.05), { speed: 1.8, heading: 0 });
+        flushTimeouts(); frames(1);
+        const r2 = read(); r2.min = minOf(r2.sheet);
+        stop();
+        const wantOwn = left * 1609.34 / 1.8 / 60;
+        const own = (r) => !!r && !!r.sheet && r.sheet === r.strip && Math.abs(r.min - wantOwn) <= 1
+          && Math.abs(r.min - wantPace) > 1.5 && Math.abs(r.min - wantPlan) > 1.5;
+        ok(own(r2) && !own(Object.assign({}, r2, { min: Math.round(wantPace) })) && !own(Object.assign({}, r2, { min: Math.round(wantPlan) }))
+           && !own(Object.assign({}, r2, { strip: r2.strip ? r2.strip.replace(/~(\d+)/, (m0, v) => "~" + (parseInt(v, 10) + 5)) : r2.strip })),
+           `A235 · the paddler's own pace takes over after ten fixes at 1.8 m/s, over the kayak's range: sheet "${r2.sheet}", strip "${r2.strip}" `
+           + `(the miles left at 1.8 m/s give ${wantOwn.toFixed(1)} min; the floor ${wantPace.toFixed(1)}, the plan ${wantPlan.toFixed(1)}); `
+           + `the reader rejects the floor's and the plan's figures, and a strip that differs`);
+        const agree = (r) => !!r && !!r.card && r.card === r.sheet && r.sheet === r.strip;
+        const paced = (r) => !!r && !!r.sheet && r.sheet === r.strip && Math.abs(r.min - wantPace) <= 1 && Math.abs(r.min - wantPlan) > 1.5;
+        const bump = (x, n) => x ? x.replace(/~(\d+)/, (m0, v) => "~" + (parseInt(v, 10) + n)) : x;
+        ok(agree(r0) && paced(r1) && r1.sheet !== r0.sheet
+           && !agree(Object.assign({}, r0, { card: bump(r0.card, 16) })) && !agree(Object.assign({}, r0, { sheet: bump(r0.sheet, 16) }))
+           && !agree(Object.assign({}, r0, { strip: null })) && !paced(Object.assign({}, r1, { strip: bump(r1.strip, 5) }))
+           && !paced(Object.assign({}, r1, { min: Math.round(wantPlan) })),
+           `A235 · one arrival estimate for a river run at its put-in: card "${r0.card}", sheet "${r0.sheet}", strip "${r0.strip}" ("${(r0.stripText || "").slice(0, 70)}"); `
+           + `at the paddler's own pace after ten fixes, sheet "${r1.sheet}", strip "${r1.strip}" (the pace rule gives ${wantPace.toFixed(1)} min, `
+           + `the run's own estimate ${wantPlan.toFixed(1)}); the reader rejects a planted card, sheet and strip, and the plan's figure after the pace is known`);
+      }
+    }
+
+    /* A230 · a RESUMED trip waiting for its first fix (a phone restarted in
+       the woods, a cold GPS): its track is kept and drawn, and the Resume
+       card has just said how far it is, so the peek line names those miles
+       and never says "nothing recorded yet" (the review of lane L-ride,
+       round 1). A short ride is recorded and saved, the app "killed"
+       (__nav.reset, as section 7 does), Resume pressed with no fix; the
+       peek line is read as written, after a refold, and after the resumed
+       route is planned. The first fix then carries the same track on. The
+       saved trip is put back as it was. Last in 11b on purpose: its fixes
+       are off the route chosen earlier, so they re-route, and the 20 s
+       debounce that leaves would hold A234's re-join (seen: the first build
+       of this drill ran before A234 and A234 then failed) */
+    {
+      const ls = sandbox.window.localStorage, trip0 = ls.getItem("apex.trip.v1");
+      const at = (k) => [c0[0], c0[1] + k * 0.003];
+      grab("c-ride").fire("click"); flushTimeouts(); frames(1);
+      for (let k = 0; k < 4; k++) fix(at(k), { speed: 8, heading: 0 });
+      flushTimeouts(); frames(1);
+      const mi0 = parseFloat((N.snapshot() || {}).crumbMi) || 0, n0 = N.crumbs();
+      N.save(true); N.reset(); sandbox.window.hudShow(false);
+      grab("trip-resume")._listeners = {};
+      const offered = N.card() === true;
+      grab("trip-resume").fire("click");
+      const pk = () => String(grab("peek-txt").textContent);
+      const p0 = pk(); N.rail(false); const p1 = pk();
+      flushTimeouts(); frames(1); N.rail(false); const p2 = pk();
+      const waiting = flagged() && /^Waiting for a GPS fix$/.test(String(grab("nav-sp").textContent));
+      /* the first fix starts the recording again (the resumed branch), the
+         next records */
+      fix(at(4), { speed: 8, heading: 0 }); fix(c0, { speed: 8, heading: 180 }); flushTimeouts(); frames(1);
+      const n1 = N.crumbs(), mi1 = parseFloat((N.snapshot() || {}).crumbMi) || 0;
+      stop();
+      if (trip0 !== null) ls.setItem("apex.trip.v1", trip0); else ls.removeItem("apex.trip.v1");
+      const want = mi0.toFixed(1) + " mi recorded, kept";
+      const kept = (p) => /^Waiting for a GPS fix — /.test(p) && p.includes(want) && !/nothing recorded/.test(p);
+      /* take 189 · cold audit · the line as Resume WROTE it is judged too
+         (it read "Trip resumed · recording" until a refold) */
+      ok(offered && mi0 > 0.5 && waiting && kept(p0) && kept(p1) && kept(p2) && n1 > n0 && mi1 > mi0 + 0.5 && !kept("Waiting for a GPS fix — nothing recorded yet")
+         && !kept("Trip resumed · recording"),
+         `A230 · a resumed trip (${mi0.toFixed(2)} mi, ${n0} points) waiting for its first fix: the peek line reads "${p1}" after a refold `
+         + `and "${p2}" once its route is planned (as Resume wrote it: "${p0}"); the next fixes carry the same track on (${n0} → ${n1} points, ${mi1.toFixed(2)} mi); `
+         + `the judge rejects "Waiting for a GPS fix — nothing recorded yet" and "Trip resumed · recording" for it`);
+    }
+
+    /* take 189 · cold audit · a RESUMED trip waiting for its first fix, after
+       a relaunch (__nav.reset(true): no truck pinned, no truck marker):
+       (1) the self-test run meanwhile leaves the trip alone — its safety
+       drill took the resumed branch and spent the trip's flags, so the real
+       first fix wiped the kept track (PROVEN, the audit's harness); every
+       SAFETY row passes and the next fixes carry the same track on;
+       (2) that first fix says the truck stays where it was pinned, never
+       "Truck pinned where you are", and the truck's pin is drawn there;
+       (3) Stop before a first fix says nothing was recorded and ends the
+       trip's flags: the next Ride waits with "nothing recorded yet", and
+       its own Stop before a fix never says "Recording stopped. N mi".
+       (4) a dropout mid-ride: the peek line "Recording · live GPS" becomes
+       "No GPS fix since h:mm" on the ride's pulse and comes back on the
+       next fix. Each judge rejects its planted reading. */
+    {
+      const ls = sandbox.window.localStorage, trip0 = ls.getItem("apex.trip.v1");
+      const at = (k) => [c0[0] + 0.002, c0[1] + k * 0.003];
+      const pk = () => String(grab("peek-txt").textContent);
+      const ph = () => (grab("panel")._html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+      const rideSave = () => { grab("c-ride").fire("click"); flushTimeouts(); frames(1);
+        for (let k = 0; k < 4; k++) fix(at(k), { speed: 8, heading: 0 });
+        flushTimeouts(); frames(1);
+        const m = parseFloat((N.snapshot() || {}).crumbMi) || 0;
+        N.save(true); N.reset(true); sandbox.window.hudShow(false); return m; };
+      const resume = () => { grab("trip-resume")._listeners = {}; const o = N.card() === true; grab("trip-resume").fire("click"); return o; };
+      /* (1) and (2) */
+      const mi0 = rideSave(), off1 = resume(), n0 = N.crumbs();
+      let st = null, threw = null;
+      try { sandbox.window.__selfTest({ gps: false }, (r) => { st = r; }); } catch (e) { threw = String(e.message); }
+      for (let i = 0; i < 500 && !st && !threw; i++) { frames(2); flushTimeouts(); }
+      const saf = st ? (st.results || []).filter((r) => r.g === "SAFETY") : [];
+      const nSt = N.crumbs();
+      fix(at(4), { speed: 8, heading: 0 }); flushTimeouts(); frames(1);
+      const card1 = ph();
+      const tr = (N.snapshot() || {}).crumbs, t0p = at(0);
+      const tks = everyMarker.filter((m) => /(^|\s)truck(\s|$)/.test(m._el.className || "") && !m._removed && m._map);
+      const pinned = tks.some((m) => m._ll && Math.abs(m._ll[0] - t0p[0]) < 1e-9 && Math.abs(m._ll[1] - t0p[1]) < 1e-9);
+      fix(at(5), { speed: 8, heading: 0 }); flushTimeouts(); frames(1);
+      const n1 = N.crumbs(), mi1 = parseFloat((N.snapshot() || {}).crumbMi) || 0;
+      stop();
+      const stOk = (x) => x.saf.length >= 4 && x.saf.every((r) => r.ok !== false) && x.nSt === x.n0 && x.n1 > x.n0 && x.mi1 > x.mi0 + 0.1;
+      const S1 = { saf, nSt, n0, n1, mi0, mi1 };
+      ok(off1 && !threw && stOk(S1)
+         && !stOk(Object.assign({}, S1, { saf: saf.concat([{ g: "SAFETY", id: "distance-sane", ok: false }]) }))
+         && !stOk(Object.assign({}, S1, { n1: 1, mi1: 0 })),
+         `the self-test run while a resumed trip (${mi0.toFixed(2)} mi, ${n0} points) waits leaves it alone: SAFETY ${saf.map((r) => r.id + " " + (r.ok === false ? "FAIL" : "ok")).join(", ") || threw || "(none)"}; `
+         + `points ${n0} → ${nSt} during the test → ${n1} after two fixes (${mi1.toFixed(2)} mi); the judge rejects a false SAFETY fail and a wiped track`);
+      const cardOk = (c, p) => /the truck stays where it was pinned/.test(c) && !/Truck pinned where you are/.test(c) && p;
+      ok(cardOk(card1, pinned) && !cardOk("Recording live GPS Truck pinned where you are. Ride.", true) && !cardOk(card1, false),
+         `a resumed trip's first fix keeps the truck where it was and draws its pin there (${pinned}; ${tks.length} truck marker(s)): "${card1.slice(0, 110)}"; `
+         + `the judge rejects "Truck pinned where you are" and a missing pin`);
+      /* (2b) cold audit r2 · resumed beside the truck: never a bearing to
+         where the rider stands (landmines 164/167) — under ~100 ft "you are
+         at the truck", in feet below 320 m, never "0.0 mi" */
+      const nearCard = (dLat) => { rideSave(); resume(); const t = at(0);
+        /* the card the first fix writes, read before the timers run (this
+           trip carries an earlier section's route "to the start", which
+           replans after the fix and, for this kayak, fails) */
+        fix([t[0], t[1] + dLat], { speed: 8, heading: 0 }); const c = ph(); flushTimeouts(); frames(1);
+        stop(); return c; };
+      const cNear = nearCard(0.0001), cFt = nearCard(0.0014);
+      const nearOk = (c) => /Trip resumed — you are at the truck, where it was pinned\. Ride\./.test(c) && !/\d (mi|ft) [NSEW]/.test(c);
+      const ftOk = (c) => /Trip resumed — the truck stays where it was pinned, \d+ ft [NSEW]{1,3}\. Ride\./.test(c) && !/0\.0 mi/.test(c);
+      ok(nearOk(cNear) && ftOk(cFt)
+         && !nearOk("Recording live GPS Trip resumed — the truck stays where it was pinned, 0.0 mi N. Ride.")
+         && !ftOk("Recording live GPS Trip resumed — the truck stays where it was pinned, 0.1 mi S. Ride."),
+         `a resumed trip's first fix beside the truck (~11 m): "${cNear.slice(0, 110)}"; ~155 m: "${cFt.slice(0, 110)}"; `
+         + `the judge rejects "0.0 mi N" beside it and "0.1 mi" at feet range`);
+      /* (3) */
+      rideSave(); resume();
+      grab("c-ride").fire("click");                                      /* Stop, no fix yet */
+      const cStop = ph(); flushTimeouts(); frames(1);
+      grab("c-ride").fire("click"); flushTimeouts(); frames(1);           /* a new Ride */
+      const pNew = pk();
+      grab("c-ride").fire("click");                                      /* its Stop, no fix */
+      const cStop2 = ph(); flushTimeouts(); frames(1);
+      const stopOk = (c, res) => /Stopped before the first GPS fix — nothing was recorded/.test(c) && !/Recording stopped/.test(c)
+        && (res ? /resumed trip ends here/.test(c) : !/resumed trip/.test(c));
+      ok(stopOk(cStop, true) && /^Waiting for a GPS fix — nothing recorded yet$/.test(pNew) && stopOk(cStop2, false)
+         && !stopOk("Recording stopped. 0.62 mi on the track. Retrace follows it back.", false) && !/^Waiting for a GPS fix — nothing recorded yet$/.test("Waiting for a GPS fix — 0.6 mi recorded, kept"),
+         `Stop before a first fix: on a resumed trip "${cStop.slice(0, 120)}"; the next Ride waits with "${pNew}"; `
+         + `its own Stop "${cStop2.slice(0, 80)}"; the judge rejects "Recording stopped. N mi" and the ended trip's "mi kept"`);
+      /* (4) */
+      grab("c-ride").fire("click"); flushTimeouts(); frames(1);
+      fix(at(0), { speed: 8, heading: 0 }); fix(at(1), { speed: 8, heading: 0 }); flushTimeouts(); frames(1);
+      const pLive = pk();
+      const R2 = sandbox.Date;
+      sandbox.Date = class extends R2 { constructor(...a) { if (a.length) super(...a); else super(R2.now() + 40000); }
+        static now() { return R2.now() + 40000; } };
+      let pDrop = "";
+      let pFold = "";
+      try { ticks(1); pDrop = pk(); N.rail(false); pFold = pk(); } finally { sandbox.Date = R2; }
+      fix(at(2), { speed: 8, heading: 0 }); flushTimeouts(); frames(1);
+      const pBack = pk();
+      stop();
+      if (trip0 !== null) ls.setItem("apex.trip.v1", trip0); else ls.removeItem("apex.trip.v1");
+      const dropOk = (a, b, f, c) => a === "Recording · live GPS" && /^No GPS fix since \d{1,2}:\d\d/.test(b) && /^No GPS fix since \d{1,2}:\d\d/.test(f)
+        && (c === "Recording · live GPS" || /^Truck [\d.]+ mi [NSEW]{1,3}$/.test(c));
+      ok(dropOk(pLive, pDrop, pFold, pBack) && !dropOk(pLive, "Recording · live GPS", pFold, pBack) && !dropOk(pLive, pDrop, "Truck 0.2 mi S", pBack)
+         && !dropOk(pLive, pDrop, pFold, pDrop),
+         `a dropout mid-ride: the peek line "${pLive}", 40 s with no fix "${pDrop}" (refolded "${pFold}"), the next fix "${pBack}"; `
+         + `the judge rejects "live GPS" and a truck distance through the dropout, and the dropout line left after the fix`);
+    }
+  } finally { sandbox.Date = Real1; }
 }
 
 /* 10 · nothing ever left the origin */

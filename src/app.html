@@ -398,9 +398,19 @@
     background:var(--surface-1);border:1px solid var(--border);
     border-radius:var(--r-lg);padding:var(--s-2) var(--s-3);box-shadow:var(--e-2);
     color:var(--text-1);font:600 var(--t-sm)/1.5 Barlow,Roboto,system-ui,sans-serif;
-    max-height:min(62vh,calc(100% - var(--ride-top) - var(--strip-h,64px) - var(--sheet-h,0px) - var(--s-4)));overflow-y:auto;transform-origin:bottom left;
+    max-height:calc(min(62vh,calc(100% - var(--ride-top) - var(--strip-h,64px) - var(--sheet-h,0px) - var(--s-4))) - var(--cmp-trim,0px));overflow-y:auto;transform-origin:bottom left;
     transition:opacity var(--m-base) var(--m-ease),
                transform var(--m-base) var(--m-ease)}
+  /* take 189 · cold audit · the compass panel ends on a whole line (cmpFit)
+     and says when more is below: at 360 x 800 riding it cut its caption
+     through the middle of its letters, with no cue that it scrolls.
+     Round 2: the fit is a trim (--cmp-trim) taken off the live cap, as
+     #railbody's --rc-trim, so a cap that shrinks later (--ride-top,
+     --sheet-h) still bounds the panel; and the cue is not drawn once the
+     panel is scrolled to its end (cmpCue: nothing is below there) */
+  #cmpmore{position:sticky;bottom:0;background:var(--surface-1);color:var(--text-2);text-align:center;
+    font:600 var(--t-xs)/1.6 Barlow,Roboto,system-ui,sans-serif}
+  #cmpmore[hidden]{display:none}
   #cmppanel[hidden]{opacity:0;transform:translateY(6px) scale(.98);
     pointer-events:none;visibility:hidden}
   #diagpanel{position:absolute;left:var(--edge);right:var(--edge);
@@ -417,6 +427,19 @@
   #diagpanel .sect{font:700 var(--t-xs)/1 Barlow,Roboto,system-ui,sans-serif;
     letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);padding:var(--s-1) var(--s-2) 2px}
   #diagpanel .chip{width:100%;justify-content:flex-start}
+  /* take 189 · A231 · riding, the panels sit between the turn banner and
+     the ride sheet, above the Tools strip; at 360 x 800 the strip wraps to
+     four rows (248 px) and left the compass and diagnostics 73 px, the
+     compass's dial cut (take 188 F18's cap is kept: they never cover the
+     banner). While one of them is open on a ride the strip keeps only the
+     chips that go with it — Compass, Mark this spot (marking with the
+     compass open is its use) and Diagnostics — and gives the panel the
+     room of the rows it drops. The chips come back when the panel closes.
+     take 189 · cold audit · only where it is needed: a small phone (render
+     read the panels whole without it at 411, 412, 430 and 749 px, so there
+     it only made four chips a tap further away, landmine 135) */
+  @media (max-width:400px) and (max-height:860px){
+    #shell[data-ride]:has(#cmppanel:not([hidden]),#diagpanel:not([hidden])) #tools .chip:not(#c-compass):not(#c-markme):not(#c-diag){display:none}}
   #lyrpanel .sect{font:700 var(--t-xs)/1 Barlow,Roboto,system-ui,sans-serif;letter-spacing:.14em;
     text-transform:uppercase;color:var(--text-3);padding:var(--s-2) var(--s-2) var(--s-1)}
   #lyrpanel .pnote{font:500 var(--t-md)/1.35 Barlow,Roboto,system-ui,sans-serif;color:var(--text-3);padding:0 var(--s-2) var(--s-1)}
@@ -505,6 +528,20 @@
     padding:0 0 1px!important;margin:0!important}
   .maplibregl-ctrl-bottom-left{left:var(--edge);bottom:auto;top:calc(var(--ride-top) + var(--edge))}
   .maplibregl-ctrl-attrib{font-size:var(--t-xs)}.maplibregl-ctrl-top-right{display:none}
+  /* take 189 · A229 · the attribution corner stands clear of the drawer.
+     #rail is pulled up over the map by its corner radius (A144), and the
+     compact (i), 10 px above the map's foot, sat half under that lip:
+     843-867 px against the folded drawer's top at 857 px at 411x960 (take
+     188's seal shots), its upper half still taking a tap. It now stands on
+     the lip, its foot level with the tool chips' (the strip's own padding,
+     --r-lg + --s-1), in every state and at every size; render reads it
+     clear of #rail at the five device sizes, folded, at rest and riding */
+  /* take 189 · cold audit · …and never on a chip: where the strip's last
+     row runs under it (riding at 411 with a panel open, A231's three chips
+     ran to the right edge and the (i) sat on "Diagnostics") it stands above
+     the strip instead (--attrib-lift, measured by stripH) */
+  .maplibregl-ctrl-bottom-right{bottom:calc(var(--r-lg) + var(--attrib-lift,0px))}
+  .maplibregl-ctrl-bottom-right>.maplibregl-ctrl-attrib.maplibregl-compact{margin-bottom:var(--s-1)}
   /* take 188 · A217 · every strip WRAPS. A sideways-scrolling strip hid
      actions off the right edge (Plan showed 3 of its 6 chips at 360 px,
      Tools cut "Mark this spot" in half): a rider cannot know to swipe for
@@ -691,8 +728,14 @@
      gives back the part of the body a whole row would not fill, so the
      pinned row sits right under the last whole row (never while riding:
      the ride rule below is untrimmed and the row keeps a margin instead) */
+  /* take 189 · cold audit · and at rest too, never taller than leaves the
+     tool strip clear of the left column (--ride-cap, measured by
+     ridePublish against the strip, 15vh floor): at 360 x 800 a card open on
+     the Tools tab pushed the strip's four rows up under "Everything
+     ridable", which covered "Take the tour". The route cards' trim comes
+     off what the cap leaves */
   #railbody{padding:var(--s-3) var(--s-4) var(--s-2);overflow-y:auto;
-    max-height:calc(38vh - var(--rc-trim,0px));opacity:1;
+    max-height:calc(min(38vh,max(15vh,var(--ride-cap,38vh))) - var(--rc-trim,0px));opacity:1;
     transition:max-height var(--m-drawer) var(--m-ease), opacity var(--m-fade) var(--m-ease),
                padding var(--m-drawer) var(--m-ease)}
   #rail.folded #railbody{max-height:0;opacity:0;padding-top:0;padding-bottom:0;
@@ -715,7 +758,11 @@
      sheet, under the 3:1 a mark needs (a recorded departure) */
   #peek::before{content:'';width:40px;height:4px;border-radius:var(--r-pill);
     background:var(--text-3)}
-  #peek-txt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* take 189 · cold audit · max-width: in #peek's centring column the span
+     was as wide as its text, so its ellipsis never engaged and a long line
+     ran past the drawer's edges (render: a planted 562 px line in a 336 px
+     row at 360 x 800) */
+  #peek-txt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
   /* The grabber replaced the chevron as the affordance; the element stays
      (its glyph is asserted) but does not render (take 113). */
   #peek-chev{display:none}
@@ -762,6 +809,11 @@
      and take the warning colour off "past your range" and "arrives after
      dark" (the plan review; render proves it on a planted card). */
   :where(#panel) .sub{color:var(--text-2)}
+  /* take 189 · A232 · a name that must stay whole on one line: Chrome
+     breaks after a hyphen, and at 360 px Data sources read "BSD 3-" /
+     "Clause" (take 188's 13b3 shots). The text is unchanged, so the
+     licence checks still read it word for word */
+  .nobr{white-space:nowrap}
   :where(#panel) .unit{color:var(--text-3)}
   :where(#panel) .mono{font-family:ui-monospace,"Roboto Mono",monospace;font-variant-numeric:tabular-nums}
   .tag{display:inline-block;font-size:var(--t-xs);letter-spacing:.09em;text-transform:uppercase;
@@ -919,6 +971,13 @@
   #shell:not([data-ride]) #rail.folded #actions{grid-column:2;grid-row:1;max-height:80px;opacity:1;
     margin-top:0;padding:0 var(--edge) 0 0}
   #shell:not([data-ride]) #rail.folded #actions .act:not(.primary){display:none}
+  /* take 189 · A233 · Ride, the mockup's secondary beside Return home:
+     drawn on the folded drawer at rest only (four ids outrank the rule
+     above), outlined like the drawer's other actions, so Return home stays
+     the one accent on the screen. Off the folded drawer, and while a ride
+     runs, it is not drawn: Stop is the ride's (the sheet, or Stop (GPS)) */
+  #btn-ride{display:none}
+  #shell:not([data-ride]) #rail.folded #actions #btn-ride{display:inline-block;flex:0 0 auto;padding:0 var(--s-4)}
   #shell:not([data-ride]) #rail.folded #btn-home{flex:0 0 auto;padding:0 var(--s-4);
     background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
   #rail:not(.folded) #btn-home,#shell[data-ride] #btn-home{background:var(--surface-2);color:var(--text-1);border-color:var(--accent)}
@@ -945,7 +1004,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 188</span>
+    <span id="title"><b>APEX</b> ORV · Take 189</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -983,7 +1042,7 @@
     <!-- A119 · the compass. Its own panel rather than a card, because it updates
          as fixes arrive and the panel is where the app already puts things that
          stay on screen while you use them. -->
-    <div id="cmppanel" hidden><div id="cmpbox"></div></div>
+    <div id="cmppanel" hidden><div id="cmpbox"></div><div id="cmpmore" hidden>More below — scroll</div></div>
     <div id="diagpanel" hidden>
       <div class="sect">Diagnostics</div>
       <button class="chip" id="c-about">__IC_about__<span>About this build</span></button>
@@ -1097,6 +1156,11 @@
       <button class="act" id="btn-retrace">Retrace</button>
       <button class="act" id="btn-steps">Turns</button>
       <button class="act primary" id="btn-home">Return home</button>
+      <!-- take 189 · A233 · the V4 mockup's Main board: Ride (secondary)
+           beside Return home (primary) on the folded drawer. Drawn only
+           there, at rest; the open drawer's cards carry their own Ride it,
+           and a ride's Stop is the sheet's -->
+      <button class="act" id="btn-ride">Ride</button>
     </div>
   </div>
   <!-- ── DESTINATIONS (A113, take 98) ────────────────────────────────────────
@@ -1555,10 +1619,19 @@ function strokeLen(pts){
 /* A110. "0.8 mi NE of you" is the question a rider actually has about a pin.
    Reuses mi() and compass(), both verified outside the code that produced them
    at take 69 — a bearing nobody checked is how you send someone the wrong way. */
+/* take 189 · A237 · "of you" only from a live fix. ME holds the region
+   centre until a fix arrives (it IS the start pin while there is none, and
+   routes measure from it), so the `!ME` guard never fired and every card
+   said "152 mi SSE of you" beside a footer reading "no GPS fix yet"
+   (take 189's integration shots). The line names what it is measured
+   from: you, from a live fix (liveFix); else the pin ME is, by the
+   me-marker's own name (meIs), in the words placeCard uses too (meNoun).
+   Display only: routing still measures from
+   ME, unchanged. */
 function placeDist(p){
   if(!ME)return '';
   var d=mi(ME,p);
-  return d.toFixed(d<10?1:0)+' mi '+compass(bearing(ME,p))+' of you';}
+  return d.toFixed(d<10?1:0)+' mi '+compass(bearing(ME,p))+' of '+meNoun();}
 
 /* take 188 · A202 D7 · `geo(i)` gives edge i's coordinates and MUST return a
    fresh array, because the walk reverses in place; the default decodes, as
@@ -1882,7 +1955,11 @@ var poif=((POIS&&POIS.p)||[]).map(function(r,i){
          unnamed and is labelled by KIND. Saying "Beach" is honest; inventing
          "Island Lake Beach" from the day-use area 6 m away is not
          (poi.py explains the exception). */
-      n:r.n||k.h,named:r.n?1:0,mi:r.mi||0},
+      n:r.n||k.h,named:r.n?1:0,mi:r.mi||0,
+      /* take 189 · A228 · the source's placeholder ("A", "12", "car
+         parking"): poi.py ships the pin unnamed and keeps the text here, so
+         the card can say exactly what the source called it */
+      ph:(typeof r.ph==='string')?r.ph:''},
     geometry:{type:'Point',coordinates:r.p}}});
 
 /* A87 · contour lines, a fifth product of the DEM ingest that already runs.
@@ -1992,11 +2069,18 @@ var PADKIND={};
    guessing at is the distance. */
 var PADDLE_MPH=2.5, PADDLE_SPREAD=0.5;
 
+/* take 189 · A235 · the craft's calibrated pace, in one place: the run
+   card's range, the run's own estimate (the middle of that range) and the
+   pace floor of the one arrival rule (navEta) all read it */
+function paddlePace(){var mc=MACHINE[machine]||{};
+  return mc.mph?{mph:mc.mph,spr:mc.spread||PADDLE_SPREAD,craft:mc.lbl}:{mph:PADDLE_MPH,spr:PADDLE_SPREAD,craft:null}}
+/* the run's own estimate, in minutes: its miles at the middle of the range */
+function paddleMin(miles){return miles/paddlePace().mph*60}
 function paddleHours(miles){
   /* take 149 · the craft sets the pace (A165); without one the historic
      2.5±0.5 mph livery calibration stands */
-  var mc=MACHINE[machine]||{};
-  var mph=mc.mph||PADDLE_MPH, spr=mc.mph?(mc.spread||PADDLE_SPREAD):PADDLE_SPREAD;
+  var pp=paddlePace();
+  var mph=pp.mph, spr=pp.spr;
   var slow=miles/(mph-spr), fast=miles/(mph+spr);
   var fmt=function(h){
     if(h<1)return Math.round(h*60)+' min';
@@ -2215,7 +2299,60 @@ function cmpPaint(){
     '</div></div>'+
     (rows.length?'<div style="margin-top:9px;line-height:1.7">'+rows.join('<br>')+'</div>'
      :'<div class="sub" style="margin-top:9px">Nothing to take a bearing to yet — '+
-      'pin the truck, set home, or save a waypoint.</div>')}
+      'pin the truck, set home, or save a waypoint.</div>');
+  /* the heading turns the rose on every reading; the lines change only
+     with what they say */
+  var k=(hdg===null?'n'+MAG_OK:'h'+(H&&H.src))+'|'+rows.join('|');
+  if(k!==CMP_KEY){CMP_KEY=k;cmpFit()}}
+var CMP_KEY='';
+/* take 189 · cold audit · the compass panel ends on a whole line. Where its
+   content runs past the box, the box is shortened to the top of the first
+   text line it would cut below the dial and heading (the box's first
+   block), and #cmpmore says more is below (it sticks to the foot, so the
+   line it would cover is the one cut to). Measured in the panel's own
+   pixels (it opens with a scale transition: rects divided by the scale),
+   at most three passes; the stylesheet's cap first, every time */
+function cmpFit(){try{
+  var p=el('cmppanel'),b=el('cmpbox'),mo=el('cmpmore');
+  if(!p||!b||!p.getBoundingClientRect)return;
+  p.style.removeProperty('--cmp-trim');if(mo){mo.hidden=true;mo.style.visibility=''}
+  CMP_GEO=cmpGeo();
+  if(p.hidden||!(p.offsetHeight>0))return;
+  if(p.scrollHeight<=p.clientHeight+1)return;
+  if(mo)mo.hidden=false;
+  var f=b.firstElementChild,trim=0;
+  for(var pass=0;pass<3;pass++){
+    var pr=p.getBoundingClientRect(),sc=pr.height/(p.offsetHeight||1)||1,
+        off=function(y){return (y-pr.top)/sc},
+        vb=(mo&&!mo.hidden)?off(mo.getBoundingClientRect().top):p.clientTop+p.clientHeight,
+        fb=f?off(f.getBoundingClientRect().bottom):0,cut=null,
+        tw=document.createTreeWalker(b,4,null,false),n,rg=document.createRange();
+    while((n=tw.nextNode())){rg.selectNodeContents(n);
+      var rs=rg.getClientRects();
+      for(var i=0;i<rs.length;i++){var t0=off(rs[i].top),t1=off(rs[i].bottom);
+        if(rs[i].height>0&&t0>=fb-0.5&&t0<vb-0.5&&t1>vb+0.5)cut=cut===null?t0:Math.min(cut,t0)}}
+    if(cut===null)break;
+    /* the same whole px the old max-height took (floor of the height less
+       the cut), now taken off the stylesheet's cap */
+    trim+=p.offsetHeight-Math.floor(p.offsetHeight-(vb-cut));
+    p.style.setProperty('--cmp-trim',trim+'px')}
+  cmpCue()}catch(e){}}
+/* take 189 · cold audit r2 · "More below — scroll" is true only while
+   something is below: scrolled to its end, the cue (sticky at the foot)
+   sits under the last line with nothing below it. Hidden by visibility, so
+   the panel's scroll height does not change under the rider's thumb */
+function cmpCue(){try{
+  var p=el('cmppanel'),mo=el('cmpmore');
+  if(!p||!mo||mo.hidden)return;
+  mo.style.visibility=(p.scrollTop+p.clientHeight>=p.scrollHeight-1)?'hidden':''}catch(e){}}
+try{el('cmppanel').addEventListener('scroll',cmpCue)}catch(e){}
+/* the cap's inputs as they stand; ridePublish refits when one has moved
+   since the last fit (the stripH listener runs before ridePublish's on a
+   resize, so the fit read the cap before --ride-top moved) */
+var CMP_GEO='';
+function cmpGeo(){try{var c=document.documentElement.style;
+  return [c.getPropertyValue('--ride-top'),c.getPropertyValue('--sheet-h'),c.getPropertyValue('--strip-h'),
+    window.innerHeight].join('|')}catch(e){return ''}}
 
 function runCard(a,b,riv){
   var c=null,i;
@@ -2251,12 +2388,17 @@ function runCard(a,b,riv){
     rows.push('<span class="sub">Tapped in the other order — a river only runs '+
       'one way, so this is the run.</span>');
   var _mc=MACHINE[machine]||{}, _craft=_mc.mph?_mc.lbl:null;
-  rows.push('Roughly <b>'+paddleHours(hi-lo)+'</b> of paddling'+
+  /* take 189 · A235 · the run's ONE estimate, in the format the route
+     card, the ride sheet and the strip use ("~N min"): the miles at the
+     middle of the craft's range. Navigating, the sheet and the strip give
+     the same figure at the put-in, then what is left at the paddler's own
+     pace once it is known (navEta). The range stays, as the uncertainty */
+  rows.push('About <b>~'+etaTxt(paddleMin(hi-lo))+'</b> of paddling'+
     (dams.length?' plus the portage'+(dams.length>1?'s':''):'')+
-    ' <span class="sub">'+(_craft?'as a '+_craft.toLowerCase()+' at '+
+    ' <span class="sub">('+paddleHours(hi-lo)+' '+(_craft?'as a '+_craft.toLowerCase()+' at '+
       (_mc.mph-_mc.spread)+'\u2013'+(_mc.mph+_mc.spread)+' mph, calibrated '
       :'at 2\u20133 mph, which is what these floats work out at ')+
-    'against the liveries\u2019 own times</span>');
+    'against the liveries\u2019 own times)</span>');
   logAct('act  run '+nm(putIn)+' -> '+nm(takeOut));
   show('<div class="tn">The run \u2014 <span class="sub">'+riv+'</span></div>'+
     rows.join('<br>')+
@@ -4180,8 +4322,8 @@ var last=null,sel=null;
    (presentRoutes selects that profile), else true. take 188 · cold audit ·
    a resumed trip passes {k:<that key or null>, resume:true}: nothing was
    re-routed, so its lines say the trip resumed (routeAuto reads both). */
-function routeAuto(auto){return (auto&&typeof auto==='object')?{k:auto.k||null,resume:!!auto.resume}
-  :{k:typeof auto==='string'?auto:null,resume:false}}
+function routeAuto(auto){return (auto&&typeof auto==='object')?{k:auto.k||null,resume:!!auto.resume,rejoin:auto.rejoin||null}
+  :{k:typeof auto==='string'?auto:null,resume:false,rejoin:null}}
 function routeToPoint(dest,label,auto){
   logAct('route to '+(label||'?'));
   /* review of the audit fixes · RFROM, RTO and DESTLBL are set when the
@@ -4315,6 +4457,14 @@ function fitLoop(start,targetMi,base,bearing){
   }
   return best}
 
+/* take 189 · A234 · the two loop shapes, shared by the planner and the
+   off-route re-join (which routes back to the loop with the shape it was
+   planned with) */
+var LOOP_SHAPES=[
+  {h:'Loop · most trail',k:'ltrail',f:function(e){
+      return e.L*(DESIG[e.c]?0.55:DIRT[e.c]?1.3:8)}},
+  {h:'Loop · fastest',k:'lfast',f:function(e){return e.L/spd(e)}}
+];
 function buildLoops(startNode,targetMi){
   var out=[];
   /* six bearings, and two cost shapes: quickest, and trail-hungry */
@@ -4323,11 +4473,7 @@ function buildLoops(startNode,targetMi){
      hand and missed route72, mccct and fstrail entirely — so an MCCCT loop was
      costed no better than a gravel road — and the loop shown first was the
      fastest, which on a dirt bike means pavement (take 68). */
-  var shapes=[
-    {h:'Loop · most trail',k:'ltrail',f:function(e){
-        return e.L*(DESIG[e.c]?0.55:DIRT[e.c]?1.3:8)}},
-    {h:'Loop · fastest',k:'lfast',f:function(e){return e.L/spd(e)}}
-  ];
+  var shapes=LOOP_SHAPES;
   shapes.forEach(function(sh){
     var best=null;
     for(var b=0;b<360;b+=90){
@@ -4342,6 +4488,17 @@ function buildLoops(startNode,targetMi){
 el('btn-home').addEventListener('click',function(){
   if(!HOME)return homeCard('<b>No home set.</b> ');   /* take 186 · A200 */
   routeToPoint(HOME,'home')});
+/* take 189 · A233 · the folded drawer's Ride: one tap to ride, where the
+   Ride tab needed two (the tab, then Ride it). It IS the Ride tab's Ride
+   it — the same state machine: with a route chosen it follows that route,
+   with none it is a free ride; with no fix it waits ("Stop (GPS)") or
+   refuses honestly (A223). The Ride tab opens first, so before the first
+   fix its "Stop (GPS)" — then the only Stop — is on screen (landmine 135) */
+el('btn-ride').addEventListener('click',function(){
+  if(rideMode||riding)return;
+  logAct('act  ride (folded drawer)');
+  showTab('ride');
+  el('c-ride').click()});
 
 /* take 188 · step 13b · THE ROUTE CARDS SHOW WHOLE ROWS. The drawer's body
    is capped (38vh, or the ride cap) and the cards are taller, so its bottom
@@ -4397,6 +4554,16 @@ function rcFit(){try{
       var room=mh-top-rowH,foot=Infinity;
       if(rr.height>room+0.5){
         foot=room;
+        /* take 189 · A238 · the box is set to the line itself, not to the
+           line floored: the line is a row's top, measured from the box's
+           top, and the box's top sits at a fraction of a pixel (#routes at
+           498.31 at 412 x 915), so the floored box ended up to a pixel short
+           of that row's top and cut the row of the card beside it that ends
+           there (the dirt bike's cards: 0.69 px, PROVEN in probe). Flooring
+           the line itself instead (the lane's first fix) cascaded: each
+           floored line cut the row above it again, and the bike's box fell
+           from 234 to 168 px, three rows lost (PROVEN, the lane's render
+           logs; the fix round). Chrome lays the box out to 1/64 px */
         var kids=R.querySelectorAll('.rc > *'),line=room,moved=true,it=0;
         while(moved&&it++<40){moved=false;
           for(var i=0;i<kids.length;i++){var k=kids[i].getBoundingClientRect();if(k.height<=0)continue;
@@ -4410,8 +4577,8 @@ function rcFit(){try{
            (the review of step 13b1; probe measured the sliver at 9 px) */
         var c0=R.querySelector('.rc.sel')||R.querySelector('.rc'),k2=c0&&c0.children[1],
             need=k2?k2.getBoundingClientRect().bottom-rr.top+R.scrollTop:1;
-        if(line>0&&line>=need-0.5){R.style.maxHeight=Math.floor(line)+'px';foot=Math.floor(line);
-          var g=Math.ceil(room-Math.floor(line));
+        if(line>0&&line>=need-0.5){R.style.maxHeight=line+'px';foot=line;
+          var g=Math.ceil(room-line);
           if(riding){if(row)row.style.marginTop=(rm+g)+'px'}else tn=g}}
       var ws=R.querySelectorAll('.rc.sel .warn');
       for(var w=0;w<ws.length;w++){var wr=ws[w].getBoundingClientRect();
@@ -4451,6 +4618,8 @@ function renderRoutes(out,auto){
       '<div class="big">'+s.mi.toFixed(1)+' <span class="sub">mi</span></div>'+
       '<div class="sub">~'+etaTxt(s.hrs*60)+
         ' · '+s.off.toFixed(1)+' mi off-pavement</div>'+
+      /* take 189 · A234 · a re-join's card says what it is made of */
+      (o.note?'<div class="sub">'+o.note+'</div>':'')+
       /* take 188 · step 13b · the warnings first, under the time line: the
          cards end on a whole row and scroll for the rest, so a warning
          after the profile sat out of view under a clean edge that read as
@@ -4520,7 +4689,8 @@ function renderRoutes(out,auto){
     if(w.fuel)bits.push(w.fuel.toFixed(1)+' mi past your range');
     if(w.dark)bits.push('arrives after dark');
     if(w.adv)bits.push(w.adv.toFixed(1)+' mi unverified (OSM)');
-    if(w.snap)bits.push('+'+w.snap.toFixed(1)+' mi off-network');
+    /* a re-join's "to it" already holds the gap: said as part of it */
+    if(w.snap)bits.push(ra.rejoin?w.snap.toFixed(1)+' mi of it off-network':'+'+w.snap.toFixed(1)+' mi off-network');
     /* take 188 · cold audit · an automatic route belongs to a ride. When
        the ride it was for is not running as it lands — Resume pressed and
        the GPS refused, or a re-route whose ride ended meanwhile (it left
@@ -4538,7 +4708,10 @@ function renderRoutes(out,auto){
       logAct('route cards held: the ride they were for is not running');return}
     if((w.fuel&&!(w0&&w0.fuel))||(w.dark&&!(w0&&w0.dark)))show(html,'');
     else rideCard(html,'',ra.resume
-      ?'Trip resumed \u00b7 route to '+(DESTLBL||'there')+(bits.length?' \u00b7 '+bits.join(' \u00b7 '):' is on the map')
+      ?(rideWaiting()?GPS_WAIT:'Trip resumed')+' \u00b7 route to '+(DESTLBL||'there')+(bits.length?' \u00b7 '+bits.join(' \u00b7 '):' is on the map')
+      /* take 189 · A234 · the re-join says what it is */
+      :ra.rejoin?'Back to the loop \u00b7 '+navFmt(ra.rejoin.leg*1609.34)+' to it, '+ra.rejoin.rest.toFixed(1)+' mi of it left'+
+        (bits.length?' \u00b7 '+bits.join(' \u00b7 '):'')
       :'Re-routed \u00b7 '+(bits.length?bits.join(' \u00b7 '):'the new route is on the map'))}
   else show(html,'');
   /* take 188 · step 13b · whole rows (a drawer still sliding open fits
@@ -5556,7 +5729,7 @@ function rideStart(at){
     /* take 188 · A222 · the sheet's Time moves between fixes too — and
        (cold audit) a dropout dashes what only a fix can say, on the sheet
        and on the strip */
-    try{hudPaint();if(NAV.on)navChip()}catch(e){}
+    try{hudPaint();if(NAV.on)navChip();peekGps()}catch(e){}
     /* battery moves slowly and the read is not free; the dropout watch is the
        thing that needs to be prompt */
     if(++RIDE.ticks%3===1)batteryNow().then(function(b){
@@ -5601,6 +5774,21 @@ var FIX_T=0,GPS_STALE_MS=15000;
 function fixStale(){return posMode==='gps'&&FIX_T>0&&Date.now()-FIX_T>GPS_STALE_MS}
 function fixClock(){try{return new Date(FIX_T).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
   catch(e){return 'the last one'}}
+/* take 189 · cold audit · the folded drawer's GPS line follows the fix:
+   the first fix wrote "Recording · live GPS" once and nothing rewrote it,
+   so through a dropout it said "live GPS" under a strip reading "No GPS fix
+   since 10:42" (INFERRED from the code: no writer ran on fixStale). The
+   ride's pulse and every fix rewrite it — only while it holds one of these
+   two lines of its own, never over a re-route's or an arrival's line */
+var PEEK_LIVE='Recording \u00b7 live GPS';
+function peekGpsText(){return fixStale()?'No GPS fix since '+fixClock():PEEK_LIVE}
+function peekGps(){var t=el('peek-txt');if(!t||!gotFix)return;
+  var cur=String(t.textContent||''),lost=cur.indexOf('No GPS fix since ')===0;
+  /* its own lines: the first fix's, a refold's truck line (measured from
+     the fix ME holds), and the dropout's */
+  if(cur!==PEEK_LIVE&&!lost&&cur.indexOf('Truck ')!==0)return;
+  var w=fixStale()?peekGpsText():lost?(railPeekText()||PEEK_LIVE):cur;
+  if(cur!==w)t.textContent=w}
 
 function hudSet(mps,deg,at,quiet){
   /* The compass reads the same heading the ride ribbon does, so it updates on
@@ -5696,7 +5884,9 @@ function ridePublish(){try{
   if(fr&&fr.height>0&&rb&&isFinite(low)){
     var cap=rb.getBoundingClientRect().height+fr.top-low-GAP;
     if(isFinite(cap)){var cv=Math.floor(cap)+'px';
-      if(de.style.getPropertyValue('--ride-cap')!==cv){de.style.setProperty('--ride-cap',cv);rcFit()}}}}catch(e){}}
+      if(de.style.getPropertyValue('--ride-cap')!==cv){de.style.setProperty('--ride-cap',cv);rcFit()}}}}catch(e){}
+  /* take 189 · cold audit r2 · the compass's fit follows its cap */
+  if(CMP_ON&&cmpGeo()!==CMP_GEO)cmpFit()}
 
 function hudPaint(){
   var b=el('hudbar');
@@ -5771,13 +5961,20 @@ function clockParts(ms){
 var NAV_PACE_N=10;
 function etaParts(min){return clockParts(Math.max(1,Math.round(min))*60000)}
 function etaTxt(min){var c=etaParts(min);return c[0]+' '+c[1]}
-function navEta(remainM,G){
+/* take 189 · A235 · the same rule for a river run: the plan's own
+   estimate (hrs over totalM metres; a run's is its miles at the middle of
+   the craft's range) for what is left, then the paddler's rolling pace.
+   The pace is floored at the slowest the plan allows: a land machine's
+   own speed (3 mph by default), a craft's at the slow end of its
+   calibrated range (a raft drifts under 3 mph; the land floor would have
+   promised it a take-out it cannot make) */
+function navEta(remainM,hrs,totalM,river){
   if(_navSpd.length>=NAV_PACE_N){
     var spd=_navSpd.reduce(function(a,b){return a+b},0)/_navSpd.length;
-    spd=Math.max(spd,((MACHINE[machine]||{}).spd||3)*0.44704);
+    var pp=river?paddlePace():null;
+    spd=Math.max(spd,(river?pp.mph-pp.spr:((MACHINE[machine]||{}).spd||3))*0.44704);
     return remainM/spd/60}
-  var hrs=(G&&G.o&&G.o.s&&isFinite(G.o.s.hrs))?G.o.s.hrs:null;
-  return (hrs!==null&&G.total>0)?hrs*60*remainM/G.total:null}
+  return (hrs!==null&&isFinite(hrs)&&totalM>0)?hrs*60*remainM/totalM:null}
 /* guidance publishes what the sheet shows: {togo: mi left, min: minutes} */
 var HUDG=null;
 function hudRouted(){return !!(NAV.on&&(RUN||(last&&sel!==null)))}
@@ -5842,6 +6039,10 @@ function rideReport(R){
   L.push('--- end ---');
   return L.join('\n')}
 
+/* the truck's pin at TRUCK: drawn once, moved after (both branches below) */
+function truckPin(){
+  if(!tM)tM=new maplibregl.Marker({element:mk('truck','truck')}).setLngLat(TRUCK).addTo(map);
+  else tM.setLngLat(TRUCK)}
 function startRecording(at){
   /* take 170 audit · a RESUMED trip already holds its crumb line and clock;
      the first fix after Resume continues them rather than wiping them. The
@@ -5849,6 +6050,10 @@ function startRecording(at){
   if(RESUMING){RESUMING=false;
     if(!crumbs.length){crumbs=[at.slice()];crumbMi=0}
     if(!TRUCK)TRUCK=(crumbs[0]||at).slice();
+    /* take 189 · cold audit · the truck's pin: only the fresh branch drew
+       it, so after a restart a resumed trip measured to a truck the map
+       did not show */
+    truckPin();
     rideStart(at);
     if(RESUMED_RIDE){RIDE.t0=RESUMED_RIDE.t0;RIDE.mi0=RESUMED_RIDE.mi0||0;RESUMED_RIDE=null}
     /* take 188 · A221 · this branch returned before hudShow(true), so a
@@ -5858,8 +6063,7 @@ function startRecording(at){
   TRUCK=at.slice(); crumbs=[at.slice()]; crumbMi=0;
   rideStart(at);
   hudShow(true);
-  if(!tM)tM=new maplibregl.Marker({element:mk('truck','truck')}).setLngLat(TRUCK).addTo(map);
-  else tM.setLngLat(TRUCK);
+  truckPin();
   map.getSource('back').setData({type:'FeatureCollection',features:[]});
   syncSafety()}
 
@@ -5964,10 +6168,25 @@ el('btn-disp').addEventListener('click',function(){
     'This card exists to read your <i>actual</i> location to dispatch, so it '+
     'will not print a coordinate you are not standing at. The map centre is '+
     'shown in the readout above if you want a planning reference.','fail');
+  /* take 189 · cold audit · posMode stays 'gps' after the one-shot locate,
+     after Stop, and after the start pin is moved by hand, a saved route is
+     opened or a trip resumed — so ME printed here was a fix hours old, or
+     a point the rider never stood at, as "your actual location", with no
+     time. The card reads A237's one reader: a live fix prints as it did;
+     otherwise the last real fix of this session, with its clock time and
+     age, said before the coordinates; with no real fix, it refuses. */
+  var lf=liveFix(),FX=lf?lf.at:ME_FIX?ME_FIX.at.slice():null;
+  if(!FX)return show('<b>No GPS fix yet.</b><br>The start pin is not a position: this card '+
+    'reads your <i>actual</i> location to dispatch, so it will not print a coordinate you '+
+    'are not standing at.','fail');
+  var old=lf?'':(function(){var m=Math.floor((Date.now()-ME_FIX.t)/60000);
+    return '<b>Last GPS fix '+meClock()+'</b> ('+(m<1?'under a minute':m+' min')+' ago) \u2014 '+
+      'not a live position: you may have moved since.<br>'})();
   show('Locating you on the network…','');
   setTimeout(function(){
+    var ME=FX;
     var ne=nearestEdge(ME), nj=nearestJunction(ME);
-    var out='<span class="tn">'+ME[1].toFixed(5)+'  '+ME[0].toFixed(5)+'</span>'+
+    var out=old+'<span class="tn">'+ME[1].toFixed(5)+'  '+ME[0].toFixed(5)+'</span>'+
       '<span class="meta">decimal degrees</span><br>';
     var bits=[];
     /* The address goes FIRST after the coordinate. A street name and number is
@@ -5994,8 +6213,9 @@ el('btn-disp').addEventListener('click',function(){
     var np=nearestPavement(ME);
     if(np.p)bits.push('Nearest pavement <b>'+np.d.toFixed(2)+' mi '+
       compass(bearing(ME,np.p))+'</b>'+(np.e&&np.e.n?' — '+np.e.n:''));
-    bits.push(ad?'Read the coordinates first, then the address, then the junction.'
-                :'Read the coordinates first, then the junction.');
+    bits.push((ad?'Read the coordinates first, then the address, then the junction.'
+                :'Read the coordinates first, then the junction.')+
+      (old?' Say they are your last GPS fix, from '+meClock()+'.':''));
     show(out+bits.join('<br>'),'')},20)});
 
 /* ── ride simulator ────────────────────────────────────────────────────────
@@ -6124,9 +6344,14 @@ function tripResumeCard(){
     '<button class="chip" id="trip-discard">'+ic('del')+'<span>Discard</span></button>','');
   el('trip-resume').addEventListener('click',function(){
     /* take 188 · A223 · a refused start keeps its own card */
+    /* take 189 · cold audit · nothing records before the first fix
+       (startRecording runs on it): while the GPS waits the card and the
+       peek line say so (A230's line), never "recording" */
     if(tripResume(t)){el('c-ride').click();if(rideMode||riding)
-      rideCard('<b>Trip resumed</b><div class="sub">Recording continues from your last fix.</div>','',
-        'Trip resumed \u00b7 recording')}});
+      rideCard(rideWaiting()?'<b>Trip resumed</b><div class="sub">Recording continues from the next GPS fix; the '+
+          crumbMi.toFixed(1)+' mi recorded are kept.</div>'
+        :'<b>Trip resumed</b><div class="sub">Recording continues from your last fix.</div>','',
+        rideWaiting()?railPeekText():'Trip resumed \u00b7 recording')}});
   el('trip-discard').addEventListener('click',function(){tripEnd();ack('Trip discarded.')});
   return true}
 
@@ -6169,7 +6394,10 @@ function navChip(){
      first fix no longer refuses — the strip read '0 mph · N', or the last
      ride's speed and heading: numbers nothing measured. The markup's own
      placeholder stands instead, as the ride sheet's Speed does */
-  el('nav-sp').textContent=!NAV.lastAt?'\u2014':fixStale()?'No GPS fix since '+fixClock()
+  /* take 189 · A230 · before the first fix the strip read a lone "—",
+     which reads as broken: it says what is happening instead (still no
+     number nothing measured; the first fix replaces it) */
+  el('nav-sp').textContent=!NAV.lastAt?GPS_WAIT:fixStale()?'No GPS fix since '+fixClock()
     :(Math.round(NAV.mps*2.237)+' mph \u00b7 '+dirs[Math.round(((NAV.brg%360)+360)%360/45)%8]);
   navGStale();
   hudBtns()}
@@ -6268,6 +6496,7 @@ function runSet(riv,a,b){
   var fix=function(x){if(x&&!x.p&&c){var f=c.f.filter(function(q){return Math.abs(q.mi-x.mi)<0.01})[0];
     if(f)x=Object.assign({},x,{p:f.p})}return x};
   RUN={riv:riv,a:fix(a),b:fix(b)};_rmHist=[];NAV.riverBrg=null;
+  _navSpd=[];   /* take 189 · A235 · the paddler's pace is this run's own */
   logAct('act  navigate run '+riv)}
 function runNavClear(){RUN=null;HUDG=null;NAV.riverBrg=null;_rmHist=[]}
 function corridorByName(riv){
@@ -6303,7 +6532,7 @@ function navRiver(at){
   var brg=bearing(L.pts[bi],L.pts[Math.min(L.pts.length-1,bi+1)]);
   NAV.riverBrg=off<250?brg:null;
   return {rm:rm,off:off,brg:brg,seg:bi}}
-function navRiverGuide(at,acc,st){
+function navRiverGuide(at,acc,st,mps){
   var g=el('nav-g');if(!g||!RUN)return false;
   var L=riverLine(RUN.riv);if(!L)return false;
   var lo=Math.min(RUN.a.mi,RUN.b.mi),hi=Math.max(RUN.a.mi,RUN.b.mi),bmi=RUN.b.mi;
@@ -6335,12 +6564,18 @@ function navRiverGuide(at,acc,st){
   else if(next)line1='<b><span class="arw">'+ic('downstream')+'</span>'+(next.k==='camp'?'Camp':'Access')+' in '+(next.mi-st.rm).toFixed(1)+' mi'+(next.n?' \u00b7 '+next.n:'')+'</b>';
   else line1='<b><span class="arw">'+ic('downstream')+'</span>Downstream to '+(RUN.b.n||'take-out')+'</b>';
   var craft=(MACHINE[machine]&&MACHINE[machine].mph)?MACHINE[machine].lbl.toLowerCase():null;
-  /* take 188 · A222 · the sheet: miles to the take-out, and the craft's own
-     pace for them (the middle of the range the strip prints) */
-  HUDG={togo:Math.max(0,remain),min:Math.max(0,remain)/(((MACHINE[machine]||{}).mph)||PADDLE_MPH)*60};
+  /* take 189 · A235 · the sheet's Arrive and the strip print ONE estimate,
+     the rule the route card, sheet and strip use for routes (navEta): the
+     run's own estimate for what is left, then the paddler's pace. Take
+     188's sheet printed the middle of the range and the strip the range
+     itself ("~2 hr 10 min\u20133 hr") beside the card's range */
+  if(mps>0.6){_navSpd.push(mps);if(_navSpd.length>60)_navSpd.shift()}
+  var runMi=Math.abs(RUN.b.mi-RUN.a.mi),left=Math.max(0,remain);
+  var etaMin=navEta(left*1609.34,paddleMin(runMi)/60,runMi*1609.34,true);
+  HUDG={togo:left,min:etaMin};
   g.hidden=false;
-  g.innerHTML=line1+'<span class="eta">'+Math.max(0,remain).toFixed(1)+' mi to '+(RUN.b.n||'take-out')+
-    ' \u00b7 ~'+paddleHours(Math.max(0,remain))+(craft?' as a '+craft:'')+
+  g.innerHTML=line1+'<span class="eta">'+left.toFixed(1)+' mi to '+(RUN.b.n||'take-out')+
+    (etaMin!==null?' \u00b7 ~'+etaTxt(etaMin):'')+(craft?' as a '+craft:'')+
     ' \u00b7 mile '+st.rm.toFixed(1)+
     (st.off>250?' \u00b7 off the mapped river':'')+(up?' \u00b7 heading UPSTREAM':'')+'</span>';
   ridePublish();return true}
@@ -6351,13 +6586,13 @@ function navPlan(){
   if(!last||sel===null||!last[sel])return null;
   var o=last[sel],steps=directions(o.s.path,o.na);
   if(!steps.length)return null;
-  var pts=[],cum=[0],legs=[],cur=o.na;
+  var pts=[],cum=[0],legs=[],ends=[],cur=o.na;
   for(var i=0;i<o.s.path.length;i++){var e=o.s.path[i],g=decode(GR.g[e.i]);
     if(e.a!==cur)g=g.slice().reverse();cur=(e.a===cur)?e.b:e.a;
     for(var j=(pts.length?1:0);j<g.length;j++){
       if(pts.length)cum.push(cum[cum.length-1]+mi(pts[pts.length-1],g[j])*1609.34);
       pts.push(g[j])}
-    legs.push(pts.length-1)}
+    legs.push(pts.length-1);ends.push(cur)}
   /* each step begins at the metre mark of its first leg's start */
   var marks=[];for(var k=0;k<steps.length;k++){var li=steps[k].at;
     marks.push(li===0?0:cum[legs[li-1]])}
@@ -6374,7 +6609,12 @@ function navPlan(){
      same option set now carries on from where Stop left it (LOOPWAS;
      not after the loop arrived), and the projection starts looking there.
      appr is the dashed approach: the start pin to the line's first point. */
-  var pv=NAVG,lp=o.na===o.nb,base=0,odo0=crumbMi,sg=0;
+  /* take 189 · A234 · a re-join (o.rj: back to the loop, then the rest of
+     it to the start) is guided as a loop is — progress capped by what has
+     been ridden since it was planned, arrival by progress only, a second
+     wander re-joins it again — with no approach (it starts where the
+     rider stood) */
+  var pv=NAVG,lp=o.na===o.nb||!!o.rj,base=0,odo0=crumbMi,sg=0;
   if(lp&&pv&&pv.loop&&pv.set===last){odo0=pv.odo0;base=pv.base||0}
   else if(lp&&LOOPWAS&&LOOPWAS.set===last)base=LOOPWAS.rid;
   if(lp){var r0=base+Math.max(0,crumbMi-odo0)*1609.34;
@@ -6382,7 +6622,8 @@ function navPlan(){
   var dst=RTO||pts[pts.length-1];
   NAVG={o:o,steps:steps,marks:marks,pts:pts,cum:cum,total:cum[cum.length-1],
     dest:dst,lbl:DESTLBL,seg:sg,arrived:false,key:sel+'|'+(o.k||''),
-    loop:lp,set:last,odo0:odo0,base:base,rid:base,appr:lp?mi(dst,pts[0])*1609.34:0};
+    loop:lp,set:last,odo0:odo0,base:base,rid:base,appr:(lp&&!o.rj)?mi(dst,pts[0])*1609.34:0,
+    legs:legs,ends:ends};
   return NAVG}
 /* lim, want (a loop only, metres along the line): nothing past lim is
    looked at; and because a loop comes back to where it left — its end is
@@ -6411,6 +6652,76 @@ function navProject(at,lim,want){
       if(dd<bd){bd=dd;bi=ci;bt=cand[c+1]}}}
   var seglen=G.cum[bi+1]-G.cum[bi];
   return {seg:bi,prog:G.cum[bi]+bt*seglen,off:Math.sqrt(best)*111320}}
+/* take 189 · A234 · RE-JOIN THE LOOP AHEAD. Off the loop for three fixes,
+   the rider was routed point-to-point to the loop's start pin and the rest
+   of the loop was lost. Now: the loop's own nodes from REJOIN_MIN_M ahead
+   of where the rider was last placed on it, up to REJOIN_WIN_M further
+   (the rest of it, past the start, when that window holds none), nearest
+   first as the crow flies; the first the router reaches with the loop's
+   own shape (its cost) is the re-join. The option is that leg, then the
+   loop's own edges from there to the start, unchanged. Never the start
+   itself: that is the re-route this replaces (and a loop is never re-routed
+   to where the rider stands, take 188 R1). The card says how far back to
+   the loop, how much of it is left, and how much of it is skipped. */
+var REJOIN_MIN_M=100,REJOIN_WIN_M=3219,REJOIN_TRY=4;
+function loopRejoin(at,G,pr){try{
+  var o=G.o,path=o.s.path,L=G.legs,E=G.ends;
+  if(!o||!path||!L||!E||path.length<2)return false;
+  var a=nearestNode(at);if(a<0)return false;
+  var near=function(lo,hi){var c=[];
+    for(var i=0;i<path.length-1;i++){var m=G.cum[L[i]];
+      if(m<lo||m>hi)continue;c.push({i:i,n:E[i],m:m,d:mi(at,NODES[E[i]])})}
+    c.sort(function(x,y){return x.d-y.d});return c};
+  var c=near(pr.prog+REJOIN_MIN_M,pr.prog+REJOIN_MIN_M+REJOIN_WIN_M);
+  if(!c.length)c=near(pr.prog+REJOIN_MIN_M,Infinity);
+  var sh=null;LOOP_SHAPES.forEach(function(x){if(x.k===o.k)sh=x});
+  var cost=sh?sh.f:LOOP_SHAPES[0].f;
+  /* take 189 · cold audit · the leg re-joins at the FIRST loop node it
+     reaches ahead of the rider, not at the candidate it was routed to: a
+     cut-off that meets the loop at a junction beyond the crow-nearest node
+     reached that node by riding the loop backwards from the junction, then
+     the rest rode the same stretch forwards again — a U-turn, and "1.6 mi
+     back to the loop" counting 0.5 mi ridden on the loop (PROVEN, the
+     audit's harness on the shipped code). A loop node ahead is one at least
+     REJOIN_MIN_M past the rider's mark, never the start (the old re-route's
+     end); where the loop passes a node twice, its first pass ahead. A leg
+     that reaches the start first is no re-join. */
+  var ahead={},S=E[path.length-1];
+  for(var j=0;j<path.length-1;j++)
+    if(G.cum[L[j]]>=pr.prog+REJOIN_MIN_M&&!ahead.hasOwnProperty(E[j]))ahead[E[j]]=j;
+  for(var t=0;t<Math.min(REJOIN_TRY,c.length);t++){
+    var leg=(a===c[t].n)?[]:route(a,c[t].n,cost);
+    /* every candidate is a node of the loop, and the loop is one legal
+       component: a leg route() cannot find, no other candidate has either
+       (each try is a full search of the rider's component) */
+    if(!leg)break;
+    var cut=-1,k=0,cur=a;
+    for(;;){if(ahead.hasOwnProperty(cur)){cut=ahead[cur];break}
+      if(cur===S&&k>0)break;
+      if(k>=leg.length)break;
+      cur=(leg[k].a===cur)?leg[k].b:leg[k].a;k++}
+    if(cut<0)continue;
+    leg=leg.slice(0,k);
+    var rest=path.slice(cut+1),np=leg.concat(rest);if(!np.length)continue;
+    var legMi=0,restMi=0;leg.forEach(function(e){legMi+=e.L});rest.forEach(function(e){restMi+=e.L});
+    legMi/=1609.34;restMi/=1609.34;
+    var skip=Math.max(0,(G.cum[L[cut]]-pr.prog)/1609.34);
+    /* take 189 · cold audit · "to it" is the distance to the loop, the gap
+       from the rider to the trail network included: a re-join happens only
+       more than 40 m off the line, and the leg alone read "0.0 mi to it"
+       with the rider up to 240 m away (the gap was said only past 0.15 mi).
+       Under 320 m it is said in feet (navFmt), never "0.0 mi" */
+    var snap=snapMiles(at,a),toIt=legMi+snap;
+    var opt={h:'Back to the loop',k:o.k,s:summarise(np),snap:snap,na:a,nb:o.nb,
+      rj:{leg:toIt,snap:snap,rest:restMi,skip:skip},
+      note:navFmt(toIt*1609.34)+' back to the loop, then the rest of it to the start ('+restMi.toFixed(1)+' mi)'+
+        (skip>=0.1?' \u00b7 '+skip.toFixed(1)+' mi of it skipped':'')};
+    logAct('nav  rejoin loop '+toIt.toFixed(2)+' mi back ('+snap.toFixed(2)+' off-network), '+restMi.toFixed(2)+' mi left, '+skip.toFixed(2)+' skipped');
+    RFROM=at.slice();
+    presentRoutes([opt],{k:o.k,rejoin:opt.rj});
+    NAVG=null;
+    return true}
+  return false}catch(e){return false}}
 function navFmt(m){return m<320?(Math.round(m*3.281/50)*50)+' ft':(m/1609.34).toFixed(1)+' mi'}
 function navGuide(at,acc,mps){
   if(!NAV.on)return;
@@ -6458,6 +6769,11 @@ function navGuide(at,acc,mps){
   if(pr.off>40&&!onAppr){_navOff++}else _navOff=0;
   if(_navOff>=3&&Date.now()-_navReT>20000&&RTO){
     _navReT=Date.now();_navOff=0;
+    /* take 189 · A234 · a LOOP re-joins itself ahead of the rider, so the
+       rest of the loop is kept; the point-to-point re-route to its start
+       (take 187-188) is what is left only when no re-join is found */
+    if(G.loop&&loopRejoin(at,G,pr)){
+      g.innerHTML='<b><span class="arw">'+ic('reroute')+'</span>Back to the loop</b>';g.hidden=false;ridePublish();return}
     var keep=last[sel].k;
     logAct('nav  reroute '+Math.round(pr.off)+' m off');
     routeToPoint(RTO,DESTLBL,keep||true);
@@ -6470,7 +6786,7 @@ function navGuide(at,acc,mps){
   /* take 188 · A222 · the sheet's To go and Arrive: miles left along the
      line, and the arrival estimate — take 188 · A217 · the same one the
      strip below prints and the route card gave (navEta) */
-  var etaMin=navEta(remain,G);
+  var etaMin=navEta(remain,(G.o&&G.o.s)?G.o.s.hrs:null,G.total);
   HUDG={togo:remain/1609.34,min:etaMin};
   var line1=ni<0
     ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(remain)+' to '+(G.lbl||'destination')+'</b>'
@@ -6495,6 +6811,47 @@ document.addEventListener('visibilitychange',function(){
    while he was in another state: a plausible, precise, wrong coordinate, on the
    same screen as the button that reads coordinates out to dispatch. */
 var posMode='none',awayMi=0;
+/* take 189 · A237 · THE ONE READER of "is there a live fix": where the
+   last in-region GPS fix put the rider and when, while ME still holds it.
+   null with no fix yet, on the simulator, out of the region, after a trip
+   restored a past fix, or once the start pin was moved by hand (ME is no
+   longer the fix; take 186 allows that after the one-shot locate). The
+   place cards' distance line and the me-marker's name read it; take 190's
+   Mark this spot is to read it too (its !ME guard is the same dead one
+   placeDist's was). meFix() is called where a real fix becomes ME: the
+   ride's onFix and the one-shot locate. */
+var ME_FIX=null;
+function meFix(at){ME_FIX={at:at.slice(),t:Date.now()};
+  /* take 189 · cold audit · the 'you' pin and Locate's YOU follow every
+     real fix, not only the one-shot locate's (they stayed at the startup
+     fix for the whole session) */
+  YOU=at.slice();YOU_T=ME_FIX.t;if(youM)try{youM.setLngLat(YOU)}catch(e){}}
+/* ME still holds the last in-region fix (live or not) */
+function meOnFix(){return posMode==='gps'&&!!ME_FIX&&!!ME&&ME[0]===ME_FIX.at[0]&&ME[1]===ME_FIX.at[1]}
+/* take 189 · A237 · fix round 2 · a fix is live for GPS_STALE_MS (the
+   strip's one dropout rule, fixStale) after it arrived, by ME_FIX's own
+   clock, which every fix that becomes ME refreshes — with or without a
+   watch open. Past it ME is where the rider WAS: a ride's dropout (the
+   strip reads "No GPS fix since 10:42"), a stopped ride's last fix (Stop
+   leaves posMode 'gps' and ME on it), a one-shot locate's fix, or an old
+   fix while a new ride waits for its first (navStart zeroes FIX_T, so
+   FIX_T cannot answer this). */
+function liveFix(){
+  if(!meOnFix()||Date.now()-ME_FIX.t>GPS_STALE_MS)return null;
+  return {at:ME_FIX.at.slice(),t:ME_FIX.t,age:Date.now()-ME_FIX.t}}
+/* the clock time of the fix ME holds (ME_FIX.t: FIX_T is the ride's, which
+   a one-shot locate never sets and navStart zeroes) */
+function meClock(){try{return new Date(ME_FIX.t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
+  catch(e){return 'time unknown'}}
+/* what ME is, for the words that name it: 'you' only from a live fix;
+   'last' when ME is a fix gone stale */
+function meIs(){return liveFix()?'you':meOnFix()?'last':posMode==='sim'?'sim':posMode==='away'?'away':'pin'}
+/* the ONE table of words for the point every place card measures from:
+   placeDist ("of …") and placeCard ("from …"); own=true reads "your
+   position" for a live fix, where "of you" reads better on one line */
+function meNoun(own){var k=meIs();
+  return k==='you'?(own?'your position':'you'):k==='last'?'your last GPS fix ('+meClock()+')':
+    {sim:'the simulated position',away:'the planning start',pin:'the start pin'}[k]}
 function inRegion(at){var b=BUNDLE.bbox;if(!b)return true;
   return at[0]>=b[0]-0.02&&at[0]<=b[2]+0.02&&at[1]>=b[1]-0.02&&at[1]<=b[3]+0.02}
 function classifyFix(at){
@@ -6581,11 +6938,25 @@ function gpsStart(onFix,onFail){
 function gpsStop(){
   if(watchId===null)return;
   gpsClear(watchId);watchId=null}
-function stopReal(){gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=false;
+function stopReal(){var had=gotFix,wasRes=RESUMING;
+  gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=false;
+  /* take 189 · cold audit · Stop ends the trip (tripEnd), so a resumed
+     trip's flags end with it: left set, the next Ride's peek said its miles
+     were "kept" and its first fix carried the ENDED trip's track, clock and
+     truck on (INFERRED from the code; the self-test half PROVEN) */
+  RESUMING=false;RESUMED_RIDE=null;
   navStop();tripEnd();runNavClear();
   hudShow(false);
   setChip('c-ride','ride','Ride it');rideFlag();
   var R=rideStop();
+  /* take 189 · cold audit · Stop before the first fix recorded nothing:
+     the card said "Recording stopped. 3.42 mi on the track" — the LAST
+     ride's miles (crumbMi is reset only by a first fix) — just after the
+     peek line said "nothing recorded yet" */
+  if(!R&&!had)return show('<b>Stopped before the first GPS fix</b> \u2014 nothing was recorded'+
+    (wasRes?' on this ride. The resumed trip ends here':'')+'.'+
+    (crumbs.length>1?(wasRes?' Its ':' The last ')+'track ('+crumbMi.toFixed(2)+
+      ' mi) is still on the map; <b>Retrace</b> follows it back.':''),'');
   if(!R)return show('Recording stopped. <b>'+crumbMi.toFixed(2)+
     ' mi</b> on the track. <b>Retrace</b> follows it back.','');
   logAct('ride end '+(R.hrs*60).toFixed(0)+'min '+R.fixes+' fixes');
@@ -6642,17 +7013,28 @@ function onFix(at,acc,mps,deg){
   /* take 170 · speed and heading finally used: the follow camera */
   navFollow(at,mps,deg);
   /* take 171/172 · guidance rides the same fix: a run first, else the route */
-  try{if(!(NAV.on&&_rs&&navRiverGuide(at,acc,_rs)))navGuide(at,acc,mps)}catch(e){}
+  try{if(!(NAV.on&&_rs&&navRiverGuide(at,acc,_rs,mps)))navGuide(at,acc,mps)}catch(e){}
   /* speed and heading arrived on every fix since take 21 and were discarded on
      both drivers. A82: the data was already flowing (take 78). */
   if(posMode==='gps')hudSet(mps,deg,at,true);
-  if(!gotFix){gotFix=true;startRecording(at);ME=at.slice();mM.setLngLat(ME);
+  if(!gotFix){gotFix=true;startRecording(at);ME=at.slice();mM.setLngLat(ME);meFix(ME);
     if(!NAV.on)map.easeTo({center:ME,zoom:14.5,duration:600});
     /* take 188 · landmine 135 · quiet: the first fix opened the drawer over
        the map the moment a ride began; the peek line keeps the live-GPS
        signal and the folded drawer keeps its action row while riding */
-    showQuiet('<span class="tn">Recording</span><span class="meta">live GPS</span><br>Truck pinned where you are. Ride.','Recording \u00b7 live GPS');return}
-  ME=at.slice();mM.setLngLat(ME);record(ME);checkOffRoute();
+    /* take 189 · cold audit · "Truck pinned where you are" only when this
+       fix pinned it: a resumed trip keeps the truck where it was pinned */
+    var tk=!TRUCK||(TRUCK[0]===at[0]&&TRUCK[1]===at[1]);
+    /* take 189 · cold audit r2 · and never a bearing to where the rider
+       stands (landmines 164/167): under ~100 ft the truck is right here, as
+       the compass's rows say; feet below 320 m (navFmt), never "0.0 mi" */
+    var tkd=tk?0:mi(ME,TRUCK);
+    showQuiet('<span class="tn">Recording</span><span class="meta">live GPS</span><br>'+
+      (tk?'Truck pinned where you are. Ride.'
+       :tkd<0.02?'Trip resumed \u2014 you are at the truck, where it was pinned. Ride.'
+       :'Trip resumed \u2014 the truck stays where it was pinned, '+
+        navFmt(tkd*1609.34)+' '+compass(bearing(ME,TRUCK))+'. Ride.'),PEEK_LIVE);return}
+  ME=at.slice();mM.setLngLat(ME);meFix(ME);record(ME);checkOffRoute();peekGps();
   /* take 188 · A222 · paint after record(): painted before this fix was on
      the track, Trip lagged Recorded by one fix. The one paint of the fix
      (cold audit: hudSet above only notes it) */
@@ -6689,7 +7071,11 @@ el('c-ride').addEventListener('click',function(){
       if(m){rideMode=m;logAct('ride gps first fix slow: still waiting');return}}
     refused=true;gpsRefuse('fail')};
   rideMode=gpsStart(onFix,onGpsFail);
-  if(rideMode){setChip('c-ride','stop','Stop (GPS)',1);navStart();rideFlag();return}
+  if(rideMode){setChip('c-ride','stop','Stop (GPS)',1);navStart();rideFlag();
+    /* take 189 · A230 · the drawer folded above, before the watch opened:
+       its peek line is written again now that the ride waits for a fix */
+    var pw=el('peek-txt');if(pw&&/\bfolded\b/.test(el('rail').className))pw.textContent=railPeekText();
+    return}
   if(!refused){refused=true;gpsRefuse('none')}});
 /* take 188 · A223 · the maintainer, 2026-09-25: "Refuse honestly". Ride was
    pressed and no position can come (location off or refused, no receiver;
@@ -7000,9 +7386,9 @@ function sourcesCard(){
     '\u00a9 2017 The Barlow Project Authors.<br><b>Map renderer</b> \u2014 MapLibre GL JS'+
     /* take 188 · the version the WebView actually runs (ci/bundle.sh fetches maplibre-gl@5) */
     (window.maplibregl&&typeof maplibregl.getVersion==='function'?' '+maplibregl.getVersion():'')+
-    ', BSD 3-Clause licence, \u00a9 2023 MapLibre contributors; it contains code from Mapbox GL JS '+
-    '(BSD 3-Clause, \u00a9 2020 Mapbox), glfx.js (MIT, \u00a9 2011 Evan Wallace) and d3-color '+
-    '(BSD 3-Clause, \u00a9 2010-2016 Mike Bostock).<br><b>App runtime</b> \u2014 Capacitor 8 with its '+
+    ', <span class="nobr">BSD 3-Clause</span> licence, \u00a9 2023 MapLibre contributors; it contains code from Mapbox GL JS '+
+    '(<span class="nobr">BSD 3-Clause</span>, \u00a9 2020 Mapbox), glfx.js (MIT, \u00a9 2011 Evan Wallace) and d3-color '+
+    '(<span class="nobr">BSD 3-Clause</span>, \u00a9 2010-2016 Mike Bostock).<br><b>App runtime</b> \u2014 Capacitor 8 with its '+
     'Device, Geolocation, Haptics and Share plugins, MIT licence, \u00a9 2017-present Drifty Co.; '+
     'the plugins \u00a9 2020-present Ionic (Geolocation \u00a9 2025 Ionic).'+
     '<br>The full licence texts are included in the app package.</div>'+
@@ -7056,7 +7442,9 @@ var PANELS=PICKERS.concat(['diagpanel','cmppanel']);
 var PANEL_CHIP={modepanel:'c-mode',actpanel:'c-act',lyrpanel:'c-layers',diagpanel:'c-diag',cmppanel:'c-compass'};
 function panelOpen(list){list=list||PANELS;for(var i=0;i<list.length;i++){var p=el(list[i]);if(p&&!p.hidden)return list[i]}return null}
 function panelsClose(list){list=list||PANELS;var n=0;list.forEach(function(id){var p=el(id);if(p&&!p.hidden){p.hidden=true;n++;
-  if(id==='cmppanel')CMP_ON=false}});return n}
+  if(id==='cmppanel')CMP_ON=false}});
+  if(n){stripH();ridePublish()}   /* take 189 · A231 · the strip's chips come back */
+  return n}
 function within(t,node){while(t){if(t===node)return true;t=t.parentNode}return false}
 try{document.addEventListener('click',function(e){
   if(!panelOpen(PICKERS))return;
@@ -7093,7 +7481,7 @@ function onBack(){
 try{window.addEventListener('popstate',function(){onBack()});backPush()}catch(e){}
 /* A154 · the Tools strip tells the panels how tall it is. Measured, not
    assumed: chip height follows the type scale and the safe-area inset. */
-function stripH(){try{var t=el('tools');if(t){var h=t.offsetHeight;
+function stripH(){attribLift();try{var t=el('tools');if(t){var h=t.offsetHeight;
   /* take 188 · step 13b · the band at the map's foot that floating things
      sit above: the strip, and the MapLibre attribution in the corner (the
      data licences require it drawn) where it reaches higher than the strip.
@@ -7103,6 +7491,7 @@ function stripH(){try{var t=el('tools');if(t){var h=t.offsetHeight;
      down onto the attribution (render, 411 px and wider) */
   var up=stripAttribUp();if(up>0)h+=up;
   document.documentElement.style.setProperty('--strip-h',h+'px')}}catch(e){}
+  if(CMP_ON)cmpFit();
   /* take 188 · A216 · and the DOCK height: from the screen's bottom to the
      strip's top, which the toast (fixed to the screen) sits above. It moves
      with the drawer, so the toast re-reads it as it shows. take 188 · step
@@ -7112,6 +7501,21 @@ function stripH(){try{var t=el('tools');if(t){var h=t.offsetHeight;
     vh=window.innerHeight||document.documentElement.clientHeight;
     if(r&&r.height>0&&isFinite(vh-r.top))document.documentElement.style
       .setProperty('--dock-h',Math.max(0,Math.round(vh-r.top+Math.max(0,stripAttribUp())))+'px')}catch(e){}}
+/* take 189 · cold audit · the attribution's (i) never sits on a chip: when
+   a drawn chip of the strip comes within 8 px of where the (i) stands
+   unlifted, it is lifted to stand 8 px above the strip's top (and then
+   counts in stripAttribUp, so the panels and the toast clear it). Read
+   unlifted, so a lift never decides itself */
+function attribLift(){try{
+  var a=document.querySelector('.maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib'),t=el('tools'),de=document.documentElement;
+  if(!a||!t||!a.getBoundingClientRect||!t.querySelectorAll)return;
+  var L=parseFloat(de.style.getPropertyValue('--attrib-lift'))||0,ar=a.getBoundingClientRect(),G=8,hit=false;
+  if(!(ar.height>0)){if(L)de.style.removeProperty('--attrib-lift');return}
+  var top=ar.top+L,bot=ar.bottom+L;
+  Array.prototype.forEach.call(t.querySelectorAll('.chip'),function(c){var r=c.getBoundingClientRect();
+    if(r.width>0&&r.height>0&&r.left<ar.right+G&&r.right>ar.left-G&&r.top<bot+G&&r.bottom>top-G)hit=true});
+  var tr=t.getBoundingClientRect(),w=hit?Math.max(0,Math.ceil(bot-tr.top+G)):0;
+  if(w!==L){if(w)de.style.setProperty('--attrib-lift',w+'px');else de.style.removeProperty('--attrib-lift')}}catch(e){}}
 /* px the attribution reaches above the strip's top (0 when it does not, or
    when either is not drawn) */
 function stripAttribUp(){try{var t=el('tools'),a=document.querySelector('.maplibregl-ctrl-bottom-right');
@@ -7176,6 +7580,8 @@ el('guide').addEventListener('click',function(e){
 el('c-compass').addEventListener('click',function(){
   var p=el('cmppanel');CMP_ON=p.hidden;p.hidden=!p.hidden;
   if(CMP_ON){magStart();el('diagpanel').hidden=true;cmpPaint()}
+  /* take 189 · A231 · riding, an open panel changes the strip's height */
+  stripH();ridePublish();cmpFit();
   logAct('tap  c-compass')});
 
 /* One tap where you are, rather than long-pressing a map you may not be able to
@@ -7199,7 +7605,7 @@ el('peek').addEventListener('click',function(){
   logAct('tap  rail '+(folded?'open':'fold'))});
 
 el('c-diag').addEventListener('click',function(){
-  var p=el('diagpanel');p.hidden=!p.hidden;logAct('tap  c-diag')});
+  var p=el('diagpanel');p.hidden=!p.hidden;stripH();ridePublish();logAct('tap  c-diag')});
 
 el('c-layers').addEventListener('click',function(){
   var p=el('lyrpanel');buildLyrPanel();p.hidden=!p.hidden;
@@ -7356,6 +7762,15 @@ map.on('load',function(){var k='ride';
    handler delegated to the GeolocateControl, which does nothing useful when the
    rider is outside the region. */
 function flyToYou(){
+  /* take 189 · cold audit · "You are here" only from a fix that is live
+     (A237's reader, or the one-shot locate's own fix under GPS_STALE_MS).
+     YOU was written by the one-shot locate only and never aged: once the
+     startup fix landed, Locate flew back to it and said "You are here"
+     for the rest of the session, miles from a rider who had ridden on
+     (PROVEN by code read). A live ride fix moves YOU and its pin too. */
+  var lf=liveFix();
+  if(lf){YOU=lf.at;YOU_T=lf.t;if(youM)youM.setLngLat(YOU)}
+  if(YOU&&!(Date.now()-YOU_T<=GPS_STALE_MS))return false;
   if(YOU){
     var far=!inRegion(YOU);
     map.easeTo({center:YOU,zoom:far?7.2:14.5,duration:900,essential:true});
@@ -7517,8 +7932,10 @@ function placeCard(at,kind,title){
   rows.push('<span class="mono" style="font-size:var(--t-lg)">'+at[1].toFixed(5)+' '+
     at[0].toFixed(5)+'</span> <span class="unit">DD'+
     (e!==null?' · '+ft(e)+' ft':'')+'</span>');
+  /* take 189 · A237 · fix round 1 · measured from ME, which is the start
+     pin until a fix: "from your position" only from a live fix (meNoun) */
   if(kind!=='me')rows.push('<span class="unit">'+d.toFixed(2)+' mi '+b.pt+
-    ' ('+b.deg+'°) from your position</span>');
+    ' ('+b.deg+'°) from '+meNoun(true)+'</span>');
   var ad=addressAt(at)||addressAt(at,true);
   if(ad)rows.push('<span style="color:var(--text-1)">'+ad.txt+'</span>');
   if(ne)rows.push('<span class="unit">nearest: '+(ne.e.n||label(ne.e.c))+
@@ -7610,7 +8027,8 @@ function dropPin(at){
 
 try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.paddleCard=paddleCard;window.PADDLE_MPH=PADDLE_MPH;
-    window.headingNow=headingNow;window.railSet=railSet;
+    window.headingNow=headingNow;window.railSet=railSet;window.railFoldIfAway=railFoldIfAway;
+    window.cmpFit=cmpFit;   /* take 189 · cold audit r2 · render's cap read */
     window.guideShow=guideShow;window.guideClose=guideClose;
     window.showQuiet=showQuiet;
     window.railState=function(){var b=el('railbody');
@@ -7715,8 +8133,15 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         plan:navPlan,guide:function(){return NAVG},project:navProject,
         runSet:runSet,run:function(){return RUN},river:navRiver,riverLine:riverLine,
         pos:function(v){if(v!==undefined)posMode=v;return posMode},
+        /* take 189 · A237 · the one live-fix reader, read by the harnesses */
+        live:function(){return liveFix()},
+        /* fix round 1 · and the distance line the place cards print */
+        dist:function(p){return placeDist(p)},
         /* the harness's stand-in for the app being killed: state gone, storage kept */
-        reset:function(){gotFix=false;rideMode=null;crumbs=[];crumbMi=0;RIDE=null;NAV.on=false;NAV.lastAt=null},
+        reset:function(full){gotFix=false;rideMode=null;crumbs=[];crumbMi=0;RIDE=null;NAV.on=false;NAV.lastAt=null;
+          /* take 189 · cold audit · full: a relaunch has no truck pinned and
+             no truck marker drawn either (the resumed first fix's drill) */
+          if(full){TRUCK=null;if(tM){try{tM.remove()}catch(e){}tM=null}}},
         crumbs:function(){return crumbs.length},
         stopReal:stopReal,rail:function(on){try{railSet(!!on)}catch(e){}},
         save:tripSave,load:tripLoad,resume:tripResume,end:tripEnd,card:tripResumeCard,
@@ -7968,7 +8393,7 @@ function stLayout(){
       stAdd('PERF','dispatch-scan',ms<budget,
         Math.round(ms)+' ms of '+budget+' ms budget ('+EDGES.length+
         ' edges, '+(ms*1000/EDGES.length).toFixed(1)+' µs/edge, from '+
-        ((ME&&ME.slice)?'your position':'the region centre')+
+        meNoun(true)+
         ') — this is what you wait for after tapping Dispatch');
     }catch(e){stInfo('PERF','dispatch-scan','could not time: '+e)}
   })();
@@ -8032,7 +8457,7 @@ function stLayout(){
      mid-transition they disagree (take 109). */
   var _r=el('rail'),_rb=el('railbody');
   var _folded=!_rb||_rb.getBoundingClientRect().height<8;
-  var LIST=_folded?['peek','btn-home','c-ride','c-locate']
+  var LIST=_folded?['peek','btn-home','btn-ride','c-ride','c-locate']
                   :['btn-home','btn-disp','btn-steps','btn-retrace','c-ride','c-locate'];
   LIST.forEach(function(id){
     var e=el(id);if(!e)return;var r=e.getBoundingClientRect();
@@ -8206,10 +8631,18 @@ function stSafety(){
      the field and got exactly that: "the compass popped up at the top… it
      doesn't work whatever it is." A drill must put back EVERYTHING it moved,
      not just the state it was written to think about (take 84). */
+  /* take 189 · cold audit · and a RESUMED trip waiting for its first fix:
+     the drill's startRecording took the resumed branch (its 25 points on
+     the trip's track, two false SAFETY fails) and spent RESUMING, so the
+     real first fix then wiped the kept track and the saved trip (PROVEN,
+     the audit's harness on the shipped functions). The drill runs as a
+     fresh recording and the flags go back as they were. */
   var save={T:TRUCK,c:crumbs.slice(),m:crumbMi,p:posMode,me:ME.slice(),
+            rs:RESUMING,rr:RESUMED_RIDE,
             ride:RIDE,lastride:LASTRIDE,
             hud:!!(el('hudbar')&&el('hudbar').hidden),
             chips:!!(el('chips')&&el('chips').hidden)};
+  RESUMING=false;RESUMED_RIDE=null;
   try{
     var c=CTR,pts=[];
     for(var i=0;i<25;i++)pts.push([c[0]+i*0.0008,c[1]+i*0.0005]);
@@ -8232,6 +8665,7 @@ function stSafety(){
   if(RIDE&&RIDE!==save.ride){try{clearInterval(RIDE.pulse)}catch(e){}}
   RIDE=save.ride;LASTRIDE=save.lastride;
   TRUCK=save.T;crumbs=save.c;crumbMi=save.m;posMode=save.p;ME=save.me;
+  RESUMING=save.rs;RESUMED_RIDE=save.rr;
   hudShow(!save.hud);
   if(el('chips'))el('chips').hidden=save.chips;
   try{syncSafety()}catch(e){}
@@ -8427,6 +8861,52 @@ function stHaptics(){
       :'no voices reported — strip stays silent'));
 }
 
+/* take 189 · A236 · WHICH FONT THE MAP'S LABELS DRAW IN. Take 188 found,
+   in headless Chrome, that MapLibre fails to load glyph range 0-255 from
+   the APEX pack ("mismatched image size") and draws every Latin label
+   locally, in a system font, instead; on the Fold it is UNKNOWN. This line
+   reads it back on the device: the label layers' font stacks, which glyph
+   ranges loaded from the pack, which failed (their glyphs drawn locally),
+   which are still pending, and the font MapLibre asked the canvas for when
+   it drew locally. INFO, never a verdict: the fix waits for the phone's
+   answer. It reads MapLibre's glyph manager (map.style.glyphManager), which
+   is not public API; a build without it says UNKNOWN rather than guess. */
+function stGlyphs(){
+  var stacks={},order=[],num=function(a,b){return a-b},
+      rg=function(r){return (r*256)+'-'+(r*256+255)},
+      list=function(a){return a.length?a.sort(num).map(rg).join(', '):'none'};
+  try{map.getLayersOrder().forEach(function(id){
+    var L=map.getLayer(id);if(!L||L.type!=='symbol')return;
+    var f=map.getLayoutProperty(id,'text-font');if(!f||!f.join)return;
+    var k=f.join(',');if(!stacks[k]){stacks[k]=[];order.push(k)}stacks[k].push(id)})}catch(e){}
+  if(!order.length)return stInfo('RENDER','glyphs','UNKNOWN \u2014 no label layer with a text-font was found');
+  var gm=null;try{gm=map.style&&map.style.glyphManager}catch(e){}
+  if(!gm||!gm.entries)return stInfo('RENDER','glyphs','UNKNOWN \u2014 this MapLibre build exposes no glyph '+
+    'manager; label layers use '+order.join(' / '));
+  stInfo('RENDER','glyphs',order.map(function(k){
+    var e=gm.entries[k],n=stacks[k].length,who=k+' ('+n+' label layer'+(n===1?'':'s')+')';
+    /* take 189 · A236 · fix round 1 · "no glyph requested yet" only when the
+       manager holds no stack at all; holding others but not this key means
+       the reader's key is wrong, and it says so rather than reading blind */
+    if(!e){var ks=Object.keys(gm.entries);
+      return who+(ks.length?': UNKNOWN \u2014 the glyph manager holds '+ks.join(' / ')+', none is '+k:
+        ': no glyph requested yet')}
+    /* take 189 · cold audit · an entry whose fields are not where this
+       reads them (MapLibre's private names, floating within 5.x) read as
+       "0 from the pack, 0 drawn locally": blind, and said as a reading */
+    if(!e.glyphs||typeof e.glyphs!=='object'||!e.ranges||typeof e.ranges!=='object'||
+       !e.requests||typeof e.requests!=='object')
+      return who+': UNKNOWN \u2014 the glyph manager\'s '+k+' entry has no glyphs / ranges / requests to read';
+    var loaded=[],failed=[],pending=[],local=0,pack=0,lr={};
+    Object.keys(e.glyphs||{}).forEach(function(id){var g=e.glyphs[id];if(!g)return;
+      if(g.metrics&&g.metrics.isDoubleResolution){local++;lr[Math.floor(+id/256)]=1}else pack++});
+    Object.keys(e.ranges||{}).forEach(function(r){if(e.ranges[r])loaded.push(+r)});
+    Object.keys(e.requests||{}).forEach(function(r){r=+r;if(loaded.indexOf(r)>=0)return;
+      (lr[r]?failed:pending).push(r)});
+    var font=null;try{font=e.tinySDF&&e.tinySDF.ctx&&e.tinySDF.ctx.font}catch(x){}
+    return who+': ranges from the pack '+list(loaded)+' \u00b7 failed '+list(failed)+
+      ' \u00b7 pending '+list(pending)+' \u00b7 '+pack+' glyphs from the pack, '+local+
+      ' drawn locally'+(font?' in "'+font+'"':'')}).join(' ;; '))}
 function stReport(){
   var pass=0,fail=0,info=0;
   ST.forEach(function(r){if(r.ok===null)info++;else if(r.ok)pass++;else fail++});
@@ -8534,6 +9014,7 @@ function selfTest(opts,done){
     try{window.__selfTestReport=rep}catch(e){}
     if(done)done(rep);return rep};
   stLabels(function(){
+  stGlyphs();
   stPerf(function(){
     if(opts.gps===false)return finish();
     show('<b>Self-test running…</b><br>Waiting up to 20s for a GPS fix. '+
@@ -8582,8 +9063,10 @@ el('c-selftest').addEventListener('click',function(){
 
 [[hM,'home',function(){return HOME},function(){return 'Home / truck'}],
  [mM,'me',function(){return ME},function(){
-    return posMode==='gps'?'You are here':posMode==='sim'?'Simulated position':
-           posMode==='away'?'Planning start':'Start pin'}]
+    /* take 189 · A237 · 'You are here' only from a live fix: a start pin
+       moved by hand after a locate was still called you */
+    return {you:'You are here',last:'Last GPS fix ('+meClock()+')',sim:'Simulated position',
+      away:'Planning start',pin:'Start pin'}[meIs()]}]
 ].forEach(function(t){
   try{t[0].getElement().addEventListener('click',function(ev){
     ev.stopPropagation();placeCard(t[2](),t[1],t[3]())})}catch(e){}});
@@ -8940,7 +9423,7 @@ map.on('load',function(){makeBadges();setBasemap(bmi);wpDraw();showTab('map');
    ▶ Ride it, so it happily showed a region you were 135 miles from and said
    nothing (take 27 field report). Knowing early costs one fix and changes the
    whole first screen. */
-var YOU=null,youM=null,LOCATE_N=0,LOCATE_MS=25000;
+var YOU=null,YOU_T=0,youM=null,LOCATE_N=0,LOCATE_MS=25000;
 function locateOnce(cb){
   /* Take 30 used getCurrentPosition with enableHighAccuracy:false and a 10s
      timeout. On the Fold it never produced a fix — the self-test reported
@@ -8948,11 +9431,11 @@ function locateOnce(cb){
      watch machinery that demonstrably works, take the first fix, stop. One
      proven path beats two plausible ones (landmine 56 again). */
   var handle=function(at,acc){
-    YOU=at.slice();
+    YOU=at.slice();YOU_T=Date.now();
     if(!youM){var d=mk('you');youM=new maplibregl.Marker({element:d}).setLngLat(YOU).addTo(map)}
     else youM.setLngLat(YOU);
     classifyFix(at);
-    if(posMode==='away')showAway(acc); else{posMode='gps';ME=at.slice();mM.setLngLat(ME);paint();syncSafety()}
+    if(posMode==='away')showAway(acc); else{posMode='gps';ME=at.slice();mM.setLngLat(ME);meFix(ME);paint();syncSafety()}
     drawCoverage();
     if(cb)try{cb(at)}catch(e){}};
   /* take 188 · cold audit · its OWN watch (gpsWatch), closed through the
@@ -9098,7 +9581,9 @@ map.on('click',function(e){
     show('<b>'+(pr.named?pr.n:pr.h)+'</b>'+
       (pr.named?'<div class="sub">'+pr.h+(pr.mi?' \u00b7 '+pr.mi+' mi of trail':'')+
           (pr.w?' \u00b7 named for the lake it is on; the source has no name for this spot':'')+'</div>':
-                '<div class="sub">Unnamed in the source \u2014 shown by what it is</div>')+
+                '<div class="sub">'+(pr.ph?'The source names it only \u201c'+
+                  String(pr.ph).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+
+                  '\u201d \u2014 shown by what it is':'Unnamed in the source \u2014 shown by what it is')+'</div>')+
       campLine+
       (pr.named?photoHTML(pr.k,pr.n,pp):'')+
       /* take 142 · a ski hill's card lists its runs with their tagged
@@ -9231,7 +9716,22 @@ map.on('click',function(e){
 var RAIL_AT=null;          /* what the open card is about, in lon/lat */
 var RAIL_MANUAL=false;     /* did the rider fold it by hand? then leave it alone */
 
+/* take 189 · A230 · Ride pressed and no fix yet: the folded drawer's peek
+   line was empty (an empty dark band over the action row). It says what is
+   happening until the first fix, whose own peek line ("Recording · live
+   GPS") replaces it; nothing is recorded before that fix (startRecording
+   runs on it), so the line says so. One wording, shared with the strip.
+   A RESUMED trip waiting for its first fix (the phone restarted in the
+   woods, a cold GPS) has its track kept and drawn, and the Resume card has
+   just said how far it is: its line says that, never "nothing recorded"
+   (the review of the lane, round 1) */
+var GPS_WAIT='Waiting for a GPS fix';
+function rideWaiting(){return !!(rideMode&&!gotFix&&!riding)}
 function railPeekText(){
+  if(rideWaiting())return GPS_WAIT+' \u2014 '+(RESUMING?crumbMi.toFixed(1)+' mi recorded, kept':'nothing recorded yet');
+  /* a dropout: the truck distance would be measured from where the rider
+     was; the line says the fix is old instead (the strip's words) */
+  if(gotFix&&fixStale())return 'No GPS fix since '+fixClock();
   if(TRUCK&&ME){
     var d=mi(ME,TRUCK);
     return 'Truck '+(d<10?d.toFixed(1):Math.round(d))+' mi '+compass(bearing(ME,TRUCK))}
@@ -9256,10 +9756,20 @@ function railSet(open,at){
      when it ends; with reduced motion there is no slide to wait for) */
   rcFit()}
 
-function railFoldIfAway(){
+function railFoldIfAway(e){
   /* Pan far enough that the thing the card is about has left the screen and the
      card goes with it. Not a timer and not a scroll threshold — the subject
      either is on screen or it is not. */
+  /* take 189 · A240 · only the RIDER's camera move folds the card. The
+     drawer is a grid row under #stage (#shell rows 1fr auto auto), so
+     opening it shrinks the stage; MapLibre's ResizeObserver answers each
+     step of the drawer's slide with map.resize(), which keeps the CENTRE and
+     fires moveend — a pin above the centre rides up by half the height the
+     map lost, and at 360x800 a card folded itself ~0.5 s after the tap
+     (PROVEN, probe-refold2). A gesture's moveend carries the input event
+     (originalEvent: drag, pinch, wheel, keys, double-tap); a resize's and
+     the app's own eases do not. */
+  if(!e||!e.originalEvent)return;
   if(RAIL_MANUAL||!RAIL_AT)return;
   try{
     var p=map.project(RAIL_AT),b=map.getContainer().getBoundingClientRect();
@@ -9327,6 +9837,15 @@ try{map.addControl(new maplibregl.ScaleControl({maxWidth:96,unit:'imperial'}),'b
 el('c-locate').addEventListener('click',function(){
   if(NAV.on){NAV.follow=true;navChip()}
   if(flyToYou())return;
+  /* an old fix: say so, ask for a new one, and fly when it lands (a
+     timeout or an error says the last fix's time, never "You are here") */
+  if(YOU){var was=new Date(YOU_T).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+    show('<b>Waiting for a GPS fix\u2026</b><br>Your last fix was at '+was+
+      '; the map moves to you when a new one arrives.','');
+    return locateOnce(function(at,why){
+      if(at){flyToYou();return}
+      show('<b>No new GPS fix.</b><br>Your last fix was at '+was+' \u2014 you may have '+
+        'moved since. Try again in the open.','')})}
   locateOnce();
   setTimeout(function(){if(!flyToYou())geo.trigger()},1200)});
 geo.on('error',function(){show('Location unavailable — this phone did not give a position (location permission off, or no fix yet). Place yourself by hand with <b>I&#39;m here</b> on the Plan tab.','fail')});
@@ -9362,7 +9881,10 @@ function refreshReadout(){
 
 function paint(){var c=map.getCenter();
   var e=elevAt([c.lng,c.lat]);
-  var tag=posMode==='gps'?'DD':posMode==='sim'?'DD · SIMULATED TRACK':
+  /* take 189 · cold audit · the coordinate is the MAP CENTRE in every
+     mode: with a fix it read a bare "DD", under a card that measured from
+     the rider's last fix, and a panned map's centre read as "where I am" */
+  var tag=posMode==='gps'?'DD · MAP CENTRE':posMode==='sim'?'DD · MAP CENTRE · simulated ride':
     posMode==='away'?
       'DD · MAP CENTRE · you are '+Math.round(awayMi)+' mi away':
       'DD · MAP CENTRE · no GPS fix yet';
