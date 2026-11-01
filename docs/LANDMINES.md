@@ -157,6 +157,8 @@ Start here. Do not read top to bottom.
 | A lane's run changed the main tree's data, or its gate check read the main tree | 245 |
 | Render time jumps between runs of the same code | 246 |
 | Two layers on one source count different features over the same view | 247 |
+| Work that was "done" is gone: a machine or a session died, and the branch was never pushed | 248 |
+| A ride never starts in render (the Ride chip still reads "Ride it"), on a machine CI passes | 249 |
 
 ---
 
@@ -3284,3 +3286,38 @@ probe-t189-seal-casing-1.log, twice). Rule: compare
 two layers by feature, not by count, and judge a feature only one of them
 reports by its geometry against the canvas; an inset box does not help,
 because a stroke reaches across any box's edge (A246).
+
+**248. Work that lives on one disk is not work yet.** Take 190 was built on
+the workstation's local branch `v6`, about 20 wip commits from 2026-10-02 to
+2026-10-08: every screen of the V4 mockup's artboards 10–23, smoke 497 → 626
+ok lines, agenda A247–A266 recorded. None was pushed: the plan was to squash
+at the seal and open one pull request, and the seal never ran (usage limits
+stopped the overnight run five times, PROVEN in the UI/UX chat's transcript).
+The workstation was then deleted, and with it `v6`, `~/apex-logs`,
+`~/apex-shots`, the work folders and the subagents' transcripts, which were
+the only record of the code: the chat keeps the orchestrator's own calls and
+400-character agent summaries, so no line of take 190 could be replayed
+(PROVEN, 2026-11-01, docs/RECOVERY-t190.md). What survived was what had left
+the machine: main and the t189 tag on GitHub, the V4 mockup as a claude.ai
+artifact, and the maintainer's decisions quoted in the chat. Rule: push work
+in progress to a branch at least at every green step, and a draft pull
+request is the place for it; squash at the seal, not instead of pushing. A
+working note a take depends on goes in the branch too (landmine 233's rule,
+one level up: not in /tmp, and not only on one machine).
+
+**249. Render on a Chrome other than CI's pin is not CI's render.** The
+first render in a cloud container (2026-11-01, take 189's committed build,
+the bundle restored from run 92's APK) used the container's Chrome for
+Testing 153 and failed two checks: "Wrong turn is the simulator's control"
+(after Ride, the chip still read "Ride it", not "Stop (GPS)") and "the audit
+reached each of its 23 states" (not reached: ride pressed with no fix, ride
+sheet routed), 656 ok (PROVEN, render-t189-cloud-baseline-1.log). The same
+sections on Chrome 138.0.7204.183, the version `ci/bundle.sh` pins, passed
+60 of 60 (PROVEN, render-t189-cloud-c138-only-1.log). Mechanism INFERRED:
+the newer headless Chrome answers the geolocation request with an error at
+once, so the app's honest GPS refusal (A223) keeps the ride from starting,
+where 138 leaves the request pending and the ride waits for its first fix.
+Rule: render with the Chrome `ci/bundle.sh` pins — `ci/cloud_setup.sh`
+installs it and prints the `PUPPETEER_EXECUTABLE_PATH` to export — and
+treat a failure on any other browser as a question about the browser
+first.
