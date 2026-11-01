@@ -160,6 +160,7 @@ Start here. Do not read top to bottom.
 | Work that was "done" is gone: a machine or a session died, and the branch was never pushed | 248 |
 | A ride never starts in render (the Ride chip still reads "Ride it"), on a machine CI passes | 249 |
 | Smoke or render fails on a missing manifest or payload right after `build_app.py split`, in a container with no pipeline run | 250 |
+| A check passes on one build's data and fails on fresh data with the same code, after a control tap | 251 |
 
 ---
 
@@ -3336,3 +3337,19 @@ that assembles www/ owns everything in it, and a stale manifest is the one
 file the loader trusts absolutely. Rule: in a container without a pipeline
 run, `bash ci/cloud_setup.sh bundle` follows every `split`, before smoke or
 render; it puts back the APK's bundle in seconds from the copy it kept.
+
+**251. A control action can move the state the next read depends on.**
+Render's head-tap check (A214) taps a lone teardrop's head, then taps 70 px
+aside as its control, then point-queries the head to judge the anchor. On
+run 92's data (2026-10-02) it passed; on the data runs 96 and 97 built fresh
+on 2026-11-01, with the same code, it failed: "a point query at the head
+MISSES the badge" (PROVEN on both runs, and reproduced in a cloud session
+from run 97's uploaded www/). The control tap had landed on a neighbouring
+two-place stack: the pin's isolation rule keeps stacks 70 px from the PIN,
+this one was 72.7 px away and 16 px from the control point, and a stack's
+tray zooms the map into it (z11.4 to z14.6). The anchor read then asked
+about the wrong place on a moved camera. Nothing in the app was wrong. Rule:
+a read that follows a control action restores the state that action may
+have changed (here the camera, put back before the query), or runs before
+it; and fresh data is a new input every build — a check that passed on
+yesterday's data has not been proven against today's.
