@@ -6,6 +6,10 @@ name: build
 #   apk    -> Stage 1: installable APK on the Releases tab
 #
 # Run it from the Actions tab ("Run workflow") or just push.
+# A pull request into main builds too, once it is ready for review: the same
+# pipeline, render, gate and signed APK, with no seed commit, no Pages and no
+# release (2026-11-01: the workstation that verified takes before a merge is
+# gone, so CI verifies them; landmine 248).
 
 on:
   workflow_dispatch:
@@ -25,9 +29,29 @@ on:
       - package-lock.json
       - capacitor.config.json
       - 'signing/**'
+  pull_request:
+    branches: [main]
+    # a draft does not build: work in progress is pushed to be safe, not to
+    # spend two hours of runner time per push. Ready for review starts it.
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'apex-seed*.zip'
+      - BUILD
+      - 'src/**'
+      - 'tools/**'
+      - regions.json
+      - package.json
+      - package-lock.json
+      - capacitor.config.json
+      - 'signing/**'
+      - 'ci/**'
+      - '.github/workflows/**'
 
+# main keeps its one group, so a newer push still cancels an older build. A
+# pull request gets a group of its own: it must never cancel a build of main,
+# and a newer push to the same request cancels its older build.
 concurrency:
-  group: build
+  group: ${{ github.event_name == 'pull_request' && format('build-pr-{0}', github.event.pull_request.number) || 'build' }}
   cancel-in-progress: true
 
 
@@ -63,14 +87,21 @@ jobs:
   # GITHUB_TOKEN cannot write .github/workflows, which is why the seed carries
   # ci/build.yml for hand-pasting and never the workflow itself (landmine 46).
   seed:
+    # a draft pull request does not build (see the trigger); every later job
+    # needs this one, so skipping it here skips the run
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref_name }}
       - name: Unpack any seed zip at the repo root and commit it
         run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            echo "pull request: a seed zip is unpacked on main only — nothing committed here"
+            exit 0
+          fi
           shopt -s nullglob
           zips=(apex-seed*.zip)
           if [ ${#zips[@]} -eq 0 ]; then
@@ -111,7 +142,7 @@ jobs:
       # (landmine 85). ref_name follows the branch tip.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref_name }}
 
       # Fail here, plainly, rather than 200 lines later inside npm or python.
       # Jacob uploaded the wrong zip and got a Node error that said nothing
@@ -192,6 +223,7 @@ jobs:
   # Allowed to fail so a un-enabled Pages doesn't block the APK.
   pages:
     needs: bundle
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     continue-on-error: true
     environment:
@@ -220,7 +252,7 @@ jobs:
       # (landmine 85). ref_name follows the branch tip.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref_name }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -273,6 +305,9 @@ jobs:
       # reading "Install from this page on the Fold" two takes after I changed
       # it (landmine 96).
       - name: Publish release
+        # a pull request's APK and AAB stay run artifacts: a release is what
+        # main ships
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
