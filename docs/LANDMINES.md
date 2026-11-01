@@ -159,6 +159,7 @@ Start here. Do not read top to bottom.
 | Two layers on one source count different features over the same view | 247 |
 | Work that was "done" is gone: a machine or a session died, and the branch was never pushed | 248 |
 | A ride never starts in render (the Ride chip still reads "Ride it"), on a machine CI passes | 249 |
+| Smoke or render fails on a missing manifest or payload right after `build_app.py split`, in a container with no pipeline run | 250 |
 
 ---
 
@@ -3321,3 +3322,17 @@ Rule: render with the Chrome `ci/bundle.sh` pins — `ci/cloud_setup.sh`
 installs it and prints the `PUPPETEER_EXECUTABLE_PATH` to export — and
 treat a failure on any other browser as a question about the browser
 first.
+
+**250. `build_app.py split` owns all of www/bundle, so it clears a bundle it
+did not build.** In a cloud container the bundle comes from CI's APK
+(`ci/cloud_setup.sh`); the pipeline never ran, so `bundles/<region>/` does
+not exist. `split` copies www/bundle's named files from there and removes
+every stale one it does not find: on take 189's tree it printed "removed
+stale bundle/manifest.json from an earlier build" (with hillshade.jpg and
+imagery.jpg), left 174 MB of the 293 MB and "NOTE no bundle artifacts
+found", while www/app.js and www/index.html came out byte-identical to the
+commit (PROVEN 2026-11-01). That rule is right — it is take 76's: the step
+that assembles www/ owns everything in it, and a stale manifest is the one
+file the loader trusts absolutely. Rule: in a container without a pipeline
+run, `bash ci/cloud_setup.sh bundle` follows every `split`, before smoke or
+render; it puts back the APK's bundle in seconds from the copy it kept.

@@ -167,7 +167,8 @@ The screens are outside the repo: the "before" screens in
 - A Claude Code cloud session is the workspace; GitHub Actions is the
   build machine. `bash ci/cloud_setup.sh` installs npm deps, CI's pinned
   Chrome (landmine 249) and the bundle from the newest green CI APK; then
-  smoke, render and probe run here. The pipeline does not: Geofabrik and
+  smoke, render and probe run here. After every `build_app.py split`,
+  `bash ci/cloud_setup.sh bundle` puts the bundle back (landmine 250). The pipeline does not: Geofabrik and
   overpass-api.de refuse this cloud's connections (PROVEN 2026-11-01), so
   data changes are proven by CI.
 - `python3 ci/gatefn.py check_a …` runs single gate checks (the helper the
@@ -237,10 +238,10 @@ The screens are outside the repo: the "before" screens in
   - compare timings only A/B in one window (246).
 - At take 189's seal: agenda A246, landmine 247 (this line read A244 and
   246 until 2026-11-01; A245, A246 and landmine 247 were added at the seal).
-- At this brief (2026-11-01): take 189 sealed, agenda A246, landmine 249.
+- At this brief (2026-11-01): take 189 sealed, agenda A246, landmine 250.
   Next numbers: take 190; agenda A247, and take 190's items keep the
   numbers the lost `v6` gave them, A247–A266 (docs/RECOVERY-t190.md), so
-  the recovered decisions still cite the right items; landmine 250.
+  the recovered decisions still cite the right items; landmine 251.
 
 ## Order (as of 2026-11-01)
 

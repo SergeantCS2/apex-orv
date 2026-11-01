@@ -36,7 +36,8 @@ pipeline or the data is proven by CI's run, which builds everything.
    landmine for anything that bit, `BUILD` and the title in `src/app.html`,
    then `python3 tools/stamp.py`.
 2. Build the app: `python3 tools/build_app.py split` turns `src/app.html`
-   into `www/`. The pipeline runs in CI (above).
+   into `www/`, then `bash ci/cloud_setup.sh bundle` puts back the bundle
+   `split` clears (landmine 250). The pipeline runs in CI (above).
 3. Verify: `node tools/smoke.mjs`, `node tools/render.mjs` (on CI's Chrome),
    and the gate checks that need no pipeline output through
    `python3 ci/gatefn.py check_a check_b …`, each to its exit line. The
