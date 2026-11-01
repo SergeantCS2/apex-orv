@@ -119,8 +119,34 @@ The line numbers above are take 189's `src/app.html`.
 
 ## 5 · The maintainer's decisions (quoted from the chat's notes)
 
-**2026-09-30.** "The take-190 screens are approved" (the mockup's
-artboards 10–23).
+**2026-09-30 23:50Z.** "The take-190 screens are approved, continue" (the
+mockup's artboards 10–23, proposed at 23:34Z). At 00:57Z on 2026-10-01,
+after the plan was written: "I like where you're going with these plans,
+continue." Earlier the same evening (22:15Z) he approved the plan to cap
+off V4: take 189 the render speed-up and desktop-decidable polish, take
+190 "the unmocked screens from an extended mockup you approve first",
+then his Fold session and one polish take.
+
+**2026-09-30, defaults taken for plan190.md §3's fourteen open items**,
+listed to him to override before the build (none was overridden in the
+chat):
+1. Sheet height against §8's 12% open floor: the floor holds; the Plan and
+   Tools sheets use the measured cap and the index scrolls if it must;
+   stop and ask if Return home needs a scroll at 360x800 or 749x832
+   (answered 2026-10-02: pin a slim Return home row at the sheet foot).
+2. Paths one tap longer off a ride (Return home from Tools 2→3, the Ride
+   card 1→2, Dispatch 1–2→2–3): as approved with the screens; a slim
+   outlined Return home + Dispatch at the sheet foot offered, not built.
+3. The tour's exits (A194): Skip = never show again (Tools → Take the tour
+   replays it); back = not now.
+4. Mark this spot with no live fix refuses, with copy per state and the
+   fix's age (take 189 marks the region centre and says "Marked" — a dead
+   !ME guard, app.html:3577/7184). Superseded 2026-10-02: take a fresh
+   fix.
+Also by default: Loop's copy "Starts at the start pin" (the code's truth,
+app.html:8556); craft rows disabled in land modes; Saved counts
+other-region records instead of "Nothing saved yet"; the compass while
+riding keeps #hudcells drawn.
 
 **2026-10-02, before the overnight run** — "I want you to work on the next
 when this one is complete overnight, get any approvals out of the way
@@ -158,12 +184,19 @@ now." Recorded as:
   sheet's body is its rows followed by the stats and coordinates (one
   scroll away); the action row stays one tap.**
 - T-mark-pin-label — **(b) ease to z12.5 instead of z11** (still "zoom
-  11+") so the mark's name label draws below the "you" marker.
+  11+") so the mark's name label draws below the "you" marker. Not (c),
+  colouring untyped waypoints green as the board draws: green on this map
+  means an easy ORV route, so the mark keeps the app's orange
+  (`wpt-dot`'s untyped colour, #E2570F).
 
-**2026-10-03, pc-start ("Start from here" on the place card):** "Fix it,
-same words as Plan." — option (a): pc-start uses the same predicate as the
-Plan sheet's Start from my position (meDriven()) and the same sentence.
-The sentence was then reworded by batch item 3 below.
+**2026-10-03 04:15 (the workstation's clock), P-pcstart-live — (a):**
+the place card's Start from here (pc-start) uses meDriven(), the Plan
+sheet's predicate, and lane P's words ("GPS is on (a ride, or a Locate
+waiting for its fix) — the next fix in the region moves the start pin to
+where you are, so it cannot be placed by hand."), with a smoke drill that
+opens a place card with the watch open and the fix 40 s old and rejects
+"live", plus its planted control. Batch item 3 below then dropped the
+bracket.
 
 **2026-10-08 01:01Z, the batch brief — "1a 2b 3a 4a 5a 6a", all as
 recommended:**
@@ -200,7 +233,8 @@ rather than sitting in the sheet (2026-10-02).
   every time."
 - A reviewer's blocking finding in the last run: Retrace and Dispatch from
   the Ride tab went from 2 taps to 3, a landmine-135 rise never brought to
-  the maintainer.
+  the maintainer (default 2 above accepted Dispatch 1–2 → 2–3 off a ride,
+  so whether this one was covered is UNKNOWN).
 - Smaller: the Machine picker scrolls at 360×800; Return home from the
   Tools index on a ride went back to the Plan index; Save on a re-join
   card recorded a point-to-point route.
@@ -211,6 +245,18 @@ rather than sitting in the sheet (2026-10-02).
 The chat is session "UI/UX" (2026-09-23 → 2026-10-09) on the maintainer's
 claude.ai account; it holds the orchestrator's calls and the agents'
 summaries. The texts recovered from it are copied under
-`docs/recovery-t190/`, with an INDEX naming each one's event and whether
-it is whole. Paths inside them name the deleted workstation's home
-directory as `~`.
+`docs/recovery-t190/`, verbatim except that the deleted workstation's home
+directory reads `~`. `INDEX.md` there names each one's events and whether
+it is whole:
+- whole: `DECISIONS.md`, the three pending notes (`F-diag-ride-float.md`,
+  `F-ride-sheet-footer.md`, `T-mark-pin-label.md`), the maintainer's
+  messages of 2026-09-30 → 10-01, the two proposals, `mockgen190.py` (the
+  generator of artboards 10–23), the lane driver `v6-lanes.js` and the
+  overnight driver `t190-build.js` / `driver-tail.js` as launched;
+- partial: `plan190.md` (lines 1–68, 96–156, 341–460 of about 460: the
+  rest of lane F, most of P and all of S, T and R are missing) and
+  `plan190-delta.md` (lines 1–40, plus the workflow's own summary);
+- not found: the seven `wp-*.json` work packages (a size and review
+  summary, and the first 8,000 characters of the framework's, survive).
+The chat's two recovery reads were made 2026-11-01; the full catalog of
+`v6`'s commits, with the events behind each, is section 2 above.
