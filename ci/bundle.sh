@@ -40,18 +40,25 @@ CHROME_PIN="138.0.7204.183"
 npx puppeteer browsers install "chrome@$CHROME_PIN"
 export PUPPETEER_EXECUTABLE_PATH="$(ls -d ~/.cache/puppeteer/chrome/linux-$CHROME_PIN/chrome-linux64/chrome)"
 echo "chrome pinned: $PUPPETEER_EXECUTABLE_PATH"
-node tools/render.mjs
+# 2026-11-01 · every check after the pipeline runs, and the job fails at
+# the end if any did: CI is the only place the pipeline and the whole gate
+# run now (the workstation is gone, landmine 248), and a render failure that
+# stops the job here hides every gate finding behind it for another two-hour
+# run. Each step's exit is kept; the job's exit is the first non-zero one.
+RC=0
+keep() { "$@" || { s=$?; echo "::error::$* exited $s"; [ "$RC" -ne 0 ] || RC=$s; }; }
+keep node tools/render.mjs
 # The pipeline has a palette step, but the pipeline runs ABOVE this line —
 # before npm ci — so it finds no puppeteer and skips. Run it here, where chrome
 # exists. A check that skips is not a check (landmine 53).
-node tools/verify_palette.mjs
+keep node tools/verify_palette.mjs
 
 # The Play privacy policy is served from Pages, and Pages deploys
 # THIS job's www/ artifact — so it is generated here, not in the
 # apk job. Play requires the URL to resolve before review.
-python3 tools/play_assets.py
+keep python3 tools/play_assets.py
 
-python3 tools/gate.py
+keep python3 tools/gate.py
 
 # ── Built what the seed declared? (take 118, landmine 199) ─────────────────
 # Take 117's seed declared ALL OF MICHIGAN; the hand-pasted workflow held a
@@ -87,3 +94,4 @@ VERIFY
   du -sh www
   echo '```'
 } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+exit "$RC"

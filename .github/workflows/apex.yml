@@ -212,11 +212,16 @@ jobs:
         # updates. The workflow file is pasted by hand and cannot be (landmine 84).
         run: bash ci/bundle.sh
 
+      # 2026-11-01 · uploaded when the build fails too: the data a failed
+      # check ran on exists only on this runner, and a cloud session (which
+      # cannot run the pipeline) restores it to reproduce the failure
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: www
           path: www
           retention-days: 7
+          if-no-files-found: ignore
 
   # ── Stage 0 ─────────────────────────────────────────────────────────────
   # Needs Settings -> Pages -> Source: "GitHub Actions" once, from the phone.
