@@ -23,6 +23,30 @@ URL = ("https://waterservices.usgs.gov/nwis/site/?format=rdb"
        f"&stateCd={STATE}&siteType=ST&siteStatus=active&hasDataTypeCd=iv")
 
 
+# take 192 · A245 (the maintainer, 2026-11-02: "The omission is fine"): an
+# omitted inventory is RECORDED, not only printed. The reason goes in
+# OMITTED; tools/bundle.py carries it into the manifest's "omitted", and
+# render accepts a bundle without gauges.json only with that record (a
+# layer lost without a word still fails). Any run that leaves a payload
+# removes the record.
+OMITTED = "gauges_omitted.json"
+
+
+def omitted(why):
+    # the region it was written for: bundle.py ignores a record of another
+    # region's build (the region stamp's rule, landmine 199)
+    json.dump({"why": why, "region": RID,
+               "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
+              open(OMITTED, "w"))
+    print(f"gauges: payload omitted — {why}; recorded in {OMITTED}, the card "
+          "simply offers no conditions button")
+
+
+def kept():
+    if os.path.exists(OMITTED):
+        os.remove(OMITTED)
+
+
 def main():
     print(f"gauges: NWIS site inventory for {STATE} (surface water, live data)")
     # take 179 (A191): one refusal from a public service must not stop a
@@ -46,16 +70,15 @@ def main():
                 n = "?"
             print(f"gauges: NWIS refused twice — keeping {n} sites from the "
                   "previous build (gauges_payload.json unchanged)")
+            kept()
             return
-        print("gauges: NWIS refused twice and nothing is cached — payload "
-              "omitted, the card simply offers no conditions button")
+        omitted("NWIS refused twice and nothing is cached")
         return
     rows = [l for l in raw.splitlines() if l and not l.startswith("#")]
     if len(rows) < 3:
-        print("gauges: inventory empty — payload omitted, the card simply "
-              "offers no conditions button")
         if os.path.exists("gauges_payload.json"):
             os.remove("gauges_payload.json")
+        omitted("NWIS answered with an empty inventory")
         return
     head = rows[0].split("\t")
     ix = {k: head.index(k) for k in
@@ -74,7 +97,16 @@ def main():
         out.append({"id": c[ix["site_no"]],
                     "n": c[ix["station_nm"]].title(),
                     "p": [round(lon, 5), round(lat, 5)]})
+    if not out:
+        # an inventory with nothing inside the box is an omission too, said
+        # and recorded (the review of take 192: an empty payload was staged
+        # and render failed it as a lost layer)
+        if os.path.exists("gauges_payload.json"):
+            os.remove("gauges_payload.json")
+        omitted(f"no NWIS surface-water site inside the region's box ({skipped} outside or unparsable)")
+        return
     json.dump({"g": out}, open("gauges_payload.json", "w"))
+    kept()
     kb = os.path.getsize("gauges_payload.json") // 1024
     print(f"gauges: {len(out)} sites in the box ({skipped} outside or "
           f"unparsable), {kb} KB")

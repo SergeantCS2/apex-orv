@@ -50,6 +50,10 @@ ARTIFACTS = [
     ("nf.json",              "nf.json",          "nf",       False),   # take 174 · A186
 ]
 
+# take 192 · A245 · artifact -> the record its step writes when it omits the
+# payload on purpose (tools/gauges.py: NWIS refused twice with nothing cached)
+OMISSIONS = {"gauges.json": "gauges_omitted.json"}
+
 # How many things are actually IN a payload. A layer with no features in it is
 # not a layer, and existence is not content (landmine 74).
 #
@@ -165,11 +169,33 @@ def build(rid):
             os.remove(p)
             print(f"  ---  {name:<16} {'stale — removed':>20}")
 
+    # take 192 · A245 · an optional artifact its step chose to omit, with the
+    # step's recorded reason. Absence alone cannot tell an honest omission
+    # from a lost layer; this record can, and render reads it.
+    omit = {}
+    for name, marker in OMISSIONS.items():
+        mp_ = os.path.join(ROOT, marker)
+        if name not in staged and os.path.exists(mp_):
+            try:
+                rec = json.load(open(mp_))
+            except (ValueError, OSError):
+                rec = {}
+            # a record from another region's build, or one with no region,
+            # excuses nothing: the layer is reported missing, not omitted
+            if rec.get("region") != rid:
+                print(f"  opt  {name:<16} {'MISSING':>12}  (an omission record for "
+                      f"{rec.get('region') or 'no region'} ignored)")
+                continue
+            omit[name] = rec.get("why") or "omitted"
+            print(f"  opt  {name:<16} {'OMITTED':>12}  {omit[name]}")
+
     man = {"schema": SCHEMA, "region": rid, "name": reg.name,
            "bbox": reg.bbox, "note": reg.note, "centre": reg.centre, "bulk": bool(getattr(reg, "bulk", False)),
            "anchors": reg.anchors,
            "built": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
            "bytes": total, "artifacts": entries}
+    if omit:
+        man["omitted"] = omit
     # a hash over the artifact hashes, so a manifest cannot be edited to match
     # imagery is useless without its georeference; carry it in the manifest so
     # a bundle is self-contained (take 15 — the meta only ever lived in scratch)

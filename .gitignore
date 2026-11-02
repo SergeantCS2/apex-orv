@@ -12,6 +12,7 @@ aoi.json
 authoritative.json
 graph_raw.json
 *_payload.json
+gauges_omitted.json
 hillshade.jpg
 imagery.jpg
 imagery_meta.json

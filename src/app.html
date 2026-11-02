@@ -1204,7 +1204,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 191</span>
+    <span id="title"><b>APEX</b> ORV · Take 192</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -6265,7 +6265,7 @@ function rideStart(at){
     /* take 188 · A222 · the sheet's Time moves between fixes too — and
        (cold audit) a dropout dashes what only a fix can say, on the sheet
        and on the strip */
-    try{hudPaint();if(NAV.on)navChip();peekGps()}catch(e){}
+    try{hudPaint();if(NAV.on)navChip();peekGps();elevCell()}catch(e){}
     /* battery moves slowly and the read is not free; the dropout watch is the
        thing that needs to be prompt */
     if(++RIDE.ticks%3===1)batteryNow().then(function(b){
@@ -6584,6 +6584,20 @@ function rideReport(R){
   L.push('--- end ---');
   return L.join('\n')}
 
+/* take 192 · A242 · the map's objects for the track, drawn again from the
+   state: the truck's pin at TRUCK (none without one), the breadcrumb line
+   from crumbs and the retrace line as it was last drawn. A drill that puts
+   the state back puts these back too (take 84's rule): the self-test's left
+   its truck pin at the region centre and its 25-point track on the map. */
+var BACK_FC={type:'FeatureCollection',features:[]};
+function backSet(fc){BACK_FC=fc;map.getSource('back').setData(fc)}
+/* the breadcrumb line: a line needs two points (one crumb draws nothing) */
+function crumbFC(){return {type:'FeatureCollection',features:crumbs.length>1?[{type:'Feature',
+  properties:{},geometry:{type:'LineString',coordinates:crumbs}}]:[]}}
+function trackDraw(){
+  try{if(TRUCK)truckPin();else if(tM){tM.remove();tM=null}}catch(e){}
+  try{map.getSource('crumb').setData(crumbFC())}catch(e){}
+  try{map.getSource('back').setData(BACK_FC)}catch(e){}}
 /* the truck's pin at TRUCK: drawn once, moved after (both branches below) */
 function truckPin(){
   if(!tM)tM=new maplibregl.Marker({element:mk('truck','truck')}).setLngLat(TRUCK).addTo(map);
@@ -6609,7 +6623,7 @@ function startRecording(at){
   rideStart(at);
   hudShow(true);
   truckPin();
-  map.getSource('back').setData({type:'FeatureCollection',features:[]});
+  backSet({type:'FeatureCollection',features:[]});
   syncSafety()}
 
 function record(at){
@@ -6617,12 +6631,14 @@ function record(at){
   var prev=crumbs[crumbs.length-1], d=mi(prev,at);
   if(d<0.004)return;                    /* ~7 m — don't log GPS jitter as travel */
   crumbs.push(at.slice()); crumbMi+=d;
-  map.getSource('crumb').setData({type:'FeatureCollection',features:[
-    {type:'Feature',properties:{},geometry:{type:'LineString',coordinates:crumbs}}]});
+  map.getSource('crumb').setData(crumbFC());
   syncSafety()}
 
 /* 4.3 — back to the vehicle. Never more than a glance away, always on the rail. */
 function syncSafety(){
+  /* take 192 · A243 · and the Elevation cell, which follows ME as these do
+     (a start pin moved by hand is no longer the fix: a dash) */
+  try{elevCell()}catch(e){}
   var tv=el('v-truck'), rv=el('v-rec');
   if(!TRUCK){tv.textContent='—';tv.className='v';rv.textContent='—';
     /* a cell with nothing to say takes no space (take 113); parentNode is
@@ -6665,7 +6681,7 @@ el('btn-retrace').addEventListener('click',function(){
   if(crumbs.length<2)return show('Nothing recorded yet. Retrace follows the track a ride records \u2014 tap <b>Ride it</b> (Ride tab) with a GPS fix to start one.','fail');
   var back=crumbs.slice().reverse(), d=0;
   for(var i=1;i<back.length;i++)d+=mi(back[i-1],back[i]);
-  map.getSource('back').setData({type:'FeatureCollection',features:[
+  backSet({type:'FeatureCollection',features:[
     {type:'Feature',properties:{},geometry:{type:'LineString',coordinates:back}}]});
   var b=new maplibregl.LngLatBounds();back.forEach(function(c){b.extend(c)});
   map.fitBounds(b,{padding:50,duration:700});
@@ -6862,8 +6878,7 @@ function tripResume(t){
       machIdx=Math.max(0,ORDER.indexOf(machine));
       setChip('c-machine',MACHINE[machine].ic,MACHINE[machine].lbl)}
     crumbs=(t.crumbs||[]).slice();crumbMi=t.crumbMi||0;
-    if(crumbs.length)map.getSource('crumb').setData({type:'FeatureCollection',
-      features:[{type:'Feature',properties:{},geometry:{type:'LineString',coordinates:crumbs}}]});
+    if(crumbs.length)map.getSource('crumb').setData(crumbFC());
     if(t.lastFix&&t.lastFix.at){ME=t.lastFix.at.slice();mM.setLngLat(ME)}
     if(t.run)RUNFROM=t.run;
     if(t.runNav)runSet(t.runNav.riv,t.runNav.a,t.runNav.b);
@@ -7379,7 +7394,9 @@ function meFix(at){ME_FIX={at:at.slice(),t:Date.now()};
   /* take 189 · cold audit · the 'you' pin and Locate's YOU follow every
      real fix, not only the one-shot locate's (they stayed at the startup
      fix for the whole session) */
-  YOU=at.slice();YOU_T=ME_FIX.t;if(youM)try{youM.setLngLat(YOU)}catch(e){}}
+  YOU=at.slice();YOU_T=ME_FIX.t;if(youM)try{youM.setLngLat(YOU)}catch(e){}
+  /* take 192 · A243 · the ride sheet's Elevation is this fix's */
+  try{elevCell()}catch(e){}}
 /* ME still holds the last in-region fix (live or not) */
 function meOnFix(){return posMode==='gps'&&!!ME_FIX&&!!ME&&ME[0]===ME_FIX.at[0]&&ME[1]===ME_FIX.at[1]}
 /* take 189 · A237 · fix round 2 · a fix is live for GPS_STALE_MS (the
@@ -7842,12 +7859,44 @@ function hdChip(){HD.stats().then(function(st){
   var e=el('c-hd');if(e)e.className='basebtn'+(st.tiles?' on':'')}).catch(function(){})}
 function refreshSat(){try{var sc=(map.style.sourceCaches||{})['satpatch'];
   if(sc){sc.clearTiles();map.triggerRepaint()}}catch(e){}}
+/* take 192 · A266 · the card follows the download. Its progress line was
+   written once, when the card opened, and sat at "0 of 1,234 tiles" for the
+   whole save. Every tile that lands rewrites it in place (the save's own
+   report, never a timer) while the card is up; when the save ends, a card
+   the rider can see is drawn again (its Save buttons back, the saved total
+   new), and one under a folded drawer is told it finished without opening
+   the drawer. */
+function hdProgTxt(pr){
+  var left=pr.eta==null?'':(pr.eta<60?' \u00b7 under a minute left':' \u00b7 about '+Math.ceil(pr.eta/60)+' min left');
+  return (pr.done+pr.skipped).toLocaleString()+' of '+pr.total.toLocaleString()+' tiles'+left+
+    (WAKE.active()?' \u00b7 the screen stays on until it finishes':'')}
+function hdLive(){var e=el('hd-prog'),pr=HDDL.progress();if(e&&pr)e.textContent=hdProgTxt(pr)}
+/* the HD card is what the rider is looking at: the drawer up, not in
+   search, and in no sheet or in the HD tool's own. Search and the sheet
+   indexes leave #panel's markup in place, so the card's line being in the
+   DOM does not say it is seen — and a redraw goes through show(), which
+   ends search and the sheet (the review of take 192) */
+function hdSeen(){var r=el('rail');
+  return !(r&&/\bfolded\b/.test(r.className))&&!SRCH.on&&(!SHEET.tab||SHEET.tool==='c-hdmanage')}
+function hdEnded(r){
+  var e=el('hd-prog');if(!e||!r)return;
+  if(hdSeen())return hdCard();
+  var k=el('hd-dlk'),o=el('hd-stop'),sv=el('hd-saved');
+  if(k)k.textContent=(r.stopped?'STOPPED ':'SAVED ')+String(r.label).toUpperCase();
+  e.textContent=(r.done+r.skipped).toLocaleString()+' of '+r.total.toLocaleString()+' tiles'+
+    (r.stopped?' \u2014 what landed is kept':' \u2014 finished');
+  if(o&&o.parentNode)o.parentNode.removeChild(o);
+  /* and the saved total, from the store, so the card is true when the
+     rider comes back to it (its Save buttons return when it is reopened) */
+  if(sv)HD.stats().then(function(st){sv.textContent=st.tiles.toLocaleString()+' tiles \u00b7 '+
+    (st.bytes/1048576).toFixed(1)+' MB'}).catch(function(){})}
 function startHDSave(tiles,label){
   hdChipTxt('HD 0%');
-  HDDL.save(tiles,function(d,t){hdChipTxt('HD '+Math.round(d/Math.max(1,t)*100)+'%')},label)
+  HDDL.save(tiles,function(d,t){hdChipTxt('HD '+Math.round(d/Math.max(1,t)*100)+'%');hdLive()},label)
     .then(function(r){hdChip();refreshSat();
-      if(r&&r.error)show('<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
-        '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');})}
+      if(r&&r.error)return show('<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
+        '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');
+      hdEnded(r)})}
 /* take 179 · A190 H2 · the three tiers, quoted from the bundle's own rings
    and the per-zoom sizes measured in 178. Each is a polygon, never a box:
    the state's box is 69% water. */
@@ -7867,7 +7916,7 @@ function hdMB(mb){return mb<1?'under 1 MB':'about '+Math.round(mb)+' MB'}
    forgets the question, so the whole-state save is asked every time. */
 function hdCard(confirmId){
   var conf=typeof confirmId==='string'?confirmId:null;
-  var tiers=hdTiers(),pr=HDDL.progress();
+  var tiers=hdTiers(),pr;
   /* take 190 · A247 · the card is written after a storage read (a promise), by
      which time a sheet row's pending mark is gone: whether it belongs in the
      sheet is decided NOW, and honoured when it is written if the rider is
@@ -7880,11 +7929,12 @@ function hdCard(confirmId){
        deliberate, read4); the logic of what may be saved is unchanged */
     var h=(inSheet?'':'<b>HD imagery</b>')+
       '<div class="sub">Sharper satellite for places you choose. Nothing downloads on its own \u2014 save on wifi.</div>';
+    /* the save may have ended while the storage read ran: its progress is
+       read now, not when the card was asked for */
+    pr=HDDL.progress();
     if(pr){
-      var left=pr.eta==null?'':(pr.eta<60?' · under a minute left':' · about '+Math.ceil(pr.eta/60)+' min left');
-      h+='<div class="k">DOWNLOADING '+String(pr.label).toUpperCase()+'</div><div class="sub">'+
-        (pr.done+pr.skipped).toLocaleString()+' of '+pr.total.toLocaleString()+' tiles'+left+
-        (WAKE.active()?' · the screen stays on until it finishes':'')+'</div>'+
+      h+='<div class="k" id="hd-dlk">DOWNLOADING '+String(pr.label).toUpperCase()+'</div><div class="sub" id="hd-prog">'+
+        hdProgTxt(pr)+'</div>'+
         '<button class="chip" id="hd-stop">'+ic('stopdl')+'<span>Stop downloading</span></button>'}
     for(var i=0;i<tiers.length;i++){
       var t=tiers[i],big=t.id==='view'&&t.mb>500,fits=!q.known||q.free>=t.mb*1048576*1.2;
@@ -7900,7 +7950,7 @@ function hdCard(confirmId){
       else h+='<button class="chip" id="hd-'+(t.confirm?'ask-':'go-')+t.id+'">'+ic('hd')+'<span>'+t.btn+'</span></button>';
       h+='</div>'}
     if(!q.known)h+='<div class="sub">This phone does not say how much space it allows — a save stops itself if space runs out, and keeps what landed.</div>';
-    h+='<div class="k">SAVED ON THIS PHONE</div><div class="sub">'+st.tiles.toLocaleString()+
+    h+='<div class="k">SAVED ON THIS PHONE</div><div class="sub" id="hd-saved">'+st.tiles.toLocaleString()+
         ' tiles · '+(st.bytes/1048576).toFixed(1)+' MB</div>'+
       (st.tiles?'<button class="chip" id="hd-del">'+ic('del')+'<span>Delete all saved HD</span></button>':'');
     if(inSheet&&SHEET.tab===sTab&&(SHEET.tool==='c-hdmanage'||(SHEET.tool===null&&!SHEET_PENDING)))SHEET_PENDING='c-hdmanage';
@@ -8313,6 +8363,10 @@ var MARK={gen:0,stop:null,rec:null,MS:30000};
 function toolShow(id,h,s){if(SHEET.tool===id&&SHEET.tab)SHEET_PENDING=id;show(h,s)}
 function markUnique(n){var have={};wpLoad().forEach(function(x){have[x.n]=1});
   if(!have[n])return n;for(var i=2;i<1000;i++)if(!have[n+' '+i])return n+' '+i;return n+' '+Date.now()}
+/* take 192 · A265 · what a numbered save says: the name it would have had is
+   taken, and nothing was replaced */
+function wpKept(n0,n){return n0===n?'':' <span class="sub">A waypoint named '+n0+
+  ' was already saved \u2014 both are kept.</span>'}
 function markCancel(){MARK.gen++;if(MARK.stop){try{MARK.stop()}catch(e){}MARK.stop=null}}
 function markAt(at){
   var nm=markUnique(wpName(at)),rec={n:nm,p:at.slice(),r:BUNDLE.region||null,ts:Date.now()};
@@ -8541,7 +8595,13 @@ function flyToYou(){
      (PROVEN by code read). A live ride fix moves YOU and its pin too. */
   var lf=liveFix();
   if(lf){YOU=lf.at;YOU_T=lf.t;if(youM)youM.setLngLat(YOU)}
-  if(YOU&&!(Date.now()-YOU_T<=GPS_STALE_MS))return false;
+  /* take 192 · A272 · an age below zero is unknown, never small (landmine
+     252): a fix stamped ahead of the clock (the clock set back after it)
+     is not "here" — Locate asks for a new one. liveFix had the rule;
+     this second reader of YOU's age did not (take 192's A243 drill found
+     it saying "You are here" at a fix stamped ahead of its clock) */
+  var age=Date.now()-YOU_T;
+  if(YOU&&!(age>=0&&age<=GPS_STALE_MS))return false;
   if(YOU){
     var far=!inRegion(YOU);
     map.easeTo({center:YOU,zoom:far?7.2:14.5,duration:900,essential:true});
@@ -8752,24 +8812,28 @@ function placeCard(at,kind,title){
   on('pc-disp',function(){el('btn-disp').click()});
   on('pc-go',function(){map.easeTo({center:at,zoom:Math.max(map.getZoom(),14),
     duration:600,essential:true})});
+  /* take 192 · A265 · a name already saved is never replaced. wpAdd keeps
+     one waypoint per name, so a second save at "Trail 7" took the first
+     one's place without a word; the new one gets a number, as Mark this
+     spot's does (A260), and the card says both are kept */
   on('pc-wpt',function(){
-    var nm=wpName(at);
+    var nm0=wpName(at),nm=markUnique(nm0);
     if(!wpAdd({n:nm,p:at.slice(),r:BUNDLE.region||null,ts:Date.now()}))
       return show('<b>Could not save.</b> This phone would not let the app '+
         'store it \u2014 its storage may be full or blocked.','fail');
     logAct('act  saved waypoint '+nm);
     wpDraw();clearDrop();
-    show('Saved as <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
+    show('Saved as <b>'+nm+'</b>.'+wpKept(nm0,nm)+'<br><span class="sub">On this phone only. '+
       'Find it again under <b>Saved</b> on the Plan tab.</span>','pass')});
   on('pc-drop',function(){clearDrop();ack('Pin removed.')});
   Array.prototype.forEach.call(document.querySelectorAll('[data-wpt]'),function(b){
     b.addEventListener('click',function(){
-      var k=b.dataset.wpt,nm=WPTYPES[k].h+' \u00b7 '+wpName(at);
+      var k=b.dataset.wpt,nm0=WPTYPES[k].h+' \u00b7 '+wpName(at),nm=markUnique(nm0);
       if(!wpAdd({n:nm,t:k,p:at.slice(),r:BUNDLE.region||null,ts:Date.now()}))
         return show('<b>Could not save.</b>','fail');
       logAct('act  saved waypoint '+k);
       wpDraw();clearDrop();
-      show('Saved <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
+      show('Saved <b>'+nm+'</b>.'+wpKept(nm0,nm)+'<br><span class="sub">On this phone only. '+
         'Find it again under <b>Saved</b> on the Plan tab.</span>','pass')})});
 }
 
@@ -8864,7 +8928,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     /* take 145 · app.js is wrapped (the take-127 lesson): nothing reaches
        window unless placed there. The drill drives the save loop through
        these. */
-    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};window.__back={onBack:onBack,open:backOpen,panelOpen:panelOpen,state:function(){return BACK},toast:toast};window.__privacy=function(u){var o=PRIVACY_URL;if(u!==undefined)PRIVACY_URL=u;return o};window.__tour={start:tourStart,next:tourNext,close:tourClose,seen:tourSeen,reset:tourReset,state:function(){return TOUR},steps:TOUR_STEPS};
+    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__hdSave=startHDSave;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};window.__back={onBack:onBack,open:backOpen,panelOpen:panelOpen,state:function(){return BACK},toast:toast};window.__privacy=function(u){var o=PRIVACY_URL;if(u!==undefined)PRIVACY_URL=u;return o};window.__tour={start:tourStart,next:tourNext,close:tourClose,seen:tourSeen,reset:tourReset,state:function(){return TOUR},steps:TOUR_STEPS};
     window.__ph={index:PHOTOS,html:photoHTML};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};
@@ -8873,7 +8937,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
        first red). */
     try{
       window.__paddle={data:PADDLE,run:runCard,near:nearStop,hours:paddleHours,
-        craft:function(){return machine}};
+        craft:function(){return machine},card:paddleCard};
       window.__gauge=GAUGE;
       window.__gauges=(typeof GAUGES!=='undefined')?GAUGES:null;
       window.__search=function(q,all){return all?searchAll(q):search(q)};
@@ -8890,15 +8954,13 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         /* …and a full teardown after it (landmine 177): everything the
            simulator moves, put back as the self-test's ride drill does */
         simSave:function(){return {T:TRUCK?TRUCK.slice():null,c:crumbs.slice(),m:crumbMi,p:posMode,me:ME.slice(),
-          ride:RIDE,last:LASTRIDE,got:gotFix,on:NAV.on,lost:lost,hud:!!(el('hudbar')&&el('hudbar').hidden)}},
+          ride:RIDE,last:LASTRIDE,got:gotFix,on:NAV.on,lost:lost,hud:!!(el('hudbar')&&el('hudbar').hidden),back:BACK_FC}},
         simRestore:function(v){try{stopRide()}catch(e){}
           if(RIDE&&RIDE!==v.ride){try{clearInterval(RIDE.pulse)}catch(e){}}
           RIDE=v.ride;LASTRIDE=v.last;TRUCK=v.T;crumbs=v.c;crumbMi=v.m;posMode=v.p;ME=v.me;
-          gotFix=v.got;NAV.on=v.on;lost=v.lost;
+          gotFix=v.got;NAV.on=v.on;lost=v.lost;if(v.back)BACK_FC=v.back;
           try{mM.setLngLat(ME)}catch(e){}
-          try{if(tM&&TRUCK)tM.setLngLat(TRUCK);else if(tM&&!TRUCK){tM.remove();tM=null}}catch(e){}
-          try{map.getSource('crumb').setData({type:'FeatureCollection',features:crumbs.length>1?[{type:'Feature',
-            properties:{},geometry:{type:'LineString',coordinates:crumbs}}]:[]})}catch(e){}
+          trackDraw();
           hudShow(!v.hud);try{syncSafety()}catch(e){}},
         plan:navPlan,guide:function(){return NAVG},project:navProject,
         runSet:runSet,run:function(){return RUN},river:navRiver,riverLine:riverLine,
@@ -9408,7 +9470,7 @@ function stSafety(){
      the audit's harness on the shipped functions). The drill runs as a
      fresh recording and the flags go back as they were. */
   var save={T:TRUCK,c:crumbs.slice(),m:crumbMi,p:posMode,me:ME.slice(),
-            rs:RESUMING,rr:RESUMED_RIDE,
+            rs:RESUMING,rr:RESUMED_RIDE,back:BACK_FC,
             ride:RIDE,lastride:LASTRIDE,
             hud:!!(el('hudbar')&&el('hudbar').hidden),
             chips:!!(el('chips')&&el('chips').hidden)};
@@ -9435,7 +9497,8 @@ function stSafety(){
   if(RIDE&&RIDE!==save.ride){try{clearInterval(RIDE.pulse)}catch(e){}}
   RIDE=save.ride;LASTRIDE=save.lastride;
   TRUCK=save.T;crumbs=save.c;crumbMi=save.m;posMode=save.p;ME=save.me;
-  RESUMING=save.rs;RESUMED_RIDE=save.rr;
+  RESUMING=save.rs;RESUMED_RIDE=save.rr;BACK_FC=save.back;
+  trackDraw();
   hudShow(!save.hud);
   if(el('chips'))el('chips').hidden=save.chips;
   try{syncSafety()}catch(e){}
@@ -10697,10 +10760,29 @@ function refreshReadout(){
   var r=el('ro-elev');
   /* Was a bare "1194 ft" sitting under a scale bar reading "3000 ft" — two
      numbers in the same unit with nothing to tell them apart. Say which is
-     which (take 65). */
-  if(r)r.textContent=(e===null?'':ft(e)+' ft elevation');
-  var v=el('v-elev');
-  if(v)v.textContent=(e===null?'—':ft(e)+' ft')}
+     which (take 65). take 192 · A243 · and whose: it is the map centre's,
+     as the footer's coordinate says (F20) */
+  if(r)r.textContent=(e===null?'':ft(e)+' ft at map centre')}
+/* take 192 · A243 · the maintainer, 2026-11-02: "Rider's own on the ride
+   sheet". The sheet's Elevation read the map centre's, which a rider reads
+   as their own; it is now the elevation at the live GPS fix (liveFix: the
+   strip's dropout rule), or at the simulated rider while the simulator
+   rides, and a dash until there is one — never the centre's, never a stale
+   fix's. Written on every fix, on the ride's pulse (so a dropout dashes it),
+   in syncSafety, whenever the footer paints, and at the live fix's own
+   expiry. */
+var ELEV={t:null,id:null};
+function elevCell(){
+  var v=el('v-elev');if(!v)return;
+  var lf=liveFix(),at=(posMode==='sim'&&riding)?ME:(lf&&lf.at),e=at?elevAt(at):null;
+  v.textContent=(e===null||e===undefined)?'\u2014':ft(e)+' ft';
+  /* the review of take 192 · a live fix's number holds only until that fix
+     goes stale: one check at its own expiry (GPS_STALE_MS after it came,
+     by its clock), once per fix — so the cell dashes with no ride pulse
+     and a still map too (a one-shot locate's fix). A deadline the fix
+     sets, not a polling timer. */
+  if(lf&&at===lf.at&&ELEV.t!==lf.t){ELEV.t=lf.t;try{clearTimeout(ELEV.id)}catch(x){}
+    ELEV.id=setTimeout(elevCell,Math.max(0,GPS_STALE_MS-lf.age)+250)}}
 
 function paint(){var c=map.getCenter();
   var e=elevAt([c.lng,c.lat]);
@@ -10713,6 +10795,10 @@ function paint(){var c=map.getCenter();
       'DD · MAP CENTRE · no GPS fix yet';
   el('coords').innerHTML=c.lat.toFixed(5)+' '+c.lng.toFixed(5)+
     ' <span class="unit">'+tag+(e!==null?' · '+ft(e)+' ft':'')+'</span>';
+  /* take 192 · A243 · the Elevation cell with the footer: every move, and
+     every state change that paints (a fix that leaves the region paints
+     and returns: its cell dashes here) */
+  try{elevCell()}catch(x){}
   }
 map.on('move',paint);map.on('load',paint);paint();syncSafety();
 

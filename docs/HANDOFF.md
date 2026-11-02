@@ -1,4 +1,137 @@
-# HANDOFF — through Take 191 · V3
+# HANDOFF — through Take 192 · V3
+
+## Take 192 — 2026-11-02 — the ride sheet's Elevation is the rider's own (A243); the HD card follows its download (A266); a place card's save never replaces a waypoint (A265); the self-test puts its drill's track back on the map (A242); two harness defects (A244); a recorded gauges omission (A245); Locate and a clock set back (A272)
+
+RECORDED FIRST. The maintainer, 2026-11-02, started this take while PR #8's
+re-run went ("start take 192 while that runs - merge when green") and
+answered two of take 189's open items: A243, "Rider's own on the ride
+sheet"; A245, "The omission is fine". The other items were already
+decided by the standing rules: A242 (take 84's rule, a drill puts back
+everything it moved), A244, A265 (A260's never-overwrite rule), A266
+(real progress, never timers). Built on PR #8's head (19668f5), and
+committed on main 0c0f829 once PR #8 merged.
+
+A265 — the place card's Save as waypoint, and its typed saves, number a
+taken name as Mark's does (markUnique). The card says "A waypoint named X
+was already saved — both are kept". Smoke 9i: three saves at one spot keep
+"Ohio Road", "Ohio Road 2", "Ohio Road 3", and the 2nd and 3rd cards say
+so. Its controls: a save that replaced one, a card that said nothing, one
+name three times.
+
+A266 — the HD card's progress line (#hd-prog) is rewritten by every tile
+that lands (hdLive, called from the save's own report). The card reads the
+progress when it is written, not when it was asked for. When the save
+ends (hdEnded), a card the rider can see is drawn again. One under a
+folded drawer says "SAVED … · N of N tiles — finished" (or "what landed is
+kept") and the drawer stays folded. Render (imagery): started as the
+card's Save starts one (__hdSave = startHDSave), the line read twice
+mid-save is the save's own count both times, and the two differ. Then both
+endings. Its controls: a frozen line, a line off the count, a stale card,
+an opened drawer.
+
+A242 — trackDraw() draws the track's map objects again from the state:
+the truck pin at TRUCK (removed without one), the crumb line, and the
+retrace line as last drawn (BACK_FC, kept by backSet). stSafety saves
+BACK_FC and calls it after putting the values back. The simulator's
+teardown uses the same function. Smoke 9b compares the map after the
+self-test with the state before it. Its controls: the drill's pin left
+drawn, its line left drawn, a retrace line wiped, a drill that drew nothing.
+
+A243 — the ride sheet's Elevation (#v-elev) is elevCell(): the elevation
+at the live fix (liveFix), or at the simulated rider while the simulator
+rides; a dash otherwise. It is written on every fix (meFix), the ride's
+pulse, syncSafety and the readout. #ro-elev reads "N ft at map centre".
+Smoke 9i: "—" before a fix while the centre reads "1247 ft at map centre";
+"935 ft" at a live fix at an anchor while the centre still reads 1247; "—"
+once that fix is 60 s old. Its controls: the centre's number in the cell,
+a cell filled before a fix, a stale fix's number kept, the old unlabelled
+readout. --no-gps: a dash.
+
+A272 — found by A243's drill. Its first form tapped Locate and found no
+watch open: "You are here. Inside the downloaded area." An earlier block
+had left YOU_T ahead of the drill's clock, and flyToYou took a negative
+age as fresh (PROVEN, smoke-t192-dbg). That is landmine 252's rule, which
+liveFix got and this second reader of an age did not. On a phone it
+happens when the clock is set back after a fix. Now a negative age is
+stale there too. Smoke 9i, the drill making its own state as 252 says: a
+fix, then the clock set back an hour. Locate says "Waiting for a GPS fix…"
+and opens a watch. Its controls: "You are here", and no watch opened. The
+same drill's second form failed the same way. I first blamed landmine
+58's corollary (flushTimeouts firing the locate's 25 s give-up), and I was
+wrong: flushTimeouts has a 5 s ceiling since then. Both failures were A272
+alone.
+
+A244 — (1) render SECTIONS `stacks: ["water"]`; (2) smoke's Marker stub
+remove() splices only a listed marker. Smoke 9i shows it a double remove,
+beside the old splice's result (it dropped the list's last).
+
+A245 — tools/gauges.py writes gauges_omitted.json (the reason and the
+time) when it omits the inventory, and removes it whenever a payload is
+left (fresh, or the cached one kept). tools/bundle.py carries it into the
+manifest as "omitted" (OMISSIONS). Render (water): with no inventory it
+requires that record and a river card with no conditions button; with one,
+the inventory as before and a card at the put-in that offers conditions
+(__paddle.card = paddleCard). The gate's check_gauges_fallback holds the
+three links; its four controls (an omission branch unrecorded, the record
+never removed, the manifest not carrying it, render not reading it) are
+each caught. gauges_omitted.json is in .gitignore.
+
+The cold audit (the code-review skill, extra-high, 11 findings). Fixed:
+- an HD save ending while the rider was in Search or on a sheet index
+  would have redrawn the card through show() and ended them; now hdSeen();
+- the Elevation cell held a one-shot locate's number on a still map, and
+  an "away" fix's predecessor; now the fix's own expiry and paint();
+- a stale card under a folded drawer kept its old saved total;
+- the omission record named no region; bundle.py now ignores another
+  region's;
+- an inventory with no site in the box staged an empty payload;
+- the folded test by equality;
+- a dead read;
+- three copies of the crumb line, now crumbFC();
+- smoke's stale read fired a map move, which masked the event gap.
+Recorded OPEN, both pre-existing and needing drills of their own: A273
+(the self-test's battery read lands in the rider's ride) and A274 (the
+pulse takes a negative age as no dropout). Every fix was taken back out of
+a copy of the built app to watch its drill fail (below).
+
+Measured (cloud, Chrome 138, the bundle from the APK of main's run 105,
+take 191's data):
+- Smoke, all five passes PASSED: 287 / 200 / 54 ok, fatal 6, dead 33.
+- Render, in parts: imagery PASSED with the Search case; water and stacks
+  PASSED (water 12, stacks 49); stacks alone with its water setup PASSED.
+- The gate checks that need no pipeline output (28) PASSED.
+
+Each fix was taken out of a copy of the built app, and its drill failed:
+- smoke, trackDraw out of stSafety: A242 FAIL (the drill's line left);
+- smoke, the cell from the map centre: A243 FAIL ("1247 ft" before a fix);
+- smoke, its expiry out: A243 FAIL ("935 ft" kept on a still map);
+- smoke, markUnique out: A265 FAIL ("Ohio Road" once);
+- smoke, the age rule out: A272 and A243 FAIL ("You are here", no watch);
+- render, hdLive out: FAIL ("0 of 150 tiles" twice);
+- render, hdSeen without its Search test: FAIL (search closed);
+- render, a bundle without gauges and no record: FAIL ("nothing recorded
+  — a lost layer"); with the record it PASSED, the river card offering no
+  conditions button;
+- render, stacks alone with `stacks: []`: take 189's two FAILs, word for
+  word.
+The gauges step's four paths ran in a scratch directory with NWIS stubbed:
+refused, nothing in the box, answered, and refused with a payload cached.
+bundle.py's carry ran with records for michigan, ohio and no region. One
+render run (stacks alone) timed out loading the page at boot, before any
+section, and passed when run again (INFERRED: the container). The HD
+drill's Search case first read a card the folded case had left, and
+waited for the new card's own line after that. UNKNOWN until this take's
+CI run: the full render and gate on fresh data.
+
+A271 (OPEN) — PR #8's run 107 failed in the gate's own render on a change
+that cannot reach the app (ci/, workflows, CLAUDE.md): 0 water labels, and
+the V4 clean reload never ready. The standalone render before it passed.
+It was re-run once, and the re-run went green end to end (seed, bundle,
+apk; 2026-11-02, 18:34–20:11Z). PR #8 merged as 0c0f829. The `tag`
+workflow then pushed t190 on 6c0fe16 (release take-101) and t191 on
+0d3c942 (release take-105), each annotated with its release line (tag
+runs 1 and 2; PROVEN, git ls-remote and the tags' messages read here).
+From this take on, main's build tags the take itself.
 
 ## Take 191 — 2026-11-02 — the maintainer's two answers on take 190: a tap on search's dimmed map closes search (A268); the map goes back flat and north-up when a ride stops (A269); a stack tray's row waits for the restack it asked for (A270)
 
