@@ -1,0 +1,18 @@
+framework        size=XL verdicts=['fixable', 'fixable'] needs_maint=2 guards=9
+    N: The approved Plan board's sheet starts at 212 px on the 411x960 cover screen. That leaves 40 px (4 %) of clear map under the activity chip, below §8's open floor of 12 %. PROVEN from mockgen190.py: activity chip at y 124
+    N: Return home from the Tools tab goes from 2 taps (today the folded drawer's RETURN HOME is under the Tools strip, census 411x960-05-tab-tools.png) to 3 (Map, then Return home, then Ride it), because the approved Tools boa
+plan             size=L verdicts=['fixable', 'fixable'] needs_maint=2 guards=8
+    N: Sheet height (the approved board against §8). As drawn, the Plan board's sheet top (212 px) is under the left column's bottom (#c-act ends at 168 px, PROVEN in render-t188-review-2.log:583), a band of 0.046 against the 0
+    N: Craft in a land mode. The approved picker lists seven machines in one list, but today a land mode cycles only bike, quad, side-by-side and on foot (ORDER, app.html:1395) and Water only the three craft (WORDER, 1396). A k
+search           size=L verdicts=['fixable', 'fixable'] needs_maint=0 guards=11
+loop-saved       size=M verdicts=['fixable', 'fixable'] needs_maint=2 guards=8
+    N: The approved Loop line says 'Starts at the map centre — no GPS fix yet', but the code starts every loop at the start pin. PROVEN by reading: 8556 nearestNode(ME); ME = the region centre at boot (3577), moved only by a fi
+    N: Saved records stamped with an earlier region (neml-bullgap, sthelen in regions.json) are hidden today, and the screen then says 'Nothing saved yet' (4112-4118). Whether your phone holds any is UNKNOWN. The spec counts th
+tools            size=L verdicts=['fixable', 'fixable'] needs_maint=1 guards=8
+    N: Data sources says 'who publishes each layer', but the list (app.html:6961-6973) never names the U.S. Census Bureau. Its TIGER data ships in every bundle as county boundaries and address ranges (tools/manifest.py:225-246;
+tools-detail     size=L verdicts=['fixable', 'fixable'] needs_maint=2 guards=7
+    N: Mark this spot with no GPS fix. Today it marks the region centre or the start pin and says 'Marked'. The !ME guard can never fire because ME starts at CTR (app.html:3577 and 7184, PROVEN); census 21 shows a mark beside '
+    N: Return home from inside a tool view, off a ride, goes 2 → 3 taps, because the approved design drops the action row from tool views. Ceiling B (from the folded drawer) is unchanged and guarded, and riding keeps the row. K
+ride-turns-tour  size=L verdicts=['fixable', 'fixable'] needs_maint=1 guards=7
+    N: The tour's exits. A194 (your words in the code comment, app.html:3895-3900): 'a way to skip it, stop it, or never see it again until re-enabled under Tools'. The approved card has only Next and Skip. Proposed: Skip = nev
+plan chars: 43737

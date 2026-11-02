@@ -1,8 +1,24 @@
 # APEX ORV — NEW CHAT BRIEF · V4 (rewritten 2026-09-23 at take 186, brought to take 189)
 
-Read this first, then CLAUDE.md (how work happens on the workstation),
+Read this first, then CLAUDE.md (how work happens: a cloud session and CI
+since 2026-11-01),
 then the newest HANDOFF entries. PROTOCOL is the law; LANDMINES §0 is the
 symptom index. The ledgers are long: grep them, never read them whole.
+
+## 2026-11-01 — the workstation is gone
+
+The WSL2 workstation that built takes 183–189 was deleted after take 189.
+Take 189 is safe: merged (PR #4), CI run 92 green, tagged t189, released.
+Take 190 is not: it was built on the workstation's local branch `v6`
+(about 20 wip commits, 2026-10-02 → 10-08, A247–A266, every V4 screen of
+artboards 10–23) and never pushed, so its code is lost. Its spec survives:
+the V4 mockup artifact, the maintainer's decisions quoted word for word,
+the agenda table and the batch brief, all in `docs/RECOVERY-t190.md`.
+The maintainer, 2026-11-01: rebuild take 190 as one take, one piece at a
+time in a cloud session (no parallel lanes); push the session's branch and
+open draft pull requests; add pull-request builds to CI. The rule that
+came out of it is landmine 248: work that lives on one disk is not work
+yet. How a session works now is CLAUDE.md, "A fresh cloud session".
 
 ## What this project is
 
@@ -146,7 +162,26 @@ The screens are outside the repo: the "before" screens in
   the fix waits on it); a ride started under trees ("Waiting for a GPS
   fix"); a loop left and re-joined (A234).
 
-## How work happens (since take 183)
+## How work happens (since 2026-11-01)
+
+- A Claude Code cloud session is the workspace; GitHub Actions is the
+  build machine. `bash ci/cloud_setup.sh` installs npm deps, CI's pinned
+  Chrome (landmine 249) and the bundle from the newest green CI APK; then
+  smoke, render and probe run here. After every `build_app.py split`,
+  `bash ci/cloud_setup.sh bundle` puts the bundle back (landmine 250). The pipeline does not: Geofabrik and
+  overpass-api.de refuse this cloud's connections (PROVEN 2026-11-01), so
+  data changes are proven by CI.
+- `python3 ci/gatefn.py check_a …` runs single gate checks (the helper the
+  workstation kept in a work folder, rebuilt in the repo).
+- Work in progress is pushed to the session's `claude/…` branch with a
+  draft pull request open; marking it ready for review starts a full CI
+  build of the pull request (no release). The maintainer merges; main's
+  run publishes the release.
+- Measured 2026-11-01 on a 4-core cloud container, take 189's build:
+  smoke 242 ok (one pass), render 656 ok and 2 FAIL on Chrome 153, the two
+  passing on Chrome 138 (landmine 249); a full render about 19 min.
+
+## How work happened on the workstation (takes 183–189)
 
 - The clone at `~/apex-orv` is the workspace and the repo head is the
   truth. A take is one ordinary commit, `take N: …`, that CI builds; the
@@ -201,10 +236,22 @@ The screens are outside the repo: the "before" screens in
   - a live fix is a question of its age (244);
   - a worktree lane reaches the main tree through a symlink (245);
   - compare timings only A/B in one window (246).
-- At this brief: take 189 built, agenda A244, landmine 246. Next numbers:
-  take 190, agenda A245, landmine 247.
+- At take 189's seal: agenda A246, landmine 247 (this line read A244 and
+  246 until 2026-11-01; A245, A246 and landmine 247 were added at the seal).
+- At this brief (2026-11-01): take 189 sealed, agenda A246, landmine 250.
+  Next numbers: take 190; agenda A247, and take 190's items keep the
+  numbers the lost `v6` gave them, A247–A266 (docs/RECOVERY-t190.md), so
+  the recovered decisions still cite the right items; landmine 251.
 
-## Order (as of 2026-10-01)
+## Order (as of 2026-11-01)
+
+0. **Take 190, rebuilt** — the maintainer, 2026-11-01: one take, one piece
+   at a time in a cloud session, from the V4 mockup's artboards 10–23 and
+   the decisions in docs/RECOVERY-t190.md, verified here and by a CI build
+   of its pull request before he merges.
+
+The order as of 2026-10-01 follows; its item 3 is the take above.
+
 
 1. **Tester field reports** as they arrive — each an agenda item, and in
    a take.

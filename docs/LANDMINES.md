@@ -157,6 +157,10 @@ Start here. Do not read top to bottom.
 | A lane's run changed the main tree's data, or its gate check read the main tree | 245 |
 | Render time jumps between runs of the same code | 246 |
 | Two layers on one source count different features over the same view | 247 |
+| Work that was "done" is gone: a machine or a session died, and the branch was never pushed | 248 |
+| A ride never starts in render (the Ride chip still reads "Ride it"), on a machine CI passes | 249 |
+| Smoke or render fails on a missing manifest or payload right after `build_app.py split`, in a container with no pipeline run | 250 |
+| A check passes on one build's data and fails on fresh data with the same code, after a control tap | 251 |
 
 ---
 
@@ -3284,3 +3288,68 @@ probe-t189-seal-casing-1.log, twice). Rule: compare
 two layers by feature, not by count, and judge a feature only one of them
 reports by its geometry against the canvas; an inset box does not help,
 because a stroke reaches across any box's edge (A246).
+
+**248. Work that lives on one disk is not work yet.** Take 190 was built on
+the workstation's local branch `v6`, about 20 wip commits from 2026-10-02 to
+2026-10-08: every screen of the V4 mockup's artboards 10–23, smoke 497 → 626
+ok lines, agenda A247–A266 recorded. None was pushed: the plan was to squash
+at the seal and open one pull request, and the seal never ran (usage limits
+stopped the overnight run five times, PROVEN in the UI/UX chat's transcript).
+The workstation was then deleted, and with it `v6`, `~/apex-logs`,
+`~/apex-shots`, the work folders and the subagents' transcripts, which were
+the only record of the code: the chat keeps the orchestrator's own calls and
+400-character agent summaries, so no line of take 190 could be replayed
+(PROVEN, 2026-11-01, docs/RECOVERY-t190.md). What survived was what had left
+the machine: main and the t189 tag on GitHub, the V4 mockup as a claude.ai
+artifact, and the maintainer's decisions quoted in the chat. Rule: push work
+in progress to a branch at least at every green step, and a draft pull
+request is the place for it; squash at the seal, not instead of pushing. A
+working note a take depends on goes in the branch too (landmine 233's rule,
+one level up: not in /tmp, and not only on one machine).
+
+**249. Render on a Chrome other than CI's pin is not CI's render.** The
+first render in a cloud container (2026-11-01, take 189's committed build,
+the bundle restored from run 92's APK) used the container's Chrome for
+Testing 153 and failed two checks: "Wrong turn is the simulator's control"
+(after Ride, the chip still read "Ride it", not "Stop (GPS)") and "the audit
+reached each of its 23 states" (not reached: ride pressed with no fix, ride
+sheet routed), 656 ok (PROVEN, render-t189-cloud-baseline-1.log). The same
+sections on Chrome 138.0.7204.183, the version `ci/bundle.sh` pins, passed
+60 of 60 (PROVEN, render-t189-cloud-c138-only-1.log). Mechanism INFERRED:
+the newer headless Chrome answers the geolocation request with an error at
+once, so the app's honest GPS refusal (A223) keeps the ride from starting,
+where 138 leaves the request pending and the ride waits for its first fix.
+Rule: render with the Chrome `ci/bundle.sh` pins — `ci/cloud_setup.sh`
+installs it and prints the `PUPPETEER_EXECUTABLE_PATH` to export — and
+treat a failure on any other browser as a question about the browser
+first.
+
+**250. `build_app.py split` owns all of www/bundle, so it clears a bundle it
+did not build.** In a cloud container the bundle comes from CI's APK
+(`ci/cloud_setup.sh`); the pipeline never ran, so `bundles/<region>/` does
+not exist. `split` copies www/bundle's named files from there and removes
+every stale one it does not find: on take 189's tree it printed "removed
+stale bundle/manifest.json from an earlier build" (with hillshade.jpg and
+imagery.jpg), left 174 MB of the 293 MB and "NOTE no bundle artifacts
+found", while www/app.js and www/index.html came out byte-identical to the
+commit (PROVEN 2026-11-01). That rule is right — it is take 76's: the step
+that assembles www/ owns everything in it, and a stale manifest is the one
+file the loader trusts absolutely. Rule: in a container without a pipeline
+run, `bash ci/cloud_setup.sh bundle` follows every `split`, before smoke or
+render; it puts back the APK's bundle in seconds from the copy it kept.
+
+**251. A control action can move the state the next read depends on.**
+Render's head-tap check (A214) taps a lone teardrop's head, then taps 70 px
+aside as its control, then point-queries the head to judge the anchor. On
+run 92's data (2026-10-02) it passed; on the data runs 96 and 97 built fresh
+on 2026-11-01, with the same code, it failed: "a point query at the head
+MISSES the badge" (PROVEN on both runs, and reproduced in a cloud session
+from run 97's uploaded www/). The control tap had landed on a neighbouring
+two-place stack: the pin's isolation rule keeps stacks 70 px from the PIN,
+this one was 72.7 px away and 16 px from the control point, and a stack's
+tray zooms the map into it (z11.4 to z14.6). The anchor read then asked
+about the wrong place on a moved camera. Nothing in the app was wrong. Rule:
+a read that follows a control action restores the state that action may
+have changed (here the camera, put back before the query), or runs before
+it; and fresh data is a new input every build — a check that passed on
+yesterday's data has not been proven against today's.

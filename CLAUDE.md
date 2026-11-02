@@ -2,9 +2,12 @@
 
 # Claude Code in this repo
 
-This clone on the maintainer's workstation is the workspace; the repo head is
-the single source of truth. A take is an ordinary commit that CI builds.
-`docs/PROTOCOL.md` is the law; `docs/LANDMINES.md` §0 is the symptom index.
+Since 2026-11-01 the workspace is a Claude Code cloud session, and GitHub
+Actions is the build machine; the workstation that took takes 183–189 was
+deleted, and with it the unpushed take 190 (landmine 248,
+`docs/RECOVERY-t190.md`). The repo head is the single source of truth. A
+take is an ordinary commit that CI builds. `docs/PROTOCOL.md` is the law;
+`docs/LANDMINES.md` §0 is the symptom index.
 
 ## Read order at session start
 1. `docs/NEW-CHAT-BRIEF.md`, then `docs/HANDOFF.md` newest entries first
@@ -19,48 +22,72 @@ Every claim about behaviour is PROVEN (observed; say what), INFERRED
 (reasoned) or UNKNOWN. When in doubt, label down. Desktop Chrome is not the
 Fold's WebView; a green CI run is not a phone in the woods.
 
+## A fresh cloud session
+`bash ci/cloud_setup.sh` readies the container: npm without puppeteer's own
+Chrome, the Chrome CI pins (render on any other Chrome is not CI's render,
+landmine 249), and `www/bundle` + `www/vendor` restored from the APK of the
+newest green CI run on main. Export the `PUPPETEER_EXECUTABLE_PATH` it
+prints. The pipeline cannot run here: Geofabrik and overpass-api.de close
+this cloud's connections (PROVEN 2026-11-01). A take that changes the
+pipeline or the data is proven by CI's run, which builds everything.
+
 ## How a take works here
 1. Record first: HANDOFF entry, AGENDA item with a `Ruled out:` line, a
    landmine for anything that bit, `BUILD` and the title in `src/app.html`,
    then `python3 tools/stamp.py`.
-2. Build: `python3 tools/pipeline.py`, with `APEX_PHOTO_BUDGET_S=0` unless
-   the take refreshes photos on purpose. A touched pipeline step must
-   execute its changed path before the commit; a changed step gets a clean
-   run (PROTOCOL §6b).
-3. Verify: smoke, render, then `python3 tools/gate.py`, each to its exit line.
+2. Build the app: `python3 tools/build_app.py split` turns `src/app.html`
+   into `www/`, then `bash ci/cloud_setup.sh bundle` puts back the bundle
+   `split` clears (landmine 250). The pipeline runs in CI (above).
+3. Verify: `node tools/smoke.mjs`, `node tools/render.mjs` (on CI's Chrome),
+   and the gate checks that need no pipeline output through
+   `python3 ci/gatefn.py check_a check_b …`, each to its exit line. The
+   whole gate runs in CI.
 4. Audit the diff cold (PROTOCOL §0.3). Read `git status` before staging;
    never `git add -A` blind.
-5. One commit `take N: <what changed>`. `www/app.js`, `www/index.html` and
-   `docs/PROVISION.md` are built outputs that ship in the commit.
-6. Push once, on the maintainer's explicit go. CI's gate is the last word; a
-   red run means the take is not promoted. The commit hash is the seal.
+5. Push work in progress to the session's branch at every green step, with
+   a draft pull request open (landmine 248). At the seal the take is one
+   commit `take N: <what changed>`; `www/app.js`, `www/index.html` and
+   `docs/PROVISION.md` are built outputs that ship in it.
+6. Mark the pull request ready for review: CI builds it (pipeline, render,
+   gate, signed APK as a run artifact; no release). The maintainer merges;
+   CI's run on main publishes the release, and is the last word. The
+   commit hash is the seal.
 Take, agenda and landmine numbers are assigned only in this repo. Any other
 surface starts from the repo head.
 
-## Long stages on this machine
-Render and gate run for many minutes. Run them in the background, log to a
-file, and poll until the exit line (`GATE PASSED` / `GATE FAILED`, or the
-render summary and its exit code) is in the log. Never report a stage done
-before that. One render or gate at a time. Before launching:
+## Long stages
+Render runs for many minutes (about 19 on a 4-core cloud container). Run it
+in the background, log to a file under `~/apex-logs/`, and poll until the
+exit line (`RENDER PASSED` / `RENDER FAILED`, `SMOKE PASSED`, `GATEFN
+PASSED`) is in the log. Never report a stage done before that. One render
+at a time. Before launching:
 `ps -eo comm | awk '$1=="node"||$1=="chrome"' | wc -l` must print 0;
 `df -h /`; `rm -rf /tmp/puppeteer_dev_chrome_profile-* /tmp/apex-fatal-*`.
 Kill by exact name (`pkill -x node`), never by a pattern the calling shell
 carries (landmine 204). Launch as `setsid nohup bash -c 'echo "PID $$"; …' &`
 and stop by the PID the log's first line records, never by `$!`, which is
 a parent that has already exited (landmine 221). Read the process count
-between a kill and a launch.
+between a kill and a launch. Do not restore `www/bundle` while a render
+runs. Logs and screenshots in the container die with it: a number a take
+cites goes into its HANDOFF entry.
 
 ## Push hygiene
-- The workflow builds on pushes touching `BUILD`, `src/**`, `tools/**`,
-  `regions.json`, `package*.json`, `capacitor.config.json`, `signing/**`
-  and `apex-seed*.zip`; docs-only pushes do not build.
-- `cancel-in-progress` is on: run `gh run list` before pushing a second
-  build-triggering commit.
+- The workflow builds main on pushes touching `BUILD`, `src/**`,
+  `tools/**`, `regions.json`, `package*.json`, `capacitor.config.json`,
+  `signing/**` and `apex-seed*.zip`; docs-only and `ci/**` pushes do not
+  build main.
+- A pull request into main builds when it is ready for review and touches
+  those paths, `ci/**` or `.github/workflows/**`; a draft does not build.
+  Each pull request has its own concurrency group, so it never cancels a
+  build of main; main's `cancel-in-progress` is on: run `gh run list`
+  before pushing a second build-triggering commit to main.
 - `ci/build.yml` and `.github/workflows/apex.yml` change in the same commit
   and stay byte-identical (`cmp` them). The seed job and `apex-seed*.zip`
   in `push.paths` are load-bearing (landmine 202).
-- Never push, tag, publish a release, touch Play, or change signing or
-  secrets without the maintainer's explicit go.
+- Standing go (the maintainer, 2026-11-01): push to the session's own
+  `claude/…` branch and open draft pull requests. Never push to main, tag,
+  publish a release, touch Play, or change signing or secrets without the
+  maintainer's explicit go; he merges every pull request.
 
 ## Truth
 Code is the truth; a document that disagrees with it is the bug. Fix the

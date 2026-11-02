@@ -2519,9 +2519,18 @@ if (zoomed.trails > 0) {
            has a live fix (its one reader) */
         const live = window.__nav && typeof window.__nav.live === "function" ? !!window.__nav.live() : null;
         await closeCard();
+        /* 2026-11-01 · the control tap can land on a neighbouring stack, and a
+           stack's tray zooms the map into it (run 96 on fresh data: from z11.4
+           to z14.6, "2 places here"), which moved the head the point query
+           below reads. The camera is put back first: the query is about the
+           anchor, not about what the control tap opened */
+        const camC = { c: m.getCenter(), z: m.getZoom(), b: m.getBearing() };
         tap(t.p.x + 70, t.p.y - up); await s(700);
         const ctl = ((document.getElementById("panel") || document.body).innerText || "").indexOf(t.n) !== -1;
         await closeCard();
+        m.jumpTo({ center: camC.c, zoom: camC.z, bearing: camC.b });
+        if (window.__stack) window.__stack.run();
+        m.triggerRepaint(); await Promise.race([new Promise((r) => m.once("idle", r)), s(6000)]); await s(250);
         /* anchor-sensitive part: the app's tap box is 22 px wide, so the tap
            above could still land on a CENTRE-anchored badge. A point query at
            the head centre must return the pin — and must NOT once the anchor
