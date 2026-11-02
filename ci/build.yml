@@ -321,3 +321,15 @@ jobs:
             "$(ls play-assets-*.zip)" \
             --title "APEX ORV — take ${{ steps.pkg.outputs.take }}" \
             --notes-file ci/RELEASE.md
+
+      # Take tags (the maintainer, 2026-11-02, "CI tags tN itself"): the take
+      # BUILD names is tagged tN on the commit this run built, after its
+      # release. A take's first green build of main is its tag; one that
+      # exists is left. The workstation pushed these by hand; a cloud session's
+      # git cannot push a tag (HTTP 403). A missed one: the tag workflow.
+      - name: Tag the take
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          TAKE: ${{ steps.pkg.outputs.take }}
+          REL: take-${{ github.run_number }}
+        run: bash ci/tag_take.sh "$TAKE" "$(git rev-parse HEAD)" "$REL"

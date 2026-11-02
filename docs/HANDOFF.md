@@ -51,6 +51,17 @@ taken out it reads "2 places here Stacked at this zoom. Tap one. CAMPGROUND
 Back" — run 101's text (PROVEN, both runs here). Run 101's failed job was
 re-run once to confirm take 190's build on main (landmine 256).
 
+After the merges (2026-11-02): take 190 shipped as release take-101 (main's
+run 101 green on its second attempt, after A270's cause was proven), take
+191 as release take-105 (run 105 green). The t190 tag could not be pushed
+from this session (HTTP 403, landmine 257); the maintainer chose "CI tags
+tN itself": ci/tag_take.sh, called by the build workflow's apk job after a
+green release of main, and a manual `tag` workflow for takes built before
+it (t190 on 6c0fe16, t191 on 0d3c942). Its controls, dry-run here: it
+would push t190 and t191 with their release lines, refuses take 191 on
+take 190's commit (BUILD at the commit decides) and a non-hex sha, and
+leaves t189 as it is.
+
 Measured (cloud, Chrome 138, the bundle from run 92's APK — take 189's
 data, main's newest green run when this was measured): smoke all five passes
 PASSED (282 / 197 / 54 ok, fatal, dead); render --only=nav,ui,realdom,

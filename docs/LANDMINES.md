@@ -166,6 +166,7 @@ Start here. Do not read top to bottom.
 | A smoke drill that clicks a card's chip changes nothing, though the app wires it | 254 |
 | A section run is green and the full run fails a later section the change never touched | 255 |
 | A tap the app makes for the rider lands on what the map drew before it moved | 256 |
+| `git push origin <tag>` from a cloud session: HTTP 403, "RPC failed" | 257 |
 
 ---
 
@@ -3421,4 +3422,14 @@ synthetic click) checks that the frame it reads is the one its own change
 made — here, that no drawn stack still holds a place the model says is
 alone — and waits for it, with a ceiling that only answers a frame that
 never comes.
+
+**257. A cloud session's git can push its branch, not a tag.** Takes 185
+to 189 were tagged by the sessions on the workstation, with the
+maintainer's own git; he never ran a tag command. On 2026-11-02 this cloud
+session's `git push origin t190` got "RPC failed; HTTP 403" while its
+branch pushes went through (PROVEN). The proxy's 403 is policy, not a
+fault to retry or route around. Rule: CI makes the tags with its own token
+(`ci/tag_take.sh`: the build workflow after a green release of main, the
+`tag` workflow by hand), and a session that would need one says so instead
+of handing the maintainer a command.
 
