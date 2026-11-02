@@ -1615,7 +1615,38 @@ def check_gauges_fallback():
         return fails.append("gauges.py has no retry — one NWIS 503 stops the build (A191)")
     if 'os.path.exists("gauges_payload.json")' not in g or "previous build" not in g:
         return fails.append("gauges.py does not fall back to the cached payload (A191)")
-    notes.append("gauges fallback: retry once -> previous build's payload -> spoken omission")
+    b, r = read("tools", "bundle.py") or "", read("tools", "render.mjs") or ""
+    f = _gauges_record_fault(g, b, r)
+    # its negative controls: each link of the record taken out of a copy
+    ctl = [_gauges_record_fault(g.replace('omitted("NWIS refused twice', 'print("NWIS refused twice'), b, r),
+           _gauges_record_fault(g.replace("    kept()\n", "\n"), b, r),
+           _gauges_record_fault(g, b.replace('man["omitted"] = omit', 'pass'), r),
+           _gauges_record_fault(g, b, r.replace('(manifest.omitted || {})["gauges.json"]', 'null'))]
+    if f:
+        return fails.append(f)
+    if not all(ctl):
+        return fails.append("check_gauges_fallback's omission controls passed a broken record: "
+                            + str([bool(c) for c in ctl]))
+    notes.append("gauges fallback: retry once -> previous build's payload -> a recorded omission "
+                 "(gauges_omitted.json -> manifest \"omitted\" -> render; 4 controls caught)")
+
+
+def _gauges_record_fault(g, b, r):
+    """take 192 (A245, the maintainer: "The omission is fine"): an omitted
+    inventory is recorded by gauges.py, carried into the manifest by
+    bundle.py and read by render, which accepts a bundle without gauges.json
+    only with the record. None when every link is there."""
+    if 'OMITTED = "gauges_omitted.json"' not in g or "def omitted(" not in g:
+        return "gauges.py does not record an omitted inventory in gauges_omitted.json (A245)"
+    if g.count('omitted("') < 2:
+        return "gauges.py omits the inventory somewhere without recording why (A245)"
+    if "def kept(" not in g or g.count("    kept()\n") < 2:
+        return "gauges.py leaves a stale omission record beside a payload (A245)"
+    if 'OMISSIONS = {"gauges.json": "gauges_omitted.json"}' not in b or 'man["omitted"] = omit' not in b:
+        return "bundle.py does not carry the gauges omission into the manifest (A245)"
+    if '(manifest.omitted || {})["gauges.json"]' not in r:
+        return "render.mjs does not read the manifest's recorded gauges omission (A245)"
+    return None
 
 
 def check_osm_fallback():

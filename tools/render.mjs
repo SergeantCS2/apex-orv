@@ -55,9 +55,12 @@ const SHOT = opt("--shot", null);
    the Pins selector's food read and the head tap failed (INFERRED: they lean
    on the tiles and stack windows the stack drills leave) — take 189's
    isolated run, render-t189-L-render-only-1.log. Every section was run
-   without its neighbour (only-1, only-2). */
+   without its neighbour (only-1, only-2). take 192 · A244 · stacks run alone
+   failed two checks on unchanged code ("the same town inside band 14" and
+   "the same camera stacks different things per mode"): every passing
+   stacks run had water before it, so water is its declared setup. */
 const SECTIONS = { trails: [], labels: [], modes: [], imagery: [], back: [], water: [], shell: ["water"],
-  stacks: [], pins: ["stacks"], nav: [], camp: [], paddle: [], ui: [], home: [], tools: [], basemap: [],
+  stacks: ["water"], pins: ["stacks"], nav: [], camp: [], paddle: [], ui: [], home: [], tools: [], basemap: [],
   selftest: [], routes: [], devices: ["routes"], faults: [], realdom: ["home", "routes"],
   clear: ["home", "routes"], tail: [], g6: [], "v4-setup": [], "v4-band": ["v4-setup"],
   "v4-select": ["v4-setup"], "v4-toast": ["v4-setup"], "v4-audit": ["v4-setup"],
@@ -1313,6 +1316,81 @@ if (zoomed.trails > 0) {
        `after 60 tiles the card shows a MEASURED time-left (${h2.eta.eta} s remaining at the read)`);
   }
 
+  /* take 192 · A266 · the card follows the download. Started as the card's
+     own Save starts one (startHDSave), the card's progress line is read
+     twice while tiles land: each time it is the save's own count, and the
+     two differ. When it ends with the drawer up the card is drawn again
+     (no progress line; the saved total new); ended under a folded drawer,
+     the line says it finished and the drawer stays folded. */
+  const h3 = await page.evaluate(async () => {
+    const H = window.__hd, D = window.HDDL, SV = window.__hdSave, N = window.__nav;
+    if (!H || !D || !SV || !window.__hdCard || !N || !N.rail) return { missing: true };
+    const wait = (ms) => new Promise((z) => setTimeout(z, ms));
+    const txt = (id) => { const e = document.getElementById(id); return e ? e.textContent : null; };
+    const until = async (f, n) => { for (let i = 0; i < (n || 300) && !f(); i++) await wait(20); return f(); };
+    const cnt = () => { const p = D.progress(); return p ? p.done + p.skipped : null; };
+    await H.clear();
+    const list = []; for (let k = 0; k < 150; k++) list.push([13, 4300 + k, 3010]);
+    D.fetchTile = () => wait(12).then(() => new ArrayBuffer(100));
+    N.rail(true);
+    SV(list, 'a list'); window.__hdCard();
+    await until(() => !!document.getElementById('hd-prog'));
+    await until(() => cnt() >= 20);
+    const a = { t: txt('hd-prog'), n: cnt() };
+    await until(() => cnt() >= 90);
+    const b = { t: txt('hd-prog'), n: cnt() };
+    await until(() => !D.busy(), 600); await wait(400);
+    const end = { prog: !!document.getElementById('hd-prog'), card: (document.getElementById('panel') || {}).textContent || '',
+                  folded: document.getElementById('rail').className === 'folded' };
+    await H.clear();
+    SV(list.slice(0, 80), 'a list'); window.__hdCard();
+    /* this card's own line: the card before it may have left one */
+    await until(() => txt('hd-dlk') === 'DOWNLOADING A LIST' && /^\d+ of 80 tiles/.test(txt('hd-prog') || ''));
+    N.rail(false); await wait(60);
+    await until(() => !D.busy(), 600); await wait(400);
+    const fold = { folded: document.getElementById('rail').className === 'folded', t: txt('hd-prog'), k: txt('hd-dlk'),
+                   stop: !!document.getElementById('hd-stop') };
+    /* the review of take 192 · a save that ends while the rider is in
+       Search: search stays open (a redraw goes through show(), which ends
+       it), and the card left under it says it finished */
+    N.rail(true); await H.clear();
+    SV(list.slice(0, 80), 'a list'); window.__hdCard();
+    /* this card's own line: the card before it may have left one */
+    await until(() => txt('hd-dlk') === 'DOWNLOADING A LIST' && /^\d+ of 80 tiles/.test(txt('hd-prog') || ''));
+    /* the chip toggles: opened only if it is not already open */
+    const srchPre = document.getElementById('srch').className === 'on';
+    if (!srchPre) document.getElementById('c-search').click();
+    await wait(80);
+    const srch0 = document.getElementById('srch').className === 'on';
+    await until(() => !D.busy(), 600); await wait(400);
+    const insrch = { pre: srchPre, was: srch0, on: document.getElementById('srch').className === 'on', t: txt('hd-prog') };
+    /* out of search as a rider leaves it: a tap on its dim (A268) */
+    try { if (document.getElementById('srch').className === 'on') document.getElementById('scrim').click(); } catch (e) {}
+    await wait(80); N.rail(true);
+    await H.clear(); window.__hdChip();
+    return { a, b, end, fold, insrch };
+  });
+  if (h3.missing) ok(false, "take-192 HD hooks missing (__hdSave / __nav.rail)");
+  else {
+    /* the line is the save's own count at the read ("N of 150 tiles", then
+       its measured time left and the screen note, if any) */
+    const at = (r) => !!r && typeof r.n === "number" && typeof r.t === "string"
+      && new RegExp("^" + r.n + " of 150 tiles( \u00b7 .*)?$").test(r.t);
+    const follows = (a, b, end, fold, insrch) => at(a) && at(b) && b.n > a.n && a.t !== b.t
+      && !end.prog && !end.folded && /SAVED ON THIS PHONE\s*150 tiles\b/.test(end.card)
+      && fold.folded && fold.t === "80 of 80 tiles \u2014 finished" && fold.k === "SAVED A LIST" && !fold.stop
+      && insrch.was && insrch.on && insrch.t === "80 of 80 tiles \u2014 finished";
+    const { a, b, end, fold, insrch } = h3;
+    const ctl = !follows(a, { ...b, t: a.t }, end, fold, insrch) && !follows(a, { ...b, n: b.n + 7 }, end, fold, insrch)
+      && !follows(a, b, { ...end, prog: true }, fold, insrch) && !follows(a, b, end, { ...fold, folded: false }, insrch)
+      && !follows(a, b, end, fold, { ...insrch, on: false });
+    ok(follows(a, b, end, fold, insrch) && ctl,
+       `the HD card follows the download: "${a.t}" then "${b.t}" (the save's own ${a.n} and ${b.n}); ended with the drawer up it is drawn again `
+       + `(${end.prog ? "the progress line LEFT" : "no progress line"}, ${/SAVED ON THIS PHONE\s*150 tiles\b/.test(end.card) ? "150 tiles saved" : "saved total not 150: \"" + end.card.slice(-160) + "\""}); `
+       + `ended under a folded drawer: "${fold.k} · ${fold.t}", drawer ${fold.folded ? "still folded" : "OPENED"}; ended while in Search (${insrch.was ? "opened" + (insrch.pre ? ", already open" : "") : "NOT OPENED"}): search ${insrch.on ? "still open" : "CLOSED"} ("${insrch.t}"); `
+       + `the judge rejects a frozen line, a line off the count, a stale card, an opened drawer and a closed search (${ctl})`);
+  }
+
   }
   if (RUN("back")) {
   /* Take 181 · the first field reports. A192: panels close on an outside tap
@@ -1528,7 +1606,7 @@ if (zoomed.trails > 0) {
       // a river with two NAMED stops, from the bundle
       const c = (P.data.c || []).find((r) =>
         (r.f || []).filter((f) => f.n && (f.k === "launch" || f.k === "access")).length >= 2);
-      let run = null, bridge = null, gnear = null;
+      let run = null, bridge = null, gnear = null, cond = null, condAt = null;
       if (c) {
         const st = c.f.filter((f) => f.n && (f.k === "launch" || f.k === "access"));
         const a = st[0], b = st[st.length - 1];
@@ -1537,6 +1615,10 @@ if (zoomed.trails > 0) {
         run = document.getElementById("panel").innerText;
         bridge = P.near(a.p);
         gnear = GS ? G.near(a.p, 12) : null;
+        /* take 192 · A245 · the river card at the put-in, and whether it
+           offers live conditions */
+        if (P.card) { P.card({ properties: { riv: c.n, n: a.n, k: a.k, mi: a.mi }, geometry: { coordinates: a.p } });
+          await s(150); cond = !!document.getElementById("pd-gauge"); condAt = a.n; }
       }
       let livDrawn = -1;
       if (liv0) {
@@ -1564,7 +1646,7 @@ if (zoomed.trails > 0) {
       m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
       return { craft0, craft1, landRefused, hK, hAfter, riv: c && c.n, run, livDrawn,
                bridge: bridge && bridge.riv, gcount: GS ? GS.g.length : 0,
-               gnear: gnear && gnear.g.id, fmt };
+               gnear: gnear && gnear.g.id, fmt, cond, condAt };
     }, liv[0] || null, livIdx);
     if (wb.missing) ok(false, "water-batch hooks missing");
     else {
@@ -1581,8 +1663,25 @@ if (zoomed.trails > 0) {
          "the run card names the craft and its calibrated pace");
       ok(wb.bridge === wb.riv, "a launch point projects to its river's run flow (the pin bridge)");
       ok(wb.livDrawn > 0, `a livery is on the map in Water — as its own pin or inside a stack (${wb.livDrawn} at ${liv[0] ? liv[0].n : "-"})`);
-      ok(wb.gcount > 100 && !!wb.gnear,
-         `the bundle carries the USGS gauge inventory (${wb.gcount} sites; nearest to the run: ${wb.gnear})`);
+      /* take 192 · A245 · the maintainer, 2026-11-02, "The omission is
+         fine": a build that met NWIS refusing twice with nothing cached ships
+         without the inventory, as A191 designed, and records why
+         (tools/gauges.py writes the reason; tools/bundle.py carries it in the
+         manifest's "omitted"). Render accepts that bundle only with the
+         record — an inventory lost without a word still fails here — and
+         then the river card must offer no conditions button. */
+      const gOmit = (manifest.omitted || {})["gauges.json"] || null;
+      if (wb.gcount > 0) {
+        ok(wb.gcount > 100 && !!wb.gnear,
+           `the bundle carries the USGS gauge inventory (${wb.gcount} sites; nearest to the run: ${wb.gnear})`);
+        ok(wb.cond === true,
+           `the river card at ${wb.condAt} offers live conditions (the gauge ${wb.gnear} is within 12 mi)`);
+      } else {
+        ok(!!gOmit,
+           `no USGS gauge inventory in this bundle, and the build recorded why: "${gOmit || "(nothing recorded — a lost layer)"}"`);
+        ok(wb.cond === false,
+           `with no inventory the river card at ${wb.condAt} offers no conditions button (${wb.cond === null ? "no card was read" : wb.cond ? "it offered one" : "none"})`);
+      }
       ok(wb.fmt.rows.length === 2 && /1,240 cfs/.test(wb.fmt.rows[0]) && /50\u00b0F|50°F/.test(wb.fmt.rows[1]),
          `gauge values format honestly (flow shown, 10\u00b0C -> 50\u00b0F)`);
     }
@@ -8700,7 +8799,7 @@ if (RUN("v4-setup")) {
 {
   SECTION_AT = "(floor guard)";
   const SECTION_FLOOR = {
-  boot: 13, trails: 2, labels: 11, modes: 33, imagery: 31, back: 14, water: 11, shell: 10,
+  boot: 13, trails: 2, labels: 11, modes: 33, imagery: 32, back: 14, water: 12, shell: 10,
   stacks: 48, pins: 21, nav: 31, camp: 16, paddle: 25, ui: 37, home: 7, tools: 28, basemap: 2,
   selftest: 2, routes: 3, devices: 222, faults: 6, realdom: 6, clear: 3, tail: 30, g6: 2,
   "v4-setup": 1, "v4-band": 7, "v4-select": 6, "v4-toast": 1, "v4-audit": 11, "v4-walker": 15,

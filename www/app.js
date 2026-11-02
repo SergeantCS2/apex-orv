@@ -3493,7 +3493,7 @@ function rideStart(at){
   RIDE.pulse=setInterval(function(){
     if(!RIDE)return;
      
-    try{hudPaint();if(NAV.on)navChip();peekGps()}catch(e){}
+    try{hudPaint();if(NAV.on)navChip();peekGps();elevCell()}catch(e){}
      
     if(++RIDE.ticks%3===1)batteryNow().then(function(b){
       if(RIDE&&b){RIDE.batt1=b.lvl;RIDE.chg=RIDE.chg||b.chg}});
@@ -3721,6 +3721,16 @@ function rideReport(R){
   return L.join('\n')}
 
  
+var BACK_FC={type:'FeatureCollection',features:[]};
+function backSet(fc){BACK_FC=fc;map.getSource('back').setData(fc)}
+ 
+function crumbFC(){return {type:'FeatureCollection',features:crumbs.length>1?[{type:'Feature',
+  properties:{},geometry:{type:'LineString',coordinates:crumbs}}]:[]}}
+function trackDraw(){
+  try{if(TRUCK)truckPin();else if(tM){tM.remove();tM=null}}catch(e){}
+  try{map.getSource('crumb').setData(crumbFC())}catch(e){}
+  try{map.getSource('back').setData(BACK_FC)}catch(e){}}
+ 
 function truckPin(){
   if(!tM)tM=new maplibregl.Marker({element:mk('truck','truck')}).setLngLat(TRUCK).addTo(map);
   else tM.setLngLat(TRUCK)}
@@ -3740,7 +3750,7 @@ function startRecording(at){
   rideStart(at);
   hudShow(true);
   truckPin();
-  map.getSource('back').setData({type:'FeatureCollection',features:[]});
+  backSet({type:'FeatureCollection',features:[]});
   syncSafety()}
 
 function record(at){
@@ -3748,12 +3758,13 @@ function record(at){
   var prev=crumbs[crumbs.length-1], d=mi(prev,at);
   if(d<0.004)return;                     
   crumbs.push(at.slice()); crumbMi+=d;
-  map.getSource('crumb').setData({type:'FeatureCollection',features:[
-    {type:'Feature',properties:{},geometry:{type:'LineString',coordinates:crumbs}}]});
+  map.getSource('crumb').setData(crumbFC());
   syncSafety()}
 
  
 function syncSafety(){
+   
+  try{elevCell()}catch(e){}
   var tv=el('v-truck'), rv=el('v-rec');
   if(!TRUCK){tv.textContent='—';tv.className='v';rv.textContent='—';
      
@@ -3789,7 +3800,7 @@ el('btn-retrace').addEventListener('click',function(){
   if(crumbs.length<2)return show('Nothing recorded yet. Retrace follows the track a ride records \u2014 tap <b>Ride it</b> (Ride tab) with a GPS fix to start one.','fail');
   var back=crumbs.slice().reverse(), d=0;
   for(var i=1;i<back.length;i++)d+=mi(back[i-1],back[i]);
-  map.getSource('back').setData({type:'FeatureCollection',features:[
+  backSet({type:'FeatureCollection',features:[
     {type:'Feature',properties:{},geometry:{type:'LineString',coordinates:back}}]});
   var b=new maplibregl.LngLatBounds();back.forEach(function(c){b.extend(c)});
   map.fitBounds(b,{padding:50,duration:700});
@@ -3941,8 +3952,7 @@ function tripResume(t){
       machIdx=Math.max(0,ORDER.indexOf(machine));
       setChip('c-machine',MACHINE[machine].ic,MACHINE[machine].lbl)}
     crumbs=(t.crumbs||[]).slice();crumbMi=t.crumbMi||0;
-    if(crumbs.length)map.getSource('crumb').setData({type:'FeatureCollection',
-      features:[{type:'Feature',properties:{},geometry:{type:'LineString',coordinates:crumbs}}]});
+    if(crumbs.length)map.getSource('crumb').setData(crumbFC());
     if(t.lastFix&&t.lastFix.at){ME=t.lastFix.at.slice();mM.setLngLat(ME)}
     if(t.run)RUNFROM=t.run;
     if(t.runNav)runSet(t.runNav.riv,t.runNav.a,t.runNav.b);
@@ -4298,7 +4308,9 @@ var posMode='none',awayMi=0;
 var ME_FIX=null;
 function meFix(at){ME_FIX={at:at.slice(),t:Date.now()};
    
-  YOU=at.slice();YOU_T=ME_FIX.t;if(youM)try{youM.setLngLat(YOU)}catch(e){}}
+  YOU=at.slice();YOU_T=ME_FIX.t;if(youM)try{youM.setLngLat(YOU)}catch(e){}
+   
+  try{elevCell()}catch(e){}}
  
 function meOnFix(){return posMode==='gps'&&!!ME_FIX&&!!ME&&ME[0]===ME_FIX.at[0]&&ME[1]===ME_FIX.at[1]}
  
@@ -4639,12 +4651,33 @@ function hdChip(){HD.stats().then(function(st){
   var e=el('c-hd');if(e)e.className='basebtn'+(st.tiles?' on':'')}).catch(function(){})}
 function refreshSat(){try{var sc=(map.style.sourceCaches||{})['satpatch'];
   if(sc){sc.clearTiles();map.triggerRepaint()}}catch(e){}}
+ 
+function hdProgTxt(pr){
+  var left=pr.eta==null?'':(pr.eta<60?' \u00b7 under a minute left':' \u00b7 about '+Math.ceil(pr.eta/60)+' min left');
+  return (pr.done+pr.skipped).toLocaleString()+' of '+pr.total.toLocaleString()+' tiles'+left+
+    (WAKE.active()?' \u00b7 the screen stays on until it finishes':'')}
+function hdLive(){var e=el('hd-prog'),pr=HDDL.progress();if(e&&pr)e.textContent=hdProgTxt(pr)}
+ 
+function hdSeen(){var r=el('rail');
+  return !(r&&/\bfolded\b/.test(r.className))&&!SRCH.on&&(!SHEET.tab||SHEET.tool==='c-hdmanage')}
+function hdEnded(r){
+  var e=el('hd-prog');if(!e||!r)return;
+  if(hdSeen())return hdCard();
+  var k=el('hd-dlk'),o=el('hd-stop'),sv=el('hd-saved');
+  if(k)k.textContent=(r.stopped?'STOPPED ':'SAVED ')+String(r.label).toUpperCase();
+  e.textContent=(r.done+r.skipped).toLocaleString()+' of '+r.total.toLocaleString()+' tiles'+
+    (r.stopped?' \u2014 what landed is kept':' \u2014 finished');
+  if(o&&o.parentNode)o.parentNode.removeChild(o);
+   
+  if(sv)HD.stats().then(function(st){sv.textContent=st.tiles.toLocaleString()+' tiles \u00b7 '+
+    (st.bytes/1048576).toFixed(1)+' MB'}).catch(function(){})}
 function startHDSave(tiles,label){
   hdChipTxt('HD 0%');
-  HDDL.save(tiles,function(d,t){hdChipTxt('HD '+Math.round(d/Math.max(1,t)*100)+'%')},label)
+  HDDL.save(tiles,function(d,t){hdChipTxt('HD '+Math.round(d/Math.max(1,t)*100)+'%');hdLive()},label)
     .then(function(r){hdChip();refreshSat();
-      if(r&&r.error)show('<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
-        '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');})}
+      if(r&&r.error)return show('<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
+        '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');
+      hdEnded(r)})}
  
 function hdTiers(){
   var v=map.getBounds(),b=[v.getWest(),v.getSouth(),v.getEast(),v.getNorth()];
@@ -4661,7 +4694,7 @@ function hdMB(mb){return mb<1?'under 1 MB':'about '+Math.round(mb)+' MB'}
  
 function hdCard(confirmId){
   var conf=typeof confirmId==='string'?confirmId:null;
-  var tiers=hdTiers(),pr=HDDL.progress();
+  var tiers=hdTiers(),pr;
    
   var inSheet=SHEET.tab&&(SHEET_PENDING==='c-hdmanage'||SHEET.tool==='c-hdmanage'),sTab=SHEET.tab;
   Promise.all([HD.stats(),HDDL.quota()]).then(function(res){
@@ -4669,11 +4702,11 @@ function hdCard(confirmId){
      
     var h=(inSheet?'':'<b>HD imagery</b>')+
       '<div class="sub">Sharper satellite for places you choose. Nothing downloads on its own \u2014 save on wifi.</div>';
+     
+    pr=HDDL.progress();
     if(pr){
-      var left=pr.eta==null?'':(pr.eta<60?' · under a minute left':' · about '+Math.ceil(pr.eta/60)+' min left');
-      h+='<div class="k">DOWNLOADING '+String(pr.label).toUpperCase()+'</div><div class="sub">'+
-        (pr.done+pr.skipped).toLocaleString()+' of '+pr.total.toLocaleString()+' tiles'+left+
-        (WAKE.active()?' · the screen stays on until it finishes':'')+'</div>'+
+      h+='<div class="k" id="hd-dlk">DOWNLOADING '+String(pr.label).toUpperCase()+'</div><div class="sub" id="hd-prog">'+
+        hdProgTxt(pr)+'</div>'+
         '<button class="chip" id="hd-stop">'+ic('stopdl')+'<span>Stop downloading</span></button>'}
     for(var i=0;i<tiers.length;i++){
       var t=tiers[i],big=t.id==='view'&&t.mb>500,fits=!q.known||q.free>=t.mb*1048576*1.2;
@@ -4689,7 +4722,7 @@ function hdCard(confirmId){
       else h+='<button class="chip" id="hd-'+(t.confirm?'ask-':'go-')+t.id+'">'+ic('hd')+'<span>'+t.btn+'</span></button>';
       h+='</div>'}
     if(!q.known)h+='<div class="sub">This phone does not say how much space it allows — a save stops itself if space runs out, and keeps what landed.</div>';
-    h+='<div class="k">SAVED ON THIS PHONE</div><div class="sub">'+st.tiles.toLocaleString()+
+    h+='<div class="k">SAVED ON THIS PHONE</div><div class="sub" id="hd-saved">'+st.tiles.toLocaleString()+
         ' tiles · '+(st.bytes/1048576).toFixed(1)+' MB</div>'+
       (st.tiles?'<button class="chip" id="hd-del">'+ic('del')+'<span>Delete all saved HD</span></button>':'');
     if(inSheet&&SHEET.tab===sTab&&(SHEET.tool==='c-hdmanage'||(SHEET.tool===null&&!SHEET_PENDING)))SHEET_PENDING='c-hdmanage';
@@ -4978,6 +5011,9 @@ var MARK={gen:0,stop:null,rec:null,MS:30000};
 function toolShow(id,h,s){if(SHEET.tool===id&&SHEET.tab)SHEET_PENDING=id;show(h,s)}
 function markUnique(n){var have={};wpLoad().forEach(function(x){have[x.n]=1});
   if(!have[n])return n;for(var i=2;i<1000;i++)if(!have[n+' '+i])return n+' '+i;return n+' '+Date.now()}
+ 
+function wpKept(n0,n){return n0===n?'':' <span class="sub">A waypoint named '+n0+
+  ' was already saved \u2014 both are kept.</span>'}
 function markCancel(){MARK.gen++;if(MARK.stop){try{MARK.stop()}catch(e){}MARK.stop=null}}
 function markAt(at){
   var nm=markUnique(wpName(at)),rec={n:nm,p:at.slice(),r:BUNDLE.region||null,ts:Date.now()};
@@ -5155,7 +5191,9 @@ function flyToYou(){
    
   var lf=liveFix();
   if(lf){YOU=lf.at;YOU_T=lf.t;if(youM)youM.setLngLat(YOU)}
-  if(YOU&&!(Date.now()-YOU_T<=GPS_STALE_MS))return false;
+   
+  var age=Date.now()-YOU_T;
+  if(YOU&&!(age>=0&&age<=GPS_STALE_MS))return false;
   if(YOU){
     var far=!inRegion(YOU);
     map.easeTo({center:YOU,zoom:far?7.2:14.5,duration:900,essential:true});
@@ -5327,24 +5365,25 @@ function placeCard(at,kind,title){
   on('pc-disp',function(){el('btn-disp').click()});
   on('pc-go',function(){map.easeTo({center:at,zoom:Math.max(map.getZoom(),14),
     duration:600,essential:true})});
+   
   on('pc-wpt',function(){
-    var nm=wpName(at);
+    var nm0=wpName(at),nm=markUnique(nm0);
     if(!wpAdd({n:nm,p:at.slice(),r:BUNDLE.region||null,ts:Date.now()}))
       return show('<b>Could not save.</b> This phone would not let the app '+
         'store it \u2014 its storage may be full or blocked.','fail');
     logAct('act  saved waypoint '+nm);
     wpDraw();clearDrop();
-    show('Saved as <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
+    show('Saved as <b>'+nm+'</b>.'+wpKept(nm0,nm)+'<br><span class="sub">On this phone only. '+
       'Find it again under <b>Saved</b> on the Plan tab.</span>','pass')});
   on('pc-drop',function(){clearDrop();ack('Pin removed.')});
   Array.prototype.forEach.call(document.querySelectorAll('[data-wpt]'),function(b){
     b.addEventListener('click',function(){
-      var k=b.dataset.wpt,nm=WPTYPES[k].h+' \u00b7 '+wpName(at);
+      var k=b.dataset.wpt,nm0=WPTYPES[k].h+' \u00b7 '+wpName(at),nm=markUnique(nm0);
       if(!wpAdd({n:nm,t:k,p:at.slice(),r:BUNDLE.region||null,ts:Date.now()}))
         return show('<b>Could not save.</b>','fail');
       logAct('act  saved waypoint '+k);
       wpDraw();clearDrop();
-      show('Saved <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
+      show('Saved <b>'+nm+'</b>.'+wpKept(nm0,nm)+'<br><span class="sub">On this phone only. '+
         'Find it again under <b>Saved</b> on the Plan tab.</span>','pass')})});
 }
 
@@ -5428,14 +5467,14 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       skip:Object.keys(NETLO_SKIP),layers:Object.keys(NETFT)};
     window.__hd=HD;
      
-    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};window.__back={onBack:onBack,open:backOpen,panelOpen:panelOpen,state:function(){return BACK},toast:toast};window.__privacy=function(u){var o=PRIVACY_URL;if(u!==undefined)PRIVACY_URL=u;return o};window.__tour={start:tourStart,next:tourNext,close:tourClose,seen:tourSeen,reset:tourReset,state:function(){return TOUR},steps:TOUR_STEPS};
+    window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__hdSave=startHDSave;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};window.__back={onBack:onBack,open:backOpen,panelOpen:panelOpen,state:function(){return BACK},toast:toast};window.__privacy=function(u){var o=PRIVACY_URL;if(u!==undefined)PRIVACY_URL=u;return o};window.__tour={start:tourStart,next:tourNext,close:tourClose,seen:tourSeen,reset:tourReset,state:function(){return TOUR},steps:TOUR_STEPS};
     window.__ph={index:PHOTOS,html:photoHTML};
     window.__ride={start:startRecording,fix:rideFix,stop:rideStop,report:rideReport,
                    get R(){return RIDE},get last(){return LASTRIDE}};
      
     try{
       window.__paddle={data:PADDLE,run:runCard,near:nearStop,hours:paddleHours,
-        craft:function(){return machine}};
+        craft:function(){return machine},card:paddleCard};
       window.__gauge=GAUGE;
       window.__gauges=(typeof GAUGES!=='undefined')?GAUGES:null;
       window.__search=function(q,all){return all?searchAll(q):search(q)};
@@ -5446,15 +5485,13 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         sim:function(){railSet(false);startSim()},simStop:stopRide,
          
         simSave:function(){return {T:TRUCK?TRUCK.slice():null,c:crumbs.slice(),m:crumbMi,p:posMode,me:ME.slice(),
-          ride:RIDE,last:LASTRIDE,got:gotFix,on:NAV.on,lost:lost,hud:!!(el('hudbar')&&el('hudbar').hidden)}},
+          ride:RIDE,last:LASTRIDE,got:gotFix,on:NAV.on,lost:lost,hud:!!(el('hudbar')&&el('hudbar').hidden),back:BACK_FC}},
         simRestore:function(v){try{stopRide()}catch(e){}
           if(RIDE&&RIDE!==v.ride){try{clearInterval(RIDE.pulse)}catch(e){}}
           RIDE=v.ride;LASTRIDE=v.last;TRUCK=v.T;crumbs=v.c;crumbMi=v.m;posMode=v.p;ME=v.me;
-          gotFix=v.got;NAV.on=v.on;lost=v.lost;
+          gotFix=v.got;NAV.on=v.on;lost=v.lost;if(v.back)BACK_FC=v.back;
           try{mM.setLngLat(ME)}catch(e){}
-          try{if(tM&&TRUCK)tM.setLngLat(TRUCK);else if(tM&&!TRUCK){tM.remove();tM=null}}catch(e){}
-          try{map.getSource('crumb').setData({type:'FeatureCollection',features:crumbs.length>1?[{type:'Feature',
-            properties:{},geometry:{type:'LineString',coordinates:crumbs}}]:[]})}catch(e){}
+          trackDraw();
           hudShow(!v.hud);try{syncSafety()}catch(e){}},
         plan:navPlan,guide:function(){return NAVG},project:navProject,
         runSet:runSet,run:function(){return RUN},river:navRiver,riverLine:riverLine,
@@ -5839,7 +5876,7 @@ function stSafety(){
    
    
   var save={T:TRUCK,c:crumbs.slice(),m:crumbMi,p:posMode,me:ME.slice(),
-            rs:RESUMING,rr:RESUMED_RIDE,
+            rs:RESUMING,rr:RESUMED_RIDE,back:BACK_FC,
             ride:RIDE,lastride:LASTRIDE,
             hud:!!(el('hudbar')&&el('hudbar').hidden),
             chips:!!(el('chips')&&el('chips').hidden)};
@@ -5866,7 +5903,8 @@ function stSafety(){
   if(RIDE&&RIDE!==save.ride){try{clearInterval(RIDE.pulse)}catch(e){}}
   RIDE=save.ride;LASTRIDE=save.lastride;
   TRUCK=save.T;crumbs=save.c;crumbMi=save.m;posMode=save.p;ME=save.me;
-  RESUMING=save.rs;RESUMED_RIDE=save.rr;
+  RESUMING=save.rs;RESUMED_RIDE=save.rr;BACK_FC=save.back;
+  trackDraw();
   hudShow(!save.hud);
   if(el('chips'))el('chips').hidden=save.chips;
   try{syncSafety()}catch(e){}
@@ -6833,9 +6871,16 @@ function refreshReadout(){
   var c=map.getCenter(),e=elevAt([c.lng,c.lat]);
   var r=el('ro-elev');
    
-  if(r)r.textContent=(e===null?'':ft(e)+' ft elevation');
-  var v=el('v-elev');
-  if(v)v.textContent=(e===null?'—':ft(e)+' ft')}
+  if(r)r.textContent=(e===null?'':ft(e)+' ft at map centre')}
+ 
+var ELEV={t:null,id:null};
+function elevCell(){
+  var v=el('v-elev');if(!v)return;
+  var lf=liveFix(),at=(posMode==='sim'&&riding)?ME:(lf&&lf.at),e=at?elevAt(at):null;
+  v.textContent=(e===null||e===undefined)?'\u2014':ft(e)+' ft';
+   
+  if(lf&&at===lf.at&&ELEV.t!==lf.t){ELEV.t=lf.t;try{clearTimeout(ELEV.id)}catch(x){}
+    ELEV.id=setTimeout(elevCell,Math.max(0,GPS_STALE_MS-lf.age)+250)}}
 
 function paint(){var c=map.getCenter();
   var e=elevAt([c.lng,c.lat]);
@@ -6846,6 +6891,8 @@ function paint(){var c=map.getCenter();
       'DD · MAP CENTRE · no GPS fix yet';
   el('coords').innerHTML=c.lat.toFixed(5)+' '+c.lng.toFixed(5)+
     ' <span class="unit">'+tag+(e!==null?' · '+ft(e)+' ft':'')+'</span>';
+   
+  try{elevCell()}catch(x){}
   }
 map.on('move',paint);map.on('load',paint);paint();syncSafety();
 

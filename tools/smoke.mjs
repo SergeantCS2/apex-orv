@@ -65,7 +65,8 @@ const geo = { cb: null, err: null, cleared: 0, seq: 0, id: null, watches: new Ma
 const protocolsAdded = [];
 const markers = [];
 /* take 189 · fix round 2 · every Marker ever made, never spliced: the A237
-   stop drill finds the app's me-marker here (see remove() below) */
+   stop drill finds the app's me-marker here (remove() lost it from `markers`
+   until take 192's A244 fix; the drill keeps reading this list) */
 const everyMarker = [];
 function ok(cond, msg) {
   if (cond) { console.log(`  ok   ${msg}`); }
@@ -324,7 +325,10 @@ const maplibregl = {
     setLngLat(ll) { this._ll = ll; return this; }
     addTo(m) { this._map = m; if (markers.indexOf(this) < 0) markers.push(this); /* re-attach re-registers, like real MapLibre (take 117) */ return this; }
     getElement() { return this._el; }
-    remove() { this._removed = true; markers.splice(markers.indexOf(this), 1); }
+    /* take 192 · A244 · a marker removed twice splices nothing the second
+       time: splice(-1, 1) dropped the list's LAST marker, which by the stop
+       drill was the app's me-marker (take 189's smoke5-t189-L-small-fix2-1) */
+    remove() { this._removed = true; const i = markers.indexOf(this); if (i >= 0) markers.splice(i, 1); }
     getLngLat() { return this._ll; }
   },
   GeolocateControl: class { on() { return this; } trigger() {} },
@@ -2214,10 +2218,39 @@ if (!NO_GPS && sandbox.window.__selfTest) {
   /* The perf section drives requestAnimationFrame, and this harness owns the
      clock — so pump frames rather than await, or the promise never settles. */
   let st = null, threw = null;
+  /* take 192 · A242 · what the map draws of the track before the drill */
+  const N0 = sandbox.window.__nav, pre = N0 && N0.simSave ? N0.simSave() : null;
+  const crumbN0 = (record.setData.crumb || []).length, backN0 = (record.setData.back || []).length;
   try { sandbox.window.__selfTest({ gps: false }, (r) => { st = r; }); }
   catch (e) { threw = String(e.message); }
   for (let i = 0; i < 500 && !st && !threw; i++) { frames(2); flushTimeouts(); }
   ok(!threw && !!st, `app self-test runs under the stubs${threw ? ": " + threw : st ? "" : " (never completed)"}`);
+  /* take 192 · A242 · the safety drill rides 25 fixes from the region's
+     centre: it pins a truck there and draws their line. After it, the map
+     draws what the state holds again — the truck's pin where the truck was
+     (none without one), the breadcrumb line of the rider's own crumbs and
+     the retrace line as it was. Take 189 put the values back and left the
+     drill's pin and line drawn. */
+  if (pre) {
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const lineOf = (fc) => (fc && fc.features && fc.features[0] && fc.features[0].geometry) ? fc.features[0].geometry.coordinates : null;
+    const judge = (o) => o.drew && (o.T ? o.trucks.length === 1 && same(o.trucks[0], o.T) : o.trucks.length === 0)
+      && (o.c.length > 1 ? same(lineOf(o.crumb), o.c) : !!o.crumb && o.crumb.features.length === 0)
+      && same(o.back, o.backWas);
+    const seen = {
+      drew: (record.setData.crumb || []).length > crumbN0 + 1, T: pre.T, c: pre.c,
+      trucks: markers.filter((m) => /(^|\s)truck(\s|$)/.test(m._el.className || "") && !m._removed).map((m) => m._ll),
+      crumb: (record.setData.crumb || []).at(-1) || null,
+      back: (record.setData.back || []).length > backN0 ? record.setData.back.at(-1) : pre.back, backWas: pre.back };
+    const drillLine = { type: "FeatureCollection", features: [{ type: "Feature", properties: {},
+      geometry: { type: "LineString", coordinates: [[0, 0], [1e-3, 5e-4], [2e-3, 1e-3]] } }] };
+    const ctl = !judge({ ...seen, trucks: seen.trucks.concat([[0, 0]]) }) && !judge({ ...seen, crumb: drillLine })
+      && !judge({ ...seen, back: { type: "FeatureCollection", features: [] }, backWas: drillLine }) && !judge({ ...seen, drew: false });
+    ok(judge(seen) && ctl,
+       `A242 · after the self-test's safety drill the map draws the rider's own track again: ${seen.trucks.length} truck pin${seen.trucks.length === 1 ? "" : "s"} `
+       + `(the truck ${pre.T ? "at " + pre.T.map((x) => x.toFixed(4)).join(",") : "none"}), the breadcrumb line of ${pre.c.length} crumb${pre.c.length === 1 ? "" : "s"}, the retrace line as it was; `
+       + `the judge rejects the drill's pin left drawn, its line left drawn, a retrace line wiped, and a drill that drew nothing (${ctl})`);
+  } else ok(false, "A242 · no __nav.simSave hook to read the track's state");
   if (st) {
     /* RENDER checks need a real GPU; render.mjs judges those. Here we assert
        everything a stub CAN judge — load, data, routing, safety, geocoding —
@@ -3818,6 +3851,96 @@ if (!NO_GPS) {
        `A269 · a ride that ends (${NO_GPS ? "refused: no receiver" : "Stop"}) eases a tilted map back flat and north-up, centre and zoom kept `
        + `(${flat.length} ease${flat.length === 1 ? "" : "s"}: ${JSON.stringify(flat[0] || null)}); the judge rejects none, and one that moves the zoom`);
     SX.tab("map"); flushTimeouts();
+  }
+}
+
+/* 9i · take 192. A265: a place card's Save as waypoint at a name already
+   saved keeps both (the new one numbered, the card says so). A243 (the
+   maintainer, 2026-11-02, "Rider's own on the ride sheet"): the ride
+   sheet's Elevation is the live fix's, a dash before one and after it goes
+   stale; the readout under the scale says it is the map centre's. A244:
+   smoke's own Marker stub, shown its old fault. Each judge is shown a
+   forged reading it must reject. */
+{
+  /* A244 · a marker removed twice leaves the others listed */
+  {
+    const n0 = markers.length, a = new maplibregl.Marker(), b = new maplibregl.Marker(), c = new maplibregl.Marker();
+    a.remove(); a.remove();
+    const kept = markers.includes(b) && markers.includes(c) && markers.length === n0 + 2;
+    const old = [1, 2, 3]; old.splice(old.indexOf(9), 1);   /* the old remove(): splice(-1, 1) */
+    b.remove(); c.remove();
+    ok(kept && old.join() === "1,2" && markers.length === n0,
+       `A244 · smoke's Marker stub: a marker removed twice leaves the other two listed (${kept}); the old splice(indexOf) dropped the list's last (${old.join()})`);
+  }
+  /* A265 · three saves at one spot */
+  {
+    sandbox.localStorage.removeItem("apex.waypoints.v1");
+    const c = manifest.bbox, at = [(c[0] + c[2]) / 2 + 0.013, (c[1] + c[3]) / 2 - 0.011];
+    const save = () => { grab("pc-wpt")._listeners = {}; theMap._hit = [];
+      theMap.fire("contextmenu", { lngLat: { lng: at[0], lat: at[1] } }); frames(1); flushTimeouts();
+      grab("pc-wpt").fire("click"); flushTimeouts(); return grab("panel")._html || ""; };
+    const cards = [save(), save(), save()];
+    let recs = []; try { recs = JSON.parse(sandbox.localStorage.getItem("apex.waypoints.v1") || "[]"); } catch { }
+    const names = recs.map((r) => r.n).reverse();      /* wpAdd puts the newest first */
+    const judge = (n, k) => n.length === 3 && new Set(n).size === 3 && n[1] === n[0] + " 2" && n[2] === n[0] + " 3"
+      && !/already saved/.test(k[0]) && k.slice(1).every((x) => x.includes("A waypoint named " + n[0] + " was already saved") && /both are kept/.test(x));
+    const ctl = !judge([names[0], names[0] + " 2"], cards) && !judge(names, [cards[0], cards[0], cards[2]])
+      && !judge([names[0], names[0], names[0]], cards);
+    ok(judge(names, cards) && ctl,
+       `A265 · three saves at one spot keep three waypoints ("${names.join('", "')}"), the 2nd and 3rd numbered, and their cards say the name was taken and both are kept; `
+       + `the judge rejects a save that replaced one, a card that said nothing, and one name three times (${ctl})`);
+    sandbox.localStorage.removeItem("apex.waypoints.v1");
+  }
+  /* A243 · the ride sheet's Elevation is the rider's own */
+  {
+    const N = sandbox.window.__nav, gc = theMap.getCenter, R1 = sandbox.Date;
+    const num = (t) => (String(t).match(/^([\d,]+) ft\b/) || [])[1] || null;
+    const cell = () => grab("v-elev").textContent, ro = () => grab("ro-elev").textContent;
+    const roAt = (p) => { theMap.getCenter = () => ({ lng: p[0], lat: p[1] }); try { theMap.fire("move"); } finally { theMap.getCenter = gc; } return ro(); };
+    const ctr = gc.call(theMap), eC = num(roAt([ctr.lng, ctr.lat]));
+    let p = null, eP = null;
+    /* the fix at one of the region's own anchors (in the region, so the
+       fix is not "away"), the first whose elevation differs from the centre's */
+    for (const a of anchors) { if (p) break; const q = [a[1], a[2]];
+      const e = num(roAt(q)); if (e && eC && e !== eC) { p = q; eP = e; } }
+    const shift = (ms) => { sandbox.Date = class extends R1 { constructor(...a) { if (a.length) super(...a); else super(R1.now() + ms); }
+      static now() { return R1.now() + ms; } }; };
+    let s0 = null, s1 = null, s2 = null, w = null;
+    const fixAt = (q) => { geo.cb && geo.cb({ coords: { longitude: q[0], latitude: q[1], accuracy: 5 } }); flushTimeouts(); frames(1); };
+    if (p && !NO_GPS) {
+      try {
+        N.pos("none"); theMap.fire("move"); flushTimeouts();
+        s0 = { cell: cell(), ro: ro(), live: N.live() !== null };
+        /* the drill's own state (landmine 252): a fix now, by the one-shot
+           locate's own watch — or the fresh one Locate already holds */
+        grab("c-locate").fire("click"); fixAt([ctr.lng, ctr.lat]);
+        /* then the clock set back an hour: that fix is stamped ahead of it,
+           so its age is unknown — Locate must ask for a new fix (A272) and
+           the cell must not use it; the new fix arrives at p */
+        shift(-3600000); grab("c-locate").fire("click");
+        w = { card: String(grab("panel")._html || ""), watch: typeof geo.cb === "function" };
+        fixAt(p); theMap.fire("move");
+        s1 = { cell: cell(), ro: ro(), live: N.live() !== null };
+        /* 60 s on, with NO map move and no ride: the cell dashes at the
+           fix's own expiry (the one timer the fix set, run here by hand) */
+        shift(-3600000 + 60000); flushTimeouts(20000);
+        s2 = { cell: cell(), live: N.live() !== null };
+      } finally { sandbox.Date = R1; }
+    }
+    const asks = (x) => !!x && x.watch && /Waiting for a GPS fix/.test(x.card) && !/You are here/.test(x.card);
+    if (!NO_GPS) ok(!!p && asks(w) && !asks({ ...w, card: "<b>You are here.</b> Inside the downloaded area." }) && !asks({ ...w, watch: false }),
+       `A272 · with the clock set back an hour after the last fix, Locate asks for a new fix ("${w ? w.card.replace(/<[^>]*>/g, "").slice(0, 60) : "?"}", watch ${w && w.watch ? "open" : "NOT open"}); `
+       + `the judge rejects "You are here" and a Locate that opened no watch`);
+    const judge = (a, b, d) => !!a && !!b && !!d && !a.live && a.cell === "\u2014" && num(a.ro) === eC && / ft at map centre$/.test(a.ro)
+      && b.live && num(b.cell) === eP && b.cell === eP + " ft" && num(b.ro) === eC && / ft at map centre$/.test(b.ro)
+      && !d.live && d.cell === "\u2014";
+    const ctl = !!s1 && !judge(s0, { ...s1, cell: eC + " ft" }, s2) && !judge({ ...s0, cell: eC + " ft" }, s1, s2)
+      && !judge(s0, s1, { ...s2, cell: s1.cell }) && !judge({ ...s0, ro: eC + " ft elevation" }, s1, s2);
+    if (NO_GPS) ok(cell() === "\u2014", `A243 · no receiver: the ride sheet's Elevation is a dash ("${cell()}")`);
+    else ok(!!p && judge(s0, s1, s2) && ctl,
+       `A243 · the ride sheet's Elevation: "${s0 && s0.cell}" before a fix (the centre reads "${s0 && s0.ro}"); "${s1 && s1.cell}" at a live fix `
+       + `${p ? p.map((x) => x.toFixed(3)).join(",") : "(no point with its own elevation found)"} while the centre still reads "${s1 && s1.ro}"; "${s2 && s2.cell}" once that fix is 60 s old, the map still; `
+       + `the judge rejects the centre's number in the cell, a cell filled before a fix, a stale fix's number kept, and the old unlabelled readout (${ctl})`);
   }
 }
 
