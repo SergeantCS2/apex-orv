@@ -244,6 +244,8 @@ The screens are outside the repo: the "before" screens in
   the recovered decisions still cite the right items; landmine 251.
 - At take 190's seal (2026-11-02): agenda A269, landmine 255. Next
   numbers: take 191; agenda A270; landmine 256.
+- After take 191 and CI's tags (2026-11-02): agenda A270, landmine 257.
+  Next numbers: take 192; agenda A271; landmine 258.
 
 ## Order (as of 2026-11-01)
 

@@ -1,0 +1,42 @@
+name: tag
+
+# A take's tag by hand: an annotated tN on a commit CI built green on main.
+# The build workflow tags a take itself after its first green build of main
+# (ci/tag_take.sh); this is for a take built before that, or a missed one.
+# Run it from the Actions tab ("Run workflow"). It pushes nothing unless the
+# commit is on main, carries that take in its BUILD and has a successful
+# build run; an existing tag is left as it is.
+
+on:
+  workflow_dispatch:
+    inputs:
+      take:
+        description: "The take number, e.g. 190"
+        required: true
+      commit:
+        description: "The full sha of the commit CI built green on main"
+        required: true
+      release:
+        description: "Its release tag, e.g. take-101 (named in the tag's message)"
+        required: false
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Tag the take
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAKE: ${{ inputs.take }}
+          COMMIT: ${{ inputs.commit }}
+          REL: ${{ inputs.release }}
+        run: bash ci/tag_take.sh "$TAKE" "$COMMIT" "$REL" check

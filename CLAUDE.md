@@ -86,9 +86,16 @@ cites goes into its HANDOFF entry.
   and stay byte-identical (`cmp` them). The seed job and `apex-seed*.zip`
   in `push.paths` are load-bearing (landmine 202).
 - Standing go (the maintainer, 2026-11-01): push to the session's own
-  `claude/…` branch and open draft pull requests. Never push to main, tag,
+  `claude/…` branch and open draft pull requests. Never push to main,
   publish a release, touch Play, or change signing or secrets without the
-  maintainer's explicit go; he merges every pull request.
+  maintainer's explicit go. Since 2026-11-02 he lets a session merge its
+  pull requests once CI is green ("merge them yourself … when they're
+  green").
+- Tags (the maintainer, 2026-11-02, "CI tags tN itself"): CI tags each
+  take `tN` on its first green build of main (`ci/tag_take.sh`, after the
+  release). A take built before that, or a missed one, is tagged by the
+  `tag` workflow (Actions, "Run workflow": take, commit, release). A
+  session never pushes a tag: its git gets HTTP 403 (landmine 257).
 
 ## Truth
 Code is the truth; a document that disagrees with it is the bug. Fix the
