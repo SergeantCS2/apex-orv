@@ -355,7 +355,9 @@ const fr0 = await page.evaluate(async () => {
   const rings = !!(rr && cr) && rr.left <= cr.left && rr.top <= cr.top && rr.right >= cr.right && rr.bottom >= cr.bottom;
   const txt = (document.getElementById('tour-card') || {}).textContent || '';
   const seenBefore = T.seen();
-  const btns = ['tour-next', 'tour-notnow', 'tour-never', 'tour-x'].map((id) => !!document.getElementById(id));
+  /* take 190 · A263 · Next, Skip (never again) and × (not now) */
+  const btns = ['tour-next', 'tour-never', 'tour-x'].map((id) => !!document.getElementById(id))
+    .concat([/^Skip$/.test(((document.getElementById('tour-never') || {}).textContent || '').trim()), !document.getElementById('tour-notnow')]);
   const how = on ? T.close('notnow') : null;
   return { on, visible, rings, rr: rr && [rr.left, rr.top, rr.width, rr.height].map(Math.round), cr: cr && [cr.left, cr.top, cr.width, cr.height].map(Math.round), txt: txt.slice(0, 60), seenBefore, btns, how, seenAfter: T.seen() };
 });
@@ -364,7 +366,7 @@ else {
   ok(fr0.on && fr0.visible && fr0.rings && /What are you doing today\?/.test(fr0.txt),
      `first run: the tour opens itself after the map loads and rings the mode chip — "What are you doing today?" (ring ${fr0.rr} · chip ${fr0.cr} · on=${fr0.on} visible=${fr0.visible})`);
   ok(fr0.btns.every(Boolean) && fr0.how === 'notnow' && !fr0.seenBefore && !fr0.seenAfter,
-     `every step carries Next, Not now, Don't show again and ×; Not now closes it and leaves the flag clear`);
+     `every step carries Next, Skip and × (take 190 · A263: no separate Not now); × — not now — closes it and leaves the flag clear`);
 }
 
 const info = await page.evaluate(() => {
@@ -1296,7 +1298,9 @@ if (zoomed.trails > 0) {
        `${h2.cName}: ${h2.cN} tiles planned at z13–15, every centre inside its rings (z13 ${h2.cz[13]} · z14 ${h2.cz[14]} · z15 ${h2.cz[15]})`);
     ok(h2.sN >= 12300 && h2.sN <= 12600 && h2.sZ && h2.sPatch === 0 && h2.sN < 0.4 * h2.box,
        `the state clips the ${h2.box.toLocaleString()}-tile box to ${h2.sN.toLocaleString()} land tiles at z13, none already shipped (~${Math.round(h2.sMB)} MB)`);
-    ok(/THIS VIEW/.test(h2.sheet) && /COUNTY/.test(h2.sheet) && /THE WHOLE STATE/.test(h2.sheet) && (h2.sheet.match(/ tiles · /g) || []).length >= 2
+    /* take 190 · A259 · the tier names are sentence case (the cards' own
+       titles, "This view", "Roscommon County", "The whole state") */
+    ok(/this view/i.test(h2.sheet) && /county/i.test(h2.sheet) && /the whole state/i.test(h2.sheet) && (h2.sheet.match(/ tiles · /g) || []).length >= 2
        && h2.sheetBtns.view && h2.sheetBtns.county && h2.sheetBtns.state && !h2.busy3,
        `the sheet quotes all three tiers before any button is pressed (this view ${h2.viewN.toLocaleString()} tiles / ${h2.viewMB} MB${h2.viewMB > 500 ? ', told to zoom in' : h2.viewN === 0 ? ', already sharp here' : ''}), and nothing has started`);
     ok(/Not enough space/.test(h2.q100.txt) && !h2.q100.state && h2.q100.county,
@@ -1439,6 +1443,13 @@ if (zoomed.trails > 0) {
     const before = T.state().steps[T.state().i].id;
     click('tour-next'); await wait(120);
     const after = { id: T.state().steps[T.state().i].id, i: T.state().i, on: T.state().on };
+    T.close('notnow');
+    /* take 190 · A263 · with the HD chip hidden, the count follows the
+       steps actually shown: every card's "N of M" has the same M, and it is
+       the number of cards the walk shows */
+    T.reset(); T.start(); await wait(60);
+    const counts = []; let g4 = 0;
+    while (T.state().on && g4++ < 12) { counts.push(((document.getElementById('tour-n') || {}).textContent || '').trim()); click('tour-next'); await wait(60); }
     T.close('notnow'); hd.style.display = was;
     /* 5 · Don't show again sets the flag; Tools still starts it */
     T.reset(); T.start(); await wait(60); click('tour-never'); await wait(60);
@@ -1461,7 +1472,7 @@ if (zoomed.trails > 0) {
     /* take 188 · A217 · the steps' order is READ, not typed (landmine 189):
        the step before the HD chip, and the one a hidden HD chip hands on to */
     const ids = T.steps.map((x) => x.id), hdAt = ids.indexOf('c-hd');
-    return { n1, before, after, never, replay, back, done, nSteps: T.steps.length,
+    return { n1, before, after, counts, never, replay, back, done, nSteps: T.steps.length,
              wantBefore: hdAt > 0 ? ids[hdAt - 1] : null, wantAfter: hdAt >= 0 ? ids[hdAt + 1] : null };
   });
   if (tr.missing) ok(false, "take-182 tour hooks missing");
@@ -1471,8 +1482,13 @@ if (zoomed.trails > 0) {
     ok(!!tr.wantAfter && tr.before === tr.wantBefore && tr.after.id === tr.wantAfter && tr.after.on,
        `a hidden chip's step is skipped, not faked (after ${tr.before}: ${tr.after.id}, HD hidden; `
        + `the steps say ${tr.wantBefore} then ${tr.wantAfter}, of ${tr.nSteps})`);
+    { const c = tr.counts || [], ms = c.map((x) => +((x.match(/of (\d+)$/) || [])[1] || 0)), ns = c.map((x) => +((x.match(/^(\d+) of/) || [])[1] || 0));
+      const countOk = (n, m, len) => len > 0 && m.every((x) => x === len) && n.every((x, i) => x === i + 1);
+      ok(countOk(ns, ms, c.length) && c.length < tr.nSteps && !countOk(ns, ms.map(() => tr.nSteps), c.length),
+         `A263 · with the HD chip hidden the tour shows ${c.length} of its ${tr.nSteps} steps and says so on every card (${c.join(", ")}); `
+         + `the judge rejects a count of all ${tr.nSteps}`); }
     ok(!tr.never.on && tr.never.seen && tr.replay.on && tr.replay.i === 0,
-       `Don't show again closes it and sets the flag; Tools → Take the tour still starts it`);
+       `Skip (never again) closes it and sets the flag; Tools → Take the tour still starts it`);
     ok(tr.back.r === 'closed:tour' && !tr.back.on && !tr.back.seen, `the back button closes the tour as Not now`);
     ok(!tr.done.on && tr.done.seen && tr.done.tab === tr.done.tab0 && tr.done.tab0 === 'plan',
        `Done sets the flag and hands back the tab the tour started on (${tr.done.tab0})`);
@@ -1499,7 +1515,14 @@ if (zoomed.trails > 0) {
       M.apply("water", { silent: true }); await s(250);
       const craft0 = P.craft();
       const hK = P.hours(10);
+      /* take 190 · A249 · Your machine is rows: the canoe's is picked, and a
+         land machine's is refused by key in Water */
       document.getElementById("c-machine").click(); await s(150);
+      const landRow = document.querySelector('#panel [data-mach="bike"]');
+      if (landRow) landRow.click(); await s(120);
+      const landRefused = { craft: P.craft(), note: ((document.getElementById("mach-note") || {}).textContent || "") };
+      const canoeRow = document.querySelector('#panel [data-mach="canoe"]');
+      if (canoeRow) canoeRow.click(); await s(150);
       const craft1 = P.craft();
       const hAfter = P.hours(10);
       // a river with two NAMED stops, from the bundle
@@ -1539,14 +1562,16 @@ if (zoomed.trails > 0) {
       const fmt = G.fmt(canned);
       M.apply(was, { silent: true });
       m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
-      return { craft0, craft1, hK, hAfter, riv: c && c.n, run, livDrawn,
+      return { craft0, craft1, landRefused, hK, hAfter, riv: c && c.n, run, livDrawn,
                bridge: bridge && bridge.riv, gcount: GS ? GS.g.length : 0,
                gnear: gnear && gnear.g.id, fmt };
     }, liv[0] || null, livIdx);
     if (wb.missing) ok(false, "water-batch hooks missing");
     else {
-      ok(wb.craft0 === "kayak" && wb.craft1 === "canoe",
-         `Water hands you a kayak and the chip cycles craft (${wb.craft0} -> ${wb.craft1})`);
+      ok(wb.craft0 === "kayak" && wb.craft1 === "canoe" && wb.landRefused.craft === "kayak"
+         && /used in the land modes/.test(wb.landRefused.note),
+         `Water hands you a kayak and Your machine picks a craft (${wb.craft0} -> ${wb.craft1}); the bike's row is refused there `
+         + `("${wb.landRefused.note.slice(0, 48)}", still ${wb.landRefused.craft})`);
       ok(wb.hK !== wb.hAfter,
          `float pace follows the craft (10 mi: ${wb.hK} as a kayak, ${wb.hAfter} as a canoe)`);
       ok(!!wb.run && /Put in/.test(wb.run) && /Take out/.test(wb.run) &&
@@ -3247,7 +3272,13 @@ if (zoomed.trails > 0) {
     b.click(); await s(400);
     const t = document.body.innerText;
     const hrefs = [...document.querySelectorAll("a[href]")].map((a) => a.href);
-    return { shown: /Where the data comes from/i.test(t),
+    /* take 190 · A257 · the card's two lists, in order: the agencies' box
+       follows OFFICIAL SOURCES, the other data's box follows OTHER DATA */
+    const P = document.getElementById("panel"), boxes = P ? [...P.querySelectorAll(".sbox")] : [];
+    const ks = P ? [...P.querySelectorAll(".k")].map((k) => k.textContent.trim()) : [];
+    const box = (i) => boxes[i] ? [...boxes[i].querySelectorAll("a[href]")].map((a) => a.href) : [];
+    return { shown: /independent app/i.test(t) && /OFFICIAL SOURCES/i.test(t),
+             kicks: ks, official: box(0), other: box(1),
              disclaims: /not\s+affiliated/i.test(t) && /any other government agency/i.test(t),
              dnr: hrefs.some((h) => /michigan\.gov\/dnr/.test(h)),
              usfs: hrefs.some((h) => /fs\.usda\.gov/.test(h)),
@@ -3261,6 +3292,19 @@ if (zoomed.trails > 0) {
        "and states plainly that the app is not affiliated with any government agency");
     ok(src.dnr && src.usfs && src.usgs && src.osm,
        `every government source it republishes is linked (DNR ${src.dnr}, USFS ${src.usfs}, USGS ${src.usgs}, OSM ${src.osm})`);
+    /* take 190 · A257 · the Census Bureau among the agencies (the maintainer,
+       2026-10-02); OpenStreetMap and AWS Terrain Tiles under OTHER DATA, not
+       under "These agencies are the authority" (2026-10-08, item 4). Its
+       control: the same lists with OpenStreetMap moved back among the
+       agencies, which the judge must reject */
+    const listsOk = (o) => o.kicks.indexOf("OFFICIAL SOURCES") >= 0 && o.kicks.indexOf("OTHER DATA") > o.kicks.indexOf("OFFICIAL SOURCES")
+      && o.official.some((h) => /census\.gov/.test(h)) && o.official.some((h) => /michigan\.gov\/dnr/.test(h))
+      && !o.official.some((h) => /openstreetmap|amazonaws|opendata\.aws/.test(h))
+      && o.other.some((h) => /openstreetmap\.org/.test(h)) && o.other.some((h) => /registry\.opendata\.aws/.test(h));
+    const forged = { ...src, official: src.official.concat(src.other.filter((h) => /openstreetmap/.test(h))) };
+    ok(listsOk(src) && !listsOk(forged),
+       `A257 · Data sources lists ${src.official.length} agencies (the Census Bureau among them) under OFFICIAL SOURCES and `
+       + `${src.other.length} under OTHER DATA (OpenStreetMap, AWS Terrain Tiles); its control, OpenStreetMap among the agencies, is rejected`);
   }
   /* take 189 · A232 · at 360 px wide every "BSD 3-Clause" on Data sources
      stays on one line: take 188's 13b3 shots read "BSD 3-" / "Clause". Read
@@ -4009,8 +4053,16 @@ if (zoomed.trails > 0) {
     for (const t of ["map", "plan", "ride", "tools"]) {
       document.querySelector(`#tabs .tab[data-go="${t}"]`).click();
       await s(180);
-      for (const c of document.querySelectorAll(".chip[data-tab]"))
-        if (!c.hidden) seen[c.id] = t;
+      /* take 190 · A247 · a destination is its strip's chips and, for Plan and
+         Tools, the rows of the sheet its tab opens: drawn, not merely
+         un-hidden (an index is hidden whole, its rows are not) */
+      for (const c of document.querySelectorAll(".chip[data-tab], .srow[data-tab]"))
+        if (!c.hidden && c.getClientRects().length) seen[c.id] = t;
+      /* take 190 · A262 · on the Ride tab the drawn Start stands for the
+         Ride tab's own (c-ride): the Ride card's Start riding, or route
+         cards' Ride it — each one's handler presses it */
+      if (t === "ride") for (const id of ["rt-start", "rc-ride"]) { const e = document.getElementById(id);
+        if (e && !e.hidden && e.getClientRects().length && !seen["c-ride"]) seen["c-ride"] = t; }
     }
     // panels reachable from a chip
     document.querySelector('#tabs .tab[data-go="tools"]').click(); await s(150);
@@ -4038,6 +4090,74 @@ if (zoomed.trails > 0) {
   ok(reach.diag.length === 3, `diagnostics reachable behind one entry (${reach.diag.join(", ")})`);
   ok(reach.groups >= 7, `${reach.groups} layer groups reachable from Map`);
   ok(reach.acts.length >= 4, `action row always available: ${reach.acts.join(", ")}`);
+
+  /* take 190 · A247 · THE SHEET in a real browser. (1) Off a ride a sheet
+     draws no footer — the stats row, coordinates and action row — and a
+     place card still does (the footer belongs to cards about a place); its
+     control: the action row forced drawn in the sheet. (2) Back three
+     ways: the back row from a tool to its index, the hardware back the
+     same, the grabber from the index folding it onto Map; its control: the
+     back row planted away (not one tap). (3) After the fold, Return home on
+     the folded drawer is one tap; its control: an unscoped footer rule. */
+  const sx = await page.evaluate(async () => {
+    const s = (ms) => new Promise((r) => setTimeout(r, ms));
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    const settle = async () => { for (let i = 0; i < 60; i++) { await frame();
+      if (!document.getAnimations().some((a) => a.playState === "running" && a.effect
+        && isFinite(a.effect.getComputedTiming().endTime))) return true; await s(30); } return false; };
+    const plant = (css) => { const st = document.createElement("style"); st.id = "v4plant-sheet"; st.textContent = css; document.head.appendChild(st); return st; };
+    const drawn = (id) => { const e = document.getElementById(id); return !!e && e.getClientRects().length > 0 && getComputedStyle(e).display !== "none"; };
+    const one = (id) => { const e = document.getElementById(id); if (!e) return false; const r = e.getBoundingClientRect();
+      if (!(r.width > 0 && r.height > 0)) return false; const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !!h && (h === e || e.contains(h)); };
+    const tab = (t) => document.querySelector(`#tabs .tab[data-go="${t}"]`);
+    const on = () => (document.querySelector("#tabs .tab.on") || {}).dataset ? document.querySelector("#tabs .tab.on").dataset.go : null;
+    const SX = window.__sheet, out = {};
+    try {
+      tab("map").click(); window.railSet(false); await settle();
+      /* (1) */
+      tab("plan").click(); await settle(); await s(120);
+      const foot = () => ({ grid: drawn("grid"), coords: drawn("coords"), actions: drawn("actions") });
+      out.sheetFoot = foot();
+      { const st = plant("#rail[data-sheet] #actions{display:flex!important;max-height:80px!important;opacity:1!important}"); await settle();
+        out.sheetFootCtl = foot(); st.remove(); await settle(); }
+      tab("map").click(); await settle();
+      window.show("<b>A place card (render)</b>", ""); await settle(); await s(120);
+      out.cardFoot = foot();
+      window.railSet(false); await settle();
+      /* (2) */
+      const two = async () => {
+        const r = {};
+        tab("tools").click(); await settle();
+        document.getElementById("c-sources").click(); await settle(); await s(120);
+        r.toolBack = one("sh-back"); r.k0 = SX.state().kind;
+        if (r.toolBack) document.getElementById("sh-back").click(); else SX.back();
+        await settle(); r.k1 = SX.state().kind; r.t1 = SX.state().tab;
+        document.getElementById("c-sources").click(); await settle();
+        r.hw = window.__back.onBack(); await settle(); r.k2 = SX.state().kind;
+        document.getElementById("peek").click(); await settle(); await s(120);
+        r.k3 = SX.state().kind; r.folded = /\bfolded\b/.test(document.getElementById("rail").className); r.tab = on();
+        return r; };
+      out.back = await two();
+      { const st = plant("#sheetbar{display:none!important}"); await settle(); out.backCtl = await two(); st.remove(); await settle(); }
+      /* (3) */
+      out.home = one("btn-home");
+      { const st = plant("#shell:not([data-ride]) #rail #actions{display:none!important}"); await settle(); out.homeCtl = one("btn-home"); st.remove(); await settle(); }
+      tab("map").click(); await settle();
+    } catch (e) { out.error = String((e && e.stack) || e); }
+    return out;
+  });
+  { const noFoot = (f) => !!f && !f.grid && !f.coords && !f.actions;
+    ok(!sx.error && noFoot(sx.sheetFoot) && !noFoot(sx.sheetFootCtl) && !!sx.cardFoot && sx.cardFoot.actions,
+       `A247 · a sheet off a ride draws no footer (${JSON.stringify(sx.sheetFoot)}); a place card does (action row ${sx.cardFoot && sx.cardFoot.actions}); `
+       + `its control, the action row forced drawn in the sheet, is caught (${JSON.stringify(sx.sheetFootCtl)})` + (sx.error ? " — " + sx.error : ""));
+    const backOk = (b) => !!b && b.toolBack && b.k0 === "tool" && b.k1 === "index" && b.t1 === "tools" && b.hw === "closed:sheet"
+      && b.k2 === "index" && b.k3 === null && b.folded && b.tab === "map";
+    ok(!sx.error && backOk(sx.back) && !backOk(sx.backCtl),
+       `A247 · back three ways: the back row ${JSON.stringify(sx.back)}; its control, the back row planted away, is caught `
+       + `(${sx.backCtl ? "back row one tap " + sx.backCtl.toolBack : "not read"})`);
+    ok(!sx.error && sx.home === true && sx.homeCtl === false,
+       `A247 · after a sheet folds, Return home on the folded drawer is one tap (${sx.home}); its control, an unscoped footer rule, is caught (${sx.homeCtl})`); }
 
   /* take 188 · A217 · Wrong turn is the SIMULATOR's control (it veers the
      simulated track to fire the off-route alert; on a GPS ride the alert
@@ -4144,6 +4264,154 @@ if (zoomed.trails > 0) {
        + `reads ${(fc.plantStale || []).length} back (must fail)` + (fc.error ? " — " + fc.error : ""));
   }
 
+  /* take 190 · piece P in a real browser. (1) Fuel range's stepper keeps
+     its row one row tall, its − and + each 48 px and one tap; its control:
+     the row's own padding planted back (the row grows). (2) Your machine
+     draws its chosen row's dot and inset line, and a tap on Quad writes the
+     row's value. (3) Loop from here's distances wrap inside the card. (4) A
+     Saved record's row, Rename and Delete each one tap, nothing wider than
+     the screen. */
+  {
+    const pp = await page.evaluate(async () => {
+      const s = (ms) => new Promise((r) => setTimeout(r, ms));
+      const tab = async (t) => { document.querySelector(`#tabs .tab[data-go="${t}"]`).click(); await s(320); };
+      const one = (e) => { if (!e) return false; const q = e.getBoundingClientRect(); if (q.width < 47.5 || q.height < 47.5) return false;
+        const h = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2); return !!h && e.contains(h); };
+      const out = {};
+      try {
+        await tab("plan");
+        const fr = document.getElementById("c-fuel"), rowH = (q) => Math.round(q.getBoundingClientRect().height);
+        const nb = document.getElementById("c-loop");
+        out.fuel = { h: rowH(fr), nb: Math.round(parseFloat(getComputedStyle(nb).minHeight)) || 0,
+          dn: one(document.getElementById("c-fuel-dn")), up: one(document.getElementById("c-fuel-up")) };
+        const pl = document.createElement("style"); pl.textContent = ".srow.sfuel{padding:var(--s-2) var(--s-3)!important}";
+        document.head.appendChild(pl); await s(60); out.fuelCtl = rowH(fr); pl.remove(); await s(60);
+        document.getElementById("c-machine").click(); await s(320);
+        const rows = [...document.querySelectorAll("#panel [data-mach]")];
+        const on = rows.find((b) => b.classList.contains("on"));
+        /* the dot is the label column's ::before (a direct child: the V4
+           audit reads an element and its children) */
+        const dot = on ? getComputedStyle(on.querySelector(":scope > .sr-t"), "::before") : null;
+        out.mach = { n: rows.length, drawn: rows.filter((b) => b.getClientRects().length).length, on: on ? on.dataset.mach : null,
+          dot: dot ? dot.width + " " + dot.backgroundColor : null, line: on ? getComputedStyle(on).boxShadow : "",
+          offLine: rows.find((b) => !b.classList.contains("on")) ? getComputedStyle(rows.find((b) => !b.classList.contains("on"))).boxShadow : "" };
+        const was = out.mach.on, q = document.querySelector('#panel [data-mach="quad"]');
+        if (q) { q.click(); await s(250); }
+        out.mach.after = document.getElementById("c-machine-v").textContent;
+        const back = document.querySelector(`#panel [data-mach="${was}"]`); if (back) { back.click(); await s(250); }
+        await tab("plan"); document.getElementById("c-loop").click(); await s(320);
+        const pan = document.getElementById("panel"), lp = [...document.querySelectorAll("#panel [data-loop]")];
+        const pr = pan.getBoundingClientRect();
+        out.loop = { n: lp.length, inside: lp.every((b) => { const r = b.getBoundingClientRect(); return r.left >= pr.left - 0.5 && r.right <= pr.right + 0.5; }),
+          find: one(document.getElementById("lp-find")), over: pan.scrollWidth > pan.clientWidth + 1 };
+        const KEY = "apex.waypoints.v1", wp0 = localStorage.getItem(KEY);
+        try {
+          localStorage.setItem(KEY, JSON.stringify([{ n: "A long name for a spot by the river crossing", p: [-84.6, 44.6], r: null, ts: 7 }]));
+          await tab("plan"); document.getElementById("c-saved").click(); await s(320);
+          const rec = document.querySelector("#panel .svrec");
+          out.saved = { row: one(rec && rec.querySelector(".srow")) || (rec && rec.querySelector(".srow").getBoundingClientRect().height >= 47.5),
+            ren: one(rec && rec.querySelector("[data-wpren]")), del: one(rec && rec.querySelector("[data-wpdel]")),
+            wide: document.documentElement.scrollWidth > innerWidth + 1 || (rec ? rec.getBoundingClientRect().right > innerWidth + 0.5 : true) };
+        } finally { if (wp0 === null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, wp0); }
+      } catch (e) { out.error = String(e); }
+      try { window.railSet(false); await tab("map"); } catch (e) {}
+      return out;
+    });
+    const f = pp.fuel || {}, m = pp.mach || {}, l = pp.loop || {}, v = pp.saved || {};
+    const fuelOk = (h, nb) => h <= nb + 0.5;
+    ok(!pp.error && fuelOk(f.h, f.nb) && f.dn && f.up && !fuelOk(pp.fuelCtl, f.nb),
+       `A250 · Fuel range's row is ${f.h} px, a row's least height ${f.nb} (--row-h); − and + each 48 px and one tap (${f.dn}/${f.up}); `
+       + `its control, the row's padding planted back: ${pp.fuelCtl} px, rejected` + (pp.error ? " — " + pp.error : ""));
+    ok(m.n === 7 && m.drawn === 7 && !!m.on && /^8px /.test(m.dot || "") && /inset/.test(m.line) && !/inset/.test(m.offLine)
+       && /^Quad 50/.test(m.after || ""),
+       `A249 · Your machine draws its ${m.drawn} of ${m.n} rows, the chosen one (${m.on}) with its dot (${m.dot}) and inset line, `
+       + `the others without; a tap on Quad writes the row's value ("${m.after}")`);
+    ok(l.n === 6 && l.inside && l.find && !l.over,
+       `A253 · Loop from here's ${l.n} distances wrap inside the card (${l.inside}), Find is one tap (${l.find}), nothing scrolls sideways (${!l.over})`);
+    ok(v.row && v.ren && v.del && !v.wide,
+       `A254 · a Saved record with a long name: its row, Rename and Delete each one tap (${v.row}/${v.ren}/${v.del}), nothing wider than the screen (${!v.wide})`);
+  }
+  /* take 190 · A251 · Search as a sheet in a real browser: "Where to?" on
+     the Plan index opens it with the Map tab marked, no footer, 12 % of the
+     screen still map; typed, the first result row is one tap; scrolled to
+     the foot of the results, the field is still drawn at the drawer's top.
+     Its control: the field's sticky rule planted away — scrolled, the field
+     leaves the drawer */
+  {
+    const sr = await page.evaluate(async () => {
+      const s = (ms) => new Promise((r) => setTimeout(r, ms));
+      const one = (e) => { if (!e) return false; const q = e.getBoundingClientRect(); if (q.height < 47.5) return false;
+        const h = document.elementFromPoint(q.left + Math.min(q.width / 2, 120), q.top + q.height / 2); return !!h && e.contains(h); };
+      const out = {};
+      try {
+        document.querySelector('#tabs .tab[data-go="plan"]').click(); await s(320);
+        document.getElementById("ix-search").click(); await s(400);
+        const rail = document.getElementById("rail"), rb = document.getElementById("railbody"), q = document.getElementById("q");
+        out.kind = window.__sheet.state().kind;
+        out.mapTab = document.querySelector('#tabs .tab[data-go="map"]').classList.contains("on");
+        out.band = +(rail.getBoundingClientRect().top / innerHeight).toFixed(3);
+        out.footer = ["grid", "actions"].filter((id) => { const e = document.getElementById(id); return e && e.getClientRects().length; });
+        out.home = one(document.getElementById("btn-home"));
+        q.value = "mi"; q.dispatchEvent(new Event("input", { bubbles: true })); await s(300);
+        out.rows = document.querySelectorAll("#hits .hit").length;
+        out.first = one(document.querySelector("#hits .hit"));
+        out.count = (document.getElementById("hits-n") || {}).textContent || "";
+        const fieldIn = () => { const a = q.getBoundingClientRect(), b = rb.getBoundingClientRect(); return a.height > 0 && a.top >= b.top - 0.5 && a.bottom <= b.bottom + 0.5; };
+        rb.scrollTop = rb.scrollHeight; await s(120); out.scrolls = rb.scrollHeight > rb.clientHeight + 1; out.fieldStays = fieldIn();
+        const pl = document.createElement("style"); pl.textContent = '#rail[data-sheet="search"] #q{position:static!important}';
+        document.head.appendChild(pl); await s(80); rb.scrollTop = rb.scrollHeight; await s(120); out.fieldCtl = fieldIn(); pl.remove();
+        q.value = ""; q.dispatchEvent(new Event("input", { bubbles: true }));
+      } catch (e) { out.error = String(e); }
+      try { window.__back && window.__back.onBack(); await s(300); window.railSet(false); await s(200); } catch (e) {}
+      return out;
+    });
+    /* the action row stays drawn (take 189's search was a card over it:
+       Return home one tap — landmine 135); the stats grid goes */
+    ok(!sr.error && sr.kind === "search" && sr.mapTab && sr.band >= 0.12 && sr.footer.join() === "actions" && sr.home && sr.rows >= 1 && sr.first
+       && /offline$/.test(sr.count) && (!sr.scrolls || (sr.fieldStays && !sr.fieldCtl)),
+       `A251 · "Where to?" opens search as a sheet (${sr.kind}) with the Map tab marked (${sr.mapTab}), ${Math.round((sr.band || 0) * 100)} % map above it, `
+       + `of the footer only the action row (${(sr.footer || []).join(", ") || "none drawn"}), Return home one tap (${sr.home}); typed, ${sr.rows} rows under "${sr.count}", the first one tap (${sr.first}); `
+       + (sr.scrolls ? `scrolled to the foot the field stays at the top (${sr.fieldStays}), its control the sticky rule away: ${sr.fieldCtl ? "STILL IN (not caught)" : "gone, caught"}`
+         : "the results fit without a scroll here (the sticky field is not exercised)") + (sr.error ? " — " + sr.error : ""));
+  }
+  /* take 190 · A262 · one Start on the Ride tab (the maintainer,
+     2026-10-02): the tab bar's Ride opens the Ride card, and of the three
+     Starts — the card's Start riding, the strip's Ride it, the folded
+     drawer's Ride — exactly one is drawn, open and folded. Its control:
+     the strip's chip forced drawn beside the card (two Starts) */
+  {
+    const one = await page.evaluate(async () => {
+      const s = (ms) => new Promise((r) => setTimeout(r, ms));
+      /* drawn means a tap at its centre lands on it (a button left in the
+         folded drawer's panel has boxes and is under the map) */
+      const vis = (id) => { const e = document.getElementById(id); if (!e || e.hidden || !e.getClientRects().length) return false;
+        const q = e.getBoundingClientRect(), h = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
+        return !!h && e.contains(h); };
+      const starts = () => ["rt-start", "c-ride", "btn-ride", "rc-ride"].filter(vis);
+      const out = {};
+      try {
+        document.querySelector('#tabs .tab[data-go="map"]').click(); await s(250);
+        document.querySelector('#tabs .tab[data-go="ride"]').click(); await s(450);
+        out.card = /Ride (from here|the route)/.test(document.getElementById("panel").textContent);
+        out.open = starts();
+        const pl = document.createElement("style"); pl.textContent = "#c-ride{display:inline-flex!important}";
+        document.head.appendChild(pl); await s(80); out.ctl = starts(); pl.remove(); await s(80);
+        window.railSet(false); await s(450);
+        out.folded = starts();
+        document.querySelector('#tabs .tab[data-go="map"]').click(); await s(250);
+        out.mapFolded = ["btn-ride"].filter(vis);
+      } catch (e) { out.error = String(e); }
+      return out;
+    });
+    const oneOk = (l) => Array.isArray(l) && l.length === 1;
+    /* open: the Ride card's Start riding, or — route cards up — their Ride it */
+    ok(!one.error && oneOk(one.open) && (one.open[0] === "rt-start" ? one.card : one.open[0] === "rc-ride") && oneOk(one.folded) && one.folded[0] === "c-ride"
+       && !oneOk(one.ctl) && one.mapFolded.length === 1,
+       `A262 · the Ride tab opens the Ride card (${one.card}) with one Start drawn (${(one.open || []).join(", ")}); folded, one (${(one.folded || []).join(", ")}); `
+       + `on the Map tab the folded drawer keeps its Ride (${(one.mapFolded || []).join(", ") || "NONE"}); its control, the strip's chip forced beside the card: `
+       + `${(one.ctl || []).join(", ")} — rejected` + (one.error ? " — " + one.error : ""));
+  }
+
   }
   if (RUN("home")) {
   /* A119 · the compass. Written AFTER printing the panel and reading it, which
@@ -4188,9 +4456,19 @@ if (zoomed.trails > 0) {
     document.getElementById("c-compass").click();
     await s(300);
     const still = box();
-    document.getElementById("c-markme").click();
-    await s(200);
+    /* take 190 · A260 · Mark this spot marks a FRESH fix: one is delivered
+       here through a watch that answers at once (the map's centre, inside
+       the region), and the mark must land on it */
+    const g0 = navigator.geolocation, gw0 = g0 && g0.watchPosition, gc0 = g0 && g0.clearWatch;
+    const ctr = window.map.getCenter();
+    if (g0) { g0.watchPosition = (ok) => { setTimeout(() => ok({ coords: { longitude: ctr.lng, latitude: ctr.lat, accuracy: 6,
+      speed: null, heading: null, altitude: null, altitudeAccuracy: null }, timestamp: Date.now() }), 60); return 4343; };
+      g0.clearWatch = () => {}; }
+    try { document.getElementById("c-markme").click(); await s(700); }
+    finally { if (g0) { g0.watchPosition = gw0; g0.clearWatch = gc0; } }
     const marked = document.getElementById("panel").innerText || "";
+    let markP = null; try { markP = (JSON.parse(localStorage.getItem("apex.waypoints.v1") || "[]")[0] || {}).p || null; } catch (e) {}
+    const markAt = [ctr.lng, ctr.lat];
     window.hudSet(8.9, 48.8, null);
     await s(300);
     const moving = box();
@@ -4198,8 +4476,11 @@ if (zoomed.trails > 0) {
     // leaving Tools must put it away
     document.querySelector('#tabs .tab[data-go="map"]').click();
     await s(250);
-    const closed = !!document.getElementById("cmppanel").hidden;
-    return { still, marked, moving, rose, closed };
+    /* take 190 · A258 · off a ride the compass is the sheet's: put away means
+       neither the floating panel nor the sheet's box is drawn */
+    const cs = document.getElementById("cmpsheet");
+    const closed = !!document.getElementById("cmppanel").hidden && !(cs && cs.getClientRects().length);
+    return { still, marked, moving, rose, closed, markP, markAt };
   });
   ok(cmp.rose === 1, "the compass draws a rose");
   /* Take 105 asserted the words "no heading yet". Take 109 gave the compass a
@@ -4219,7 +4500,10 @@ if (zoomed.trails > 0) {
   }
   ok(/you are here/.test(cmp.moving),
      "a waypoint at your own position reads 'you are here', not a 0.0 mi bearing");
-  ok(/Marked/.test(cmp.marked), "Mark this spot saves a waypoint in one tap");
+  { const at = cmp.markAt, near = (p) => !!p && !!at && Math.abs(p[0] - at[0]) < 1e-7 && Math.abs(p[1] - at[1]) < 1e-7;
+    ok(/MARKED/i.test(cmp.marked) && /Find it again under/.test(cmp.marked) && near(cmp.markP) && !near(at ? [at[0] + 0.01, at[1]] : null),
+       `Mark this spot saves a waypoint in one tap, on the fix that arrives (A260): saved at ${JSON.stringify(cmp.markP)}, `
+       + `the fix ${JSON.stringify(at)}; the judge rejects a spot 0.01° away`); }
   ok(cmp.closed, "leaving Tools closes the compass");
 
   }
@@ -4230,18 +4514,51 @@ if (zoomed.trails > 0) {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     document.querySelector('#tabs .tab[data-go="tools"]').click();
     await sleep(200);
-    const toolChips = [...document.querySelectorAll('.chip[data-tab="tools"]')]
-      .filter((c) => !c.hidden).map((c) => c.id);
-    const p = document.getElementById("diagpanel");
-    const closedFirst = !!p.hidden;
+    /* take 190 · A247 · the Tools tab opens its sheet: its rows, drawn */
+    const toolChips = [...document.querySelectorAll('.chip[data-tab="tools"], .srow[data-tab="tools"]')]
+      .filter((c) => !c.hidden && c.getClientRects().length).map((c) => c.id);
+    /* take 190 · A256 · off a ride Diagnostics opens in the sheet: its rows
+       are the card's, drawn, each handing off to the panel's own button;
+       About this build opens under it and back returns to it */
+    const SX = window.__sheet, p = document.getElementById("diagpanel");
+    const closedFirst = !!p.hidden && SX.state().tool === null;
     document.getElementById("c-diag").click();
     await sleep(320);
-    const rows = [...p.querySelectorAll(".chip")].map((c) => c.id);
-    // switching destination must put the sub-menu away
+    const rows = [...document.querySelectorAll("#panel [data-diag]")].filter((b) => b.getClientRects().length).map((b) => "c-" + b.dataset.diag);
+    const inSheet = { tool: SX.state().tool, title: (document.getElementById("sh-title") || {}).textContent, panelUp: !p.hidden };
+    const ab = document.querySelector('#panel [data-diag="about"]'); if (ab) ab.click(); await sleep(320);
+    const about = { tool: SX.state().tool, title: (document.getElementById("sh-title") || {}).textContent,
+      text: (document.getElementById("panel").innerText || "").slice(0, 40) };
+    document.getElementById("sh-back").click(); await sleep(320);
+    const backTo = { tool: SX.state().tool, title: (document.getElementById("sh-title") || {}).textContent };
+    /* its control, a real other path: About again, then the Tools tab
+       (a re-tap goes to the INDEX, not to Diagnostics) */
+    { const ab2 = document.querySelector('#panel [data-diag="about"]'); if (ab2) ab2.click(); await sleep(320); }
+    document.querySelector('#tabs .tab[data-go="tools"]').click(); await sleep(320);
+    const viaTab = { tool: SX.state().tool, title: (document.getElementById("sh-title") || {}).textContent };
+    /* take 190 · A259 · HD imagery from the Tools sheet: its card is written
+       after a storage read, and must still land IN the sheet, as three tier
+       cards; its control, the map column's HD button, opens it outside one */
+    document.querySelector('#tabs .tab[data-go="tools"]').click(); await sleep(200);
+    document.getElementById("c-hdmanage").click(); await sleep(700);
+    const hd = { tool: SX.state().tool, title: (document.getElementById("sh-title") || {}).textContent,
+      tiers: document.querySelectorAll("#panel .hdtier").length };
+    document.querySelector('#tabs .tab[data-go="map"]').click(); await sleep(250);
+    /* the map's HD button opens the same tool under Tools, and back folds
+       (plan190 §4); the control, a real other path: the card drawn by its
+       own function outside any sheet */
+    let hdMap = null, hdCtl = null;
+    { const b = document.getElementById("c-hd"); if (b && b.getClientRects().length) { b.click(); await sleep(700);
+        const st = SX.state(); document.getElementById("sh-back").click(); await sleep(400);
+        hdMap = { tool: st.tool, tab: st.tab, folded: /\bfolded\b/.test(document.getElementById("rail").className), after: SX.state().kind }; } }
+    if (typeof window.__hdCard === "function") { window.__hdCard(); await sleep(700);
+      hdCtl = { tool: SX.state().tool, title: "", kind: SX.state().kind, tiers: document.querySelectorAll("#panel .hdtier").length };
+      window.railSet(false); await sleep(250); }
+    // switching destination must put the sheet away
     document.querySelector('#tabs .tab[data-go="map"]').click();
     await sleep(250);
-    const closedOnLeave = !!p.hidden;
-    return { toolChips, closedFirst, rows, closedOnLeave };
+    const closedOnLeave = !!p.hidden && SX.state().kind === null;
+    return { toolChips, closedFirst, rows, closedOnLeave, inSheet, about, backTo, viaTab, hd, hdMap, hdCtl };
   });
   /* This asserted Tools held exactly ONE chip, which was true when the bucket
      was empty and became false the moment it was filled — which was the point
@@ -4253,11 +4570,25 @@ if (zoomed.trails > 0) {
      && !dg.toolChips.includes("c-pan"),
      `Tools holds real tools with diagnostics behind one entry (${dg.toolChips.join(", ")})`);
   ok(dg.closedFirst, "the diagnostics sub-menu starts closed");
-  ok(dg.rows.length === 3 && dg.rows.includes("c-selftest"),
-     `diagnostics holds ${dg.rows.length}: ${dg.rows.join(", ")}`);
+  ok(dg.rows.length === 3 && dg.rows.includes("c-selftest") && dg.inSheet.tool === "c-diag" && dg.inSheet.title === "Diagnostics" && !dg.inSheet.panelUp,
+     `diagnostics holds ${dg.rows.length}: ${dg.rows.join(", ")} — in the sheet under "${dg.inSheet.title}" off a ride (the floating panel ${dg.inSheet.panelUp ? "UP" : "down"})`);
   ok(dg.closedOnLeave,
      "leaving Tools closes the sub-menu — a panel left open across a switch is "
      + "how a UI starts feeling arbitrary");
+  /* the tiers this view offers (This view, its county, the state — a view
+     with no county under it offers two): the card in the sheet draws as
+     many as the same card drawn outside it */
+  { const hdOk = (h) => !!h && h.tool === "c-hdmanage" && h.title === "HD imagery" && h.tiers >= 2 && h.tiers <= 3
+      && (!dg.hdCtl || h.tiers === dg.hdCtl.tiers);
+    const mapOk = (m) => !m || (m.tool === "c-hdmanage" && m.tab === "tools" && m.folded && m.after === null);
+    ok(hdOk(dg.hd) && !!dg.hdCtl && !hdOk(dg.hdCtl) && dg.hdCtl.kind === null && dg.hdCtl.tiers >= 2 && mapOk(dg.hdMap),
+       `A259 · HD imagery from the Tools sheet lands in it ("${dg.hd.title}", ${dg.hd.tiers} tier cards) though its card is written `
+       + `after a storage read; from the map's HD button ${dg.hdMap ? JSON.stringify(dg.hdMap) : "(not drawn here)"}; its control, `
+       + `the same card drawn outside a sheet, is rejected (${JSON.stringify(dg.hdCtl)})`); }
+  { const parentOk = (a, b) => a.tool === "c-about" && a.title === "About this build" && b.tool === "c-diag" && b.title === "Diagnostics";
+    ok(parentOk(dg.about, dg.backTo) && !parentOk(dg.about, dg.viaTab),
+       `A256 · About this build opens under Diagnostics ("${dg.about.title}": "${dg.about.text.replace(/\s+/g, " ")}") and back returns to `
+       + `"${dg.backTo.title}"; its control, the Tools tab instead of back, lands elsewhere (${JSON.stringify(dg.viaTab)}) and is rejected`); }
 
   /* A120 · a panel that animates stays in the layout while hidden, so it must
      be proven UNCLICKABLE — an invisible control that still catches a tap is
@@ -5060,9 +5391,11 @@ for (const dev of DEVICES) {
         const endCtl = await at(false); hold.remove();
         const back = await at(true);
         return { end, endCtl, back }; };
-      const one = async (wantEnd) => {
+      const one = async (wantEnd, prep) => {
         if (panel.hidden) chip.click();
         await settle();
+        /* a plant measured in the state it is read in (the panel open) */
+        const pst = prep ? prep() : null; if (pst) await settle();
         const r = vis(panel), nr = vis(navEl), gr = vis(ng);
         const res = { drawn: !!r, banner: !!gr, top: r ? Math.round(r.top) : null, h: r ? Math.round(r.height) : 0,
           navBottom: nr ? Math.round(nr.bottom) : null, scrolls: panel.scrollHeight > panel.clientHeight + 1,
@@ -5077,21 +5410,36 @@ for (const dev of DEVICES) {
         res.usable = !!r && blocks.length > 0 && blocks.every((b) => { const x = b && b.getBoundingClientRect();
           return !!x && x.height > 0 && x.top >= r.top - 0.5 && x.bottom <= clipB + 0.5; });
         res.room = r ? Math.round(panel.clientHeight) : 0; res.need = panel.scrollHeight;
-        res.stop = tapOn(document.getElementById("hud-stop"), 48); res.chip = tapOn(chip, 44);
+        /* take 190 · A247 · the panel's one tap to close is its own close (its
+           chip is a row of the folded sheet now) */
+        res.stop = tapOn(document.getElementById("hud-stop"), 48); res.chip = tapOn(panel.querySelector(".pclose"), 44);
+        /* what a tap on the close lands on, named in the line when it is not the close */
+        { const pc = panel.querySelector(".pclose"), q = pc && vis(pc);
+          const h = q ? document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2) : null;
+          res.closeAt = !q ? "not drawn" : !h ? "nothing" : pc.contains(h) ? "the close"
+            : (h.id || (typeof h.className === "string" ? h.className.split(" ")[0] : h.tagName)) + ` at ${Math.round(q.left)},${Math.round(q.top)} ${Math.round(q.width)}x${Math.round(q.height)}`; }
         /* take 189 · cold audit · the Tools chips drawn (A231's hiding is for a
            small phone only), none under the attribution's (i), and the
            compass box ending on a whole line with its "more below" cue when
            it scrolls (a text line straddling the visible foot is a cut) */
-        const tchips = [...document.querySelectorAll("#tools .chip[data-tab=\"tools\"]")];
+        /* take 190 · A247 · the Tools strip holds no chip (they are sheet
+           rows): what must stay one tap with a panel open on a ride is the
+           ride's own row — Stop, Re-centre, North up, Voice — and the panel's
+           close, none of them under the attribution's (i) (landmine 135) */
+        const tchips = [...document.querySelectorAll("#hudbtns button")], pcl = panel.querySelector(".pclose");
         res.toolsN = tchips.length;
-        res.chips = tchips.filter((c) => !c.hidden && !!vis(c)).length;
+        res.chips = tchips.filter((c) => tapOn(c, 44)).length;
+        res.stripChips = [...document.querySelectorAll("#tools .chip[data-tab=\"tools\"]")].length;
         const ai = document.querySelector(".maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib"), air = ai && vis(ai);
-        res.attrib = air ? tchips.filter((c) => { const x = !c.hidden && vis(c); return !!x && hit(air, x); }).map((c) => c.id) : [];
+        res.attrib = air ? tchips.concat(pcl ? [pcl] : []).filter((c) => { const x = vis(c); return !!x && hit(air, x); }).map((c) => c.id) : [];
+        /* the (i) must be drawn for "over none" to mean anything (landmine 53) */
+        res.ai = air ? [Math.round(air.left), Math.round(air.top)] : null;
         if (panel === cmp && r) {
           const cc = cmpCut(r);
           res.lineCut = cc.cut; res.cue = cc.cue;
           if (wantEnd && res.scrolls) res.endRd = await endRead();
         }
+        if (pst) pst.remove();
         if (!panel.hidden) chip.click();
         await settle();
         return res; };
@@ -5101,29 +5449,39 @@ for (const dev of DEVICES) {
       let ruleFound = false, bare = null;
       /* take 189 · cold audit · the rule now sits in an @media block: looked
          for inside grouping rules too */
-      const findRule = (list, owner) => { for (let i = 0; i < list.length; i++) { const q = list[i];
-          if (q.selectorText && q.selectorText.includes("#diagpanel:not([hidden])) #tools")) return { owner, i, txt: q.cssText };
-          if (q.cssRules) { const x = findRule(q.cssRules, q); if (x) return x; } } return null; };
-      for (const sht of document.styleSheets) { let rules = null; try { rules = sht.cssRules; } catch (e) { continue; }
-        const fr = findRule(rules, sht);
-        if (fr) { ruleFound = true; fr.owner.deleteRule(fr.i);
-          try { bare = await one(); } finally { fr.owner.insertRule(fr.txt, fr.i); } break; } }
+      /* take 190 · A247 · A231's rule is retired (the strip under a riding
+         panel holds no Tools chip). Its control is the failure it fixed,
+         planted: the strip as tall as take 188's four rows at 360 x 800
+         (248 px), which must leave the panel unusable there */
+      { const tallStrip = plantCss("#shell[data-ride] #tools{min-height:248px!important}");
+        /* the plant measured as applied, not assumed (landmine 227) */
+        ruleFound = document.getElementById("tools").getBoundingClientRect().height >= 247;
+        try { bare = await one(); } finally { tallStrip.remove(); } }
       /* its controls: take 189's rule at every size with the (i) held at its
          unlifted place (the cover screen's shot: the (i) on "Diagnostics");
          and for the compass, the box's cap as it was before the line fit */
-      const fz = plantCss("#shell[data-ride]:has(#cmppanel:not([hidden]),#diagpanel:not([hidden])) #tools .chip:not(#c-compass):not(#c-markme):not(#c-diag){display:none}"
-        + ".maplibregl-ctrl-bottom-right{bottom:var(--r-lg)!important}");
-      const forced = await one(); fz.remove();
+      /* take 190 · A247 · its control, two plants the census must report: the
+         attribution corner moved onto the sheet's Stop by a transform of the
+         measured offset (a fixed position lands elsewhere inside the map's
+         container), and North up planted out of reach (not one tap) */
+      const forced = await one(false, () => {
+        const stp = document.getElementById("hud-stop").getBoundingClientRect();
+        const ai0 = document.querySelector(".maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib"), aq = ai0 ? ai0.getBoundingClientRect() : null;
+        const dx = aq ? Math.round(stp.left + 4 - aq.left) : 0, dy = aq ? Math.round(stp.top + 4 - aq.top) : 0;
+        return plantCss(`.maplibregl-ctrl-bottom-right{transform:translate(${dx}px,${dy}px)!important}#nav-north{visibility:hidden!important}`); });
       /* …and the same forced row with the (i) free: the lift must take it
          off the chip (the behaviour; the read above is its control) */
-      const fl = plantCss("#shell[data-ride]:has(#cmppanel:not([hidden]),#diagpanel:not([hidden])) #tools .chip:not(#c-compass):not(#c-markme):not(#c-diag){display:none}");
-      const lifted = await one(); fl.remove();
+      const lifted = await one();
       /* the compass box at a cap that lands in the MIDDLE of its first text
          line below the dial and heading (the cap's own --s-4 moved by the
          difference: what a screen of another height does), read with the
          line fit (it must end on a whole line, with its cue) and, its
          control, with the cap before the fit (the line is cut) */
       let mid = null, midCtl = null, midAt = null;
+      /* take 190 · the box must be CAPPED for a cap to land mid-line: with the
+         Tools strip empty the panel has room to spare, so the content is made
+         taller than any screen (after the box, as the tall read's plant does) */
+      const tallM = panel === cmp ? plantCss("#cmppanel::after{content:'';display:block;height:900px}") : null;
       if (panel === cmp) {
         if (panel.hidden) chip.click();
         await settle();
@@ -5142,6 +5500,7 @@ for (const dev of DEVICES) {
           mid = await one(true);
           const sc = plantCss("#cmppanel{max-height:min(62vh,calc(100% - var(--ride-top) - var(--strip-h,64px) - var(--sheet-h,0px) - var(--s-4)))!important}#cmpmore{display:none!important}");
           midCtl = await one(); sc.remove(); sp.remove(); } }
+      if (tallM) tallM.remove();
       /* take 189 · cold audit r2 · the fit follows its cap. The box is given
          thirty planted text lines (so the cap lands in text at every size)
          and fitted by the app's own cmpFit — the call a content change
@@ -5427,8 +5786,8 @@ for (const dev of DEVICES) {
       const binds = !!t && !!t.bare && !use(t.bare);
       ok(!!t && t.ruleFound && use(t.real) && (dev.width > 360 || binds),
          `${dev.name}: A231 · riding on the Tools tab, the ${nm} panel is usable: ${rl.room} px of ${rl.need} shown, `
-         + `what it is opened for whole (${rl.usable}), Stop ${rl.stop}, its chip ${rl.chip}, under the banner (top ${rl.top}, foot ${rl.navBottom}); `
-         + `without the A231 rule (found ${t && t.ruleFound}) ${br.room} px, whole ${br.usable}`
+         + `what it is opened for whole (${rl.usable}), Stop ${rl.stop}, its close ${rl.chip}${rl.chip ? "" : " (a tap there lands on " + rl.closeAt + ")"}, under the banner (top ${rl.top}, foot ${rl.navBottom}); `
+         + `its control, take 188's four-row strip planted (${t && t.ruleFound}): ${br.room} px, whole ${br.usable}`
          + (dev.width > 360 ? (binds ? " — caught here too" : " — not asserted here (it fits without the rule)") : " — caught"));
     }
     /* take 189 · cold audit · riding with each panel open: A231 hides chips
@@ -5438,7 +5797,7 @@ for (const dev of DEVICES) {
        showed it: the rule forced with the (i) unlifted); and the compass
        box ends on a whole line with its cue when it scrolls (its control at
        360 x 800: the cap before the fit) */
-    { const c = tl && tl.cmp, d = tl && tl.diag, tight = dev.width <= 400 && dev.height <= 860;
+    { const c = tl && tl.cmp, d = tl && tl.diag;
       const all = (r) => !!r && r.toolsN > 3 && r.chips === r.toolsN, clear = (r) => !!r && r.attrib.length === 0;
       const whole = (r) => !!r && r.lineCut === null && (r.need <= r.room + 1 || r.cue);
       /* take 189 · cold audit r2 · scrolled to its end, no "More below" drawn;
@@ -5452,19 +5811,21 @@ for (const dev of DEVICES) {
       const G = (g) => !g ? "not read" : `fitted (trim ${g.trim0} px, cut at ${g.cut0}); --ride-top ${g.rt0} → ${g.rt1} (${g.grownBy} px past a ${g.gap} px gap, lines ${g.pitch} px, nav padded ${g.pad || g.grownBy} px): `
         + `panel top ${g.top} vs banner bottom ${g.navBottom}, over ${g.over}; refitted there (trim ${g.trim1}), back to ${g.rt2}: trim ${g.trim2}, cut at ${g.lineCut}, over ${g.over2}`
         + `${g.kept ? "" : ", the planted lines REPAINTED AWAY"}`;
-      const R = (r) => r ? `${r.chips} of ${r.toolsN} chips, (i) over ${r.attrib.join("/") || "none"}` : "not read";
+      const R = (r) => r ? `${r.chips} of ${r.toolsN} ride buttons one tap, ${r.stripChips} Tools chip(s) on the strip, `
+        + `(i) ${r.ai ? "at " + r.ai.join(",") + " over " + (r.attrib.join("/") || "none") : "NOT DRAWN"}` : "not read";
+      const clearD = (r) => !!r && !!r.ai && r.attrib.length === 0, onStop = (r) => !!r && !!r.ai && r.attrib.includes("hud-stop");
       const cover = dev.width === 411;
-      ok(!!c && !!d && (tight ? c.real.chips === 3 && d.real.chips === 3 && all(c.bare) : all(c.real) && all(d.real) && !all(c.forced) && !all(d.forced))
-         && clear(c.real) && clear(d.real) && clear(c.lifted) && clear(d.lifted) && (!cover || !clear(c.forced) || !clear(d.forced))
+      ok(!!c && !!d && all(c.real) && all(d.real) && !all(c.forced) && !all(d.forced) && c.real.stripChips === 0 && d.real.stripChips === 0
+         && clearD(c.real) && clearD(d.real) && clearD(c.lifted) && clearD(d.lifted) && onStop(c.forced) && onStop(d.forced) && clear(c.real)
          && whole(c.real) && !!c.mid && whole(c.mid) && !!c.midCtl && !whole(c.midCtl)
          && endOk(c.real) && !!c.mid.endRd && endOk(c.mid) && endCtlOk(c.mid) && (!c.real.endRd || endCtlOk(c.real))
          && grown(c.grow) && !!c.growCtl && c.growCtl.over === true,
          `${dev.name}: riding on Tools with a panel open — compass ${R(c && c.real)}, diagnostics ${R(d && d.real)} `
-         + `(${tight ? "a small phone: the rule binds" : "the rule does not apply here"}); the compass box ends on a whole line `
+         + `(the Tools tools are sheet rows); the compass box ends on a whole line `
          + `(cut at ${c && c.real ? c.real.lineCut : "?"}, cue ${c && c.real ? c.real.cue : "?"}, ${c && c.real ? c.real.room : "?"} of ${c && c.real ? c.real.need : "?"} px); `
-         + `the rule at every size with the (i) free to lift — compass ${R(c && c.lifted)}, diagnostics ${R(d && d.lifted)}; `
-         + `controls: the same, (i) unlifted — compass ${R(c && c.forced)}, diagnostics ${R(d && d.forced)}`
-         + (cover ? " (caught here)" : "") + `; a cap landing mid-line (the line ${c ? c.midAt : "?"} px down): with the fit cut at ${c && c.mid ? c.mid.lineCut : "?"}, `
+         + `read again — compass ${R(c && c.lifted)}, diagnostics ${R(d && d.lifted)}; `
+         + `controls: the (i) planted over Stop — compass ${R(c && c.forced)}, diagnostics ${R(d && d.forced)}`
+         + (cover ? " (the cover screen)" : "") + `; a cap landing mid-line (the line ${c ? c.midAt : "?"} px down): with the fit cut at ${c && c.mid ? c.mid.lineCut : "?"}, `
          + `cue ${c && c.mid ? c.mid.cue : "?"}; its control, the cap before the fit, cuts the line at ${c && c.midCtl ? c.midCtl.lineCut : "?"}`
          + `; scrolled — real: ${E(c && c.real)}; mid-line cap: ${E(c && c.mid)}`
          + `; the ride block taller with the box fitted: ${G(c && c.grow)}; control, the fit as a fixed px height: ${G(c && c.growCtl)}`);
@@ -6013,6 +6374,29 @@ for (const dev of DEVICES) {
           for (let i = 0; i < 60; i++) { await frame(); if (!document.getAnimations().some((a) => a.playState === "running"
             && a.effect && isFinite(a.effect.getComputedTiming().endTime))) break; await s(30); }
           await s(120); await frame(); await frame(); }
+        /* take 190 · A247 · Plan and Tools open a sheet: every row reachable in
+           the body (scrolled into view where the body scrolls) and what a tap
+           at its centre lands on; search and Return home on screen with the
+           body at its top; and the open band at least 12 % (DESIGN-v4 §8) */
+        const ixId = { plan: "ix-plan", tools: "ix-tools" }[t];
+        if (ixId && !open) {
+          const ix = document.getElementById(ixId), rb = document.getElementById("railbody");
+          const items = [...ix.querySelectorAll(".srow, .sx-search, .sx-home")].filter((c) => !c.hidden && c.getClientRects().length);
+          const bad = []; rb.scrollTop = 0; await frame();
+          const top = [...ix.querySelectorAll(".sx-search, .sx-home")].map((c) => { const r = c.getBoundingClientRect(), b = rb.getBoundingClientRect();
+            return r.top >= b.top - 0.5 && r.bottom <= b.bottom + 0.5 ? null : c.id; }).filter(Boolean);
+          for (const c of items) { c.scrollIntoView({ block: "nearest" }); await frame();
+            const r = c.getBoundingClientRect(), b = rb.getBoundingClientRect();
+            if (r.left < -0.5 || r.right > vw + 0.5 || r.top < b.top - 0.5 || r.bottom > b.bottom + 0.5) { bad.push(c.id + " out of the sheet"); continue; }
+            const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            if (!h || !(h === c || c.contains(h))) bad.push(c.id + " under " + (h ? (h.id || String(h.className).split(" ")[0] || h.tagName) : "nothing")); }
+          rb.scrollTop = 0; await frame();
+          const rl = document.getElementById("rail").getBoundingClientRect(), ai = document.querySelector(".maplibregl-ctrl-bottom-right");
+          let edge = rl.top; if (ai) { const q = ai.getBoundingClientRect(); if (q.height > 0 && q.top < edge) edge = q.top; }
+          return { sheet: true, n: items.length, bad, top, band: +(edge / innerHeight).toFixed(3),
+                   scrolls: rb.scrollHeight > rb.clientHeight + 1, stripH: Math.round(document.getElementById("tools").getBoundingClientRect().height),
+                   rows: items.length, overflow: false };
+        }
         const railTop = document.getElementById("rail").getBoundingClientRect().top, tools = document.getElementById("tools");
         const chips = [...document.querySelectorAll(".chip[data-tab]")]
           .filter((c) => !c.hidden && getComputedStyle(c).display !== "none");
@@ -6034,41 +6418,75 @@ for (const dev of DEVICES) {
          their listeners) are kept and put back after the tall card */
       const pnl = document.getElementById("panel"), keepN = [...pnl.childNodes], keepC = pnl.className;
       for (const t of ["map", "plan", "ride", "tools"]) out.open[t] = await read(t, true);
-      if (narrow) { const st = document.createElement("style"); st.id = "v4plant-restcap";
-        st.textContent = "#railbody{max-height:calc(38vh - var(--rc-trim,0px))!important}"; document.head.appendChild(st);
-        out.plants.restcap = await read("tools", true); st.remove(); }
+      /* take 190 · A247 · its control: the Tools strip has no chips now, so the
+         failure is planted on the Map strip — the drawer's body forced tall,
+         which must put its chips off screen or under the left column */
+      { const st = document.createElement("style"); st.id = "v4plant-restcap";
+        st.textContent = "#railbody{max-height:none!important;min-height:80vh!important}"; document.head.appendChild(st);
+        out.plants.restcap = await read("map", true); st.remove(); }
       window.railSet(false); await frame(); await s(300);
       pnl.replaceChildren(...keepN); pnl.className = keepC;
-      const tl = document.getElementById("tools");
-      const p8 = document.createElement("button"); p8.className = "chip"; p8.dataset.tab = "tools";
-      p8.id = "v4plant-chip8"; p8.innerHTML = "<span>Plant</span>"; tl.appendChild(p8);
-      const ph = document.createElement("button"); ph.className = "chip"; ph.dataset.tab = "plan";
-      ph.id = "v4plant-chiphid"; ph.style.display = "none"; tl.appendChild(ph);
-      out.plants.eight = await read("tools"); out.plants.hid = await read("plan");
-      p8.remove(); ph.remove();
+      /* take 190 · A247 · the strip plants move to the Map strip (Plan and
+         Tools are sheets): planted chips bring it to 8; a hidden planted
+         chip is not counted; at 360 px the one-row strip with them pushes
+         chips off screen. The sheet's plants: a cover over a Plan row, and
+         Return home pushed below the body's top screen */
+      const tl = document.getElementById("tools"), n0 = (out.tabs.map || {}).n || 0, pl = [];
+      for (let i = n0; i < 8; i++) { const b = document.createElement("button"); b.className = "chip"; b.dataset.tab = "map";
+        b.id = "v4plant-chip8-" + i; b.innerHTML = "<span>Plant</span>"; tl.appendChild(b); pl.push(b); }
+      out.plants.eight = await read("map");
       if (narrow) { const st = document.createElement("style"); st.id = "v4plant-nowrap";
         st.textContent = "#tools{flex-wrap:nowrap!important;overflow-x:auto!important}"; document.head.appendChild(st);
-        out.plants.nowrap = await read("plan"); st.remove(); }
+        out.plants.nowrap = await read("map"); st.remove(); }
+      pl.forEach((b) => b.remove());
+      const ph = document.createElement("button"); ph.className = "chip"; ph.dataset.tab = "map";
+      ph.id = "v4plant-chiphid"; ph.style.display = "none"; tl.appendChild(ph);
+      out.plants.hid = await read("map"); ph.remove();
+      { const tgt = document.getElementById("c-saved"), cv = document.createElement("div"); cv.id = "v4plant-cover";
+        document.querySelector('#tabs .tab[data-go="plan"]').click(); await frame(); await frame(); await s(300);
+        const r = tgt.getBoundingClientRect();
+        cv.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;z-index:99999`;
+        document.body.appendChild(cv);
+        out.plants.cover = await read("plan"); cv.remove();
+        const st = document.createElement("style"); st.id = "v4plant-homelow";
+        st.textContent = "#ix-home{margin-top:2000px!important}"; document.head.appendChild(st);
+        out.plants.homelow = await read("plan"); st.remove();
+        const st2 = document.createElement("style"); st2.id = "v4plant-tallsheet";
+        /* forced tall (min-height): a cap alone binds only where the index is
+           taller than the screen */
+        st2.textContent = "#shell:not([data-ride]) #rail[data-sheet]:not(.folded) #railbody{max-height:none!important;min-height:90vh!important}"; document.head.appendChild(st2);
+        out.plants.tallsheet = await read("plan"); st2.remove(); }
       document.querySelector('#tabs .tab[data-go="map"]').click(); await frame();
     } catch (e) { out.error = String(e); }
     return out;
   }, dev.width <= 360);
-  const destOk = (x) => !!x && x.n <= 7 && x.bad.length === 0 && !x.overflow;
-  ok(!dc.error && dc.plants.eight && !destOk(dc.plants.eight) && dc.plants.eight.n === 8
-     && destOk(dc.plants.hid) && dc.plants.hid.n === (dc.tabs.plan || {}).n
-     && (dev.width > 360 || (dc.plants.nowrap && !destOk(dc.plants.nowrap))),
-     `${dev.name}: the destination counter catches its plants (an 8th Tools chip: ${dc.plants.eight ? dc.plants.eight.n : "?"}; `
-     + `a hidden chip is not counted: Plan ${dc.plants.hid ? dc.plants.hid.n : "?"}`
-     + (dev.width <= 360 ? `; take 187's one-row strip: ${dc.plants.nowrap ? dc.plants.nowrap.bad.length + " Plan chips off screen" : "?"}` : "")
-     + ")" + (dc.error ? " — " + dc.error : ""));
+  /* a strip holds at most 7 chips, all on screen; a sheet's rows are all
+     reachable, its search and Return home on screen unscrolled, and it
+     leaves 12 % open map (no count: the sheet is the destination) */
+  const destOk = (x) => !!x && (x.sheet ? x.bad.length === 0 && x.top.length === 0 && x.band >= 0.12
+    : x.n <= 7 && x.bad.length === 0 && !x.overflow);
+  const dp = dc.plants || {};
+  ok(!dc.error && dp.eight && !destOk(dp.eight) && dp.eight.n === 8
+     && destOk(dp.hid) && dp.hid.n === (dc.tabs.map || {}).n
+     && (dev.width > 360 || (dp.nowrap && !destOk(dp.nowrap)))
+     && dp.cover && !destOk(dp.cover) && dp.homelow && !destOk(dp.homelow) && dp.tallsheet && !destOk(dp.tallsheet),
+     `${dev.name}: the destination counter catches its plants (the Map strip planted to 8: ${dp.eight ? dp.eight.n : "?"}; `
+     + `a hidden chip is not counted: Map ${dp.hid ? dp.hid.n : "?"}`
+     + (dev.width <= 360 ? `; take 187's one-row strip: ${dp.nowrap ? dp.nowrap.bad.length + " Map chips off screen" : "?"}` : "")
+     + `; a cover over a Plan row: ${dp.cover ? dp.cover.bad.join(", ") || "NOT CAUGHT" : "?"}`
+     + `; Return home pushed down: ${dp.homelow ? dp.homelow.top.join(", ") || "NOT CAUGHT" : "?"}`
+     + `; the sheet at 90vh: band ${dp.tallsheet ? dp.tallsheet.band : "?"})` + (dc.error ? " — " + dc.error : ""));
   for (const [t, x] of Object.entries(dc.tabs))
-    ok(destOk(x), `${dev.name}: ${t} holds ${x.n} (at most 7), all on screen in ${x.rows} row(s), strip ${x.stripH} px`
-       + (x.bad.length ? " — " + x.bad.join(", ") : "") + (x.overflow ? " — the strip scrolls sideways" : ""));
+    ok(destOk(x), x.sheet
+       ? `${dev.name}: ${t} opens its sheet: ${x.n} rows, each reachable${x.scrolls ? " (the body scrolls)" : " (no scroll)"}, `
+         + `search and Return home on screen, open band ${x.band}` + (x.bad.length ? " — " + x.bad.join(", ") : "") + (x.top.length ? " — off its top screen: " + x.top.join(", ") : "")
+       : `${dev.name}: ${t} holds ${x.n} (at most 7), all on screen in ${x.rows} row(s), strip ${x.stripH} px`
+         + (x.bad.length ? " — " + x.bad.join(", ") : "") + (x.overflow ? " — the strip scrolls sideways" : ""));
   { const op = dc.open || {}, rc = dc.plants.restcap;
-    ok(!dc.error && ["map", "plan", "ride", "tools"].every((t) => destOk(op[t])) && (dev.width > 360 || (!!rc && !destOk(rc))),
+    ok(!dc.error && ["map", "plan", "ride", "tools"].every((t) => destOk(op[t])) && !!rc && !destOk(rc),
        `${dev.name}: with the drawer open to its cap every tab's chips are on screen, one tap, clear of the left column and the (i) — `
        + ["map", "plan", "ride", "tools"].map((t) => `${t} ${op[t] ? op[t].n + (op[t].bad.length ? " (" + op[t].bad.join(", ") + ")" : "") : "?"}`).join(", ")
-       + (dev.width <= 360 ? `; its control, take 188's 38vh cap at rest on Tools: ${rc ? rc.bad.join(", ") || "NOT CAUGHT" : "?"}` : "")); }
+       + `; its control, the body forced to 80vh on Map: ${rc ? rc.bad.join(", ") || "NOT CAUGHT" : "?"}`); }
 }
 /* take 189 · A238 · THE DIRT BIKE'S ROUTE CARDS. The matrix reads the
    side-by-side's cards (the machine the full run plans for here). Planned
@@ -6400,7 +6818,10 @@ if (RUN("realdom")) {
       const src = m.getStyle().sources.poi.data.features;
       const pk = src.find((f) => f.properties.k === "trailhead") || src[0];
       const cam0 = { c: m.getCenter(), z: m.getZoom() };
-      m.jumpTo({ center: pk.geometry.coordinates, zoom: 14 }); await still();
+      /* flat and north-up, set here: an earlier section's ride leaves the
+         map pitched 55° (landmines 253, 255); the pitched case is read on
+         purpose below */
+      m.jumpTo({ center: pk.geometry.coordinates, zoom: 14, pitch: 0, bearing: 0 }); await still();
       let hits = [];
       for (let i = 0; i < 30 && !hits.length; i++) { hits = m.queryRenderedFeatures({ layers: LAY }); if (!hits.length) await s(300); }
       if (!hits.length) return { error: "no pin drawn to tap" };
@@ -6409,10 +6830,24 @@ if (RUN("realdom")) {
       out.cam0 = cam0;
       const cv = m.getCanvas(), rc = cv.getBoundingClientRect();
       const p0 = m.project(at); m.panBy([p0.x - rc.width / 2, p0.y - 24], { duration: 0 }); await still();
-      const cam = { c: m.getCenter(), z: m.getZoom() };
+      const cam = { c: m.getCenter(), z: m.getZoom(), p: m.getPitch(), b: m.getBearing() };
       let resizes = 0; const onRz = () => { resizes++; }; m.on("resize", onRz);
       const tap = async () => { const p = m.project(at), r = cv.getBoundingClientRect();
         const y0 = Math.round(p.y);
+        /* every camera call after the tap, by name, time and caller: what an
+           ease into view meets (take 190 · A264 full-run read, y -21) */
+        const t0 = performance.now(), calls = [], wrapped = {};
+        for (const k of ["easeTo", "jumpTo", "flyTo", "stop", "panBy", "fitBounds", "resize"]) {
+          const f = m[k]; wrapped[k] = f;
+          m[k] = function (...a) { const st = (new Error().stack || "").split("\n").slice(2, 4).map((x) => x.trim().replace(/^at /, "").replace(/\(?http[^)]*\/([^/)]+)\)?/, "$1")).join(" < ");
+            calls.push(`${k}@${Math.round(performance.now() - t0)}${k === "panBy" ? JSON.stringify(a[0]) : ""} ${st.slice(0, 90)}`); return f.apply(this, a); }; }
+        /* …and every move: when, where the pin is, the centre and the zoom —
+           the full run's pan completed and the pin was read 197 px higher */
+        const moves = []; let lastY = null;
+        const onMv = () => { const y = Math.round(m.project(at).y); if (y === lastY) return; lastY = y;
+          const c = m.getCenter(); moves.push(`${Math.round(performance.now() - t0)}:y${y}/z${m.getZoom().toFixed(2)}/${c.lng.toFixed(5)},${c.lat.toFixed(5)}/${m.getContainer().clientHeight}`); };
+        m.on("move", onMv); m.on("resize", onMv);
+        const unwrap = () => { for (const k in wrapped) m[k] = wrapped[k]; m.off("move", onMv); m.off("resize", onMv); };
         /* a phone's tap starts with a touch: the app's long-press watch
            (touchstart) clears its "the long press already acted" flag,
            which an earlier drill's touch long press left set — a bare
@@ -6426,18 +6861,41 @@ if (RUN("realdom")) {
           cv.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, clientX: r.left + p.x, clientY: r.top + p.y }));
         await s(30); const openedAt = !/\bfolded\b/.test(rail.className);
         await s(70); await settle(); await still(); await s(600); await settle(); await still();
+        unwrap();
         const q = m.project(at);
-        return { y0, openedAt, y: Math.round(q.y), folded: /\bfolded\b/.test(rail.className),
+        const why = window.__sheet && window.__sheet.pinLast ? window.__sheet.pinLast() : "?";
+        const dbg = window.__sheet && window.__sheet.pinDbg ? window.__sheet.pinDbg() : null;
+        return { y0, openedAt, why, dbg, calls, moves: moves.length > 14 ? moves.slice(0, 4).concat(["…"], moves.slice(-9)) : moves,
+          y: Math.round(q.y), folded: /\bfolded\b/.test(rail.className),
           card: (document.getElementById("panel").innerText || "").replace(/\s+/g, " ").trim().slice(0, 60),
           mapH: Math.round(m.getContainer().getBoundingClientRect().height), resizes };
       };
       out.real = await tap();
       window.railSet(false); await settle(); await still();
+      /* take 190 · the second review · the same tap on a PITCHED map (the
+         ride's follow camera leaves 55°): the pin put at y 24 by moving the
+         ground under that point to it, then tapped */
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z, pitch: 55 }); await still();
+      { const rc2 = cv.getBoundingClientRect(), u = m.unproject([rc2.width / 2, 24]), c0 = m.getCenter();
+        m.jumpTo({ center: [c0.lng + (at[0] - u.lng), c0.lat + (at[1] - u.lat)] }); await still(); }
+      out.pitched = await tap(); out.pitched.pitch = Math.round(m.getPitch());
+      window.railSet(false); await settle(); await still();
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z, pitch: cam.p, bearing: cam.b }); await still();
+      /* take 190 · A264 · the same tap with the app's ease into view taken out
+         (map.panBy a no-op): the pin rides off the top as before A264, and the
+         card must still stay open (A240's claim) */
+      m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z }); await still();
+      resizes = 0;
+      { const pb = m.panBy; m.panBy = function () { return this; };
+        try { out.noease = await tap(); } finally { m.panBy = pb; } }
+      window.railSet(false); await settle(); await still();
       m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z }); await still();
       resizes = 0;
       const plant = (e) => window.railFoldIfAway({ originalEvent: (e && e.originalEvent) || { type: "planted" } });
       m.on("moveend", plant);
-      out.plant = await tap();
+      /* A240's control runs in its read's state: A264's ease taken out too */
+      { const pb = m.panBy; m.panBy = function () { return this; };
+        try { out.plant = await tap(); } finally { m.panBy = pb; } }
       m.off("moveend", plant); m.off("resize", onRz);
       window.railSet(false); await settle();
       m.jumpTo({ center: [cam0.c.lng, cam0.c.lat], zoom: cam0.z });
@@ -6445,10 +6903,60 @@ if (RUN("realdom")) {
     return out;
   });
   const keepOk = (r) => !!r && r.openedAt && !r.folded && r.y < -40 && r.resizes > 0 && r.card.length > 0;
-  { const R = rf2.real || {}, P = rf2.plant || {};
-    ok(!rf2.error && keepOk(rf2.real) && !keepOk(rf2.plant) && P.folded,
+  /* take 190 · A264 · the pin in the open band: inside the map, 48 px clear */
+  const inView = (r) => !!r && r.openedAt && !r.folded && r.y >= 48 && r.y <= r.mapH - 48 && r.card.length > 0;
+  { const R = rf2.real || {}, Q = rf2.noease || {};
+    const Pp = rf2.pitched || {};
+    ok(!rf2.error && inView(rf2.real) && inView(rf2.pitched) && !inView(rf2.noease) && Q.y < -40,
+       `360x800 (real DOM): A264 · a pin tapped near the top stays in view when its card opens — tapped at y ${R.y0}, `
+       + `after the slide it sits at y ${R.y} of a ${R.mapH} px map (drawer ${R.folded ? "FOLDED" : "open"}; the app: "${R.why}"); `
+       + `on a map pitched ${Pp.pitch}° the same tap at y ${Pp.y0} ends at y ${Pp.y} ("${Pp.why}"); its control, `
+       + `the app's ease taken out: y ${Q.y} (off the top, as take 189 left it)` + (rf2.error ? ` — ${rf2.error}` : "")
+       + (inView(rf2.real) ? "" : ` — the ease: ${JSON.stringify(R.dbg)}; camera calls after the tap: ${(R.calls || []).join(" | ") || "none"}; `
+         + `the pin's moves (ms:y/zoom/centre/map height): ${(R.moves || []).join(" ")}`)); }
+  /* take 190 · A261 · Turns in a real browser at 360 x 800: the steps in the
+     drawer's one scroller (no nested one), Ride it pinned at its foot and
+     one tap, "N more steps below" while steps are under it, gone at the
+     end. Its control: take 189's 150 px inner scroller planted back */
+  {
+    const tn = await page.evaluate(async () => {
+      const s = (ms) => new Promise((r) => setTimeout(r, ms));
+      const one = (e) => { if (!e) return false; const q = e.getBoundingClientRect(); if (q.height < 47.5) return false;
+        const h = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2); return !!h && e.contains(h); };
+      const out = {};
+      try {
+        if (!document.querySelector(".rc")) { const c = window.map.getCenter();
+          window.map.fire("contextmenu", { lngLat: { lng: c.lng + 0.01, lat: c.lat } }); await s(300);
+          const pr = document.getElementById("pc-route"); if (pr) pr.click();
+          for (let i = 0; i < 60 && !document.querySelector(".rc"); i++) await s(250); }
+        window.railSet(true); await s(300);
+        document.getElementById("btn-steps").click(); await s(500);
+        const st = document.getElementById("steps"), rb = document.getElementById("railbody");
+        if (!st) return { error: "no Turns card" };
+        out.n = st.querySelectorAll(".st").length;
+        out.inner = st.scrollHeight > st.clientHeight + 1;
+        out.ride = one(document.getElementById("st-ride"));
+        const more = () => { const m = document.getElementById("st-more"); return m && !m.hidden ? m.textContent : ""; };
+        out.more0 = more(); out.scrolls = rb.scrollHeight > rb.clientHeight + 1;
+        rb.scrollTop = rb.scrollHeight; await s(200);
+        out.moreEnd = more(); out.rideEnd = one(document.getElementById("st-ride"));
+        rb.scrollTop = 0; await s(120);
+        const pl = document.createElement("style"); pl.textContent = "#steps{max-height:150px!important;overflow-y:auto!important}";
+        document.head.appendChild(pl); await s(120); out.ctl = st.scrollHeight > st.clientHeight + 1; pl.remove();
+      } catch (e) { out.error = String(e); }
+      try { window.railSet(false); await s(250); } catch (e) {}
+      return out;
+    });
+    const moreOk = (t) => !t.scrolls || (/^\d+ more steps? below$/.test(t.more0) && t.moreEnd === "");
+    ok(!tn.error && tn.n > 0 && !tn.inner && tn.ride && tn.rideEnd && moreOk(tn) && (tn.ctl || tn.n < 4),
+       `360x800 (real DOM): A261 · Turns: ${tn.n} steps in the drawer's own scroller (an inner one: ${tn.inner}), Ride it pinned and one tap `
+       + `(${tn.ride}, scrolled to the end ${tn.rideEnd}); ${tn.scrolls ? `"${tn.more0}" over it, at the end "${tn.moreEnd}"` : "the steps fit (no cue needed)"}; `
+       + `its control, take 189's 150 px inner scroller planted: ${tn.ctl ? "an inner scroller, caught" : "fits in 150 px here"}` + (tn.error ? " — " + tn.error : ""));
+  }
+  { const R = rf2.noease || {}, P = rf2.plant || {};
+    ok(!rf2.error && keepOk(rf2.noease) && !keepOk(rf2.plant) && P.folded,
        `360x800 (real DOM): A240 · a tapped pin card stays open while the drawer's slide resizes the map — `
-       + `pin tapped at y ${R.y0} (drawer opened ${R.openedAt}), after ${R.resizes} resize(s) it sits at y ${R.y} (the old rule folded below -40), `
+       + `with A264's ease taken out, pin tapped at y ${R.y0} (drawer opened ${R.openedAt}), after ${R.resizes} resize(s) it sits at y ${R.y} (the old rule folded below -40), `
        + `map ${R.mapH} px tall, drawer ${R.folded ? "FOLDED" : "open"} ("${R.card}"); its control, the old rule `
        + `(every moveend the rider's), folds the same tap (opened ${P.openedAt}, folded ${P.folded}, y ${P.y}, ${P.resizes} resize(s))`
        + (rf2.error ? ` — ${rf2.error}` : "")); }
@@ -7604,10 +8112,15 @@ if (RUN("v4-setup")) {
     let homeBefore = null;
     await run("set home", async () => { tab("plan"); await s(200); window.railSet(false); await s(300);
       homeBefore = homeUp(); click("#c-home"); }, homeUp, 700);
-    await run("compass", async () => { tab("tools"); await s(200); click("#c-compass"); }, () => up("cmppanel"), 600);
-    click("#c-compass"); await s(300);
-    await run("diagnostics", async () => { tab("tools"); await s(200); click("#c-diag"); }, () => up("diagpanel"), 600);
-    click("#c-diag"); await s(300); tab("map"); await s(200);
+    /* take 190 · A258 · A256 · off a ride both open in the Tools sheet: the
+       states are reached when the sheet's own content is drawn (riding, they
+       float, which the device matrix reads) */
+    const drawnIn = (sel) => { const e = document.querySelector(sel); return !!e && e.getClientRects().length > 0
+      && !/\bfolded\b/.test(document.getElementById("rail").className); };
+    await run("compass", async () => { tab("tools"); await s(200); click("#c-compass"); }, () => drawnIn("#cmpsheet svg"), 600);
+    tab("map"); await s(300);
+    await run("diagnostics", async () => { tab("tools"); await s(200); click("#c-diag"); }, () => drawnIn('#panel [data-diag="selftest"]'), 600);
+    tab("map"); await s(200);
     await run("place card", async () => { const c = window.map.getCenter();
       window.map.fire("contextmenu", { lngLat: { lng: c.lng + 0.01, lat: c.lat } }); window.railSet(true); },
       () => !!document.getElementById("pc-route"), 900);
@@ -7616,8 +8129,11 @@ if (RUN("v4-setup")) {
       () => !!document.querySelector(".rc"), 600);
     /* take 188 · A216 · where the turn icons draw */
     await run("turn list", async () => click("#btn-steps"), () => !!document.getElementById("steps"), 500);
+    /* take 190 · A259 · the map's HD button opens HD under Tools: "HD
+       imagery" is the sheet's title there, the tiers the card */
     await run("hd sheet", async () => click("#c-hd"),
-      () => /HD imagery/.test(document.getElementById("panel").textContent));
+      () => window.__sheet.state().tool === "c-hdmanage" && /HD imagery/.test(document.getElementById("sh-title").textContent)
+        && document.querySelectorAll("#panel .hdtier").length > 0);
     await run("tour", async () => { tab("tools"); await s(300); click("#c-tour"); }, () => up("tour"), 900);
     try { window.__tour && window.__tour.close && window.__tour.close(); } catch (e) {} await s(300);
     await run("guide", async () => window.guideShow(), () => up("guide"), 600);
@@ -7817,7 +8333,11 @@ if (RUN("v4-setup")) {
               if (!(await until(() => !!$("hc-tap"), 3000))) fl.blocked = "hc-tap (no home card)";
               else if (await tap(fl, "hc-tap")) fl.done = await until(() => /\barm\b/.test($("c-home").className), 2000); }
           } else if (F === "D") {
-            if (await tap(fl, '#tabs .tab[data-go="ride"]') && await tap(fl, "c-ride")) fl.done = await until(riding, 3000);
+            /* take 190 · A262 · the Ride tab's one Start: the Ride card's Start
+               riding (route cards up: their Ride it; folded: the strip's chip) */
+            if (await tap(fl, '#tabs .tab[data-go="ride"]')) { await s(300);
+              const st = ["rt-start", "rc-ride", "c-ride"].find((id) => $(id) && !$(id).hidden && tappable($(id)) === null) || "c-ride";
+              if (await tap(fl, st)) fl.done = await until(riding, 3000); }
           } else if (F === "F") {
             /* take 189 · A233 · free ride from the FOLDED drawer: its Ride,
                one tap; done when the ride waits and the Ride tab's Stop
@@ -8108,15 +8628,17 @@ if (RUN("v4-setup")) {
    (A240 at 360; the resumed peek line's widest form judged, was reported),
    devices +10 (per size: riding with a panel open — A231 only on a small
    phone, no chip under the (i), the compass box's whole line; and every
-   tab with the drawer open to its cap). The judge proves itself on
+   tab with the drawer open to its cap). take 190 · A247: ui +3 (the sheet's
+   footer, back three ways, Return home after a sheet), realdom +1 (A264's
+   pin in view, beside A240's read). The judge proves itself on
    planted books first (its control: shell booked 11 of 13, a section with no
    floor). */
 {
   SECTION_AT = "(floor guard)";
   const SECTION_FLOOR = {
   boot: 13, trails: 2, labels: 11, modes: 33, imagery: 31, back: 14, water: 11, shell: 10,
-  stacks: 48, pins: 21, nav: 31, camp: 15, paddle: 25, ui: 34, home: 7, tools: 26, basemap: 2,
-  selftest: 2, routes: 3, devices: 222, faults: 6, realdom: 5, clear: 3, tail: 30, g6: 2,
+  stacks: 48, pins: 21, nav: 31, camp: 16, paddle: 25, ui: 37, home: 7, tools: 28, basemap: 2,
+  selftest: 2, routes: 3, devices: 222, faults: 6, realdom: 6, clear: 3, tail: 30, g6: 2,
   "v4-setup": 1, "v4-band": 7, "v4-select": 6, "v4-toast": 1, "v4-audit": 11, "v4-walker": 15,
   "v4-eta": 9 };
   const short = (got, floor, ran) => ran.filter((x) => !(x in floor) || (got[x] || 0) < floor[x]);

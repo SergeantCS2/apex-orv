@@ -1,16 +1,16 @@
-**Take 186 — choose your pins; set home in one button.**
+**Take 190 — Plan and Tools as sheets of rows; the screens the V4 mockup drew.**
 
-Layers now has a "Pins in <Mode>" section: one row per kind the mode can
-show, the mode's defaults pre-set (restaurants and stores off in Off-road
-and Camp), remembered per mode, with a Reset row. Water lists no fuel.
+Plan and Tools open sheets of labelled rows; each tool opens inside with a
+back row. Machine is a picker, fuel range a stepper. Loop: pick a distance,
+then Find. Saved lists routes and marked spots. Search is a sheet that one
+back closes. Mark this spot marks a fresh GPS fix or says there is none.
+The Ride tab opens a Ride card with one Start. Data sources credits the
+Census Bureau and AWS Terrain Tiles.
 
-Set home is one button with three choices — use my location, type an
-address, or tap the map — and Clear home when one is set. Return home
-with no home opens the same chooser. The map opens at home on launch.
-
-On the phone: Layers → Pins in Camp — switch Toilets off, kill the app,
-reopen: still off? Reset restores? Switch Restaurants on: they appear at
-street zoom? Set home each of the three ways; kill and reopen: does the
-map open at home? Plan a ride in two actions: Set home → my location,
-then press and hold a destination → Route here (renamed at take 188), then
-Ride it.
+On the phone: Plan — does every row fit with Return home on screen, at
+both screens of the Fold? Machine: pick Quad with a route planned — does
+it say the route was cleared? Fuel range: − to Off, + to 120, and no
+further? Loop: tap 10 mi, then Find. Search from "Where to?", then one
+back: are you on the map? Tools → Mark this spot indoors: does it wait,
+and after 30 s say no fix? Ride tab: one Start on screen, open and
+folded? Tap a pin near the top: does it stay in view as the card opens?

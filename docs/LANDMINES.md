@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 189.*
+*Current as of take 190.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -161,6 +161,10 @@ Start here. Do not read top to bottom.
 | A ride never starts in render (the Ride chip still reads "Ride it"), on a machine CI passes | 249 |
 | Smoke or render fails on a missing manifest or payload right after `build_app.py split`, in a container with no pipeline run | 250 |
 | A check passes on one build's data and fails on fresh data with the same code, after a control tap | 251 |
+| "Live" GPS, or a mark made at once, though no fix came for minutes — after a clock change | 252 |
+| A camera move lands short of a computed target, only after a ride or in a full run | 253 |
+| A smoke drill that clicks a card's chip changes nothing, though the app wires it | 254 |
+| A section run is green and the full run fails a later section the change never touched | 255 |
 
 ---
 
@@ -3353,3 +3357,53 @@ a read that follows a control action restores the state that action may
 have changed (here the camera, put back before the query), or runs before
 it; and fresh data is a new input every build — a check that passed on
 yesterday's data has not been proven against today's.
+
+**252. An age is now minus then, and a clock can go back.** Take 189's
+liveFix() held a fix live while `Date.now() - ME_FIX.t` was at most 15 s,
+and a negative age passes that test. Take 190's smoke drills for Mark this
+spot shifted the clock 10 minutes forward and still found a live fix: an
+earlier block had shifted it further and delivered one, so ME_FIX.t sat
+1.8 h ahead of the drill's clock (age -6,599,983 ms, PROVEN). On a phone the
+same happens when the clock is set back after a fix (a network time
+correction, a manual change): the last fix reads live until the next one
+arrives, the place cards say "of you", and Mark this spot would mark an old
+position as fresh. Rule: an age below zero is unknown, never small — a
+reader of an age treats it as stale; and a drill that shifts the clock
+starts from a state it made, not one an earlier block left.
+
+**253. A screen offset is not a ground distance on a pitched map.** Take
+190's A264 placed a tapped pin by its pixel offset from the centre and
+panned by that offset. Alone in render it landed at y 176 of a 391 px map;
+in the full run it ended at y -21 (PROVEN, the move log: the pan moved the
+centre 228 px of ground and the pin, near the top, 28). The ride's follow
+camera pitches the map 55° and nothing flattens it after the ride, so the
+full run reached the pin pitched; in perspective a point near the top
+moves a fraction of what the centre does, and a resize shifts it less than
+half the height change. Rule: to put a place at a screen point, move the
+ground point under that screen point to the place (unproject, then the
+camera that lands it) — never scale a screen offset; and a camera read
+records the pitch and bearing it was made at.
+
+**254. Smoke's DOM answers an element's own query by class only.**
+`El.querySelectorAll` (tools/smoke.mjs) matches `.class`; `[data-x]` is
+answered only by the document's query, which walks every element's parsed
+children. Take 189's `wireJumpChips(root)` used `root.querySelectorAll`, so
+in smoke the jump chips were wired to nothing and no drill ever ran a jump
+(found when take 190's drill clicked one and search stayed on). The stub
+also keeps one element per id across innerHTML rewrites — its listeners
+and its `hidden` flag survive into the next card (Turns' Ride it pressed
+c-ride twice, the Ride card's Start read hidden before it was). Rule: wire
+a card's buttons through `document.querySelectorAll('[data-x]')` or by id,
+as the loop chooser and Saved do; and a drill clears an id's listeners and
+flags before it opens the card that makes the id anew.
+
+**255. A section run sees the boot's state, not the one a full run
+reaches.** `render.mjs --only=` runs a section from the boot (take 189,
+A227). Take 190's piece R passed its section runs; the full run failed 34
+checks: tapping the Ride tab had replaced the route cards with the Ride
+card, so the device matrix, which plans a route once and reads it at each
+screen size, lost it from the second size on (PROVEN, run render-full).
+A264's pitched pin (253) also showed only there. Rule: a change to what a
+tab, a fold or a card does is proven by a full render, not by the sections
+it names; and state a change leaves behind (a card replaced, a camera
+pitched) is a change to every section after it.

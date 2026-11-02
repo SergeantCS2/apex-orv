@@ -639,6 +639,8 @@ var GAUGE=(function(){
 
  
 var CMP_ON=false, MAG=null, MAG_OK=null;
+ 
+var CMP_WHERE=null;
 
  
  
@@ -725,6 +727,8 @@ function cmpRows(hdg){
 function cmpPaint(){
   var box=el('cmpbox');
   if(!box||!CMP_ON)return;
+   
+  var shb=CMP_WHERE==='sheet'?el('cmpsheet'):null;
   var H=headingNow(),hdg=H?H.deg:null,rows=cmpRows(hdg);
   box.innerHTML='<div style="text-align:center">'+cmpRose(hdg)+
     '<div style="font:700 var(--t-lg)/1 Barlow,Roboto,system-ui,sans-serif;margin-top:4px">'+
@@ -738,6 +742,7 @@ function cmpPaint(){
     (rows.length?'<div style="margin-top:9px;line-height:1.7">'+rows.join('<br>')+'</div>'
      :'<div class="sub" style="margin-top:9px">Nothing to take a bearing to yet — '+
       'pin the truck, set home, or save a waypoint.</div>');
+  if(shb)shb.innerHTML=box.innerHTML;
    
   var k=(hdg===null?'n'+MAG_OK:'h'+(H&&H.src))+'|'+rows.join('|');
   if(k!==CMP_KEY){CMP_KEY=k;cmpFit()}}
@@ -777,7 +782,7 @@ try{el('cmppanel').addEventListener('scroll',cmpCue)}catch(e){}
 var CMP_GEO='';
 function cmpGeo(){try{var c=document.documentElement.style;
   return [c.getPropertyValue('--ride-top'),c.getPropertyValue('--sheet-h'),c.getPropertyValue('--strip-h'),
-    window.innerHeight].join('|')}catch(e){return ''}}
+    c.getPropertyValue('--alert-room'),window.innerHeight].join('|')}catch(e){return ''}}
 
 function runCard(a,b,riv){
   var c=null,i;
@@ -1670,7 +1675,8 @@ var ICON_OF={
   bearleft:'arrow-up-left',bearright:'arrow-up-right',left:'corner-up-left',
   right:'corner-up-right',sharpleft:'arrow-down-left',sharpright:'arrow-down-right',
   uturn:'undo-2',arrive:'circle-dot',reroute:'refresh-cw',downstream:'arrow-down',
-  external:'external-link',pass:'circle-check',fail:'circle-x',truck:'truck'
+  external:'external-link',pass:'circle-check',fail:'circle-x',truck:'truck',
+  next:'chevron-right',back:'chevron-left',less:'minus',more:'plus',rename:'pencil'
 };
 var LUCIDE={
   'map':'<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" /> <path d="M15 5.764v15" /> <path d="M9 3.236v15" />',
@@ -1703,6 +1709,11 @@ var LUCIDE={
   'repeat':'<path d="m17 2 4 4-4 4" /> <path d="M3 11v-1a4 4 0 0 1 4-4h14" /> <path d="m7 22-4-4 4-4" /> <path d="M21 13v1a4 4 0 0 1-4 4H3" />',
   'star':'<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />',
   'search':'<path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" />',
+  'chevron-right':'<path d="m9 18 6-6-6-6" />',
+  'chevron-left':'<path d="m15 18-6-6 6-6" />',
+  'minus':'<path d="M5 12h14" />',
+  'plus':'<path d="M5 12h14" /> <path d="M12 5v14" />',
+  'pencil':'<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" />',
   'map-pin':'<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" />',
   'phone':'<path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" />',
   'maximize':'<path d="M8 3H5a2 2 0 0 0-2 2v3" /> <path d="M21 8V5a2 2 0 0 0-2-2h-3" /> <path d="M3 16v3a2 2 0 0 0 2 2h3" /> <path d="M16 21h3a2 2 0 0 0 2-2v-3" />',
@@ -1767,9 +1778,155 @@ function paintIcons(){
       b.innerHTML=b.innerHTML.replace(/__IC_([a-z]+)__/g,
         function(_,n){return ic(n)})})}
 
+ 
+var SHEET={tab:null,tool:null,parent:null},SHEET_PENDING=null;
+var SHEET_TOOLS={'c-home':'Home','c-loop':'Loop from here','c-saved':'Saved','c-machine':'Your machine',
+  'c-markme':'Mark this spot','c-hdmanage':'HD imagery','c-sources':'Data sources',
+  'c-diag':'Diagnostics','c-about':'About this build','c-compass':'Compass'};
+var SHEET_FOLD=['c-tour','c-howto'];
+ 
+var SHEET_RIDEFLOAT=['c-diag','c-compass'];
+ 
+var SHEET_CHILD_ONLY={'c-about':'c-diag'};
+ 
+var SHEET_ROWS=['c-loop','c-me','c-saved','c-machine','c-fuel','c-home','c-compass','c-markme',
+  'c-hdmanage','c-tour','c-howto','c-sources','c-diag'];
+ 
+function aboutLine(){
+  var tk=((el('title')||{}).textContent||'').match(/Take (\d+)/),b=BUNDLE||{},d=b.built?String(b.built).slice(0,10):'';
+  return (tk?'Take '+tk[1]:'This build')+(b.name?' \u00b7 '+b.name:'')+(d?' data of '+d:'')+(b.hash?' \u00b7 '+String(b.hash).slice(0,8):'')}
+function diagCard(){
+  var R=[['about','about','About this build',aboutLine()],
+         ['selftest','selftest','Self-test','Checks this phone: location, screen, sound, compass'],
+         ['pan','pantest','Pan test','Pans the map to measure how smoothly it draws']];
+  show('<div class="sbox">'+R.map(function(r){return srowHTML({attrs:' data-diag="'+r[0]+'"',icon:r[1],label:r[2],sub:r[3]})}).join('')+'</div>'+
+    '<div class="sub">Run the self-test and share its report when something looks wrong — it says what '+
+    'this phone can and cannot do.</div>','');
+  handOff('diag')}
+function sheetKind(){return SHEET.tool?'tool':(SHEET.tab?'index':(SRCH.on?'search':null))}
+ 
+var SRCH={on:false,from:null};
+ 
+function srowHTML(o){var t=o.tag||'button';
+  return '<'+t+' class="srow"'+(o.attrs||'')+'><span class="sr-i">'+ic(o.icon)+'</span><span class="sr-t">'+
+    '<span class="sr-l">'+o.label+'</span>'+(o.sub?'<span class="sr-s">'+o.sub+'</span>':'')+'</span>'+
+    '<span class="sr-c">'+ic(o.trail||'next')+'</span></'+t+'>'}
+ 
+function handOff(attr){Array.prototype.forEach.call(document.querySelectorAll('[data-'+attr+']'),function(b){
+  b.addEventListener('click',function(){var t=el('c-'+b.dataset[attr]);if(t)t.click()})})}
+ 
+var PLAN_ROWS=['c-loop','c-me','c-saved','c-machine','c-fuel','c-home'];
+function rowTab(id){return PLAN_ROWS.indexOf(id)>=0?'plan':'tools'}
+ 
+function rideUp(){var s=el('shell');return !!(rideMode||riding||(s&&s.dataset&&s.dataset.ride))}
+function sheetPaint(){
+  var r=el('rail'),sh=el('shell'),k=sheetKind();
+  if(r&&r.dataset){if(k)r.dataset.sheet=k;else delete r.dataset.sheet}
+  if(sh&&sh.dataset){if(k)sh.dataset.sheet=k;else delete sh.dataset.sheet;
+     
+    if(SHEET.tool)sh.dataset.sheettool=SHEET.tool;else delete sh.dataset.sheettool}
+  var ip=el('ix-plan'),it=el('ix-tools'),b=el('sheetbar'),t=el('sh-title');
+  if(ip)ip.hidden=!(k==='index'&&SHEET.tab==='plan');
+  if(it)it.hidden=!(k==='index'&&SHEET.tab==='tools');
+   
+  if(b)b.hidden=(k!=='tool'||SHEET.tool==='c-markme');
+  if(t)t.textContent=SHEET.tool?(SHEET_TOOLS[SHEET.tool]||''):'';
+  if(MARK.stop&&SHEET.tool!=='c-markme'&&!rideUp()&&k)markCancel();
+  if(CMP_WHERE==='sheet'&&SHEET.tool!=='c-compass'&&SHEET.parent!=='c-compass'){
+    CMP_WHERE=null;var cpn=el('cmppanel');if(!cpn||cpn.hidden)CMP_ON=false}
+  sheetVals();sheetCap()}
+function sheetIndex(tab){
+  SHEET.tab=tab;SHEET.tool=null;SHEET.parent=null;SHEET_PENDING=null;
+  RAIL_MANUAL=false;railSet(true);sheetPaint();
+  try{var rb=el('railbody');if(rb)rb.scrollTop=0}catch(e){}
+  logAct('sheet index '+tab)}
+function sheetExit(){
+  if(!SHEET.tab&&!SHEET.tool&&!SRCH.on)return false;
+  SHEET.tab=null;SHEET.tool=null;SHEET.parent=null;SHEET_PENDING=null;
+  if(SRCH.on)searchEnd('exit');
+  sheetPaint();return true}
+function searchEnd(why,keepArm){
+  SRCH.on=false;SRCH.from=null;
+  try{el('srch').className='';el('c-search').className='chip'}catch(e){}
+  if(arm==='homeaddr'&&!keepArm){arm=null;syncArm();logAct('act  address arm ended with search')}
+  logAct('search close '+why)}
+function searchOpen(o){o=o||{};
+  if(TAB!=='map')showTab('map');
+  SHEET.tab=null;SHEET.tool=null;SHEET.parent=null;SHEET_PENDING=null;
+  SRCH.on=true;SRCH.from=o.from||'map';
+  el('srch').className='on';el('c-search').className='chip on';
+  var n=el('snote');if(n)n.innerHTML=o.note||'A trail code like H58, a town, a river or a street address \u2014 all of it offline.';
+  RAIL_MANUAL=false;railSet(true);sheetPaint();
+  try{var rb=el('railbody');if(rb)rb.scrollTop=0}catch(e){}
+  searchPaint();
+  try{el('q').focus()}catch(e){}
+  logAct('search open '+SRCH.from)}
+ 
+function searchPaint(){var q=el('q').value||'';
+  if(q)renderHits(searchAll(q));else el('hits').innerHTML='';
+  el('sjump').innerHTML=jumpChipsHTML();wireJumpChips()}
+ 
+function searchAll(q){return search(q,true)}
+function searchClose(why){if(!SRCH.on)return false;
+  searchEnd(why);RAIL_MANUAL=true;railSet(false);sheetPaint();return true}
+function sheetBack(){
+   
+  if(SHEET.tool&&SHEET.parent==='(fold)'){logAct('sheet back fold '+SHEET.tool);RAIL_MANUAL=true;railSet(false);return 'fold'}
+  if(SHEET.tool&&SHEET.tab&&SHEET.parent){var par=SHEET.parent;logAct('sheet back '+SHEET.tool+' -> '+par);
+     
+    SHEET.parent=null;SHEET.tool=null;
+    var pb=el(par);if(pb){pb.click();return 'parent'}}
+  if(SHEET.tool&&SHEET.tab){var t=SHEET.tab;logAct('sheet back '+SHEET.tool);sheetIndex(t);return 'index'}
+  RAIL_MANUAL=true;railSet(false);logAct('sheet back fold');return 'fold'}
+ 
+function sheetVals(){try{
+  var m=MACHINE[machine];
+  var v=el('c-loop-s');if(v&&m)v.textContent='Ends where it starts · legal for your '+m.lbl;
+  v=el('c-home-v');if(v)v.textContent=HOME?'Set':'Not set';
+  v=el('c-saved-v');if(v)v.textContent=String(sheetSavedN());
+  }catch(e){}}
+ 
+function sheetSavedN(){
+  var mine=function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region};
+  try{return svLoad().filter(mine).length+wpLoad().filter(mine).length}catch(e){return 0}}
+ 
+function sheetCap(){try{
+  var r=el('rail'),rb=el('railbody'),de=document.documentElement;
+  if(!r||!rb||!sheetKind()||r.className==='folded'||rideUp())return;
+  var vh=window.innerHeight||0,rr=r.getBoundingClientRect();
+  if(!(vh>0)||!(rr.top>0))return;
+  var top=rr.top,a=document.querySelector('.maplibregl-ctrl-bottom-right');
+  if(a){var ar=a.getBoundingClientRect();if(ar.height>0&&ar.top<top)top=ar.top}
+  var cap=Math.floor(rb.getBoundingClientRect().height+top-Math.ceil(vh*0.12)-8);
+  if(isFinite(cap)&&cap>0){var cv=cap+'px';
+    if(de.style.getPropertyValue('--sheet-cap')!==cv)de.style.setProperty('--sheet-cap',cv)}}catch(e){}}
+try{window.addEventListener('resize',sheetCap)}catch(e){}
+function sheetFoldKeep(){if(sheetExit()){SHEET_KEEP=true;RAIL_MANUAL=false;try{railSet(false)}finally{SHEET_KEEP=false}}}
+Object.keys(SHEET_TOOLS).forEach(function(id){var b=el(id);if(!b)return;
+  b.addEventListener('click',function(){
+    if(SHEET_RIDEFLOAT.indexOf(id)>=0&&rideUp())return sheetFoldKeep();
+    var only=SHEET_CHILD_ONLY[id];
+    if(only&&SHEET.tool!==only)return;
+    if(SHEET.tab){SHEET.parent=(SHEET.tool&&SHEET.tool!==id)?SHEET.tool:null;SHEET_PENDING=id}})});
+SHEET_FOLD.forEach(function(id){var b=el(id);if(!b)return;
+  b.addEventListener('click',sheetFoldKeep)});
+var SHEET_KEEP=false;
+try{el('sh-back').addEventListener('click',function(){sheetBack()})}catch(e){}
+try{el('ix-home').addEventListener('click',function(){
+  logAct('tap  ix-home');sheetExit();el('btn-home').click()})}catch(e){}
+try{el('ix-search').addEventListener('click',function(){
+  logAct('tap  ix-search');searchOpen({from:'plan'})})}catch(e){}
+try{window.__sheet={state:function(){return {tab:SHEET.tab,tool:SHEET.tool,kind:sheetKind(),pending:SHEET_PENDING}},
+  tab:function(t){showTab(t)},tap:function(t){tabTap(t)},index:sheetIndex,back:sheetBack,exit:sheetExit,cap:sheetCap,
+  tool:function(id){if(!el(id))return false;showTab(rowTab(id));el(id).click();return SHEET.tool},
+  pin:function(){return pinInView()},pinLast:function(){return PIN_LAST},pinDbg:function(){return PIN_DBG}}}catch(e){}
+
 function setChip(id,icon,label,on){
   var b=el(id);
   if(!b)return;
+   
+  if(SHEET_ROWS.indexOf(id)>=0){
+    var v=el(id+'-v'),i=el(id+'-i');if(v)v.innerHTML=label;if(i)i.innerHTML=ic(icon);return}
   b.innerHTML=ic(icon)+'<span>'+label+'</span>';
    
   var base=(' '+b.className+' ').indexOf(' basebtn ')>=0?'basebtn':'chip';
@@ -1820,10 +1977,10 @@ function homeCard(prefix){
       if(w==='tap'){arm='home';syncArm();return show('Tap the map to place <b>home</b>.','')}
       if(w==='clear'){HOME=null;homeSave();homeMark();clearRoute();syncSafety();
         return ack('<b>Home cleared.</b>')}
-      if(w==='addr'){arm='homeaddr';syncArm();
-        try{el('srch').className='on';el('c-search').className='chip on';el('q').value='';el('q').focus()}catch(e){}
-        return show('Type the address — a number and a street, like <b>4952 S Branch Rd</b>. '+
-          'The hit you tap becomes home.','')}
+      if(w==='addr'){try{el('q').value=''}catch(e){}
+        searchOpen({from:'home',note:'Type the address \u2014 a number and a street, like <b>4952 S Branch Rd</b>. '+
+          'The hit you tap becomes home.'});
+        arm='homeaddr';syncArm();return}
        
       show('Waiting for a GPS fix…','');
       locateOnce(function(at,why){
@@ -1837,37 +1994,63 @@ el('c-home').addEventListener('click',function(){
   if(arm==='home'||arm==='homeaddr'){arm=null;syncArm();return ack('Cancelled.')}
   homeCard('')});
 el('c-me').addEventListener('click',function(){
+  if(arm!=='me'&&meDriven()){logAct('act  start from my position refused: gps');return show(ME_DRIVEN,'')}
   arm=arm==='me'?null:'me';syncArm();
   if(arm)show("Tap the map to place <b>where you are</b>.",'');else ack('Cancelled.')});
-function syncArm(){el('c-home').className='chip'+((arm==='home'||arm==='homeaddr')?' arm':'');
-  el('c-me').className='chip'+(arm==='me'?' arm':'')}
+function syncArm(){el('c-home').className='srow'+((arm==='home'||arm==='homeaddr')?' arm':'');
+  el('c-me').className='srow'+(arm==='me'?' arm':'')}
 
 el('c-saved').addEventListener('click',function(){
   logAct('act  saved routes');buildSavedPanel()});
 
-el('c-machine').addEventListener('click',function(){
-   
-  if(mode==='water'){
-    var wi=(WORDER.indexOf(machine)+1)%WORDER.length;
-    machine=WORDER[wi];waterCraft=machine;
-    setChip('c-machine',MACHINE[machine].ic,MACHINE[machine].lbl);
-    show('Craft set to <b>'+MACHINE[machine].lbl+
-      '</b>. Float times on the river cards use it.','');
-    return}
-  machIdx=(machIdx+1)%ORDER.length;machine=ORDER[machIdx];_legalMemo={};
-  setChip('c-machine',MACHINE[machine].ic,MACHINE[machine].lbl);
+ 
+var MACH_ROWS=ORDER.concat(WORDER);
+function machCard(note){
+  var water=mode==='water';
+  var rows=MACH_ROWS.map(function(k){var M=MACHINE[k],craft=!!M.mph,off=craft!==water,on=k===machine;
+    return '<button class="srow'+(on?' on':'')+(off?' off':'')+'" data-mach="'+k+'" aria-pressed="'+on+'">'+
+      '<span class="sr-i">'+ic(M.ic)+'</span><span class="sr-t"><span class="sr-l">'+M.lbl+'</span>'+
+      (off?'<span class="sr-s">'+(craft?'Used in Water mode':'Used in the land modes')+'</span>':'')+
+      '</span></button>'}).join('');
+  toolShow('c-machine',(note?'<div class="mnote" id="mach-note">'+note+'</div>':'')+
+    '<div class="sub">'+(water?'Float times on the river cards use the craft you pick.'
+      :'Routing follows what is legal for it, and lines too narrow for it fade \u2014 still real trails, just not yours today.')+
+    '</div><div class="sbox">'+rows+'</div>','');
+  Array.prototype.forEach.call(document.querySelectorAll('[data-mach]'),function(b){
+    b.addEventListener('click',function(){machPick(b.dataset.mach)})})}
+function machPick(k){
+  var M=MACHINE[k];if(!M)return;
+  var water=mode==='water',craft=!!M.mph;
+  if(craft!==water){logAct('act  machine refused '+k);
+    return machCard('<b>'+M.lbl+'</b> is used '+(craft?'in Water mode':'in the land modes')+
+      ' \u2014 change the mode first.')}
+  if(k===machine)return machCard('');
+  logAct('act  machine '+k);
+  if(water){machine=k;waterCraft=k;setChip('c-machine',M.ic,M.lbl);
+    return machCard('Craft set to <b>'+M.lbl+'</b>. Float times on the river cards use it.')}
+  var was=machine,had=!!last;
+  machIdx=ORDER.indexOf(k);machine=k;_legalMemo={};
+  setChip('c-machine',M.ic,M.lbl);
   applyMachine();
   var no=machineIllegal();
-  clearRoute();show('Machine set to <b>'+MACHINE[machine].lbl+
-   '</b>. Routing respects what is legal for it, and the map now shows it: '+
-   (no.length?'<b>'+no.length+'</b> kind'+(no.length>1?'s':'')+' of line faded '+
-     'because they are too narrow for it. They are still real trails \u2014 just '+
-     'not yours today.':'nothing on this map is off limits for it.'),'')});
+  clearRoute();
+  machCard(had?'Route cleared \u2014 it was planned for '+MACHINE[was].lbl+'. Plan it again for '+M.lbl+'.'
+    :'Machine set to <b>'+M.lbl+'</b>. '+(no.length?'<b>'+no.length+'</b> kind'+(no.length>1?'s':'')+
+      ' of line faded because they are too narrow for it.':'Nothing on this map is off limits for it.'))}
+el('c-machine').addEventListener('click',function(){logAct('act  machine picker');machCard('')});
 
-var FUELS=[30,50,80,120,0],fi=1;
-el('c-fuel').addEventListener('click',function(){fi=(fi+1)%FUELS.length;
-  setChip('c-fuel','fuel',FUELS[fi]?FUELS[fi]+' mi':'off');
-  if(last)renderRoutes(last)});
+ 
+var FUELS=[0,30,50,80,120],fi=2;
+function fuelPaint(){var f=FUELS[fi];
+  setChip('c-fuel','fuel',f?f+' mi':'Off');
+  var t=el('c-fuel-s');if(t)t.textContent=f?'Routes warn past it':'Off \u2014 no route is checked against a tank';
+  var d=el('c-fuel-dn'),u=el('c-fuel-up');if(d)d.disabled=fi<=0;if(u)u.disabled=fi>=FUELS.length-1}
+function fuelStep(n){var j=Math.max(0,Math.min(FUELS.length-1,fi+n));if(j===fi)return;
+  fi=j;fuelPaint();logAct('act  fuel '+(FUELS[fi]?FUELS[fi]+' mi':'off'));
+  if(last)renderRoutes(last)}
+el('c-fuel-dn').addEventListener('click',function(){fuelStep(-1)});
+el('c-fuel-up').addEventListener('click',function(){fuelStep(1)});
+fuelPaint();
 
  
  
@@ -2037,7 +2220,8 @@ function guideClose(mark){
 
  
  
-var TOURKEY='apex.tour.v2',TOUR={on:false,i:0,steps:[]};
+ 
+var TOURKEY='apex.tour.v3',TOUR={on:false,i:0,steps:[],n:0,total:0};
 var TOUR_STEPS=[
   {id:'c-mode',   tab:null,   t:'What are you doing today?',
    s:'Off-road, Outdoors, Hunt, Water or Camp. A mode sets the pins, the lines and the routing for that kind of day — and everything it sets stays one tap away.'},
@@ -2063,6 +2247,9 @@ function tourStart(){
   var t=el('tour');if(!t)return false;
   TOUR.steps=TOUR_STEPS.slice();TOUR.i=-1;TOUR.on=true;t.hidden=false;
   TOUR.tab0=(typeof TAB==='string')?TAB:null;    
+   
+  TOUR.n=0;TOUR.total=0;TOUR.pre={};
+  TOUR.steps.forEach(function(st){if((st.tab&&st.tab!==TOUR.tab0)||tourVisible(st.id))TOUR.total++;else TOUR.pre[st.id]=1});
   logAct('act  tour start');
   return tourNext()}
 function tourNext(){
@@ -2070,8 +2257,9 @@ function tourNext(){
   for(var i=TOUR.i+1;i<TOUR.steps.length;i++){
     var st=TOUR.steps[i];
     try{if(st.tab&&typeof showTab==='function')showTab(st.tab)}catch(e){}
-    if(!tourVisible(st.id)){logAct('tour skip '+st.id+' (hidden)');continue}
-    TOUR.i=i;tourPaint();return true}
+    if(!tourVisible(st.id)){logAct('tour skip '+st.id+' (hidden)');
+      if(!TOUR.pre[st.id])TOUR.total=Math.max(TOUR.n+1,TOUR.total-1);continue}
+    TOUR.i=i;TOUR.n++;tourPaint();return true}
   return tourClose('done')}
 function tourPaint(){
   var st=TOUR.steps[TOUR.i],c=el(st.id),ring=el('tour-ring'),card=el('tour-card');
@@ -2080,18 +2268,17 @@ function tourPaint(){
   ring.style.left=(r.left-pad)+'px';ring.style.top=(r.top-pad)+'px';
   ring.style.width=(r.width+pad*2)+'px';ring.style.height=(r.height+pad*2)+'px';
   var last=TOUR.i>=TOUR.steps.length-1;
+   
   card.innerHTML='<button id="tour-x" aria-label="Not now">'+ic('close',18)+'</button>'+
+    '<div class="k" id="tour-n">'+TOUR.n+' of '+Math.max(TOUR.n,TOUR.total)+'</div>'+
     '<b>'+st.t+'</b><div class="sub">'+st.s+'</div>'+
     '<div id="tour-btns">'+
-      '<button class="chip" id="tour-next"><span>'+(last?'Done':'Next')+'</span></button>'+
-      '<button class="chip quiet" id="tour-notnow"><span>Not now</span></button>'+
-      '<button class="chip quiet" id="tour-never"><span>Don\u2019t show again</span></button>'+
-      '<span id="tour-n">'+(TOUR.i+1)+' of '+TOUR.steps.length+'</span></div>';
+      '<button class="chip" id="tour-next">'+(last?'':ic('next'))+'<span>'+(last?'Done':'Next')+'</span></button>'+
+      '<button class="chip quiet" id="tour-never">'+ic('close')+'<span>Skip</span></button></div>';
    
   if(r.top<vh/2){card.style.top=(r.bottom+pad+12)+'px';card.style.bottom='auto'}
   else{card.style.bottom=(vh-r.top+pad+12)+'px';card.style.top='auto'}
   el('tour-next').addEventListener('click',function(){tourNext()});
-  el('tour-notnow').addEventListener('click',function(){tourClose('notnow')});
   el('tour-x').addEventListener('click',function(){tourClose('notnow')});
   el('tour-never').addEventListener('click',function(){tourClose('never')});}
 function tourClose(how){
@@ -2102,6 +2289,8 @@ function tourClose(how){
   logAct('act  tour close '+how);
   return how}
 try{window.addEventListener('resize',function(){if(TOUR.on)tourPaint()})}catch(e){}
+ 
+try{el('rail').addEventListener('transitionend',function(e){if(TOUR.on&&e&&e.target===el('railbody'))tourPaint()})}catch(e){}
 
 function wpLoad(){
   if(!svAvailable())return [];
@@ -2221,35 +2410,39 @@ function svPrefer(k){
     sel=i;draw(last[i],true);rcSel();
     return}}
 
+ 
+function svRec(attrs,icon,label,sub,ren,del){
+  var q=String(label).replace(/"/g,'&quot;');
+  return '<div class="svrec"><button class="srow"'+attrs+'><span class="sr-i">'+ic(icon)+'</span>'+
+    '<span class="sr-t"><span class="sr-l">'+label+'</span><span class="sr-s">'+sub+'</span></span></button>'+
+    '<button class="sv-x"'+ren+' aria-label="Rename '+q+'">'+ic('rename')+'</button>'+
+    '<button class="sv-x"'+del+' aria-label="Delete '+q+'">'+ic('del')+'</button></div>'}
 function buildSavedPanel(){
-  var a=svLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region});
-  var wp=wpLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region});
+  var here=function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region};
+  var A=svLoad(),W=wpLoad(),a=A.filter(here),wp=W.filter(here),away=(A.length-a.length)+(W.length-wp.length);
   if(!svAvailable())
-    return show('<b>Saved routes are unavailable here.</b> This phone would not let '+
+    return toolShow('c-saved','<b>Saved routes are unavailable here.</b> This phone would not let '+
       'the app store anything \u2014 its storage may be full or blocked.','fail');
-  if(!a.length&&!wp.length)
-    return show('<b>Nothing saved yet.</b><br>Plan a route or a loop, pick the card you want to keep, then tap '+
-      '<b>Save</b> under the route options. It is stored on this phone '+
-      'only — nothing is sent anywhere — and reopening it routes again on the '+
-      'current map, so closures stay up to date.','');
-  var h='<div id="routes">';
-  if(wp.length){
-    h+='<div class="sub" style="margin:2px 0 6px">'+wp.length+' waypoint'+
-       (wp.length===1?'':'s')+'</div>';
-    wp.forEach(function(x,i){
-      h+='<div class="rc" data-wp="'+i+'"><h5>'+ic('spot')+x.n+'</h5>'+
-         '<div class="sub">'+x.p[1].toFixed(5)+', '+x.p[0].toFixed(5)+'</div>'+
-         '<div class="sub"><button class="chip" data-wpgo="'+i+'">Go to</button> '+
-         '<button class="chip" data-wpren="'+i+'">Rename</button> '+
-         '<button class="chip" data-wpdel="'+i+'">Delete</button></div></div>'})}
-  a.forEach(function(r,i){
-    h+='<div class="rc" data-sv="'+i+'"><h5>'+r.n+'</h5>'+
-       '<div class="sub">'+(r.k==='loop'?'loop · '+r.mi+' mi target':'point to point')+
-       ' · '+((MACHINE[r.m]||{}).lbl||r.m||'')+'</div>'+
-       '<div class="sub"><button class="chip" data-svopen="'+i+'">Open</button> '+
-       '<button class="chip" data-svren="'+i+'">Rename</button> '+
-       '<button class="chip" data-svdel="'+i+'">Delete</button></div></div>'});
-  show(h+'</div>','');
+  var awayLine=away?'<div class="sub" id="sv-away">'+away+' more saved in a different region, not shown here.</div>':'';
+  var markRow='<div class="mkrow"><button class="chip" data-svto="markme">'+ic('spot')+'<span>Mark this spot</span></button></div>';
+  if(!a.length&&!wp.length){
+    toolShow('c-saved','<div class="svempty">'+ic('saved')+'</div>'+
+      '<div class="svh">'+(away?'Nothing saved for this map':'Nothing saved yet')+'</div>'+awayLine+
+      '<div class="sub">Plan a route or a loop, pick the card you want to keep, then tap <b>Save</b> under the '+
+      'route options. Marked spots land here too. It is stored on this phone only \u2014 nothing is sent '+
+      'anywhere \u2014 and reopening a route plans it again on the current map, so closures stay up to date.</div>'+
+      markRow,'');
+    return handOff('svto')}
+  var h='';
+  if(wp.length)h+='<div class="k">Marked spots \u00b7 '+wp.length+'</div><div class="sbox">'+wp.map(function(x,i){
+    return svRec(' data-wpgo="'+i+'"','spot',x.n,x.p[1].toFixed(5)+', '+x.p[0].toFixed(5),
+      ' data-wpren="'+i+'"',' data-wpdel="'+i+'"')}).join('')+'</div>';
+  if(a.length)h+='<div class="k">Routes \u00b7 '+a.length+'</div><div class="sbox">'+a.map(function(r,i){
+    return svRec(' data-svopen="'+i+'"',r.k==='loop'?'loop':'route',r.n,
+      (r.k==='loop'?'Loop \u00b7 '+r.mi+' mi target':'Point to point')+' \u00b7 '+((MACHINE[r.m]||{}).lbl||r.m||''),
+      ' data-svren="'+i+'"',' data-svdel="'+i+'"')}).join('')+'</div>';
+  toolShow('c-saved',h+awayLine+markRow,'');
+  handOff('svto');
   var bind=function(attr,fn){
     Array.prototype.forEach.call(document.querySelectorAll('['+attr+']'),function(b){
       b.addEventListener('click',function(e){
@@ -2537,17 +2730,14 @@ function renderRoutes(out,auto){
       :ra.rejoin?'Back to the loop \u00b7 '+navFmt(ra.rejoin.leg*1609.34)+' to it, '+ra.rejoin.rest.toFixed(1)+' mi of it left'+
         (bits.length?' \u00b7 '+bits.join(' \u00b7 '):'')
       :'Re-routed \u00b7 '+(bits.length?bits.join(' \u00b7 '):'the new route is on the map'))}
+   
+  else if(sheetKind()==='index'||sheetKind()==='tool'){var pq=el('panel');pq.innerHTML=html;pq.className='';
+    logAct('route cards written under the sheet')}
   else show(html,'');
    
   rcFit();
   var rr=el('rc-ride');
-  if(rr)rr.addEventListener('click',function(){
-     
-    if(rideMode||riding)return;
-    if(last&&sel!==null&&!routeFits(last[sel]))return routeUnfitCard();
-    logAct('act  ride it (route card)');
-    RAIL_MANUAL=false;railSet(false);showTab('ride');
-    el('c-ride').click()});
+  if(rr)rr.addEventListener('click',function(){rideItGo('route card')});
   var cb2=el('btn-clear');
   if(cb2)cb2.addEventListener('click',function(){
     logAct('act  cleared route');
@@ -2679,7 +2869,7 @@ function buildIndex(){
   IDX=rows;return rows}
 
 var KRANK={address:0,place:1,river:1.5,trail:2,number:3,road:4,street:5,junction:6};
-function search(q){
+function search(q,all){
   q=q.trim().toLowerCase();if(q.length<1)return [];
   var rows=buildIndex(),out=[];
    
@@ -2698,7 +2888,7 @@ function search(q){
     for(var i2=0;i2<rows.length;i2++){var r2=rows[i2];
       if(near1(qz,r2.z))out.push([5,(KRANK[r2.k]||5),r2.t.length,r2])}}
   out.sort(function(a,b){return a[0]-b[0]||a[1]-b[1]||a[2]-b[2]});
-  return out.slice(0,9).map(function(x){return x[3]})}
+  return (all?out:out.slice(0,9)).map(function(x){return x[3]})}
 
  
 function near1(needle,hay){
@@ -2714,16 +2904,23 @@ function near1(needle,hay){
     if(i>=n&&miss<=1)return true}
   return false}
 
-function renderHits(list){
-  if(!list.length){el('hits').innerHTML=
+ 
+var KIND_WORD={address:'Address',place:'Place',river:'River',trail:'Trail',number:'Trail number',
+  road:'Road',street:'Street',junction:'Junction'};
+function renderHits(all){
+  if(!all.length){el('hits').innerHTML=
     '<div class="hit">No match. Try a code like <b>TMM</b> or <b>H58</b>.</div>';return}
-  el('hits').innerHTML=list.map(function(r,i){
-    return '<div class="hit" data-i="'+i+'"><b>'+r.t+'</b><i>'+r.k+'</i></div>'}).join('');
+  var list=all.slice(0,9),n=all.length;
+  el('hits').innerHTML='<div class="k" id="hits-n">'+(n>list.length?'First '+list.length+' of '+n:n+' result'+(n===1?'':'s'))+
+    ' \u00b7 offline</div><div class="sbox">'+list.map(function(r,i){
+    return '<button class="srow hit" data-i="'+i+'"><span class="sr-t"><span class="sr-l">'+r.t+'</span>'+
+      '<span class="sr-s">'+(KIND_WORD[r.k]||r.k)+'</span></span><span class="sr-c">'+ic('next')+'</span></button>'}).join('')+'</div>';
   Array.prototype.forEach.call(document.querySelectorAll('.hit'),function(d){
     if(d.dataset.i===undefined)return;
     d.addEventListener('click',function(){
       var r=list[+d.dataset.i];if(!r)return;
-      el('srch').className='';el('c-search').className='chip';
+       
+      if(SRCH.on){searchEnd('hit',r.k!=='river');sheetPaint()}
       if(r.k==='river'){
          
         var c=null;for(var ci=0;ci<((PADDLE&&PADDLE.c)||[]).length;ci++)
@@ -2757,16 +2954,9 @@ function renderHits(list){
       placeCard(r.c,'drop',r.t)})})}
 
 el('c-search').addEventListener('click',function(){
-  var on=el('srch').className.indexOf('on')<0;
-  el('srch').className=on?'on':'';el('c-search').className='chip'+(on?' on':'');
-  if(on){el('q').focus();
-    var q0=el('q').value||'';
-    if(q0){renderHits(search(q0))}
-    else{show(jumpChipsHTML(),'');wireJumpChips(el('panel'))}}});
-el('q').addEventListener('input',function(){
-  var q=el('q').value;
-  if(!q){show(jumpChipsHTML(),'');wireJumpChips(el('panel'));return}
-  renderHits(search(q))});
+  if(SRCH.on)return searchClose('chip');
+  searchOpen({from:'map'})});
+el('q').addEventListener('input',function(){if(SRCH.on)searchPaint()});
 
  
 function turnWord(d){
@@ -2819,8 +3009,33 @@ el('btn-steps').addEventListener('click',function(){
       (at>0.05?'<div class="at">at '+at.toFixed(1)+' mi</div>':'')+
       '</div></div>'});
   html+='</div>';
+  var ride=!rideMode&&!riding;
   show('<span class="tn">'+steps.length+' steps · '+tot.toFixed(1)+
-    ' mi</span><span class="meta">'+last[sel].h+'</span>'+html,'')})
+    ' mi</span><span class="meta">'+last[sel].h+'</span>'+html+
+    '<div class="stfoot" id="st-foot"><div class="sub" id="st-more" hidden></div>'+
+    (ride?'<button class="chip primary" id="st-ride">'+ic('ride')+'<span>Ride it</span></button>':'')+'</div>','');
+  stMore();
+   
+  var sr=el('st-ride');
+  if(sr)sr.addEventListener('click',function(){rideItGo('turns')})})
+ 
+function rideItGo(from){
+  if(rideMode||riding)return;
+  if(last&&sel!==null&&!routeFits(last[sel]))return routeUnfitCard();
+  logAct('act  ride it ('+from+')');
+  RAIL_MANUAL=false;railSet(false);showTab('ride');
+  el('c-ride').click()}
+ 
+function stMore(){try{
+  var m=el('st-more'),f=el('st-foot'),b=el('railbody');if(!m||!f||!b)return;
+  var lim=f.getBoundingClientRect().top,n=0;
+  Array.prototype.forEach.call(document.querySelectorAll('#steps .st'),function(x){
+    if(x.getBoundingClientRect().top>=lim-1)n++});
+  var bh=b.getBoundingClientRect().height;
+  if(!(bh>0)||!(lim>0))n=0;
+  m.hidden=!n;m.textContent=n?n+' more step'+(n===1?'':'s')+' below':''}catch(e){}}
+try{el('railbody').addEventListener('scroll',stMore)}catch(e){}
+try{el('rail').addEventListener('transitionend',function(e){if(e&&e.target===el('railbody'))stMore()})}catch(e){}
 
  
  
@@ -3363,6 +3578,11 @@ function ridePublish(){try{
   var alr=el('alert');
   if(alr&&/\bon\b/.test(alr.className)){var ar=alr.getBoundingClientRect();if(ar.height>0)low=Math.max(low,ar.bottom)}
    
+  { var alertRoom=0;if(alr&&/\bon\b/.test(alr.className)){var ar2=alr.getBoundingClientRect();
+      if(ar2.height>0)alertRoom=Math.max(0,Math.ceil(ar2.bottom-(s0+h)))}
+    var amv=alertRoom?alertRoom+'px':'';
+    if(de.style.getPropertyValue('--alert-room')!==amv){if(amv)de.style.setProperty('--alert-room',amv);else de.style.removeProperty('--alert-room')}}
+   
   var hs=el('hudstats'),rb=el('railbody'),GAP=8;    
    
   var fl=(hs&&!hs.hidden)?hs:el('tools'),fr=fl?fl.getBoundingClientRect():null;
@@ -3669,7 +3889,8 @@ function stopRide(){if(riding){clearInterval(riding);riding=null;
  
 function rideFlag(){try{var s=el('shell');if(!s)return;
    
-  if(rideMode||riding){s.dataset.ride='1';var rr=el('rc-ride');if(rr)rr.hidden=true}
+  if(rideMode||riding){s.dataset.ride='1';var rr=el('rc-ride');if(rr)rr.hidden=true;
+    var rt=el('rt-start');if(rt)rt.hidden=true}
   else delete s.dataset.ride}catch(e){}
    
   simChip();stripH();ridePublish()}
@@ -4075,12 +4296,18 @@ function meFix(at){ME_FIX={at:at.slice(),t:Date.now()};
 function meOnFix(){return posMode==='gps'&&!!ME_FIX&&!!ME&&ME[0]===ME_FIX.at[0]&&ME[1]===ME_FIX.at[1]}
  
 function liveFix(){
-  if(!meOnFix()||Date.now()-ME_FIX.t>GPS_STALE_MS)return null;
-  return {at:ME_FIX.at.slice(),t:ME_FIX.t,age:Date.now()-ME_FIX.t}}
+   
+  var age=meOnFix()?Date.now()-ME_FIX.t:-1;
+  if(!meOnFix()||age<0||age>GPS_STALE_MS)return null;
+  return {at:ME_FIX.at.slice(),t:ME_FIX.t,age:age}}
  
 function meClock(){try{return new Date(ME_FIX.t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
   catch(e){return 'time unknown'}}
  
+ 
+function meDriven(){return posMode==='gps'&&(watchId!==null||LOCATE_N>0)}
+var ME_DRIVEN='<b>GPS is on</b> \u2014 the next fix in the region moves the start pin to where you are, '+
+  'so it cannot be placed by hand.';
 function meIs(){return liveFix()?'you':meOnFix()?'last':posMode==='sim'?'sim':posMode==='away'?'away':'pin'}
  
 function meNoun(own){var k=meIs();
@@ -4236,6 +4463,7 @@ el('c-ride').addEventListener('click',function(){
   railSet(false);
    
   var rr=el('rc-ride');if(rr)rr.hidden=true;
+  var rt0=el('rt-start');if(rt0)rt0.hidden=true;
    
   GPS_REFUSED=false;
   var refused=false,onGpsFail=function(e){
@@ -4427,10 +4655,13 @@ function hdMB(mb){return mb<1?'under 1 MB':'about '+Math.round(mb)+' MB'}
 function hdCard(confirmId){
   var conf=typeof confirmId==='string'?confirmId:null;
   var tiers=hdTiers(),pr=HDDL.progress();
+   
+  var inSheet=SHEET.tab&&(SHEET_PENDING==='c-hdmanage'||SHEET.tool==='c-hdmanage'),sTab=SHEET.tab;
   Promise.all([HD.stats(),HDDL.quota()]).then(function(res){
     var st=res[0],q=res[1],busy=HDDL.busy();
-    var h='<b>HD imagery</b>'+
-      '<div class="sub">Sharper satellite for places you choose. Nothing downloads on its own.</div>';
+     
+    var h=(inSheet?'':'<b>HD imagery</b>')+
+      '<div class="sub">Sharper satellite for places you choose. Nothing downloads on its own \u2014 save on wifi.</div>';
     if(pr){
       var left=pr.eta==null?'':(pr.eta<60?' · under a minute left':' · about '+Math.ceil(pr.eta/60)+' min left');
       h+='<div class="k">DOWNLOADING '+String(pr.label).toUpperCase()+'</div><div class="sub">'+
@@ -4439,20 +4670,22 @@ function hdCard(confirmId){
         '<button class="chip" id="hd-stop">'+ic('stopdl')+'<span>Stop downloading</span></button>'}
     for(var i=0;i<tiers.length;i++){
       var t=tiers[i],big=t.id==='view'&&t.mb>500,fits=!q.known||q.free>=t.mb*1048576*1.2;
-      h+='<div class="k">'+t.name+'</div><div class="sub">'+(t.n?t.n.toLocaleString()+' tiles · '+hdMB(t.mb)+
+      h+='<div class="hdtier"><div class="hdt-n">'+t.label.charAt(0).toUpperCase()+t.label.slice(1)+'</div><div class="sub">'+(t.n?t.n.toLocaleString()+' tiles · '+hdMB(t.mb)+
         (t.note?' · '+t.note:'')+(big?' — zoom in to a smaller area to save':''):'already sharp here — built in or saved, nothing to download')+'</div>';
-      if(busy||big||!t.n)continue;
+      if(busy||big||!t.n){h+='</div>';continue}
       if(!fits){h+='<div class="sub">Not enough space: needs '+hdMB(t.mb*1.2)+', the phone allows '+
-        hdMB(q.free/1048576)+'</div>';continue}
+        hdMB(q.free/1048576)+'</div></div>';continue}
       if(t.confirm&&conf===t.id){
         h+='<div class="sub">'+hdMB(t.mb)+' and '+t.n.toLocaleString()+' tiles. The screen stays on until it finishes; Stop keeps what landed.</div>'+
           '<button class="chip" id="hd-go-'+t.id+'">'+ic('hd')+'<span>Yes, save the whole state</span></button>'+
           '<button class="chip" id="hd-no">'+ic('close')+'<span>Not now</span></button>'}
-      else h+='<button class="chip" id="hd-'+(t.confirm?'ask-':'go-')+t.id+'">'+ic('hd')+'<span>'+t.btn+'</span></button>'}
+      else h+='<button class="chip" id="hd-'+(t.confirm?'ask-':'go-')+t.id+'">'+ic('hd')+'<span>'+t.btn+'</span></button>';
+      h+='</div>'}
     if(!q.known)h+='<div class="sub">This phone does not say how much space it allows — a save stops itself if space runs out, and keeps what landed.</div>';
     h+='<div class="k">SAVED ON THIS PHONE</div><div class="sub">'+st.tiles.toLocaleString()+
         ' tiles · '+(st.bytes/1048576).toFixed(1)+' MB</div>'+
       (st.tiles?'<button class="chip" id="hd-del">'+ic('del')+'<span>Delete all saved HD</span></button>':'');
+    if(inSheet&&SHEET.tab===sTab&&(SHEET.tool==='c-hdmanage'||(SHEET.tool===null&&!SHEET_PENDING)))SHEET_PENDING='c-hdmanage';
     show(h);
     tiers.forEach(function(t){
       var g=el('hd-go-'+t.id);if(g)g.addEventListener('click',function(){startHDSave(t.tiles,t.label);hdCard()});
@@ -4464,7 +4697,9 @@ function hdCard(confirmId){
       HDDL.stop();
       setTimeout(function(){HD.clear().then(function(){refreshSat();hdChip();hdCard()})},350)});
   })}
-el('c-hd').addEventListener('click',hdCard);
+ 
+el('c-hd').addEventListener('click',function(){
+  logAct('tap  c-hd');showTab('tools');el('c-hdmanage').click();SHEET.parent='(fold)'});
 el('c-hdmanage').addEventListener('click',hdCard);
  
 var SOURCES=[
@@ -4478,25 +4713,33 @@ var SOURCES=[
    'https://apps.nationalmap.gov/downloader/'],
   ['USGS Water Services','Live river gauge readings',
    'https://waterdata.usgs.gov'],
+   
+  ['U.S. Census Bureau','The state outline, county lines and the address ranges behind addresses (TIGER)',
+   'https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html']];
+ 
+var SOURCES_OTHER=[
   ['OpenStreetMap contributors','Roads, places and context, under ODbL',
-   'https://www.openstreetmap.org/copyright']];
+   'https://www.openstreetmap.org/copyright'],
+  ['AWS Terrain Tiles','Elevation for climbs, profiles and hillshade (USGS 3DEP over the U.S.)',
+   'https://registry.opendata.aws/terrain-tiles/']];
+function srcRows(list){return '<div class="sbox">'+list.map(function(r){
+  return srowHTML({tag:'a',attrs:' href="'+r[2]+'" target="_blank" rel="noopener"',icon:'sources',label:r[0],sub:r[1],trail:'external'})}).join('')+'</div>'}
  
 var PRIVACY_URL='https://sergeantcs2.github.io/apex-orv/privacy.html';
 function sourcesCard(){
   logAct('tap  data sources');
-  show('<b>Where the data comes from</b>'+
-    '<div class="sub">APEX ORV is an <b>independent app</b>. It is not '+
+   
+  show('<div class="srcnote">APEX ORV is an <b>independent app</b>. It is not '+
     'affiliated with, endorsed by, or acting on behalf of the State of '+
     'Michigan, the Michigan Department of Natural Resources, the U.S. Forest '+
     'Service, the U.S. Geological Survey, or any other government agency.</div>'+
     '<div class="k">OFFICIAL SOURCES</div>'+
     '<div class="sub">These agencies are the authority; this app is a '+
     'convenience. Check the official source, and the signs on the ground, '+
-    'before you ride.</div>'+
-    '<div class="sub">'+SOURCES.map(function(r){
-      return '<b>'+r[0]+'</b><br>'+r[1]+'<br><a href="'+r[2]+
-        '" target="_blank" rel="noopener" style="color:var(--link)">'+r[2]+'</a>'
-      }).join('<br><br>')+'</div>'+
+    'before you ride.</div>'+srcRows(SOURCES)+
+    '<div class="k">OTHER DATA</div>'+
+    '<div class="sub">Not agencies: OpenStreetMap is mapped by its contributors, and '+
+    'AWS Terrain Tiles host elevation drawn from public surveys.</div>'+srcRows(SOURCES_OTHER)+
      
     '<div class="k">SOFTWARE AND TYPE</div><div class="sub"><b>Icons</b> \u2014 Lucide '+LUCIDE_V+
     ', ISC licence, \u00a9 Lucide Icons and Contributors; icons derived from Feather under '+
@@ -4559,14 +4802,18 @@ function backOpen(){
   if(TOUR.on)return 'tour';
   if(panelOpen())return 'panel';
   var g=el('guide');if(g&&!g.hidden)return 'guide';
-  var sr=el('srch');if(sr&&String(sr.className).indexOf('on')>=0)return 'search';
-  var r=el('rail');if(r&&r.className!=='folded')return 'rail';
+  if(SRCH.on)return 'search';
+  var r=el('rail');
+   
+  if(r&&r.className!=='folded'&&SHEET.tool&&SHEET.tab)return 'sheet';
+  if(r&&r.className!=='folded')return 'rail';
   return null}
 function backClose(w){
   if(w==='tour')return tourClose('notnow');
   if(w==='panel')return panelsClose();
   if(w==='guide')return guideClose(true);
-  if(w==='search'){el('srch').className='';el('c-search').className='chip';return}
+  if(w==='search')return searchClose('back');
+  if(w==='sheet')return sheetBack();
   if(w==='rail'){RAIL_MANUAL=true;railSet(false)}}
 function onBack(){
   var w=backOpen();
@@ -4611,9 +4858,52 @@ try{window.addEventListener('resize',ridePublish)}catch(e){}
 try{el('rail').addEventListener('transitionend',ridePublish)}catch(e){}
 try{el('rail').addEventListener('transitionend',stripH)}catch(e){}
  
+var PIN_EASED=null,PIN_LAST='',PIN_DBG=null;
+function pinInView(){return (PIN_LAST=pinWhy())}
+function pinWhy(){try{
+  var r=el('rail');
+   
+  if(!RAIL_AT)return 'no subject';
+  if(!r||r.className==='folded')return 'folded';
+  if(sheetKind())return 'in a sheet';
+  if(rideUp())return 'riding';
+  if(PIN_EASED===RAIL_AT)return 'eased already';
+   
+  var c=map.getContainer().getBoundingClientRect(),M=48;
+  if(!(c.height>0))return 'no size';
+  var gl=map.getCanvas().clientHeight;
+  if(Math.abs(gl-c.height)>1){try{map.once('resize',pinInViewSoon)}catch(e){}return 'waiting for the resize'}
+  var p=map.project(RAIL_AT),y=p.y,x=p.x;
+  if(y>=M&&y<=c.height-M&&x>=M&&x<=c.width-M)return 'inside';
+  PIN_EASED=RAIL_AT;
+  var tx=Math.min(Math.max(x,M),c.width-M),ty=Math.round(c.height*0.45);
+  var under=map.unproject([tx,ty]),ctr=map.getCenter(),
+      back=[ctr.lng-(RAIL_AT[0]-under.lng),ctr.lat-(RAIL_AT[1]-under.lat)],
+      q=map.project(back),o=map.project([ctr.lng,ctr.lat]);
+   
+  PIN_DBG={h:Math.round(c.height),gl:Math.round(gl),y:Math.round(y),ty:ty,pitch:Math.round(map.getPitch()),
+    dy:Math.round(o.y-q.y),at:RAIL_AT.slice(),ms:Date.now()};
+  map.panBy([o.x-q.x,o.y-q.y],{duration:400,essential:true});
+  logAct('pin in view '+Math.round(y)+' -> '+ty+(map.getPitch()>1?' (pitched '+Math.round(map.getPitch())+')':''));
+  return 'eased'}catch(e){return 'threw'}}
+ 
+ 
+function pinInViewSoon(){try{requestAnimationFrame(function(){requestAnimationFrame(pinInView)})}catch(e){pinInView()}}
+try{el('rail').addEventListener('transitionend',function(e){if(e&&e.target===el('railbody')&&e.propertyName==='max-height')pinInViewSoon()})}catch(e){}
+ 
 var TAB='map';
 function showTab(t){
+   
+  if(MARK.stop&&t!=='plan'&&t!=='tools'&&!rideUp())markCancel();
+   
+  if(SRCH.on){searchEnd('tab');sheetPaint()}
+   
+  var rcUp=TAB==='ride'&&t!=='ride'&&el('rt-start')&&!el('rt-start').hidden&&
+    String(el('panel').innerHTML||'').indexOf('id="rt-start"')>=0;
+  if(rcUp){el('rt-start').hidden=true;logAct('ride card put away')}
   TAB=t;
+   
+  try{var shd=el('shell');if(shd&&shd.dataset)shd.dataset.dest=t}catch(e){}
    
   if(arm&&arm!=='homeaddr'){arm=null;syncArm()}
   Array.prototype.forEach.call(document.querySelectorAll('.chip[data-tab]'),function(c){
@@ -4627,11 +4917,31 @@ function showTab(t){
   var lp=el('lyrpanel'); if(lp&&t!=='map')lp.hidden=true;
   var ap=el('actpanel'); if(ap&&t!=='map')ap.hidden=true;
    
+  if(t==='plan'||t==='tools'){if(SHEET.tab!==t||SHEET.tool||el('rail').className==='folded')sheetIndex(t)}
+  else if(sheetExit()||(rcUp&&t==='map')){RAIL_MANUAL=false;railSet(false)}
+   
   simChip();stripH();ridePublish();
   logAct('tap  tab '+t)}
 
 Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'),function(b){
-  b.addEventListener('click',function(){showTab(b.dataset.go)})});
+  b.addEventListener('click',function(){tabTap(b.dataset.go)})});
+ 
+function routesUp(){return String(el('panel').innerHTML||'').indexOf('id="routes"')>=0}
+function tabTap(t){showTab(t);
+  if(t==='ride'&&!rideMode&&!riding){if(routesUp()){RAIL_MANUAL=false;railSet(true)}else rideTabCard()}}
+ 
+function rideTabCard(){
+  var lf=liveFix(),route=(last&&sel!==null)?last[sel]:null;
+  show('<div class="k">Ride</div><div class="tn">'+(route?'Ride the route':'Ride from here')+'</div>'+
+    '<div class="sub">'+(route?'Turn by turn on <b>'+route.h+'</b>. The truck pins where you start, and <b>Retrace</b> leads you back on your own track.'
+      :'No route needed: the truck pins where you started, and <b>Retrace</b> leads you back on your own track.')+'</div>'+
+    '<div class="sub lpstart'+(lf?'':' warn')+'" id="rt-gps">'+ic('locate')+'<span>'+
+      (lf?'GPS is on \u2014 the ride starts where you are':'Waiting for GPS \u2014 the ride starts on the first fix')+'</span></div>'+
+    '<div class="mkrow"><button class="chip primary" id="rt-start">'+ic('ride')+'<span>Start riding</span></button>'+
+    '<button class="chip" id="rt-plan">'+ic('route')+'<span>Plan first</span></button></div>','');
+  el('rt-start').addEventListener('click',function(){if(rideMode||riding)return;
+    logAct('act  start riding (ride card)');el('c-ride').click()});
+  el('rt-plan').addEventListener('click',function(){logAct('act  plan first (ride card)');showTab('plan')})}
 
 el('c-howto').addEventListener('click',function(){guideShow()});
 el('c-tour').addEventListener('click',function(){logAct('tap  c-tour');tourStart()});
@@ -4640,7 +4950,16 @@ el('guide-go').addEventListener('click',function(){guideClose(true)});
 el('guide').addEventListener('click',function(e){
   if(e.target===el('guide'))guideClose(true)});
 
+ 
+function cmpSheetCard(){
+  CMP_WHERE='sheet';CMP_ON=true;magStart();el('diagpanel').hidden=true;
+  show('<div id="cmpsheet"></div><div class="sbox">'+
+    srowHTML({attrs:' data-cmp="markme"',icon:'spot',label:'Mark this spot',sub:'Saved on this phone, then a bearing to it here'})+
+    srowHTML({attrs:' data-cmp="home"',icon:'home',label:'Set home',sub:'Your location, an address, or a tap on the map'})+'</div>','');
+  handOff('cmp');
+  cmpPaint()}
 el('c-compass').addEventListener('click',function(){
+  if(!rideUp()){logAct('tap  c-compass');return cmpSheetCard()}
   var p=el('cmppanel');CMP_ON=p.hidden;p.hidden=!p.hidden;
   if(CMP_ON){magStart();el('diagpanel').hidden=true;cmpPaint()}
    
@@ -4648,17 +4967,60 @@ el('c-compass').addEventListener('click',function(){
   logAct('tap  c-compass')});
 
  
-el('c-markme').addEventListener('click',function(){
-  if(!ME)return show('<b>No position yet.</b> Wait for a fix, or long-press the '+
-    'map to mark a spot by hand.','fail');
-  var nm=wpName(ME);
-  if(!wpAdd({n:nm,p:ME.slice(),r:BUNDLE.region||null,ts:Date.now()}))
-    return show('<b>Could not save.</b> This phone would not let the app store '+
+var MARK={gen:0,stop:null,rec:null,MS:30000};
+function toolShow(id,h,s){if(SHEET.tool===id&&SHEET.tab)SHEET_PENDING=id;show(h,s)}
+function markUnique(n){var have={};wpLoad().forEach(function(x){have[x.n]=1});
+  if(!have[n])return n;for(var i=2;i<1000;i++)if(!have[n+' '+i])return n+' '+i;return n+' '+Date.now()}
+function markCancel(){MARK.gen++;if(MARK.stop){try{MARK.stop()}catch(e){}MARK.stop=null}}
+function markAt(at){
+  var nm=markUnique(wpName(at)),rec={n:nm,p:at.slice(),r:BUNDLE.region||null,ts:Date.now()};
+  if(!wpAdd(rec))
+    return toolShow('c-markme','<b>Could not save.</b> This phone would not let the app store '+
       'it \u2014 its storage may be full or blocked.','fail');
-  logAct('act  marked this spot '+nm);
-  wpDraw();
-  show('Marked <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
-    'Find it again under <b>Saved</b> on the Plan tab.</span>','pass')});
+  MARK.rec=rec;logAct('act  marked this spot '+nm);
+  wpDraw();sheetVals();
+  try{map.easeTo({center:at,zoom:Math.max(map.getZoom(),12.5),duration:600,essential:true})}catch(e){}
+  toolShow('c-markme','<div class="k">MARKED \u00b7 ON THIS PHONE ONLY</div>'+
+    '<div class="v">'+at[1].toFixed(4)+', '+at[0].toFixed(4)+'</div>'+
+    '<div class="sub">Find it again under <b>Saved</b> on the Plan tab.</div>'+
+    '<label class="sub" for="mk-name">Name (optional)</label>'+
+    '<input id="mk-name" type="text" maxlength="42" autocomplete="off" value="'+nm.replace(/"/g,'&quot;')+'">'+
+    '<div class="sub" id="mk-note"></div>'+
+    '<div class="mkrow"><button class="chip primary" id="mk-done"><span>Done</span></button>'+
+    '<button class="chip" id="mk-undo"><span>Undo</span></button></div>','pass');
+  el('mk-done').addEventListener('click',function(){
+    var v=(el('mk-name').value||'').trim();
+    if(v&&v!==rec.n){
+      if(wpLoad().some(function(x){return x.n===v})){el('mk-note').textContent='"'+v+'" is already a saved spot \u2014 pick another name.';return}
+      var a=wpLoad();a.forEach(function(x){if(x.n===rec.n&&x.ts===rec.ts)x.n=v});wpWrite(a);rec.n=v;wpDraw();
+      logAct('act  mark named '+v)}
+    MARK.rec=null;
+    if(SHEET.tool==='c-markme'&&SHEET.tab)sheetBack();else{RAIL_MANUAL=false;railSet(false)}});
+  el('mk-undo').addEventListener('click',function(){
+    var a=wpLoad().filter(function(x){return !(x.n===rec.n&&x.ts===rec.ts)});wpWrite(a);wpDraw();sheetVals();
+    MARK.rec=null;logAct('act  mark undone '+rec.n);
+    ack('<b>Mark removed.</b> Nothing is saved for that spot.')})}
+function markHere(){
+  markCancel();
+  var lf=liveFix();
+  if(lf)return markAt(lf.at);
+  var g=MARK.gen;
+  var wait=function(){
+    toolShow('c-markme','<b>Getting a GPS fix\u2026</b><div class="sub">Mark this spot uses a fresh fix '+
+      '\u2014 never your last one, the start pin or a guess.</div>'+
+      '<div class="mkrow"><button class="chip" id="mk-cancel"><span>Cancel</span></button></div>','');
+    el('mk-cancel').addEventListener('click',function(){markCancel();logAct('act  mark cancelled');
+      ack('Cancelled \u2014 nothing was marked.')})};
+  wait();
+  MARK.stop=locateOnce(function(at,why){
+    if(g!==MARK.gen)return;MARK.stop=null;
+    if(at)return markAt(at);
+    toolShow('c-markme','<b>'+(why==='none'?'This phone reports no GPS receiver.'
+      :why==='error'?'The GPS gave no fix \u2014 location may be off for this app.':'No GPS fix in 30 s.')+'</b> '+
+      'Nothing was marked.<div class="sub">Try again in the open, or long-press the map to mark a spot by hand.</div>'+
+      '<div class="mkrow"><button class="chip" id="mk-retry"><span>Try again</span></button></div>','fail');
+    el('mk-retry').addEventListener('click',function(){logAct('act  mark retry');markHere()})},MARK.MS)}
+el('c-markme').addEventListener('click',function(){logAct('tap  c-markme');markHere()});
 
 el('peek').addEventListener('click',function(){
   var folded=el('rail').className==='folded';
@@ -4666,7 +5028,12 @@ el('peek').addEventListener('click',function(){
   railSet(folded);
   logAct('tap  rail '+(folded?'open':'fold'))});
 
+ 
+el('cmp-x').addEventListener('click',function(){panelsClose(['cmppanel']);logAct('tap  cmp-x')});
+el('diag-x').addEventListener('click',function(){panelsClose(['diagpanel']);logAct('tap  diag-x')});
 el('c-diag').addEventListener('click',function(){
+   
+  if(!rideUp()){logAct('tap  c-diag');return diagCard()}
   var p=el('diagpanel');p.hidden=!p.hidden;stripH();ridePublish();logAct('tap  c-diag')});
 
 el('c-layers').addEventListener('click',function(){
@@ -4945,8 +5312,7 @@ function placeCard(at,kind,title){
       'press and hold anywhere for a new pin.','')});
   on('pc-start',function(){logAct('act  start from here');
      
-    if(posMode==='gps'&&(watchId!==null||LOCATE_N>0))return show('A live GPS fix is driving your position — '+
-      'the start pin follows you and cannot be moved by hand.','');
+    if(meDriven())return show(ME_DRIVEN,'');
     ME=at.slice();mM.setLngLat(ME);paint();syncSafety();clearRoute();
     if(kind==='drop')clearDrop();
     show('<b>Start is here now.</b> The start pin holds this spot and routes measure '+
@@ -5002,7 +5368,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.headingNow=headingNow;window.railSet=railSet;window.railFoldIfAway=railFoldIfAway;
     window.cmpFit=cmpFit;    
     window.guideShow=guideShow;window.guideClose=guideClose;
-    window.showQuiet=showQuiet;
+    window.showQuiet=showQuiet;window.show=show;
     window.railState=function(){var b=el('railbody');
       return{folded:el('rail').className==='folded',
              h:b?Math.round(b.getBoundingClientRect().height):-1}};
@@ -5065,7 +5431,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         craft:function(){return machine}};
       window.__gauge=GAUGE;
       window.__gauges=(typeof GAUGES!=='undefined')?GAUGES:null;
-      window.__search=function(q){return search(q)};
+      window.__search=function(q,all){return all?searchAll(q):search(q)};
       window.__voice=VOICE;window.__say=navSay;window.__voiceProbe=navVoiceProbe;
       window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,
          
@@ -5795,15 +6161,30 @@ function selfTest(opts,done){
     stGps(function(){finish()})})})});
 }
 try{window.__selfTest=selfTest}catch(e){}
-el('c-loop').addEventListener('click',function(){
-  show('<b>Loop from here</b> — a ride that ends where it starts, on legal line '+
-    'for a '+MACHINE[machine].lbl+'.<br>'+
-    '<div style="margin-top:8px">'+LOOP_CHOICES.map(function(m){
-      return '<button class="chip" data-loop="'+m+'">'+m+' mi</button>'}).join(' ')+
-    '</div>','');
-  Array.prototype.forEach.call(document.querySelectorAll('[data-loop]'),function(b){
+ 
+var LOOP_PICK=null;
+function loopStart(){var w=meIs();
+  return w==='you'?'Starts where you are':w==='last'?'Starts at your last GPS fix ('+meClock()+')':
+    w==='sim'?'Starts at the simulated position':w==='away'?'Starts at the planning start \u2014 you are off this map':
+    meDriven()?'Starts at the start pin \u2014 GPS is on, so the next fix moves it':
+    'Starts at the start pin \u2014 move it with Start from my position'}
+function loopCard(){
+  var cur=LOOP_PICK===null?LOOP_MI:LOOP_PICK;LOOP_PICK=cur;
+  toolShow('c-loop','<div class="sub">A ride that ends where it starts, on legal line for your '+
+    MACHINE[machine].lbl+'.</div><div class="k">How far</div><div class="lpd">'+
+    LOOP_CHOICES.map(function(m){return '<button class="chip'+(m===cur?' on':'')+'" data-loop="'+m+'"><span>'+m+' mi</span></button>'}).join('')+
+    '</div><div class="sub lpstart'+(meIs()==='you'?'':' warn')+'" id="lp-start">'+ic('start')+'<span>'+loopStart()+'</span></div>'+
+    '<div class="mkrow"><button class="chip primary" id="lp-find">'+ic('loop')+'<span id="lp-find-t">Find '+cur+' mi loops</span></button></div>','');
+  var picks=document.querySelectorAll('[data-loop]');
+  Array.prototype.forEach.call(picks,function(b){
     b.addEventListener('click',function(){
-      var want=+b.dataset.loop;LOOP_MI=want;
+      LOOP_PICK=+b.dataset.loop;logAct('act  loop pick '+LOOP_PICK+' mi');
+      Array.prototype.forEach.call(picks,function(c){c.className='chip'+(c===b?' on':'')});
+      var t=el('lp-find-t');if(t)t.textContent='Find '+LOOP_PICK+' mi loops'})});
+  el('lp-find').addEventListener('click',function(){loopFind(LOOP_PICK)})}
+el('c-loop').addEventListener('click',function(){loopCard()});
+function loopFind(want){
+      LOOP_MI=want;
       logAct('act  loop '+want+' mi');
       show('Building a '+want+' mi loop…','');
       setTimeout(function(){
@@ -5820,7 +6201,7 @@ el('c-loop').addEventListener('click',function(){
           o.h+=' · '+o.s.mi.toFixed(1)+' mi';
           if(o.repeat>0.25)o.h+=' \u00b7 '+Math.round(o.repeat*100)+'% ridden twice'});
         logAct('loop '+out.length+' options, '+out[0].s.mi.toFixed(1)+' mi');
-        presentRoutes(out)},30)})})});
+        presentRoutes(out)},30)}
 
 el('c-selftest').addEventListener('click',function(){
   setChip('c-selftest','selftest','Running…');
@@ -6088,7 +6469,9 @@ map.on('load',function(){makeBadges();setBasemap(bmi);wpDraw();showTab('map');
 
  
 var YOU=null,YOU_T=0,youM=null,LOCATE_N=0,LOCATE_MS=25000;
-function locateOnce(cb){
+function locateOnce(cb,ms){
+   
+  ms=ms||LOCATE_MS;
    
   var handle=function(at,acc){
     YOU=at.slice();YOU_T=Date.now();
@@ -6104,13 +6487,15 @@ function locateOnce(cb){
   h=gpsWatch(function(at){
     if(done)return; done=true;
     fin();handle(at,null);
-  },function(){ if(!done){done=true; fin(); if(cb)try{cb(null,'error')}catch(e){}} },LOCATE_MS);
+  },function(){ if(!done){done=true; fin(); if(cb)try{cb(null,'error')}catch(e){}} },ms);
   if(!h){if(done)return;if(cb)try{cb(null,'none')}catch(e){};return}    
    
   if(!done){LOCATE_N++;counted=true}else gpsClear(h);
    
   setTimeout(function(){ if(!done){done=true; fin();
-    if(cb)try{cb(null,'timeout')}catch(e){} } },LOCATE_MS);}
+    if(cb)try{cb(null,'timeout')}catch(e){} } },ms);
+   
+  return function(){if(!done){done=true;fin()}}}
 
 function showAway(acc){
   showQuiet('<b>You are about '+Math.round(awayMi)+' mi from '+(BUNDLE.name||'this region')+
@@ -6338,13 +6723,16 @@ function railSet(open,at){
   }else{
     RAIL_AT=null;
     r.className='folded';
+     
+    sheetExit();
+    if(!SHEET_KEEP&&(TAB==='plan'||TAB==='tools')&&!arm&&!panelOpen(['cmppanel','diagpanel']))showTab('map');
   }
   var t=el('peek-txt');
   if(t)t.textContent=open?railPeekText():
     (RAIL_AT?'Details':railPeekText());
   sheetH();
    
-  rcFit()}
+  rcFit();sheetCap()}
 
 function railFoldIfAway(e){
    
@@ -6361,6 +6749,7 @@ function cardHTML(h,s){show(h,s)}
 
  
 function showQuiet(h,peekLine){
+  sheetExit();    
   var p=el('panel');p.innerHTML=h;p.className='';
   var t=el('peek-txt');
   if(t&&peekLine)t.textContent=peekLine;}
@@ -6376,13 +6765,18 @@ function rideCard(h,s,peekLine){
   show(h,s)}
 
 function show(h,s){
+   
+  if(SHEET_PENDING&&SHEET.tab){SHEET.tool=SHEET_PENDING;SHEET_PENDING=null;sheetPaint()}
+  else sheetExit();
   var p=el('panel');p.innerHTML=h;
    
   p.className=s||'';
   void p.offsetWidth;
   p.className=(s?s+' ':'')+'swap';
    
-  RAIL_MANUAL=false;railSet(true);}
+  RAIL_MANUAL=false;railSet(true);
+   
+  try{if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)setTimeout(pinInViewSoon,60)}catch(e){}}
 
 var geo=new maplibregl.GeolocateControl({positionOptions:{enableHighAccuracy:true},
   trackUserLocation:true,showAccuracyCircle:true});
@@ -6402,21 +6796,24 @@ el('c-locate').addEventListener('click',function(){
         'moved since. Try again in the open.','')})}
   locateOnce();
   setTimeout(function(){if(!flyToYou())geo.trigger()},1200)});
-geo.on('error',function(){show('Location unavailable — this phone did not give a position (location permission off, or no fix yet). Place yourself by hand with <b>I&#39;m here</b> on the Plan tab.','fail')});
+geo.on('error',function(){show('Location unavailable — this phone did not give a position (location permission off, or no fix yet). Place yourself by hand with <b>Start from my position</b> on the Plan tab.','fail')});
 
  
 el('chips').innerHTML='';
 el('chips').style.display='none';
 function jumpChipsHTML(){
-  return '<div class="sub" style="margin:2px 0 7px">Jump to</div>'+
+  return '<div class="k">Jump to a place</div>'+
     PLACES.map(function(p,i){
-      return '<button class="chip" data-jump="'+i+'" style="margin:0 6px 6px 0">'+
-        p[0]+'</button>'}).join('')}
-function wireJumpChips(root){
-  Array.prototype.forEach.call(root.querySelectorAll('[data-jump]'),function(c){
+      return '<button class="chip" data-jump="'+i+'"><span>'+p[0]+'</span></button>'}).join('')}
+ 
+function wireJumpChips(){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-jump]'),function(c){
     c.addEventListener('click',function(){var p=PLACES[+c.dataset.jump];
+      logAct('act  jump '+p[0]);
       map.easeTo({center:[p[1],p[2]],zoom:p[3]==='town'?13.2:13.8,
-        duration:700,essential:true});railSet(false)})})}
+        duration:700,essential:true});
+       
+      if(!searchClose('jump')){RAIL_MANUAL=true;railSet(false)}})})}
 
 function refreshReadout(){
   var c=map.getCenter(),e=elevAt([c.lng,c.lat]);
@@ -6474,6 +6871,9 @@ function done(){var d=cap.slice().sort(function(a,b){return a-b});cap=null;
      pass?'Holds up with the full routable network loaded.'
    :'Below threshold — note both numbers before comparing to the APK.'),
    pass?'pass':'fail')}
+ 
+Object.keys(SHEET_TOOLS).forEach(function(id){var b=el(id);if(!b)return;
+  b.addEventListener('click',function(){SHEET_PENDING=null})});
  
 if(BUNDLE.state==='partial'){
   var names={imagery:'satellite imagery',relief:'hillshade',hydro:'water'};

@@ -1,4 +1,411 @@
-# HANDOFF — through Take 189 · V3
+# HANDOFF — through Take 190 · V3
+
+## Take 190 — 2026-11-01 — the V4 screens the first mockup never drew, rebuilt after the workstation was lost: Plan and Tools as sheets of rows (A247, A248, A255), Machine and fuel (A249, A250), Search (A251, A252), Loop and Saved (A253, A254), Diagnostics, Data sources, Compass, HD and Mark (A256–A260), Turns, the Ride card and the tour (A261–A263), a tapped pin in view (A264); the release notes (A267)
+
+RECORDED FIRST. Take 190 was first built from 2026-10-02 to 2026-10-08 on
+the workstation's local branch `v6` (about 20 wip commits, every screen of
+the V4 mockup's artboards 10–23, SMOKE5 497 → 626) and never pushed; the
+workstation was then deleted and its code is lost (landmine 248,
+docs/RECOVERY-t190.md). This entry is the rebuild's. The maintainer,
+2026-11-01: "Rebuild as one take"; one piece at a time in a cloud session,
+no parallel lanes; push the session's branch and open draft pull requests;
+CI builds the pull request before he merges. The target is the approved
+mockup (artboards 10–23, "The take-190 screens are approved, continue",
+2026-09-30), and every decision he made for the lost build stands as made
+(RECOVERY §5): Mark takes a fresh fix and gives up after 30 s with Try
+again, easing to z12.5; the compass and Diagnostics float during a ride;
+"Start riding" is the Ride tab's only Start; Return home is pinned at the
+sheet foot where it would scroll; the Census Bureau and AWS Terrain Tiles
+are credited, OpenStreetMap under OTHER DATA; Turns keeps its action row;
+Plan stays marked while Mark is up from Saved; the GPS-on refusal reads
+"GPS is on — …" with no bracket; #rc-ride and #pc-route are uppercase;
+Start from my position has its chevron and the shorter sub-line.
+
+How it is built: in a cloud container set up by `ci/cloud_setup.sh`, the
+bundle restored from run 92's APK (take 189's data), smoke and render (on
+CI's Chrome 138) run here after each piece, single gate checks through
+`ci/gatefn.py`; the pipeline and the whole gate run in CI on the pull
+request. Pieces land in plan190's order: the framework (A247, A248, A255,
+A264), then the Tools content (A256–A260), Plan's tools (A249, A250, A253,
+A254), Search (A251, A252), and Turns, the Ride card and the tour (A261–
+A263). Each id's paragraph below says what was built and measured; one
+that cannot be made green by the seal is cut whole and keeps its number
+OPEN.
+
+A265 and A266 are recorded OPEN, not built. A267: ci/RELEASE.md carried
+take 186's notes through takes 187–189; take 190 writes its own (the
+summary is the first 485 characters, so Play's 500-character cut in
+tools/play_assets.py keeps it whole, the phone checks after it), and gate
+check_release_notes now holds the file's first line to BUILD's take, its
+controls a stale take and a first line naming none (GATEFN: PASSED on take
+190's notes, FAILED on take 186's line put back). CLAUDE.md's step 1 names
+it.
+
+Measured at the seal (2026-11-02, cloud container, Chrome 138.0.7204.183,
+the bundle from run 92's APK — take 189's data): smoke all five passes
+PASSED — 280 ok (GPS), 195 (--no-gps), 54 (--away), --fatal-drill and
+--dead-renderer; the second full render 670 ok and 3 FAIL, the three
+fixed after it (A249's dot read where the review moved the dot; A264's
+panBy on a pitched map; A240's read, disturbed by the pitched read) and
+those sections PASSED again (render --only=nav,ui,realdom); take 189
+sealed at 658. Mutants, each failing its own drill: the framework 2,
+pieces T 4, P 5, S 4, R 4 and the second review's 5 (two single mutants
+that survived are recorded with why: a jump and the card's Start each have
+two closes). GATEFN PASSED on the 24 checks that need
+no pipeline output. Reviewed twice by the code-review skill's two axes
+(Standards, Spec), fixed point 06c14ce then ea6161e; each finding fixed,
+recorded OPEN (A268, A269) or answered in this entry. UNKNOWN until CI's
+run of this take's pull request: the pipeline on fresh data, the whole
+gate (bundles, class legality, pin names, address coverage, its own smoke
+and render), the signed APK. Not seen on the Fold: every screen above.
+
+A247 — the sheet framework. The Plan and Tools tabs open the drawer as a
+sheet of labelled rows (#ix-plan, #ix-tools, artboards 10 and 16); the rows
+keep the chips' ids and handlers, so every caller and harness click still
+reaches them. One state (SHEET.tab, SHEET.tool) mirrored as data-sheet
+("index", "tool") on #rail and #shell; one row (.srow: icon tile, label,
+line, value, chevron); one back row (#sheetbar), pinned between the grabber
+and the body. A row in SHEET_TOOLS opens its card inside the sheet (a
+listener registered ahead of its handler marks it pending; the first show()
+is that tool's card; a listener registered last clears the mark, so a later
+card — a loop built, a fix arriving — is ordinary). Any other card, and
+showQuiet(), ends the sheet. Every fold ends it and lands on Map, unless a
+Tools panel is open or a map tap is armed (Start from my position would lose
+its tap; plan190 folded to Map always — the maintainer, 2026-11-01: "Keep the
+tab"). Back: a tool to its index (or the tool it was opened from), an index
+folds; re-tapping the open tab goes back to its index and never folds (tabs
+are peers; the maintainer, 2026-11-01: "Back to its index"). Off a ride a sheet
+draws no footer (stats, coordinates, action row: the Plan index carries
+Return home); riding, the action row stays one tap (landmine 135) and the
+ride cap applies. The body's cap off a ride is measured (sheetCap, as
+ridePublish measures --ride-cap) so 12 % of the screen stays open map, with
+the left and right columns put away as during a ride — except for Mark this
+spot, which keeps the map's chrome (artboard 19; #shell[data-sheettool]).
+While riding, the Plan index hides Return home (the ride's action row
+carries it) and the compass's floating close is 56 px (Diagnostics' stays
+48: a 56 px header row cut its first actions at 360x800 with the alert up,
+render devices "small" 162 px of 228). setChip writes a
+row's value by id (SHEET_ROWS): smoke's DOM has no class from markup, and
+its getElementById makes any id, so neither can tell a row. Measured
+(Chrome 138, desktop headless): the band 0.169 at 411x960 and 0.177 at
+360x800 with a sheet open; both indexes fit at 411x960; at 360x800 they
+scroll about 70 px with search and Return home on screen (a departure from
+the boards, for the maintainer: fitting would cut the line under each row).
+Smoke block 9c, eight drills, each judge shown failing on a forged state
+(the hardware back's judge rejects a back that folded; Machine's a row whose
+markup the value overwrote, and a value that did not move), and two mutants
+caught (a show() that ignores the pending row: 4 FAIL; a back with no sheet
+step: 1 FAIL). Render: ui +3 (no footer in a sheet and a
+place card's footer kept; back three ways; Return home one tap after a
+sheet), each with a planted control; the reach map, Tools' contents and the
+device matrix's destination counter read sheets as sheets (rows reachable,
+search and Return home unscrolled, the band), their plants moved to the Map
+strip and the Plan sheet (a cover over a row, Return home pushed down, the
+sheet forced tall). The device matrix's A231 control measures its planted
+248 px strip (≥ 247 px drawn) instead of assuming it bound. To measure on
+the Fold.
+
+A248 and A255 — the indexes. Plan: "Where to?" (search), Return home (the
+one primary), From here (Loop from here, Start from my position with its
+chevron and "Tap where you stand — plans start there, not the map centre",
+Saved with its count), Your ride (Machine, Fuel range, Home with Set / Not
+set). Tools: On the trail (Compass, Mark this spot), Offline (HD imagery),
+Learn (Take the tour, How to use), About (Data sources, Diagnostics). Tools
+opened here as today's cards inside the sheet; the Tools content is A256–A260.
+The compass and Diagnostics panels float as before (the maintainer,
+2026-10-02, for a ride), and their row puts the sheet away first. To measure.
+
+Found and built inside A247, each from a render read:
+- the floating panels close in one tap: each has its own close (cmp-x,
+  diag-x), since its chip, the old toggle, is a row of the folded sheet now;
+  the compass's floats beside the dial (no header row);
+- A231's rule is retired: it hid Tools chips under a riding panel on a small
+  phone, and the strip under a panel holds none now. Its control in render
+  became the old failure planted (a 248 px strip), which leaves the panel
+  unusable at 360x800 (PROVEN);
+- the panels stop under the off-route alert (--alert-room, published by
+  ridePublish, in cmpGeo): at 360x800 riding with the alert up the compass's
+  close and the top of its dial lay under the safety message (render named
+  #alert at the close's centre). With that room taken the panel has 162 px,
+  so on a screen 860 px tall or less, riding with the alert up, the dial
+  draws at 112 px instead of 128 — whole, with its heading (PROVEN, devices
+  "small");
+- the device matrix's riding census now says where the (i) is ("at 326,605
+  over none") and requires it drawn — "over none" from an undrawn (i) is
+  vacuous (landmine 53); its control moves the (i) onto Stop by a transform
+  of the offset measured in the read's own state, and hides North up.
+
+A264 — a tapped pin stays in view. Opening the drawer shrinks the map and
+MapLibre keeps the centre, so a pin near the top rode off it (y 24 → -133 at
+360x800, PROVEN). Two frames after the drawer's slide ends (MapLibre's
+resize follows transitionend: an ease measured at transitionend left the
+pin at y -10, PROVEN) the map pans once, by the app, to put the place 45 %
+down the open band; not in a sheet, not on a ride, once per place.
+`__sheet.pinLast()` says why the last call eased or did not ("folded", "in
+a sheet", "riding", "eased already", "no size", "waiting for the resize",
+"inside", "eased", "threw"), and `__sheet.pinDbg()` what the last ease was
+worked out from — harness bridges, as __routeDbg is. Found by the full
+render (the second review's): the pin ended at y -21 there and at 176
+alone. The move log showed why: the pan moved the centre 228 px of ground
+and the pin, near the top, 28 — the map was PITCHED (the ride's follow
+camera leaves 55° and nothing flattens it after the ride, so this is a
+field state too), and a flat offset-from-centre guess is wrong in
+perspective. The ease now waits until MapLibre has taken the drawer's final
+size and moves the ground point under the target to the pin (unproject,
+then the panBy that lands it): exact at any pitch and bearing. The first
+fix still landed short pitched (the second full run: the centre moved
+0.008° of the 0.033° needed): MapLibre's panBy(offset) puts the current
+centre at the screen point centre − offset, so a pitched map's shift is
+measured below the centre, where a pixel is less ground; panBy is now
+given the offset of the centre moved back by the shift. Render reads the
+same tap flat and pitched 55°, both set by the read itself (an earlier
+section's ride had left the pitch; landmine 255): y 176 of 391 both
+(PROVEN, render --only=nav,ui,realdom, nav first so the pitch is
+inherited as in the full run). Render at
+360x800: y 181 of a 403 px map; its control (map.panBy stubbed) y -133;
+A240's claim — the card stays open as the slide resizes the map — read with
+the ease taken out, its control (the old rule) folding it. Smoke's map stub
+gained panBy (check_stubs refused the build without it). To measure on the
+Fold.
+
+A256 — Diagnostics. Off a ride it opens in the sheet (artboard 20): About
+this build, Self-test and Pan test as rows, each handing off to the
+floating panel's own button (ids and handlers unchanged), and the line "Run
+the self-test and share its report when something looks wrong" (the
+report's Share button exists, src/app.html st-share). About this build
+opens under it, and back returns to Diagnostics (a tool opened from inside
+another goes back to it). Self-test and Pan test leave the sheet as cards:
+they measure the map. Riding, Diagnostics floats (the maintainer,
+2026-10-02 23:20); the predicate is rideUp(), which reads #shell[data-ride]
+as every ride rule does. The About row reads "Take N · region data of
+<date> · <hash>" (aboutLine). Render (tools): the rows drawn in the sheet
+under "Diagnostics" with the floating panel down; About's parent back, its
+control a real other path — the Tools tab from About lands on the index,
+which the judge rejects. To measure.
+
+A257 — Data sources. Artboard 21: the independence notice in its own box
+first; OFFICIAL SOURCES as rows that open their site — the DNR, its open
+data, the Forest Service, the USGS, USGS Water Services, and the U.S.
+Census Bureau (TIGER: the state outline, county lines and the address
+ranges, tools/address.py and tools/context.py; the maintainer,
+2026-10-02); OTHER DATA with one sentence — OpenStreetMap contributors and
+AWS Terrain Tiles (tools/terrain.py's elevation, USGS 3DEP over the U.S.),
+not agencies (2026-10-08, item 4); then the software and type notices,
+whole (the board's one-line summary is not built: the licences ask for the
+notices, and check_licences reads them; the maintainer, 2026-11-01: "keep
+the full licences"). The two new links are displayed,
+never fetched; check_offline's ALLOW names www.census.gov and
+registry.opendata.aws with the same comment shape (GATEFN check_offline and
+check_licences PASSED on the build). Render (camp +1): the two lists in
+order, the Census Bureau among the agencies, OpenStreetMap and AWS under
+OTHER DATA; its control, OpenStreetMap moved among the agencies, rejected.
+To measure.
+
+A258 — the compass in the sheet off a ride. Artboard 17: the dial, its
+heading line and the bearings in the Tools sheet, with Mark this spot and
+Set home under it (each opens under the compass and back returns to it).
+cmpPaint draws the same content into the sheet's box and the floating box;
+the compass stops when neither it nor its child is up. Riding, it floats as
+take 189 built it (the maintainer, 2026-10-02). Smoke drill 7 and render's
+"leaving Tools closes the compass" follow (put away now means neither box
+drawn). To measure.
+
+A259 — HD imagery's tiers as cards. Artboard 18: This view, the county, the
+whole state, each a card with its tiles and size, its note and its own Save
+(no accent: saves stay deliberate, read4); the rules for what may be saved
+are unchanged. Found and fixed: its card is written after a storage read (a
+promise), by which time the row's pending mark is gone, so from the Tools
+sheet it opened as an ordinary card outside the sheet; it now decides at
+the call and honours it when written, if the rider is still there. The
+map's HD button opens the same tool under Tools, and its back folds the
+drawer (plan190 §4). Tier names are in sentence case. Render (tools +1):
+from the sheet it lands in it with its tier cards — as many as the same
+card outside a sheet (three; two where no county lies under the view, as
+the full render's camera found); from the map's button
+it opens under Tools and back folds; its control, the same card drawn by
+its own function outside a sheet, is rejected. To measure.
+
+A260 — Mark this spot marks a fresh fix. A fix 15 s old or newer
+(GPS_STALE_MS, liveFix) is used at once; otherwise "Getting a GPS fix…" with
+Cancel, and after 30 s with none "No GPS fix in 30 s. Nothing was marked."
+with Try again (the maintainer, 2026-10-02) — never the last fix, the start
+pin or a guess (take 189 marked the start pin: ME is never empty, so its
+!ME guard was dead). locateOnce takes the 30 s and returns its stop, so
+Cancel closes the watch. After a mark the map eases to z12.5 (2026-10-02
+23:20); the pin keeps the app's orange. The card names the spot, offers a
+name, Done and Undo; a typed name already used is refused, the automatic
+one numbered, so nothing is overwritten (A265's place-card path is not
+changed). From the sheet every step stays in the Mark tool and the map's
+chrome stays (no back row: Done, Undo and Cancel are its exits). Leaving it
+while it waits — for its index, another tool, or the Map or Ride tab —
+cancels the wait, so no fix marks and moves the map later; folding the
+drawer does not (the mark was asked for). Smoke block 9d: waiting and
+Cancel, 30 s, a fix marked where it is, the ease to z12.5 on it, a used name
+refused (against a spot the drill saves itself) and Undo — each judge
+rejecting a forged outcome; four mutants caught (marking the start pin at
+once: 3 FAIL; a negative age counted live: 3 FAIL; an ease to z11: 1 FAIL;
+an Undo that removes nothing: 1 FAIL). The drills found landmine 252: liveFix held a
+fix stamped 1.8 h ahead of the clock live (age -6,599,983 ms); a negative
+age is now stale. Render's compass drill delivers a fix through a watch
+that answers, and the saved point is read against the fix (its judge
+rejects a spot 0.01° away). A fix up to 15 s old counts as fresh (the
+maintainer, 2026-11-01: "15 seconds is fine"). To measure on the Fold.
+
+A249 — Your machine. Artboard 14: the seven machines as rows (ORDER, then
+WORDER), the chosen one with the selected language (a dot, the label a
+weight heavier, an inset --sel line); a tap picks, where take 149's chip
+cycled. Picking a land machine applies its legality and clears a route
+planned for another, saying so above the rows in the words a mode change
+uses ("Route cleared — it was planned for X. Plan it again for Y.");
+with no route, the legality line. In Water a craft changes the float times
+and clears nothing. A row of the other family is refused by key and says
+where it is used ("Used in Water mode", "Used in the land modes"), not
+`disabled` (smoke's DOM does not parse it). Smoke 9c (8) and 9e: picked from
+its rows, the row's markup kept; Kayak refused in a land mode ("Kayak is used
+in Water mode — change the mode first.", the machine still the bike); a 6.1
+mi loop cleared by Quad 50" with the note above the rows (its control, the
+note moved under the list, rejected); mutants: the refusal taken out (2
+FAIL). Render (Chrome 138): 7 of 7 rows drawn, the chosen one's 8 px dot
+and inset line, a tap on Quad writes the row; in Water the canoe is picked
+and the bike refused. To measure on the Fold.
+
+A250 — Fuel range. Artboard 10: − and + in the row (48 px each, the
+row no taller than its neighbours), stepping Off, 30, 50, 80, 120 mi and
+stopping at the ends — 120 never turns into Off by one more tap; the line
+reads "Routes warn past it" only while a range is set (Off: "Off — no
+route is checked against a tank"). The sheet stays as it is — with a route
+planned too: route cards written while a sheet is up go under it (the
+second review: renderRoutes ended the sheet, one trip back to Plan per
+step; smoke 9e, mutant 1 FAIL). Smoke 9c (5):
+50 → 80, up to 120 and it stays, down to Off with its line, back to 50,
+nothing pending; mutant: a wrap-around (1 FAIL). Render: the row 56 px
+(--row-h), − and + each 48 px and one tap; its control, the row's padding
+planted back (64 px), rejected. To measure on the Fold.
+
+A253 — Loop from here. Artboard 12: the distances as chips (the chosen one
+selected), one primary "Find N mi loops"; a distance tap only chooses.
+The start line tells the truth: a loop starts at the start pin
+(nearestNode(ME)), so it reads what the pin is now — "Starts where you
+are", "…at your last GPS fix (h:mm)", "…at the simulated position", "…at
+the planning start", "…at the start pin — move it with Start from my
+position" — in --warn unless the fix is live; never the board's "Starts at
+the map centre". Smoke 9e: a tap on 6 mi only chooses ("Find 6 mi loops",
+nothing built), Find builds 6.1 mi ending at the start, with no GPS the line
+reads "Starts at the start pin — …" in --warn; mutant: a tap that builds (1
+FAIL). The four older loop drills press Find. Render: the six distances
+wrap inside the card, Find one tap, nothing scrolls sideways.
+
+A254 — Saved. Artboard 13: marked spots and routes as rows (a tap opens a
+route or goes to a spot, one tap as before), Rename and Delete beside each
+(48 px icons; route cards' .rc is not used, the harness reads .rc as route
+options). The empty state draws the board's star and "Nothing saved yet";
+when records exist only in another region it says "Nothing saved for this
+map" and counts them ("N more saved in a different region, not shown
+here"), as it does under a list. Mark this spot from Saved opens under
+Saved, the Plan tab still marked, and back returns to it (the maintainer,
+2026-10-08 item 2). Smoke 9e: one spot saved under another region reads
+"Nothing saved for this map" and "1 more saved in a different region, not
+shown here." (its control, "Nothing saved yet", rejected); Mark from Saved
+is {tab plan, tool c-markme} and back is {tab plan, tool c-saved}; mutant:
+the count hidden (1 FAIL). Render: a record with a long name — its row,
+Rename and Delete each one tap, nothing wider than the screen.
+
+The GPS-driven start pin. While a watch is open — a ride, or a locate
+still waiting (Locate's, Mark's, Home's) — the next fix in the region moves
+the start pin, so Start from my position and a place card's Start from here
+both refuse, in one sentence: "GPS is on — the next fix in the region moves
+the start pin to where you are, so it cannot be placed by hand." (meDriven,
+the place card's take-186 predicate, now shared; the maintainer,
+2026-10-03 (a), and without the bracket, 2026-10-08 item 3). Take 189's
+Start from my position armed a tap the next fix overwrote. Smoke 9e, with
+Home's wait holding GPS and the fix 40 s old (not live): both refuse in
+those words, nothing arms, the pin stays; when the wait ends it arms again.
+Mutant: the predicate keyed on the fix's age (liveFix) — 1 FAIL, the drill
+the maintainer asked for on 2026-10-03.
+
+A251 and A252 — Search as a sheet. Artboard 11: a third sheet kind,
+"search" (#srch was already in the drawer; no new element), opened from the
+Map strip's Search or the Plan index's "Where to?" with the Map tab marked.
+The field stays at the drawer's top while the results scroll in the body
+(take 189's 132 px inner scroller is gone); results are rows in search()'s
+own order with their kind in words (no `route` icon for roads: one meaning
+per icon), under an honest count ("N results · offline", or "First 9 of N"
+when more matched); empty, "Jump to a town" and its chips, then "all of it
+offline". Search is one layer: one back closes it and lands on Map (take
+189 took two — the results, then the drawer); a hit, a jump chip, a tab or
+any fold ends it; and Home's "Type an address" arm ends with it (take 189's
+survived and took the next hit or map tap) — kept only for a hit that
+becomes home, so a river hit ends it too (the second review: it survived
+one and moved the start pin on the next tap). From the second review: the
+action row stays drawn under search (take 189's search was a card over it;
+hiding it made Return home 1 tap to 2 and Dispatch and Retrace 1 to 3, a
+landmine-135 rise nobody approved); the jump chips stay under typed
+results, as the board and take 189 have them; the heading is "Jump to a
+place" (plan190 §3 item 4: two anchors are sites). Not built: the board's
+dimmed map, plan190's search scrim — a scrim has to decide what a tap on it
+does (close search, or reach the map), which is the maintainer's to say.
+Found on the way: the jump
+chips were wired through an element's own query, which smoke's DOM answers
+by class only, so no drill had ever run a jump; they are wired by
+attribute in the document now, as the loop chooser and Saved are. Smoke 9f
+(five drills, forged controls): "Where to?" opens it with its chips; typed,
+rows under their count, judged against every match (search's uncapped
+list; mutant, the capped list: 1 FAIL); one back ("closed:search", folded); a jump; the
+Tools tab; the address arm. Mutants, each 1 FAIL: back that leaves the
+drawer open, a tab that keeps search, the arm that survives, and a jump with
+both of its closes taken out (a fold alone already ends search, so each
+alone passes — the design, not a gap). All five smoke passes PASSED.
+
+A261 — Turns. Artboard 15: the steps in the drawer's one scroller (take
+189 nested a 150 px one), Ride it pinned at the body's foot with "N more
+steps below" over it while steps are under it, and the action row kept
+under the drawer (the maintainer, 2026-10-08 item 1). Ride it is the route
+cards' Ride it — the same guard and the Ride tab's own Start; mid-ride
+Turns has none. Smoke 9g: Turns lists the steps with Ride it under them
+(its control, a Turns without it); Ride it presses c-ride once and the ride
+starts; mid-ride Turns has none. Mutants: no Ride it (1 FAIL); Ride it
+mid-ride (1 FAIL).
+
+A262 — the Ride tab before a ride. Artboard 22: the tab bar's Ride opens
+the Ride card — "Ride from here" (or "Ride the route" with the route's
+name), the truck and Retrace line, where GPS is ("Waiting for GPS — the
+ride starts on the first fix" in --warn), Start riding and Plan first.
+One Start on the tab (the maintainer, 2026-10-02): open on the card, the
+strip's Ride it steps aside (`#shell:has(...)`); folded, the strip's chip
+is the Start and the drawer's Ride hides there (#shell[data-dest]). Only
+the tab bar opens the card: the paths that start a ride themselves go
+straight to it, so no card is left holding a Start, and once a ride runs
+the card's Start hides as Ride it's does (A217). `__sheet.tap` is the tab
+bar's path for the harness (smoke's DOM does not parse the static tabs).
+Smoke 9g: the card; Plan first opens the Plan index; Start riding presses
+c-ride once (with no receiver c-ride refuses, as it should), the ride
+starts and the card's Start hides; the tab mid-ride draws nothing over the
+ride. Mutant: both of the Start's hides taken out (1 FAIL; either alone
+suffices). Found by the full render: tapping the tab replaced route cards
+with the Ride card, losing a planned route's options, Save and Turns to one
+tap (the device matrix lost its route from the second size on). With route
+cards up the tab now keeps them, and their Ride it is its one Start; the
+card is for no route (board 22). Leaving the tab puts the card away — its
+Start goes, and on Map the drawer folds (plan190 §3 item 14). Mutants: the
+cards replaced (1 FAIL), the card left over Map (1 FAIL).
+
+A263 — the tour card. Artboard 23: "N of M" as its kicker, M the steps the
+rider will see (a step on this tab whose chip is not drawn is out from the
+start; one on another tab counts until it is skipped); Next and Skip; ×
+and back are not now, Skip is never again (2026-09-30, the defaults taken);
+Next is no accent, the ring is the screen's one; the ring is placed again
+after the drawer's slide; TOURKEY apex.tour.v3, so a rider who closed v2
+sees it once more. Smoke 9g: "1 of 7" with every chip drawn, Skip sets the
+flag (mutant: Skip as not now, 1 FAIL). Render reads the count with the HD
+chip hidden.
+
+The batch's item 5 (a): a primary is drawn as the boards draw one — 800
+weight, .06em, uppercase. The item named #rc-ride and #pc-route; the rule
+is on .chip.primary, so Turns' Ride it, Start riding and Find read the same
+(the second review: one button drawn two ways). No check reads a primary
+label's own line count; the full render's route-card, drawer and audit
+reads ran with them uppercase (the seal's line says what they read).
+
 
 ## Take 189 — 2026-09-30 — V4 cap-off: render up to a quarter faster, then eroded by 52 more checks (A227, PARTIAL); placeholder pin names ship unnamed (A228); the (i) clear of the drawer (A229); "Waiting for a GPS fix" (A230); Tools panels while riding on a small phone (A231); the licence on one line (A232); Ride beside Return home (A233); a loop re-joins itself (A234); one river-run estimate (A235); a glyph readback (A236); "of you" only from a live fix, Dispatch and Locate included (A237); the bike's route cards whole (A238); render's trails checks run (A239); a tapped card stays open (A240); the palette's casing judged by feature (A246)
 

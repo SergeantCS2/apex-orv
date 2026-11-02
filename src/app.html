@@ -23,6 +23,14 @@
     --text-1:#F5EFE2;--text-2:#CFC7B8;--text-3:#A39A8B;
     --divider:#34312B;--border:rgba(255,255,255,.12);--border-strong:rgba(255,255,255,.28);
     --press:rgba(255,255,255,.05);--wash:rgba(255,255,255,.06);
+     /* take 190 · A247 · a sheet's row group, as artboards 10 and 16 draw it:
+        3 % white, so the 40 px icon tiles (--surface-2) read on it */
+     --sheet-group:rgba(255,255,255,.03);
+     /* take 190 · A247 · a sheet row and its icon tile; the compass dial (A258) */
+     --row-h:calc(var(--tap) + var(--s-2));--row-ic:calc(var(--s-6) + var(--s-2));--dial:128px;
+     /* take 190 · A257 · the independence notice's box (artboard 21): --warn at
+        10 % and 35 % */
+     --warn-tint:rgba(224,162,75,.1);--warn-line:rgba(224,162,75,.35);
     --accent:#E2570F;--accent-tint:rgba(226,87,15,.2);--on-accent:#17130F;
     --warn:#E0A24B;--danger:#C1121F;--danger-text:#FFB3B8;--on-danger:#FFFFFF;
     --ok:#8FAE63;--ok-tint:rgba(143,174,99,.22);--route:#00A8E8;
@@ -153,7 +161,9 @@
   #tour-btns .chip{margin:0}
   /* the quiet button: the secondary's shape with no surface of its own */
   #tour-btns .quiet{background:transparent;border:1px solid var(--border-strong);box-shadow:none}
-  #tour-n{margin-left:auto;font-size:var(--t-xs);color:var(--text-3)}
+  /* take 190 · A263 · the count is the card's kicker (artboard 23) */
+  #tour-n{font:700 var(--t-xs)/1 Barlow,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--text-3);margin-bottom:var(--s-2)}
   /* take 188 · A216 · the toast is a live status line (role=status in the
      markup). It WRAPS inside the screen (nowrap ran a long message off both
      edges) and sits above the tool strip by the dock height stripH()
@@ -398,7 +408,7 @@
     background:var(--surface-1);border:1px solid var(--border);
     border-radius:var(--r-lg);padding:var(--s-2) var(--s-3);box-shadow:var(--e-2);
     color:var(--text-1);font:600 var(--t-sm)/1.5 Barlow,Roboto,system-ui,sans-serif;
-    max-height:calc(min(62vh,calc(100% - var(--ride-top) - var(--strip-h,64px) - var(--sheet-h,0px) - var(--s-4))) - var(--cmp-trim,0px));overflow-y:auto;transform-origin:bottom left;
+    max-height:calc(min(62vh,calc(100% - var(--ride-top) - var(--alert-room,0px) - var(--strip-h,64px) - var(--sheet-h,0px) - var(--s-4))) - var(--cmp-trim,0px));overflow-y:auto;transform-origin:bottom left;
     transition:opacity var(--m-base) var(--m-ease),
                transform var(--m-base) var(--m-ease)}
   /* take 189 · cold audit · the compass panel ends on a whole line (cmpFit)
@@ -418,7 +428,7 @@
     background:var(--surface-1);border:1px solid var(--border);
     border-radius:var(--r-lg);padding:var(--s-2);box-shadow:var(--e-2);
     display:flex;flex-direction:column;gap:var(--s-1);
-    max-height:calc(100% - var(--ride-top) - var(--strip-h,64px) - var(--sheet-h,0px) - var(--s-4));overflow-y:auto;
+    max-height:calc(100% - var(--ride-top) - var(--alert-room,0px) - var(--strip-h,64px) - var(--sheet-h,0px) - var(--s-4));overflow-y:auto;
     transform-origin:bottom left;
     transition:opacity var(--m-base) var(--m-ease),
                transform var(--m-base) var(--m-ease)}
@@ -438,8 +448,41 @@
      take 189 · cold audit · only where it is needed: a small phone (render
      read the panels whole without it at 411, 412, 430 and 749 px, so there
      it only made four chips a tap further away, landmine 135) */
-  @media (max-width:400px) and (max-height:860px){
-    #shell[data-ride]:has(#cmppanel:not([hidden]),#diagpanel:not([hidden])) #tools .chip:not(#c-compass):not(#c-markme):not(#c-diag){display:none}}
+  /* take 190 · A247 · retired: the Tools chips are rows of the sheet now, so
+     the strip under a riding panel holds none for this rule to hide (the
+     panel has the room the four rows took). Render reads the panels usable
+     with their real content, and its control plants the old failure — a
+     strip that tall — which must leave a panel unusable at 360 x 800 */
+  /* take 190 · A247 · a floating panel closes in one tap (landmine 135):
+     its own close in a header that stays put while the panel scrolls (its
+     strip chip, the old toggle, is a row of the folded sheet now) */
+  .phead{display:flex;align-items:center;justify-content:space-between;gap:var(--s-2);
+    position:sticky;top:0;z-index:1;background:var(--surface-1)}
+  .phead .sect{font:700 var(--t-xs)/1 Barlow,Roboto,system-ui,sans-serif;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--text-3)}
+  .pclose{appearance:none;border:0;background:none;color:var(--text-2);cursor:pointer;flex:0 0 auto;
+    min-width:var(--tap);min-height:var(--tap);border-radius:var(--r-pill);padding:0;
+    display:flex;align-items:center;justify-content:center}
+  .pclose:active{background:var(--press)}
+  .pclose .ic{margin:0;opacity:1}
+  /* the compass's close takes no height: riding at 360 x 800 with the
+     off-route alert up the panel has about 160 px, and a header row cost
+     the dial (render, devices). It floats in the top corner beside the
+     centred dial, on the panel's own surface so a scrolled line under it
+     is hidden, not read through */
+  .phead.ov{height:0;overflow:visible;justify-content:flex-end;align-items:flex-start;background:none}
+  .phead.ov .pclose{background:var(--surface-1)}
+  /* riding, the compass's floating close is a ride control's 56 px (it
+     takes no height); Diagnostics' sits in a header row, and at 360 x 800
+     with the off-route alert up a 56 px row cut its first two actions
+     (render, devices "small": 162 px of 228, take 190) — it keeps --tap */
+  #shell[data-ride] .phead.ov .pclose{min-width:var(--tap-ride);min-height:var(--tap-ride)}
+  /* …and on a short screen while the off-route alert is up (it takes the
+     panel's top, --alert-room) the dial draws at 112 px, not 128, so the dial
+     and its heading stay whole in the room left (render, devices: 162 px at
+     360 x 800 for a 170 px block) */
+  @media (max-height:860px){
+    #shell[data-ride]:has(#alert.on) #cmpbox>div:first-child>svg{width:calc(var(--dial) - var(--s-4));height:calc(var(--dial) - var(--s-4))}}
   #lyrpanel .sect{font:700 var(--t-xs)/1 Barlow,Roboto,system-ui,sans-serif;letter-spacing:.14em;
     text-transform:uppercase;color:var(--text-3);padding:var(--s-2) var(--s-2) var(--s-1)}
   #lyrpanel .pnote{font:500 var(--t-md)/1.35 Barlow,Roboto,system-ui,sans-serif;color:var(--text-3);padding:0 var(--s-2) var(--s-1)}
@@ -589,6 +632,11 @@
      "Route here" on a place, "Ride it" under the route options): the accent
      surface, the only one on that screen (render counts it) */
   .chip.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  /* take 190 · the maintainer, 2026-10-08 item 5 (a): a primary as the
+     boards draw one — 800 weight, .06em, uppercase (Return home's own case,
+     .sx-home). The item named #rc-ride and #pc-route; Turns' Ride it, Start
+     riding and Find are the same button and read the same */
+  .chip.primary{font-weight:800;letter-spacing:.06em;text-transform:uppercase}
   .chip.primary .ic{opacity:1}
   /* the ride's own start and stop: the ride floor, 56 px (--tap-ride) */
   #c-ride{min-height:var(--tap-ride)}
@@ -776,6 +824,140 @@
      touchable area does not (take 111; 48 px since take 188). */
   #rail:not(.folded) #peek{min-height:var(--tap);padding:var(--s-2) var(--s-3) var(--s-1)}
   #rail:not(.folded) #peek-txt{display:none}
+  /* ── take 190 · A247 · THE SHEET ─────────────────────────────────────────
+     The Plan and Tools tabs open the drawer as a sheet of labelled rows
+     (artboards 10 and 16). One state, on #rail and mirrored on #shell:
+     data-sheet="index" (a tab's rows) or "tool" (a tool open inside the
+     sheet, under the back row). Off a ride the generic footer (the stats
+     row, coordinates and the action row) is not drawn in a sheet — the
+     index carries Return home itself; while riding the action row stays one
+     tap (landmine 135). A sheet's body is capped by --sheet-cap, measured so
+     that 12 % of the screen stays open map (DESIGN-v4 §8), with the left
+     and right columns put away as during a ride. */
+  .sheetix{display:flex;flex-direction:column;gap:var(--s-3)}
+  .sheetix[hidden],.sheetbar[hidden]{display:none}
+  #rail[data-sheet]:not([data-sheet="search"]) #srch,#rail[data-sheet="index"] #panel,#rail[data-sheet="search"] #panel{display:none}
+  /* take 190 · A251 · Search as a sheet (artboard 11): the field stays at the
+     top while the results scroll in the drawer's own body (no inner
+     scroller); results are rows with their kind; the jump chips wrap */
+  #rail[data-sheet="search"] #srch{margin-top:0}
+  #rail[data-sheet="search"] #q{position:sticky;top:0;z-index:1}
+  #rail[data-sheet="search"] #hits{max-height:none;overflow:visible}
+  #hits .sbox{margin:var(--s-2) 0 var(--s-3)}
+  #sjump{display:flex;flex-wrap:wrap;gap:var(--s-2);margin:var(--s-2) 0 var(--s-3)}
+  #sjump .k{flex:0 0 100%;margin-top:var(--s-2)}
+  #snote{margin-bottom:var(--s-2)}
+  #shell:not([data-ride]) #rail[data-sheet]:not(.folded) #grid,
+  #shell:not([data-ride]) #rail[data-sheet]:not(.folded) #coords,
+  #shell:not([data-ride]) #rail[data-sheet]:not(.folded):not([data-sheet="search"]) #actions{display:none}
+  /* take 190 · review · Search keeps the action row: take 189's search was a
+     card over it, so hiding it in the sheet made Return home 1 tap to 2 and
+     Dispatch and Retrace 1 to 3 (landmine 135), a rise nobody approved */
+  /* off a ride only: riding, the ride cap (--ride-cap, ridePublish) keeps the
+     sheet clear of the ride buttons and the ride block, as for any card */
+  #shell:not([data-ride]) #rail[data-sheet]:not(.folded) #railbody{max-height:var(--sheet-cap,38vh)}
+  /* riding, the action row carries Return home: the Plan sheet does not draw a
+     second one (plan190 I10) */
+  #shell[data-ride] #ix-home{display:none}
+  #shell[data-sheet]:not([data-sheettool="c-markme"]) #readout,#shell[data-sheet]:not([data-sheettool="c-markme"]) .maplibregl-ctrl-bottom-left,
+  #shell[data-sheet]:not([data-sheettool="c-markme"]) #c-base,#shell[data-sheet]:not([data-sheettool="c-markme"]) #c-hd,
+  #shell[data-sheet]:not([data-sheettool="c-markme"]) #c-mode,#shell[data-sheet]:not([data-sheettool="c-markme"]) #c-act,
+  #shell[data-sheet] #actpanel,#shell[data-sheet] #modepanel,#shell[data-sheet] #lyrpanel{display:none}
+  .sheetbar{display:flex;align-items:center;gap:var(--s-1);padding:0 var(--s-3) var(--s-1)}
+  .sh-back{appearance:none;border:0;background:none;color:var(--text-1);cursor:pointer;
+    min-width:var(--tap);min-height:var(--tap);border-radius:var(--r-pill);padding:0;
+    display:flex;align-items:center;justify-content:center}
+  .sh-back:active{background:var(--press)}
+  .sh-back .ic{margin:0;width:var(--ic-ride);height:var(--ic-ride);opacity:1}
+  #sh-title{font:700 var(--t-lg)/1.2 Barlow,system-ui,sans-serif;color:var(--text-1);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sx-search,.sx-home{appearance:none;cursor:pointer;min-height:var(--tap);border-radius:var(--r-pill);
+    display:flex;align-items:center;gap:var(--s-3);width:100%;box-sizing:border-box}
+  .sx-search{background:var(--surface-2);border:1px solid var(--divider);color:var(--text-3);
+    padding:0 var(--s-4);font:400 var(--t-md)/1.2 Barlow,system-ui,sans-serif;text-align:left}
+  .sx-search .ic{margin:0;color:var(--text-2);opacity:1}
+  .sx-home{min-height:var(--tap-ride);background:var(--accent);border:0;color:var(--on-accent);justify-content:center;
+    font:800 var(--t-lg)/1 'Barlow Condensed',Barlow,system-ui,sans-serif;letter-spacing:.06em;
+    text-transform:uppercase}
+  .sx-home .ic{margin:0;width:var(--ic-ride);height:var(--ic-ride);opacity:1}
+  .sx-home:active{filter:brightness(.85)}
+  .sgrp{display:flex;flex-direction:column;gap:var(--s-2)}
+  .sbox{display:flex;flex-direction:column;background:var(--sheet-group);border:1px solid var(--divider);
+    border-radius:var(--r-md);padding:0;overflow:hidden}
+  .srow{appearance:none;border:0;background:none;cursor:pointer;color:var(--text-1);text-align:left;
+    width:100%;box-sizing:border-box;min-height:var(--row-h);display:flex;align-items:center;
+    gap:var(--s-3);padding:var(--s-2) var(--s-3);border-radius:0;
+    font:600 var(--t-md)/1.2 Barlow,system-ui,sans-serif}
+  .srow:active{background:var(--press)}
+  .sr-i{width:var(--row-ic);height:var(--row-ic);border-radius:var(--r-md);background:var(--surface-2);flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;color:var(--text-1)}
+  .sr-i .ic{margin:0;opacity:1}
+  .sr-t{display:flex;flex-direction:column;gap:var(--s-1);flex:1 1 auto;min-width:0}
+  .sr-l{font:600 var(--t-md)/1.2 Barlow,system-ui,sans-serif;color:var(--text-1)}
+  .sr-s{font:500 var(--t-sm)/1.3 Barlow,system-ui,sans-serif;color:var(--text-3)}
+  .sr-v{font:600 var(--t-md)/1 Barlow,system-ui,sans-serif;color:var(--text-2);
+    font-variant-numeric:tabular-nums;white-space:nowrap;flex:0 0 auto}
+  .sr-c{display:flex;color:var(--text-3);flex:0 0 auto}
+  .sr-c .ic{margin:0;opacity:1}
+  /* an armed row (Home or Start from my position waiting for a map tap):
+     the strip's one selected language (A216), on the row's label */
+  .srow.arm .sr-l{color:var(--accent)}
+  /* take 190 · A249 · the chosen row (Your machine, artboard 14): the one
+     selected language (A216) — a dot, the label a weight heavier, an inset
+     --sel line. A row of the other family (a craft in a land mode) reads
+     quieter and says where it is used */
+  .srow.on .sr-l{font-weight:700}
+  .srow.on>.sr-t{position:relative}
+  .srow.on>.sr-t::before{position:absolute;left:calc(-1 * var(--s-2) - var(--s-1));top:50%;margin:calc(-1 * var(--s-1)) 0 0}
+  .srow.on{box-shadow:inset 0 0 0 1px var(--sel),var(--e-1)}
+  .srow.off .sr-l{color:var(--text-2)}
+  .mnote{margin-bottom:var(--s-2)}
+  /* take 190 · A250 · Fuel range's stepper: two 48 px buttons and the value
+     between them, the row no taller than its neighbours */
+  .srow.sfuel{cursor:default;padding-top:var(--s-1);padding-bottom:var(--s-1)}
+  .srow.sfuel:active{background:none}
+  .sstep{display:flex;align-items:center;gap:var(--s-1);flex:0 0 auto}
+  .sstep .sr-v{min-width:calc(var(--s-6) + var(--s-5));text-align:center;color:var(--text-1)}
+  .sbtn{appearance:none;cursor:pointer;min-width:var(--tap);min-height:var(--tap);border-radius:var(--r-pill);
+    background:var(--surface-2);border:1px solid var(--divider);color:var(--text-1);padding:0;
+    display:flex;align-items:center;justify-content:center}
+  .sbtn .ic{margin:0;opacity:1}
+  .sbtn:active{background:var(--press)}
+  .sbtn:disabled{cursor:default;opacity:.4}
+  /* take 190 · A253 · Loop from here: the distances, and the start line */
+  .lpd{display:flex;flex-wrap:wrap;gap:var(--s-2);margin:var(--s-2) 0 var(--s-3)}
+  .lpstart{display:flex;align-items:center;gap:var(--s-2)}
+  .lpstart .ic{margin:0;flex:0 0 auto;opacity:1}
+  .lpstart.warn{color:var(--warn)}
+  /* take 190 · A254 · Saved as rows (artboard 13): a record's row opens it,
+     its two buttons rename and delete it; the empty state's star */
+  .svrec{display:flex;align-items:center}
+  .svrec .srow{flex:1 1 auto;min-width:0}
+  .sv-x{appearance:none;cursor:pointer;flex:0 0 auto;min-width:var(--tap);min-height:var(--tap);border:0;
+    background:none;color:var(--text-2);border-radius:var(--r-pill);padding:0;display:flex;align-items:center;justify-content:center}
+  .sv-x .ic{margin:0;opacity:1}
+  .sv-x:active{background:var(--press)}
+  .svempty{width:calc(2 * var(--s-6));height:calc(2 * var(--s-6));border-radius:50%;background:var(--surface-2);
+    margin:var(--s-2) auto var(--s-3);display:flex;align-items:center;justify-content:center;color:var(--text-2)}
+  .svempty .ic{margin:0;width:var(--s-6);height:var(--s-6);opacity:1}
+  .svh{text-align:center;font:700 var(--t-lg)/1.2 Barlow,system-ui,sans-serif;color:var(--text-1);margin-bottom:var(--s-2)}
+  /* take 190 · A257 · Data sources: the notice's box, and the sources as rows
+     (links: no underline, the row is the target) */
+  .srcnote{padding:var(--s-3);border-radius:var(--r-md);background:var(--warn-tint);
+    border:1px solid var(--warn-line);color:var(--text-1);font:500 var(--t-sm)/1.4 Barlow,system-ui,sans-serif}
+  #panel .sbox{margin:var(--s-2) 0 var(--s-3)}
+  a.srow{text-decoration:none}
+  /* take 190 · A260 · Mark this spot's buttons and its name field */
+  .mkrow{display:flex;gap:var(--s-2);margin-top:var(--s-3)}
+  /* take 190 · A259 · HD imagery's tiers as cards (artboard 18) */
+  .hdtier{margin-top:var(--s-3);padding:var(--s-3);border-radius:var(--r-md);background:var(--sheet-group);
+    border:1px solid var(--divider)}
+  .hdtier .chip{margin-top:var(--s-2)}
+  .hdt-n{font:600 var(--t-md)/1.2 Barlow,system-ui,sans-serif;color:var(--text-1)}
+  #mk-name{width:100%;box-sizing:border-box;min-height:var(--tap);margin-top:var(--s-1);padding:0 var(--s-3);
+    border-radius:var(--r-md);border:1px solid var(--divider);background:var(--surface-2);color:var(--text-1);
+    font:500 var(--t-md)/1.2 Barlow,system-ui,sans-serif}
+  #panel .k{margin-top:var(--s-3)}
   /* Coordinates were the FIRST thing on every card, huge, in monospace —
      debug telemetry leading the product. They are last-resort data (dispatch
      reads them aloud), so they sit at the bottom, small, and keep monospace as
@@ -843,7 +1025,14 @@
   .hit b{color:var(--text-1);font-weight:700;font-size:var(--t-md)}
   .hit i{font-style:normal;color:var(--text-3);font-size:var(--t-xs);letter-spacing:.08em;
     text-transform:uppercase;margin-left:var(--s-1)}
-  #steps{max-height:150px;overflow-y:auto;margin-top:var(--s-1)}
+  /* take 190 · A261 · Turns (artboard 15): one scroller — the drawer's body —
+     where take 189 nested a 150 px one; Ride it pinned at the body's foot
+     with "N more steps below" over it; the action row stays under the
+     drawer (2026-10-08 item 1) */
+  #steps{margin-top:var(--s-1)}
+  .stfoot{position:sticky;bottom:0;z-index:1;background:var(--surface-1);padding:var(--s-2) 0 var(--s-1);
+    display:flex;flex-direction:column;gap:var(--s-2)}
+  .stfoot .chip.primary{align-self:stretch;justify-content:center}
   .st{display:flex;gap:var(--s-2);padding:var(--s-2) 0;border-bottom:1px solid var(--divider)}
   .st .ar{flex:0 0 22px;font:700 var(--t-lg)/1.2 Barlow,Roboto,system-ui,sans-serif;color:var(--text-1);
     text-align:center}
@@ -942,7 +1131,7 @@
      button's corner so the label never rewraps under a gloved thumb. No
      fill changes. Render reads every family on and off. */
   .chip.on>span:first-of-type::before,.chip.arm>span:first-of-type::before,.basebtn.on>span::before,
-  .actrow.on>span:last-child::before,.moderow.on>span:first-child::before,.rc.sel h5::before{
+  .actrow.on>span:last-child::before,.moderow.on>span:first-child::before,.rc.sel h5::before,.srow.on>.sr-t::before{
     content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--sel);
     margin-right:var(--s-2);vertical-align:1px}
   #hudbtns button.on::before{content:'';position:absolute;top:var(--s-2);right:var(--s-2);
@@ -978,6 +1167,13 @@
      runs, it is not drawn: Stop is the ride's (the sheet, or Stop (GPS)) */
   #btn-ride{display:none}
   #shell:not([data-ride]) #rail.folded #actions #btn-ride{display:inline-block;flex:0 0 auto;padding:0 var(--s-4)}
+  /* take 190 · A262 · one Start on the Ride tab (the maintainer,
+     2026-10-02): folded, the strip's Ride it is it, so the drawer's Ride
+     hides there; open on the Ride card, the card's Start riding is it, so
+     the strip's chip steps aside */
+  #shell[data-dest="ride"] #rail.folded #actions #btn-ride{display:none}
+  #shell:has(#rail:not(.folded) #rt-start:not([hidden])) #c-ride,
+  #shell[data-dest="ride"]:has(#rail:not(.folded) #rc-ride:not([hidden])) #c-ride{display:none}
   #shell:not([data-ride]) #rail.folded #btn-home{flex:0 0 auto;padding:0 var(--s-4);
     background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
   #rail:not(.folded) #btn-home,#shell[data-ride] #btn-home{background:var(--surface-2);color:var(--text-1);border-color:var(--accent)}
@@ -1004,7 +1200,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 189</span>
+    <span id="title"><b>APEX</b> ORV · Take 190</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -1042,9 +1238,9 @@
     <!-- A119 · the compass. Its own panel rather than a card, because it updates
          as fixes arrive and the panel is where the app already puts things that
          stay on screen while you use them. -->
-    <div id="cmppanel" hidden><div id="cmpbox"></div><div id="cmpmore" hidden>More below — scroll</div></div>
+    <div id="cmppanel" hidden><div class="phead ov"><button class="pclose" id="cmp-x" aria-label="Close the compass">__IC_close__</button></div><div id="cmpbox"></div><div id="cmpmore" hidden>More below — scroll</div></div>
     <div id="diagpanel" hidden>
-      <div class="sect">Diagnostics</div>
+      <div class="phead"><div class="sect">Diagnostics</div><button class="pclose" id="diag-x" aria-label="Close diagnostics">__IC_close__</button></div>
       <button class="chip" id="c-about">__IC_about__<span>About this build</span></button>
       <button class="chip" id="c-selftest">__IC_selftest__<span>Self-test</span></button>
       <button class="chip" id="c-pan">__IC_pantest__<span>Pan test</span></button>
@@ -1087,24 +1283,14 @@
     <div class="strip" id="tools">
       <!-- A119 · Tools became a real bucket at take 101. About, Self-test and
            Pan test are DIAGNOSTICS, not tools — they went behind one entry so
-           the tab has room for the things a rider actually reaches for. -->
-      <button class="chip" data-tab="tools" id="c-tour">__IC_tour__<span>Take the tour</span></button>
-      <button class="chip" data-tab="tools" id="c-howto">__IC_guide__<span>How to use</span></button>
-      <button class="chip" data-tab="tools" id="c-compass">__IC_compass__<span>Compass</span></button>
-      <button class="chip" data-tab="tools" id="c-markme">__IC_spot__<span>Mark this spot</span></button>
-      <button class="chip" data-tab="tools" id="c-hdmanage">__IC_hd__<span>Saved HD imagery</span></button>
-      <button class="chip" data-tab="tools" id="c-sources">__IC_sources__<span>Data sources</span></button>
-      <button class="chip" data-tab="tools" id="c-diag">__IC_diag__<span>Diagnostics</span></button>
+           the tab has room for the things a rider actually reaches for.
+           take 190 · A247 · the Plan and Tools chips are rows of the sheet
+           now (#ix-plan, #ix-tools, in the drawer), with the same ids and
+           handlers; the strip keeps the Map and Ride tabs' chips -->
       <button class="chip" data-tab="map" id="c-layers">__IC_layers__<span>Layers</span></button>
-      <button class="chip" data-tab="plan" id="c-machine">__IC_dirtbike__<span>Dirt bike 24&quot;</span></button>
-      <button class="chip" data-tab="plan" id="c-home">__IC_home__<span>Set home</span></button>
-      <button class="chip" data-tab="plan" id="c-me">__IC_start__<span>I'm here</span></button>
-      <button class="chip" data-tab="plan" id="c-fuel">__IC_fuel__<span>50 mi</span></button>
       <button class="chip" data-tab="ride" id="c-ride">__IC_ride__<span>Ride it</span></button>
       <button class="chip" id="c-lost" hidden>__IC_warn__<span>Wrong turn</span></button>
       <button class="chip" data-tab="map" id="c-locate">__IC_locate__<span>Locate</span></button>
-      <button class="chip" data-tab="plan" id="c-loop">__IC_loop__<span>Loop</span></button>
-      <button class="chip" data-tab="plan" id="c-saved">__IC_saved__<span>Saved</span></button>
       <button class="chip" data-tab="map" id="c-search">__IC_search__<span>Search</span></button>
     </div>
   </div>
@@ -1125,11 +1311,52 @@
            (take 112, field report). -->
       <span id="peek-chev">&#x25BE;</span>
     </button>
+    <!-- take 190 · A247 · the back row: pinned between the grabber and the body,
+         so it never scrolls away; drawn only while a tool is open in the sheet -->
+    <div class="sheetbar" id="sheetbar" hidden><button class="sh-back" id="sh-back" aria-label="Back">__IC_back__</button><span id="sh-title"></span></div>
     <div id="railbody">
+    <!-- take 190 · A247 · THE SHEET. The Plan and Tools tabs open these indexes in
+         the drawer (artboards 10 and 16 of the V4 mockup the maintainer approved
+         2026-09-30): rows with a line saying what each does, each tool opening
+         inside the sheet under the back row. Markup in the order smoke parses:
+         class first, then data- names (tools/smoke.mjs El). -->
+    <div class="sheetix" id="ix-plan" hidden>
+      <button class="sx-search" id="ix-search">__IC_search__<span>Where to? Places, trails, addresses</span></button>
+      <button class="sx-home" id="ix-home">__IC_home__<span>Return home</span></button>
+      <div class="sgrp" id="g-from"><div class="k">From here</div><div class="sbox">
+        <button class="srow" data-tab="plan" id="c-loop"><span class="sr-i" id="c-loop-i">__IC_loop__</span><span class="sr-t"><span class="sr-l">Loop from here</span><span class="sr-s" id="c-loop-s">Ends where it starts · legal for your machine</span></span><span class="sr-c">__IC_next__</span></button>
+        <button class="srow" data-tab="plan" id="c-me"><span class="sr-i" id="c-me-i">__IC_start__</span><span class="sr-t"><span class="sr-l">Start from my position</span><span class="sr-s" id="c-me-s">Tap where you stand — plans start there, not the map centre</span></span><span class="sr-c">__IC_next__</span></button>
+        <button class="srow" data-tab="plan" id="c-saved"><span class="sr-i" id="c-saved-i">__IC_saved__</span><span class="sr-t"><span class="sr-l">Saved</span><span class="sr-s" id="c-saved-s">Routes and marked spots, on this phone only</span></span><span class="sr-v" id="c-saved-v">0</span><span class="sr-c">__IC_next__</span></button>
+      </div></div>
+      <div class="sgrp" id="g-ride"><div class="k">Your ride</div><div class="sbox">
+        <button class="srow" data-tab="plan" id="c-machine"><span class="sr-i" id="c-machine-i">__IC_dirtbike__</span><span class="sr-t"><span class="sr-l">Machine</span></span><span class="sr-v" id="c-machine-v">Dirt bike 24&quot;</span><span class="sr-c">__IC_next__</span></button>
+        <div class="srow sfuel" data-tab="plan" id="c-fuel"><span class="sr-i" id="c-fuel-i">__IC_fuel__</span><span class="sr-t"><span class="sr-l">Fuel range</span><span class="sr-s" id="c-fuel-s">Routes warn past it</span></span><span class="sstep"><button class="sbtn" id="c-fuel-dn" aria-label="Less range">__IC_less__</button><span class="sr-v" id="c-fuel-v">50 mi</span><button class="sbtn" id="c-fuel-up" aria-label="More range">__IC_more__</button></span></div>
+        <button class="srow" data-tab="plan" id="c-home"><span class="sr-i" id="c-home-i">__IC_home__</span><span class="sr-t"><span class="sr-l">Home</span><span class="sr-s" id="c-home-s">Long-press a spot, or use your position</span></span><span class="sr-v" id="c-home-v">Not set</span><span class="sr-c">__IC_next__</span></button>
+      </div></div>
+    </div>
+    <div class="sheetix" id="ix-tools" hidden>
+      <div class="sgrp" id="g-trail"><div class="k">On the trail</div><div class="sbox">
+        <button class="srow" data-tab="tools" id="c-compass"><span class="sr-i" id="c-compass-i">__IC_compass__</span><span class="sr-t"><span class="sr-l">Compass</span><span class="sr-s" id="c-compass-s">Bearing to your truck, home or a waypoint</span></span><span class="sr-c">__IC_next__</span></button>
+        <button class="srow" data-tab="tools" id="c-markme"><span class="sr-i" id="c-markme-i">__IC_spot__</span><span class="sr-t"><span class="sr-l">Mark this spot</span><span class="sr-s" id="c-markme-s">Saved on this phone, found under Saved</span></span><span class="sr-c">__IC_next__</span></button>
+      </div></div>
+      <div class="sgrp" id="g-off"><div class="k">Offline</div><div class="sbox">
+        <button class="srow" data-tab="tools" id="c-hdmanage"><span class="sr-i" id="c-hdmanage-i">__IC_hd__</span><span class="sr-t"><span class="sr-l">HD imagery</span><span class="sr-s" id="c-hdmanage-s">Sharper satellite for places you choose</span></span><span class="sr-c">__IC_next__</span></button>
+      </div></div>
+      <div class="sgrp" id="g-learn"><div class="k">Learn</div><div class="sbox">
+        <button class="srow" data-tab="tools" id="c-tour"><span class="sr-i" id="c-tour-i">__IC_tour__</span><span class="sr-t"><span class="sr-l">Take the tour</span><span class="sr-s" id="c-tour-s">A short walk over the real screen</span></span><span class="sr-c">__IC_next__</span></button>
+        <button class="srow" data-tab="tools" id="c-howto"><span class="sr-i" id="c-howto-i">__IC_guide__</span><span class="sr-t"><span class="sr-l">How to use</span><span class="sr-s" id="c-howto-s">What each control does</span></span><span class="sr-c">__IC_next__</span></button>
+      </div></div>
+      <div class="sgrp" id="g-about"><div class="k">About</div><div class="sbox">
+        <button class="srow" data-tab="tools" id="c-sources"><span class="sr-i" id="c-sources-i">__IC_sources__</span><span class="sr-t"><span class="sr-l">Data sources</span><span class="sr-s" id="c-sources-s">Who publishes each layer, and the licences</span></span><span class="sr-c">__IC_next__</span></button>
+        <button class="srow" data-tab="tools" id="c-diag"><span class="sr-i" id="c-diag-i">__IC_diag__</span><span class="sr-t"><span class="sr-l">Diagnostics</span><span class="sr-s" id="c-diag-s">About this build, self-test, pan test</span></span><span class="sr-c">__IC_next__</span></button>
+      </div></div>
+    </div>
     <div id="srch">
-      <input id="q" type="search" placeholder="Trail, road, junction, place…"
+      <input id="q" type="search" placeholder="Where to? Places, trails, addresses"
         autocomplete="off" autocapitalize="off" spellcheck="false">
       <div id="hits"></div>
+      <div id="sjump"></div>
+      <div class="sub" id="snote">A trail code like H58, a town, a river or a street address — all of it offline.</div>
     </div>
     <!-- take 185 · A199 · this used to say "You're at Bull Gap, home is the
          Pink Store" — a sentence from the Bull Gap era that a first open
@@ -2160,6 +2387,9 @@ var GAUGE=(function(){
    two fixes apart — so "no heading yet" is the normal state at a standstill and
    is said in those words. */
 var CMP_ON=false, MAG=null, MAG_OK=null;
+/* take 190 · A258 · where the compass is drawn: 'sheet' (off a ride, the
+   Tools sheet's Compass) or null (the floating panel, or nowhere) */
+var CMP_WHERE=null;
 
 /* ══ THE MAGNETOMETER (take 109) ════════════════════════════════════════════
    Jacob, on the take-108 compass: "I don't think compass works". It was working
@@ -2287,6 +2517,9 @@ function cmpRows(hdg){
 function cmpPaint(){
   var box=el('cmpbox');
   if(!box||!CMP_ON)return;
+  /* take 190 · A258 · the same content in the sheet's box while it is up
+     (the floating box is painted too: one paint, two places) */
+  var shb=CMP_WHERE==='sheet'?el('cmpsheet'):null;
   var H=headingNow(),hdg=H?H.deg:null,rows=cmpRows(hdg);
   box.innerHTML='<div style="text-align:center">'+cmpRose(hdg)+
     '<div style="font:700 var(--t-lg)/1 Barlow,Roboto,system-ui,sans-serif;margin-top:4px">'+
@@ -2300,6 +2533,7 @@ function cmpPaint(){
     (rows.length?'<div style="margin-top:9px;line-height:1.7">'+rows.join('<br>')+'</div>'
      :'<div class="sub" style="margin-top:9px">Nothing to take a bearing to yet — '+
       'pin the truck, set home, or save a waypoint.</div>');
+  if(shb)shb.innerHTML=box.innerHTML;
   /* the heading turns the rose on every reading; the lines change only
      with what they say */
   var k=(hdg===null?'n'+MAG_OK:'h'+(H&&H.src))+'|'+rows.join('|');
@@ -2352,7 +2586,7 @@ try{el('cmppanel').addEventListener('scroll',cmpCue)}catch(e){}
 var CMP_GEO='';
 function cmpGeo(){try{var c=document.documentElement.style;
   return [c.getPropertyValue('--ride-top'),c.getPropertyValue('--sheet-h'),c.getPropertyValue('--strip-h'),
-    window.innerHeight].join('|')}catch(e){return ''}}
+    c.getPropertyValue('--alert-room'),window.innerHeight].join('|')}catch(e){return ''}}
 
 function runCard(a,b,riv){
   var c=null,i;
@@ -3572,7 +3806,8 @@ var ICON_OF={
   bearleft:'arrow-up-left',bearright:'arrow-up-right',left:'corner-up-left',
   right:'corner-up-right',sharpleft:'arrow-down-left',sharpright:'arrow-down-right',
   uturn:'undo-2',arrive:'circle-dot',reroute:'refresh-cw',downstream:'arrow-down',
-  external:'external-link',pass:'circle-check',fail:'circle-x',truck:'truck'
+  external:'external-link',pass:'circle-check',fail:'circle-x',truck:'truck',
+  next:'chevron-right',back:'chevron-left',less:'minus',more:'plus',rename:'pencil'
 };
 var LUCIDE={
   'map':'<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" /> <path d="M15 5.764v15" /> <path d="M9 3.236v15" />',
@@ -3605,6 +3840,11 @@ var LUCIDE={
   'repeat':'<path d="m17 2 4 4-4 4" /> <path d="M3 11v-1a4 4 0 0 1 4-4h14" /> <path d="m7 22-4-4 4-4" /> <path d="M21 13v1a4 4 0 0 1-4 4H3" />',
   'star':'<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />',
   'search':'<path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" />',
+  'chevron-right':'<path d="m9 18 6-6-6-6" />',
+  'chevron-left':'<path d="m15 18-6-6 6-6" />',
+  'minus':'<path d="M5 12h14" />',
+  'plus':'<path d="M5 12h14" /> <path d="M12 5v14" />',
+  'pencil':'<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" />',
   'map-pin':'<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" />',
   'phone':'<path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" />',
   'maximize':'<path d="M8 3H5a2 2 0 0 0-2 2v3" /> <path d="M21 8V5a2 2 0 0 0-2-2h-3" /> <path d="M3 16v3a2 2 0 0 0 2 2h3" /> <path d="M16 21h3a2 2 0 0 0 2-2v-3" />',
@@ -3676,9 +3916,205 @@ function paintIcons(){
       b.innerHTML=b.innerHTML.replace(/__IC_([a-z]+)__/g,
         function(_,n){return ic(n)})})}
 
+/* ══ THE SHEET (take 190 · A247) ═══════════════════════════════════════════
+   The Plan and Tools tabs open the drawer as a sheet of labelled rows
+   (#ix-plan, #ix-tools: artboards 10 and 16, approved 2026-09-30). The rows
+   keep the chips' ids and handlers. One state: SHEET.tab is the index open
+   (plan, tools) and SHEET.tool the row whose card is open inside the sheet,
+   under the back row; #rail and #shell carry it as data-sheet ("index",
+   "tool") for the CSS. The contract (docs/recovery-t190/plan190.md §1):
+   - a row in SHEET_TOOLS opens its card inside the sheet: a listener
+     registered here, ahead of the row's own handler, marks it pending, and
+     the first show() the handler makes is that tool's card; a listener at
+     the end of the script clears the mark, so a later card (a loop built, a
+     GPS fix arriving) is an ordinary card;
+   - a row in SHEET_FOLD (the compass and Diagnostics panels, the tour, the
+     guide) puts the sheet away first: each draws over the map itself;
+   - any other card — show() with no row pending, or showQuiet() — ends the
+     sheet and keeps the tab mark;
+   - every fold ends the sheet, and lands on Map when the tab was Plan or
+     Tools, unless a Tools panel is open or a map tap is armed (the tab
+     change would close the one and clear the other);
+   - back: a tool goes to its index, an index folds (backOpen/backClose);
+   - re-tapping the open tab goes back to its index and never folds (tabs
+     are peers; a second tap is idempotent, so a harness that taps a tab it
+     is on changes nothing). */
+var SHEET={tab:null,tool:null,parent:null},SHEET_PENDING=null;
+var SHEET_TOOLS={'c-home':'Home','c-loop':'Loop from here','c-saved':'Saved','c-machine':'Your machine',
+  'c-markme':'Mark this spot','c-hdmanage':'HD imagery','c-sources':'Data sources',
+  'c-diag':'Diagnostics','c-about':'About this build','c-compass':'Compass'};
+var SHEET_FOLD=['c-tour','c-howto'];
+/* take 190 · A256 · Diagnostics opens in the sheet off a ride and FLOATS during
+   one (the maintainer, 2026-10-02 23:20: "Diagnostics floats like the compass
+   during a ride"); About this build opens under it, and back returns to it */
+var SHEET_RIDEFLOAT=['c-diag','c-compass'];
+/* a tool opened from inside another (About from Diagnostics; Mark this spot
+   and Home from the compass) goes back to it. About this build is a sheet
+   tool only from Diagnostics */
+var SHEET_CHILD_ONLY={'c-about':'c-diag'};
+/* every row of the two indexes, by id: setChip writes a row's value, never
+   its label. A list, not the class: a class read from markup is a DOM fact
+   smoke's stub does not model, and it would take the chip path there */
+var SHEET_ROWS=['c-loop','c-me','c-saved','c-machine','c-fuel','c-home','c-compass','c-markme',
+  'c-hdmanage','c-tour','c-howto','c-sources','c-diag'];
+/* take 190 · A256 · artboard 20: Diagnostics as rows in the sheet. Each row
+   hands off to the floating panel's own button (#c-about, #c-selftest,
+   #c-pan: their ids and handlers stay); Self-test and Pan test leave the
+   sheet through show() (they measure the map) */
+function aboutLine(){
+  var tk=((el('title')||{}).textContent||'').match(/Take (\d+)/),b=BUNDLE||{},d=b.built?String(b.built).slice(0,10):'';
+  return (tk?'Take '+tk[1]:'This build')+(b.name?' \u00b7 '+b.name:'')+(d?' data of '+d:'')+(b.hash?' \u00b7 '+String(b.hash).slice(0,8):'')}
+function diagCard(){
+  var R=[['about','about','About this build',aboutLine()],
+         ['selftest','selftest','Self-test','Checks this phone: location, screen, sound, compass'],
+         ['pan','pantest','Pan test','Pans the map to measure how smoothly it draws']];
+  show('<div class="sbox">'+R.map(function(r){return srowHTML({attrs:' data-diag="'+r[0]+'"',icon:r[1],label:r[2],sub:r[3]})}).join('')+'</div>'+
+    '<div class="sub">Run the self-test and share its report when something looks wrong — it says what '+
+    'this phone can and cannot do.</div>','');
+  handOff('diag')}
+function sheetKind(){return SHEET.tool?'tool':(SHEET.tab?'index':(SRCH.on?'search':null))}
+/* take 190 · A251, A252 · Search is a sheet of its own kind, opened from the
+   Map strip's Search or the Plan index's "Where to?", with the Map tab
+   marked (artboard 11). It is one layer: one back closes it and lands on
+   Map (take 189 took two presses — the results, then the drawer); a jump
+   chip, a hit, a tab or a fold closes it; and the address arm Home's "Type
+   an address" set dies with it (plan190 §5 item 6: it survived and took the
+   next hit or map tap). */
+var SRCH={on:false,from:null};
+/* one row's markup, for every card that lists rows (Data sources, Diagnostics,
+   the compass): {tag,attrs,icon,label,sub,trail} */
+function srowHTML(o){var t=o.tag||'button';
+  return '<'+t+' class="srow"'+(o.attrs||'')+'><span class="sr-i">'+ic(o.icon)+'</span><span class="sr-t">'+
+    '<span class="sr-l">'+o.label+'</span>'+(o.sub?'<span class="sr-s">'+o.sub+'</span>':'')+'</span>'+
+    '<span class="sr-c">'+ic(o.trail||'next')+'</span></'+t+'>'}
+/* a card's rows that stand for another control: a tap clicks it (its id and
+   handler stay the one place the action lives) */
+function handOff(attr){Array.prototype.forEach.call(document.querySelectorAll('[data-'+attr+']'),function(b){
+  b.addEventListener('click',function(){var t=el('c-'+b.dataset[attr]);if(t)t.click()})})}
+/* the tab a row lives on */
+var PLAN_ROWS=['c-loop','c-me','c-saved','c-machine','c-fuel','c-home'];
+function rowTab(id){return PLAN_ROWS.indexOf(id)>=0?'plan':'tools'}
+/* a ride is on screen: the flag every ride rule in the stylesheet keys on
+   (#shell[data-ride], set by rideFlag from rideMode||riding), or the ride
+   itself before its flag is painted */
+function rideUp(){var s=el('shell');return !!(rideMode||riding||(s&&s.dataset&&s.dataset.ride))}
+function sheetPaint(){
+  var r=el('rail'),sh=el('shell'),k=sheetKind();
+  if(r&&r.dataset){if(k)r.dataset.sheet=k;else delete r.dataset.sheet}
+  if(sh&&sh.dataset){if(k)sh.dataset.sheet=k;else delete sh.dataset.sheet;
+    /* which tool: Mark this spot keeps the map's chrome (artboard 19) */
+    if(SHEET.tool)sh.dataset.sheettool=SHEET.tool;else delete sh.dataset.sheettool}
+  var ip=el('ix-plan'),it=el('ix-tools'),b=el('sheetbar'),t=el('sh-title');
+  if(ip)ip.hidden=!(k==='index'&&SHEET.tab==='plan');
+  if(it)it.hidden=!(k==='index'&&SHEET.tab==='tools');
+  /* Mark this spot has no back row (artboard 19; plan190 §3.13): Done, Undo
+     and Cancel are its exits, and back works */
+  if(b)b.hidden=(k!=='tool'||SHEET.tool==='c-markme');
+  if(t)t.textContent=SHEET.tool?(SHEET_TOOLS[SHEET.tool]||''):'';
+  if(MARK.stop&&SHEET.tool!=='c-markme'&&!rideUp()&&k)markCancel();
+  if(CMP_WHERE==='sheet'&&SHEET.tool!=='c-compass'&&SHEET.parent!=='c-compass'){
+    CMP_WHERE=null;var cpn=el('cmppanel');if(!cpn||cpn.hidden)CMP_ON=false}
+  sheetVals();sheetCap()}
+function sheetIndex(tab){
+  SHEET.tab=tab;SHEET.tool=null;SHEET.parent=null;SHEET_PENDING=null;
+  RAIL_MANUAL=false;railSet(true);sheetPaint();
+  try{var rb=el('railbody');if(rb)rb.scrollTop=0}catch(e){}
+  logAct('sheet index '+tab)}
+function sheetExit(){
+  if(!SHEET.tab&&!SHEET.tool&&!SRCH.on)return false;
+  SHEET.tab=null;SHEET.tool=null;SHEET.parent=null;SHEET_PENDING=null;
+  if(SRCH.on)searchEnd('exit');
+  sheetPaint();return true}
+function searchEnd(why,keepArm){
+  SRCH.on=false;SRCH.from=null;
+  try{el('srch').className='';el('c-search').className='chip'}catch(e){}
+  if(arm==='homeaddr'&&!keepArm){arm=null;syncArm();logAct('act  address arm ended with search')}
+  logAct('search close '+why)}
+function searchOpen(o){o=o||{};
+  if(TAB!=='map')showTab('map');
+  SHEET.tab=null;SHEET.tool=null;SHEET.parent=null;SHEET_PENDING=null;
+  SRCH.on=true;SRCH.from=o.from||'map';
+  el('srch').className='on';el('c-search').className='chip on';
+  var n=el('snote');if(n)n.innerHTML=o.note||'A trail code like H58, a town, a river or a street address \u2014 all of it offline.';
+  RAIL_MANUAL=false;railSet(true);sheetPaint();
+  try{var rb=el('railbody');if(rb)rb.scrollTop=0}catch(e){}
+  searchPaint();
+  try{el('q').focus()}catch(e){}
+  logAct('search open '+SRCH.from)}
+/* E · the jump chips stay under the results (artboard 11; take 189 kept
+   them under typed hits too) */
+function searchPaint(){var q=el('q').value||'';
+  if(q)renderHits(searchAll(q));else el('hits').innerHTML='';
+  el('sjump').innerHTML=jumpChipsHTML();wireJumpChips()}
+/* every match, for the honest count (search() gives the nine shown) */
+function searchAll(q){return search(q,true)}
+function searchClose(why){if(!SRCH.on)return false;
+  searchEnd(why);RAIL_MANUAL=true;railSet(false);sheetPaint();return true}
+function sheetBack(){
+  /* a child tool goes back to its parent tool (About this build → Diagnostics) */
+  if(SHEET.tool&&SHEET.parent==='(fold)'){logAct('sheet back fold '+SHEET.tool);RAIL_MANUAL=true;railSet(false);return 'fold'}
+  if(SHEET.tool&&SHEET.tab&&SHEET.parent){var par=SHEET.parent;logAct('sheet back '+SHEET.tool+' -> '+par);
+    /* the parent opens as a tool of the index, not as a child of the child */
+    SHEET.parent=null;SHEET.tool=null;
+    var pb=el(par);if(pb){pb.click();return 'parent'}}
+  if(SHEET.tool&&SHEET.tab){var t=SHEET.tab;logAct('sheet back '+SHEET.tool);sheetIndex(t);return 'index'}
+  RAIL_MANUAL=true;railSet(false);logAct('sheet back fold');return 'fold'}
+/* the values a row shows: Machine, Fuel range, Home, Saved, Loop's machine */
+function sheetVals(){try{
+  var m=MACHINE[machine];
+  var v=el('c-loop-s');if(v&&m)v.textContent='Ends where it starts · legal for your '+m.lbl;
+  v=el('c-home-v');if(v)v.textContent=HOME?'Set':'Not set';
+  v=el('c-saved-v');if(v)v.textContent=String(sheetSavedN());
+  }catch(e){}}
+/* what Saved lists: this region's routes and marked spots (buildSavedPanel's
+   filter, one reader) */
+function sheetSavedN(){
+  var mine=function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region};
+  try{return svLoad().filter(mine).length+wpLoad().filter(mine).length}catch(e){return 0}}
+/* the body's cap: everything a sheet may take while 12 % of the screen
+   stays open map (DESIGN-v4 §8). Read off the page as it stands, as
+   ridePublish reads --ride-cap: the body's height now plus the room now
+   between the drawer's top (or the attribution corner over it) and the
+   floor. Layout-free hosts (smoke's stub gives every element a rect at
+   top 0) leave it unset, and the CSS falls back to the 38vh cap. */
+function sheetCap(){try{
+  var r=el('rail'),rb=el('railbody'),de=document.documentElement;
+  if(!r||!rb||!sheetKind()||r.className==='folded'||rideUp())return;
+  var vh=window.innerHeight||0,rr=r.getBoundingClientRect();
+  if(!(vh>0)||!(rr.top>0))return;
+  var top=rr.top,a=document.querySelector('.maplibregl-ctrl-bottom-right');
+  if(a){var ar=a.getBoundingClientRect();if(ar.height>0&&ar.top<top)top=ar.top}
+  var cap=Math.floor(rb.getBoundingClientRect().height+top-Math.ceil(vh*0.12)-8);
+  if(isFinite(cap)&&cap>0){var cv=cap+'px';
+    if(de.style.getPropertyValue('--sheet-cap')!==cv)de.style.setProperty('--sheet-cap',cv)}}catch(e){}}
+try{window.addEventListener('resize',sheetCap)}catch(e){}
+function sheetFoldKeep(){if(sheetExit()){SHEET_KEEP=true;RAIL_MANUAL=false;try{railSet(false)}finally{SHEET_KEEP=false}}}
+Object.keys(SHEET_TOOLS).forEach(function(id){var b=el(id);if(!b)return;
+  b.addEventListener('click',function(){
+    if(SHEET_RIDEFLOAT.indexOf(id)>=0&&rideUp())return sheetFoldKeep();
+    var only=SHEET_CHILD_ONLY[id];
+    if(only&&SHEET.tool!==only)return;
+    if(SHEET.tab){SHEET.parent=(SHEET.tool&&SHEET.tool!==id)?SHEET.tool:null;SHEET_PENDING=id}})});
+SHEET_FOLD.forEach(function(id){var b=el(id);if(!b)return;
+  b.addEventListener('click',sheetFoldKeep)});
+var SHEET_KEEP=false;
+try{el('sh-back').addEventListener('click',function(){sheetBack()})}catch(e){}
+try{el('ix-home').addEventListener('click',function(){
+  logAct('tap  ix-home');sheetExit();el('btn-home').click()})}catch(e){}
+try{el('ix-search').addEventListener('click',function(){
+  logAct('tap  ix-search');searchOpen({from:'plan'})})}catch(e){}
+try{window.__sheet={state:function(){return {tab:SHEET.tab,tool:SHEET.tool,kind:sheetKind(),pending:SHEET_PENDING}},
+  tab:function(t){showTab(t)},tap:function(t){tabTap(t)},index:sheetIndex,back:sheetBack,exit:sheetExit,cap:sheetCap,
+  tool:function(id){if(!el(id))return false;showTab(rowTab(id));el(id).click();return SHEET.tool},
+  pin:function(){return pinInView()},pinLast:function(){return PIN_LAST},pinDbg:function(){return PIN_DBG}}}catch(e){}
+
 function setChip(id,icon,label,on){
   var b=el(id);
   if(!b)return;
+  /* take 190 · A247 · a row keeps its label and line; the value and icon
+     change (Machine's "Dirt bike 24\"", Fuel range's "50 mi") */
+  if(SHEET_ROWS.indexOf(id)>=0){
+    var v=el(id+'-v'),i=el(id+'-i');if(v)v.innerHTML=label;if(i)i.innerHTML=ic(icon);return}
   b.innerHTML=ic(icon)+'<span>'+label+'</span>';
   /* The app already tests classes with indexOf on className everywhere else;
      using classList here would have added an API to the harness stub for a
@@ -3745,10 +4181,10 @@ function homeCard(prefix){
       if(w==='tap'){arm='home';syncArm();return show('Tap the map to place <b>home</b>.','')}
       if(w==='clear'){HOME=null;homeSave();homeMark();clearRoute();syncSafety();
         return ack('<b>Home cleared.</b>')}
-      if(w==='addr'){arm='homeaddr';syncArm();
-        try{el('srch').className='on';el('c-search').className='chip on';el('q').value='';el('q').focus()}catch(e){}
-        return show('Type the address — a number and a street, like <b>4952 S Branch Rd</b>. '+
-          'The hit you tap becomes home.','')}
+      if(w==='addr'){try{el('q').value=''}catch(e){}
+        searchOpen({from:'home',note:'Type the address \u2014 a number and a street, like <b>4952 S Branch Rd</b>. '+
+          'The hit you tap becomes home.'});
+        arm='homeaddr';syncArm();return}
       /* my location: one fix through the watch that demonstrably works */
       show('Waiting for a GPS fix…','');
       locateOnce(function(at,why){
@@ -3762,37 +4198,73 @@ el('c-home').addEventListener('click',function(){
   if(arm==='home'||arm==='homeaddr'){arm=null;syncArm();return ack('Cancelled.')}
   homeCard('')});
 el('c-me').addEventListener('click',function(){
+  if(arm!=='me'&&meDriven()){logAct('act  start from my position refused: gps');return show(ME_DRIVEN,'')}
   arm=arm==='me'?null:'me';syncArm();
   if(arm)show("Tap the map to place <b>where you are</b>.",'');else ack('Cancelled.')});
-function syncArm(){el('c-home').className='chip'+((arm==='home'||arm==='homeaddr')?' arm':'');
-  el('c-me').className='chip'+(arm==='me'?' arm':'')}
+function syncArm(){el('c-home').className='srow'+((arm==='home'||arm==='homeaddr')?' arm':'');
+  el('c-me').className='srow'+(arm==='me'?' arm':'')}
 
 el('c-saved').addEventListener('click',function(){
   logAct('act  saved routes');buildSavedPanel()});
 
-el('c-machine').addEventListener('click',function(){
-  /* take 149 · in Water the chip cycles craft, not machines (A165) */
-  if(mode==='water'){
-    var wi=(WORDER.indexOf(machine)+1)%WORDER.length;
-    machine=WORDER[wi];waterCraft=machine;
-    setChip('c-machine',MACHINE[machine].ic,MACHINE[machine].lbl);
-    show('Craft set to <b>'+MACHINE[machine].lbl+
-      '</b>. Float times on the river cards use it.','');
-    return}
-  machIdx=(machIdx+1)%ORDER.length;machine=ORDER[machIdx];_legalMemo={};
-  setChip('c-machine',MACHINE[machine].ic,MACHINE[machine].lbl);
+/* take 190 · A249 · Your machine (artboard 14): the seven as rows, the chosen
+   one marked; a tap picks (take 149's chip cycled, one tap per machine).
+   Picking a land machine applies its legality and clears a route planned
+   for another (take 188 · F1), saying so above the list in the words a mode
+   change uses; in Water a craft changes the float times and clears nothing.
+   A row of the other family (a craft in a land mode, a land machine in
+   Water) is refused by key, with where it is used — not `disabled`, which
+   smoke's DOM does not parse (plan190 §3 item 5). */
+var MACH_ROWS=ORDER.concat(WORDER);
+function machCard(note){
+  var water=mode==='water';
+  var rows=MACH_ROWS.map(function(k){var M=MACHINE[k],craft=!!M.mph,off=craft!==water,on=k===machine;
+    return '<button class="srow'+(on?' on':'')+(off?' off':'')+'" data-mach="'+k+'" aria-pressed="'+on+'">'+
+      '<span class="sr-i">'+ic(M.ic)+'</span><span class="sr-t"><span class="sr-l">'+M.lbl+'</span>'+
+      (off?'<span class="sr-s">'+(craft?'Used in Water mode':'Used in the land modes')+'</span>':'')+
+      '</span></button>'}).join('');
+  toolShow('c-machine',(note?'<div class="mnote" id="mach-note">'+note+'</div>':'')+
+    '<div class="sub">'+(water?'Float times on the river cards use the craft you pick.'
+      :'Routing follows what is legal for it, and lines too narrow for it fade \u2014 still real trails, just not yours today.')+
+    '</div><div class="sbox">'+rows+'</div>','');
+  Array.prototype.forEach.call(document.querySelectorAll('[data-mach]'),function(b){
+    b.addEventListener('click',function(){machPick(b.dataset.mach)})})}
+function machPick(k){
+  var M=MACHINE[k];if(!M)return;
+  var water=mode==='water',craft=!!M.mph;
+  if(craft!==water){logAct('act  machine refused '+k);
+    return machCard('<b>'+M.lbl+'</b> is used '+(craft?'in Water mode':'in the land modes')+
+      ' \u2014 change the mode first.')}
+  if(k===machine)return machCard('');
+  logAct('act  machine '+k);
+  if(water){machine=k;waterCraft=k;setChip('c-machine',M.ic,M.lbl);
+    return machCard('Craft set to <b>'+M.lbl+'</b>. Float times on the river cards use it.')}
+  var was=machine,had=!!last;
+  machIdx=ORDER.indexOf(k);machine=k;_legalMemo={};
+  setChip('c-machine',M.ic,M.lbl);
   applyMachine();
   var no=machineIllegal();
-  clearRoute();show('Machine set to <b>'+MACHINE[machine].lbl+
-   '</b>. Routing respects what is legal for it, and the map now shows it: '+
-   (no.length?'<b>'+no.length+'</b> kind'+(no.length>1?'s':'')+' of line faded '+
-     'because they are too narrow for it. They are still real trails \u2014 just '+
-     'not yours today.':'nothing on this map is off limits for it.'),'')});
+  clearRoute();
+  machCard(had?'Route cleared \u2014 it was planned for '+MACHINE[was].lbl+'. Plan it again for '+M.lbl+'.'
+    :'Machine set to <b>'+M.lbl+'</b>. '+(no.length?'<b>'+no.length+'</b> kind'+(no.length>1?'s':'')+
+      ' of line faded because they are too narrow for it.':'Nothing on this map is off limits for it.'))}
+el('c-machine').addEventListener('click',function(){logAct('act  machine picker');machCard('')});
 
-var FUELS=[30,50,80,120,0],fi=1;
-el('c-fuel').addEventListener('click',function(){fi=(fi+1)%FUELS.length;
-  setChip('c-fuel','fuel',FUELS[fi]?FUELS[fi]+' mi':'off');
-  if(last)renderRoutes(last)});
+/* take 190 · A250 · Fuel range (artboard 10): a stepper you can read, in the
+   row. − and + step Off, 30, 50, 80 and 120 mi and stop at the ends (120
+   never turns into Off by one tap more); the line says "Routes warn past
+   it" only while a range is set, and the sheet stays as it is */
+var FUELS=[0,30,50,80,120],fi=2;
+function fuelPaint(){var f=FUELS[fi];
+  setChip('c-fuel','fuel',f?f+' mi':'Off');
+  var t=el('c-fuel-s');if(t)t.textContent=f?'Routes warn past it':'Off \u2014 no route is checked against a tank';
+  var d=el('c-fuel-dn'),u=el('c-fuel-up');if(d)d.disabled=fi<=0;if(u)u.disabled=fi>=FUELS.length-1}
+function fuelStep(n){var j=Math.max(0,Math.min(FUELS.length-1,fi+n));if(j===fi)return;
+  fi=j;fuelPaint();logAct('act  fuel '+(FUELS[fi]?FUELS[fi]+' mi':'off'));
+  if(last)renderRoutes(last)}
+el('c-fuel-dn').addEventListener('click',function(){fuelStep(-1)});
+el('c-fuel-up').addEventListener('click',function(){fuelStep(1)});
+fuelPaint();
 
 /* ── Dijkstra ──────────────────────────────────────────────────────────── */
 /* Snap to the nearest node that has at least one edge this machine may legally
@@ -4050,7 +4522,9 @@ function guideClose(mark){
    Storage unavailable → it shows every launch, the guide's rule. */
 /* take 188 · v2: the Layers step names two basemaps (A147: the key moves with
    its content, once for the take) */
-var TOURKEY='apex.tour.v2',TOUR={on:false,i:0,steps:[]};
+/* take 190 · A263 · v3: the tour card changed (Next and Skip, the count of
+   the steps shown), so a rider who closed v2 sees it once more */
+var TOURKEY='apex.tour.v3',TOUR={on:false,i:0,steps:[],n:0,total:0};
 var TOUR_STEPS=[
   {id:'c-mode',   tab:null,   t:'What are you doing today?',
    s:'Off-road, Outdoors, Hunt, Water or Camp. A mode sets the pins, the lines and the routing for that kind of day — and everything it sets stays one tap away.'},
@@ -4076,6 +4550,11 @@ function tourStart(){
   var t=el('tour');if(!t)return false;
   TOUR.steps=TOUR_STEPS.slice();TOUR.i=-1;TOUR.on=true;t.hidden=false;
   TOUR.tab0=(typeof TAB==='string')?TAB:null;   /* hand back the tab it started on */
+  /* take 190 · A263 · "N of M" counts the steps the rider will see: a step
+     on this tab (or on none) whose chip is not drawn now is out from the
+     start; one on another tab is counted until it is skipped */
+  TOUR.n=0;TOUR.total=0;TOUR.pre={};
+  TOUR.steps.forEach(function(st){if((st.tab&&st.tab!==TOUR.tab0)||tourVisible(st.id))TOUR.total++;else TOUR.pre[st.id]=1});
   logAct('act  tour start');
   return tourNext()}
 function tourNext(){
@@ -4083,8 +4562,9 @@ function tourNext(){
   for(var i=TOUR.i+1;i<TOUR.steps.length;i++){
     var st=TOUR.steps[i];
     try{if(st.tab&&typeof showTab==='function')showTab(st.tab)}catch(e){}
-    if(!tourVisible(st.id)){logAct('tour skip '+st.id+' (hidden)');continue}
-    TOUR.i=i;tourPaint();return true}
+    if(!tourVisible(st.id)){logAct('tour skip '+st.id+' (hidden)');
+      if(!TOUR.pre[st.id])TOUR.total=Math.max(TOUR.n+1,TOUR.total-1);continue}
+    TOUR.i=i;TOUR.n++;tourPaint();return true}
   return tourClose('done')}
 function tourPaint(){
   var st=TOUR.steps[TOUR.i],c=el(st.id),ring=el('tour-ring'),card=el('tour-card');
@@ -4093,18 +4573,20 @@ function tourPaint(){
   ring.style.left=(r.left-pad)+'px';ring.style.top=(r.top-pad)+'px';
   ring.style.width=(r.width+pad*2)+'px';ring.style.height=(r.height+pad*2)+'px';
   var last=TOUR.i>=TOUR.steps.length-1;
+  /* take 190 · A263 · artboard 23: the count, the step, Next and Skip.
+     Skip is never again (Tools → Take the tour replays it); × and back are
+     not now (2026-09-30, the defaults taken). Next is no accent: the ring
+     is the screen's one (plan190 §5 item 17) */
   card.innerHTML='<button id="tour-x" aria-label="Not now">'+ic('close',18)+'</button>'+
+    '<div class="k" id="tour-n">'+TOUR.n+' of '+Math.max(TOUR.n,TOUR.total)+'</div>'+
     '<b>'+st.t+'</b><div class="sub">'+st.s+'</div>'+
     '<div id="tour-btns">'+
-      '<button class="chip" id="tour-next"><span>'+(last?'Done':'Next')+'</span></button>'+
-      '<button class="chip quiet" id="tour-notnow"><span>Not now</span></button>'+
-      '<button class="chip quiet" id="tour-never"><span>Don\u2019t show again</span></button>'+
-      '<span id="tour-n">'+(TOUR.i+1)+' of '+TOUR.steps.length+'</span></div>';
+      '<button class="chip" id="tour-next">'+(last?'':ic('next'))+'<span>'+(last?'Done':'Next')+'</span></button>'+
+      '<button class="chip quiet" id="tour-never">'+ic('close')+'<span>Skip</span></button></div>';
   /* below the chip when it sits in the top half, above it otherwise */
   if(r.top<vh/2){card.style.top=(r.bottom+pad+12)+'px';card.style.bottom='auto'}
   else{card.style.bottom=(vh-r.top+pad+12)+'px';card.style.top='auto'}
   el('tour-next').addEventListener('click',function(){tourNext()});
-  el('tour-notnow').addEventListener('click',function(){tourClose('notnow')});
   el('tour-x').addEventListener('click',function(){tourClose('notnow')});
   el('tour-never').addEventListener('click',function(){tourClose('never')});}
 function tourClose(how){
@@ -4115,6 +4597,9 @@ function tourClose(how){
   logAct('act  tour close '+how);
   return how}
 try{window.addEventListener('resize',function(){if(TOUR.on)tourPaint()})}catch(e){}
+/* take 190 · A263 · a step that changes the tab can slide the drawer: the
+   ring is placed again where the chip ends up */
+try{el('rail').addEventListener('transitionend',function(e){if(TOUR.on&&e&&e.target===el('railbody'))tourPaint()})}catch(e){}
 
 function wpLoad(){
   if(!svAvailable())return [];
@@ -4250,35 +4735,45 @@ function svPrefer(k){
     sel=i;draw(last[i],true);rcSel();
     return}}
 
+/* take 190 · A254 · Saved as rows (artboard 13). A record is a row — a tap
+   opens a route or goes to a spot, one tap as before — with Rename and
+   Delete beside it; route cards' .rc is not used (the harness reads .rc as
+   route options). Records saved in another region are counted, never
+   hidden behind "Nothing saved yet" (plan190 §3 item 7). Mark this spot
+   from here opens Mark under Saved, and the Plan tab stays marked (the
+   maintainer, 2026-10-08 item 2). */
+function svRec(attrs,icon,label,sub,ren,del){
+  var q=String(label).replace(/"/g,'&quot;');
+  return '<div class="svrec"><button class="srow"'+attrs+'><span class="sr-i">'+ic(icon)+'</span>'+
+    '<span class="sr-t"><span class="sr-l">'+label+'</span><span class="sr-s">'+sub+'</span></span></button>'+
+    '<button class="sv-x"'+ren+' aria-label="Rename '+q+'">'+ic('rename')+'</button>'+
+    '<button class="sv-x"'+del+' aria-label="Delete '+q+'">'+ic('del')+'</button></div>'}
 function buildSavedPanel(){
-  var a=svLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region});
-  var wp=wpLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region});
+  var here=function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region};
+  var A=svLoad(),W=wpLoad(),a=A.filter(here),wp=W.filter(here),away=(A.length-a.length)+(W.length-wp.length);
   if(!svAvailable())
-    return show('<b>Saved routes are unavailable here.</b> This phone would not let '+
+    return toolShow('c-saved','<b>Saved routes are unavailable here.</b> This phone would not let '+
       'the app store anything \u2014 its storage may be full or blocked.','fail');
-  if(!a.length&&!wp.length)
-    return show('<b>Nothing saved yet.</b><br>Plan a route or a loop, pick the card you want to keep, then tap '+
-      '<b>Save</b> under the route options. It is stored on this phone '+
-      'only — nothing is sent anywhere — and reopening it routes again on the '+
-      'current map, so closures stay up to date.','');
-  var h='<div id="routes">';
-  if(wp.length){
-    h+='<div class="sub" style="margin:2px 0 6px">'+wp.length+' waypoint'+
-       (wp.length===1?'':'s')+'</div>';
-    wp.forEach(function(x,i){
-      h+='<div class="rc" data-wp="'+i+'"><h5>'+ic('spot')+x.n+'</h5>'+
-         '<div class="sub">'+x.p[1].toFixed(5)+', '+x.p[0].toFixed(5)+'</div>'+
-         '<div class="sub"><button class="chip" data-wpgo="'+i+'">Go to</button> '+
-         '<button class="chip" data-wpren="'+i+'">Rename</button> '+
-         '<button class="chip" data-wpdel="'+i+'">Delete</button></div></div>'})}
-  a.forEach(function(r,i){
-    h+='<div class="rc" data-sv="'+i+'"><h5>'+r.n+'</h5>'+
-       '<div class="sub">'+(r.k==='loop'?'loop · '+r.mi+' mi target':'point to point')+
-       ' · '+((MACHINE[r.m]||{}).lbl||r.m||'')+'</div>'+
-       '<div class="sub"><button class="chip" data-svopen="'+i+'">Open</button> '+
-       '<button class="chip" data-svren="'+i+'">Rename</button> '+
-       '<button class="chip" data-svdel="'+i+'">Delete</button></div></div>'});
-  show(h+'</div>','');
+  var awayLine=away?'<div class="sub" id="sv-away">'+away+' more saved in a different region, not shown here.</div>':'';
+  var markRow='<div class="mkrow"><button class="chip" data-svto="markme">'+ic('spot')+'<span>Mark this spot</span></button></div>';
+  if(!a.length&&!wp.length){
+    toolShow('c-saved','<div class="svempty">'+ic('saved')+'</div>'+
+      '<div class="svh">'+(away?'Nothing saved for this map':'Nothing saved yet')+'</div>'+awayLine+
+      '<div class="sub">Plan a route or a loop, pick the card you want to keep, then tap <b>Save</b> under the '+
+      'route options. Marked spots land here too. It is stored on this phone only \u2014 nothing is sent '+
+      'anywhere \u2014 and reopening a route plans it again on the current map, so closures stay up to date.</div>'+
+      markRow,'');
+    return handOff('svto')}
+  var h='';
+  if(wp.length)h+='<div class="k">Marked spots \u00b7 '+wp.length+'</div><div class="sbox">'+wp.map(function(x,i){
+    return svRec(' data-wpgo="'+i+'"','spot',x.n,x.p[1].toFixed(5)+', '+x.p[0].toFixed(5),
+      ' data-wpren="'+i+'"',' data-wpdel="'+i+'"')}).join('')+'</div>';
+  if(a.length)h+='<div class="k">Routes \u00b7 '+a.length+'</div><div class="sbox">'+a.map(function(r,i){
+    return svRec(' data-svopen="'+i+'"',r.k==='loop'?'loop':'route',r.n,
+      (r.k==='loop'?'Loop \u00b7 '+r.mi+' mi target':'Point to point')+' \u00b7 '+((MACHINE[r.m]||{}).lbl||r.m||''),
+      ' data-svren="'+i+'"',' data-svdel="'+i+'"')}).join('')+'</div>';
+  toolShow('c-saved',h+awayLine+markRow,'');
+  handOff('svto');
   var bind=function(attr,fn){
     Array.prototype.forEach.call(document.querySelectorAll('['+attr+']'),function(b){
       b.addEventListener('click',function(e){
@@ -4713,19 +5208,18 @@ function renderRoutes(out,auto){
       :ra.rejoin?'Back to the loop \u00b7 '+navFmt(ra.rejoin.leg*1609.34)+' to it, '+ra.rejoin.rest.toFixed(1)+' mi of it left'+
         (bits.length?' \u00b7 '+bits.join(' \u00b7 '):'')
       :'Re-routed \u00b7 '+(bits.length?bits.join(' \u00b7 '):'the new route is on the map'))}
+  /* take 190 · review · route cards written while a sheet is up (Fuel
+     range's stepper with a route planned) go under it: the sheet stays, and
+     the cards are there when it is put away (plan190 §5 item 4: a stepper
+     must not throw the rider out of the sheet) */
+  else if(sheetKind()==='index'||sheetKind()==='tool'){var pq=el('panel');pq.innerHTML=html;pq.className='';
+    logAct('route cards written under the sheet')}
   else show(html,'');
   /* take 188 · step 13b · whole rows (a drawer still sliding open fits
      itself when it stops) */
   rcFit();
   var rr=el('rc-ride');
-  if(rr)rr.addEventListener('click',function(){
-    /* the guard: smoke's stub keeps one element per id, so listeners from
-       earlier cards pile up — only the first may start anything */
-    if(rideMode||riding)return;
-    if(last&&sel!==null&&!routeFits(last[sel]))return routeUnfitCard();
-    logAct('act  ride it (route card)');
-    RAIL_MANUAL=false;railSet(false);showTab('ride');
-    el('c-ride').click()});
+  if(rr)rr.addEventListener('click',function(){rideItGo('route card')});
   var cb2=el('btn-clear');
   if(cb2)cb2.addEventListener('click',function(){
     logAct('act  cleared route');
@@ -4882,7 +5376,7 @@ function buildIndex(){
   IDX=rows;return rows}
 
 var KRANK={address:0,place:1,river:1.5,trail:2,number:3,road:4,street:5,junction:6};
-function search(q){
+function search(q,all){
   q=q.trim().toLowerCase();if(q.length<1)return [];
   var rows=buildIndex(),out=[];
   /* a typed street address resolves to a point and leads the results */
@@ -4902,7 +5396,7 @@ function search(q){
     for(var i2=0;i2<rows.length;i2++){var r2=rows[i2];
       if(near1(qz,r2.z))out.push([5,(KRANK[r2.k]||5),r2.t.length,r2])}}
   out.sort(function(a,b){return a[0]-b[0]||a[1]-b[1]||a[2]-b[2]});
-  return out.slice(0,9).map(function(x){return x[3]})}
+  return (all?out:out.slice(0,9)).map(function(x){return x[3]})}
 
 /* Does needle occur in hay with at most one substitution, insertion or
    deletion? Bounded prefix scan; 3,353 entries per keystroke is cheap. */
@@ -4919,16 +5413,28 @@ function near1(needle,hay){
     if(i>=n&&miss<=1)return true}
   return false}
 
-function renderHits(list){
-  if(!list.length){el('hits').innerHTML=
+/* take 190 · A251 · the results as rows with their kind (artboard 11), the
+   order search() gives (no kind sections), and a count that says how many
+   matched when more than the nine shown did */
+var KIND_WORD={address:'Address',place:'Place',river:'River',trail:'Trail',number:'Trail number',
+  road:'Road',street:'Street',junction:'Junction'};
+function renderHits(all){
+  if(!all.length){el('hits').innerHTML=
     '<div class="hit">No match. Try a code like <b>TMM</b> or <b>H58</b>.</div>';return}
-  el('hits').innerHTML=list.map(function(r,i){
-    return '<div class="hit" data-i="'+i+'"><b>'+r.t+'</b><i>'+r.k+'</i></div>'}).join('');
+  var list=all.slice(0,9),n=all.length;
+  el('hits').innerHTML='<div class="k" id="hits-n">'+(n>list.length?'First '+list.length+' of '+n:n+' result'+(n===1?'':'s'))+
+    ' \u00b7 offline</div><div class="sbox">'+list.map(function(r,i){
+    return '<button class="srow hit" data-i="'+i+'"><span class="sr-t"><span class="sr-l">'+r.t+'</span>'+
+      '<span class="sr-s">'+(KIND_WORD[r.k]||r.k)+'</span></span><span class="sr-c">'+ic('next')+'</span></button>'}).join('')+'</div>';
   Array.prototype.forEach.call(document.querySelectorAll('.hit'),function(d){
     if(d.dataset.i===undefined)return;
     d.addEventListener('click',function(){
       var r=list[+d.dataset.i];if(!r)return;
-      el('srch').className='';el('c-search').className='chip';
+      /* the hit closes search; its card (or home) is what the drawer shows.
+         The address arm is kept only for a hit that becomes home: a river
+         hit has no point to set (review: it survived it, and moved the
+         start pin on the next map tap) */
+      if(SRCH.on){searchEnd('hit',r.k!=='river');sheetPaint()}
       if(r.k==='river'){
         /* take 152 · A168: a river hit fits the WHOLE river and hands you
            the run flow — not a dropped pin at its midpoint. */
@@ -4964,16 +5470,9 @@ function renderHits(list){
       placeCard(r.c,'drop',r.t)})})}
 
 el('c-search').addEventListener('click',function(){
-  var on=el('srch').className.indexOf('on')<0;
-  el('srch').className=on?'on':'';el('c-search').className='chip'+(on?' on':'');
-  if(on){el('q').focus();
-    var q0=el('q').value||'';
-    if(q0){renderHits(search(q0))}
-    else{show(jumpChipsHTML(),'');wireJumpChips(el('panel'))}}});
-el('q').addEventListener('input',function(){
-  var q=el('q').value;
-  if(!q){show(jumpChipsHTML(),'');wireJumpChips(el('panel'));return}
-  renderHits(search(q))});
+  if(SRCH.on)return searchClose('chip');
+  searchOpen({from:'map'})});
+el('q').addEventListener('input',function(){if(SRCH.on)searchPaint()});
 
 /* ══ DIRECTIONS ═════════════════════════════════════════════════════════════
    A blue line is not an instruction. Someone who is lost and tired needs words
@@ -5033,8 +5532,35 @@ el('btn-steps').addEventListener('click',function(){
       (at>0.05?'<div class="at">at '+at.toFixed(1)+' mi</div>':'')+
       '</div></div>'});
   html+='</div>';
+  var ride=!rideMode&&!riding;
   show('<span class="tn">'+steps.length+' steps · '+tot.toFixed(1)+
-    ' mi</span><span class="meta">'+last[sel].h+'</span>'+html,'')})
+    ' mi</span><span class="meta">'+last[sel].h+'</span>'+html+
+    '<div class="stfoot" id="st-foot"><div class="sub" id="st-more" hidden></div>'+
+    (ride?'<button class="chip primary" id="st-ride">'+ic('ride')+'<span>Ride it</span></button>':'')+'</div>','');
+  stMore();
+  /* Ride it here is the route cards' Ride it: one handler, one guard */
+  var sr=el('st-ride');
+  if(sr)sr.addEventListener('click',function(){rideItGo('turns')})})
+/* Ride it, from the route cards or Turns: the Ride tab's own Start.
+   The guard: smoke's stub keeps one element per id, so listeners from
+   earlier cards pile up — only the first may start anything */
+function rideItGo(from){
+  if(rideMode||riding)return;
+  if(last&&sel!==null&&!routeFits(last[sel]))return routeUnfitCard();
+  logAct('act  ride it ('+from+')');
+  RAIL_MANUAL=false;railSet(false);showTab('ride');
+  el('c-ride').click()}
+/* "N more steps below": the steps whose top is under the pinned foot */
+function stMore(){try{
+  var m=el('st-more'),f=el('st-foot'),b=el('railbody');if(!m||!f||!b)return;
+  var lim=f.getBoundingClientRect().top,n=0;
+  Array.prototype.forEach.call(document.querySelectorAll('#steps .st'),function(x){
+    if(x.getBoundingClientRect().top>=lim-1)n++});
+  var bh=b.getBoundingClientRect().height;
+  if(!(bh>0)||!(lim>0))n=0;
+  m.hidden=!n;m.textContent=n?n+' more step'+(n===1?'':'s')+' below':''}catch(e){}}
+try{el('railbody').addEventListener('scroll',stMore)}catch(e){}
+try{el('rail').addEventListener('transitionend',function(e){if(e&&e.target===el('railbody'))stMore()})}catch(e){}
 
 /* ══ BASEMAP ════════════════════════════════════════════════════════════════
    PROTOCOL §8 as revised at take 10: provisioning may use the network, the
@@ -5868,6 +6394,15 @@ function ridePublish(){try{
   low=Math.max(low,s0+h);
   var alr=el('alert');
   if(alr&&/\bon\b/.test(alr.className)){var ar=alr.getBoundingClientRect();if(ar.height>0)low=Math.max(low,ar.bottom)}
+  /* take 190 · A247 · the floating panels stop under the off-route alert too:
+     it is drawn over them (the one overlay allowed there), and at 360 x 800
+     the compass grew up under it, its new close and its dial's top beneath
+     a safety message (render, devices). The room is the alert's reach below
+     the ride block, and 0 while it is down */
+  { var alertRoom=0;if(alr&&/\bon\b/.test(alr.className)){var ar2=alr.getBoundingClientRect();
+      if(ar2.height>0)alertRoom=Math.max(0,Math.ceil(ar2.bottom-(s0+h)))}
+    var amv=alertRoom?alertRoom+'px':'';
+    if(de.style.getPropertyValue('--alert-room')!==amv){if(amv)de.style.setProperty('--alert-room',amv);else de.style.removeProperty('--alert-room')}}
   /* the drawer's body and the sheet move together, one for one: every px
      the body grows lifts the sheet by a px. So the room is read off the
      page as it stands — the body's height now plus the gap now between the
@@ -6240,7 +6775,8 @@ function stopRide(){if(riding){clearInterval(riding);riding=null;
 function rideFlag(){try{var s=el('shell');if(!s)return;
   /* take 188 · step 13b · the route card's Ride it goes however the ride
      began — the simulator is started by its test hook now, not c-ride */
-  if(rideMode||riding){s.dataset.ride='1';var rr=el('rc-ride');if(rr)rr.hidden=true}
+  if(rideMode||riding){s.dataset.ride='1';var rr=el('rc-ride');if(rr)rr.hidden=true;
+    var rt=el('rt-start');if(rt)rt.hidden=true}
   else delete s.dataset.ride}catch(e){}
   /* the flag hides the Map tab's chips and the columns: the strip and the
      ride block are measured again */
@@ -6837,14 +7373,29 @@ function meOnFix(){return posMode==='gps'&&!!ME_FIX&&!!ME&&ME[0]===ME_FIX.at[0]&
    fix while a new ride waits for its first (navStart zeroes FIX_T, so
    FIX_T cannot answer this). */
 function liveFix(){
-  if(!meOnFix()||Date.now()-ME_FIX.t>GPS_STALE_MS)return null;
-  return {at:ME_FIX.at.slice(),t:ME_FIX.t,age:Date.now()-ME_FIX.t}}
+  /* take 190 · A260 · a fix stamped AHEAD of the clock (the clock was set
+     back after it arrived) has an unknown age, not a small one: it is not
+     live. Smoke found one 1.8 h ahead read as live, which would have let
+     Mark this spot mark an old position as fresh (landmine 252) */
+  var age=meOnFix()?Date.now()-ME_FIX.t:-1;
+  if(!meOnFix()||age<0||age>GPS_STALE_MS)return null;
+  return {at:ME_FIX.at.slice(),t:ME_FIX.t,age:age}}
 /* the clock time of the fix ME holds (ME_FIX.t: FIX_T is the ride's, which
    a one-shot locate never sets and navStart zeroes) */
 function meClock(){try{return new Date(ME_FIX.t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
   catch(e){return 'time unknown'}}
 /* what ME is, for the words that name it: 'you' only from a live fix;
    'last' when ME is a fix gone stale */
+/* take 190 · the start pin is GPS-driven while a watch is open — a ride, or a
+   one-shot locate still waiting (Locate's, Mark's or Home's): the next fix in
+   the region moves it, so neither Start from my position nor a place card's
+   Start from here places it by hand. The predicate is the watch, not the
+   fix's age: a 40 s old fix with a watch open is still about to move it (the
+   maintainer, 2026-10-03 (a); the words without the bracket, 2026-10-08
+   item 3) */
+function meDriven(){return posMode==='gps'&&(watchId!==null||LOCATE_N>0)}
+var ME_DRIVEN='<b>GPS is on</b> \u2014 the next fix in the region moves the start pin to where you are, '+
+  'so it cannot be placed by hand.';
 function meIs(){return liveFix()?'you':meOnFix()?'last':posMode==='sim'?'sim':posMode==='away'?'away':'pin'}
 /* the ONE table of words for the point every place card measures from:
    placeDist ("of …") and placeCard ("from …"); own=true reads "your
@@ -7058,6 +7609,7 @@ el('c-ride').addEventListener('click',function(){
      ride began (this chip, Ride it, Navigate this run, Resume): a live
      button that could no longer start anything would be a lie */
   var rr=el('rc-ride');if(rr)rr.hidden=true;
+  var rt0=el('rt-start');if(rt0)rt0.hidden=true;
   /* take 188 · A223 · refuse, once per press: the plugin may report the
      error inside gpsStart (a throw) and then hand back no driver */
   GPS_REFUSED=false;
@@ -7298,10 +7850,18 @@ function hdMB(mb){return mb<1?'under 1 MB':'about '+Math.round(mb)+' MB'}
 function hdCard(confirmId){
   var conf=typeof confirmId==='string'?confirmId:null;
   var tiers=hdTiers(),pr=HDDL.progress();
+  /* take 190 · A247 · the card is written after a storage read (a promise), by
+     which time a sheet row's pending mark is gone: whether it belongs in the
+     sheet is decided NOW, and honoured when it is written if the rider is
+     still there (the tool up, or its first open from the index) */
+  var inSheet=SHEET.tab&&(SHEET_PENDING==='c-hdmanage'||SHEET.tool==='c-hdmanage'),sTab=SHEET.tab;
   Promise.all([HD.stats(),HDDL.quota()]).then(function(res){
     var st=res[0],q=res[1],busy=HDDL.busy();
-    var h='<b>HD imagery</b>'+
-      '<div class="sub">Sharper satellite for places you choose. Nothing downloads on its own.</div>';
+    /* take 190 · A259 · artboard 18: the three tiers as cards — name, tiles
+       and size, the note, and its own Save, with no accent (saves stay
+       deliberate, read4); the logic of what may be saved is unchanged */
+    var h=(inSheet?'':'<b>HD imagery</b>')+
+      '<div class="sub">Sharper satellite for places you choose. Nothing downloads on its own \u2014 save on wifi.</div>';
     if(pr){
       var left=pr.eta==null?'':(pr.eta<60?' · under a minute left':' · about '+Math.ceil(pr.eta/60)+' min left');
       h+='<div class="k">DOWNLOADING '+String(pr.label).toUpperCase()+'</div><div class="sub">'+
@@ -7310,20 +7870,22 @@ function hdCard(confirmId){
         '<button class="chip" id="hd-stop">'+ic('stopdl')+'<span>Stop downloading</span></button>'}
     for(var i=0;i<tiers.length;i++){
       var t=tiers[i],big=t.id==='view'&&t.mb>500,fits=!q.known||q.free>=t.mb*1048576*1.2;
-      h+='<div class="k">'+t.name+'</div><div class="sub">'+(t.n?t.n.toLocaleString()+' tiles · '+hdMB(t.mb)+
+      h+='<div class="hdtier"><div class="hdt-n">'+t.label.charAt(0).toUpperCase()+t.label.slice(1)+'</div><div class="sub">'+(t.n?t.n.toLocaleString()+' tiles · '+hdMB(t.mb)+
         (t.note?' · '+t.note:'')+(big?' — zoom in to a smaller area to save':''):'already sharp here — built in or saved, nothing to download')+'</div>';
-      if(busy||big||!t.n)continue;
+      if(busy||big||!t.n){h+='</div>';continue}
       if(!fits){h+='<div class="sub">Not enough space: needs '+hdMB(t.mb*1.2)+', the phone allows '+
-        hdMB(q.free/1048576)+'</div>';continue}
+        hdMB(q.free/1048576)+'</div></div>';continue}
       if(t.confirm&&conf===t.id){
         h+='<div class="sub">'+hdMB(t.mb)+' and '+t.n.toLocaleString()+' tiles. The screen stays on until it finishes; Stop keeps what landed.</div>'+
           '<button class="chip" id="hd-go-'+t.id+'">'+ic('hd')+'<span>Yes, save the whole state</span></button>'+
           '<button class="chip" id="hd-no">'+ic('close')+'<span>Not now</span></button>'}
-      else h+='<button class="chip" id="hd-'+(t.confirm?'ask-':'go-')+t.id+'">'+ic('hd')+'<span>'+t.btn+'</span></button>'}
+      else h+='<button class="chip" id="hd-'+(t.confirm?'ask-':'go-')+t.id+'">'+ic('hd')+'<span>'+t.btn+'</span></button>';
+      h+='</div>'}
     if(!q.known)h+='<div class="sub">This phone does not say how much space it allows — a save stops itself if space runs out, and keeps what landed.</div>';
     h+='<div class="k">SAVED ON THIS PHONE</div><div class="sub">'+st.tiles.toLocaleString()+
         ' tiles · '+(st.bytes/1048576).toFixed(1)+' MB</div>'+
       (st.tiles?'<button class="chip" id="hd-del">'+ic('del')+'<span>Delete all saved HD</span></button>':'');
+    if(inSheet&&SHEET.tab===sTab&&(SHEET.tool==='c-hdmanage'||(SHEET.tool===null&&!SHEET_PENDING)))SHEET_PENDING='c-hdmanage';
     show(h);
     tiers.forEach(function(t){
       var g=el('hd-go-'+t.id);if(g)g.addEventListener('click',function(){startHDSave(t.tiles,t.label);hdCard()});
@@ -7336,7 +7898,10 @@ function hdCard(confirmId){
       HDDL.stop();
       setTimeout(function(){HD.clear().then(function(){refreshSat();hdChip();hdCard()})},350)});
   })}
-el('c-hd').addEventListener('click',hdCard);
+/* take 190 · A259 · the map's HD button opens HD imagery under Tools, and back
+   folds the sheet (plan190 §4) — the same card, in the sheet */
+el('c-hd').addEventListener('click',function(){
+  logAct('tap  c-hd');showTab('tools');el('c-hdmanage').click();SHEET.parent='(fold)'});
 el('c-hdmanage').addEventListener('click',hdCard);
 /* take 167 · Play rejected build 166 under the Misleading Claims policy: an
    app presenting government information must name the official source with a
@@ -7355,27 +7920,41 @@ var SOURCES=[
    'https://apps.nationalmap.gov/downloader/'],
   ['USGS Water Services','Live river gauge readings',
    'https://waterdata.usgs.gov'],
+  /* take 190 · A257 · the maintainer, 2026-10-02: the Census Bureau's TIGER
+     data (tools/address.py, tools/context.py) */
+  ['U.S. Census Bureau','The state outline, county lines and the address ranges behind addresses (TIGER)',
+   'https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html']];
+/* take 190 · A257 · not agencies (the maintainer, 2026-10-08: OpenStreetMap
+   out from under "These agencies are the authority"; the elevation tiles
+   with it, 2026-10-02 — tools/terrain.py fetches them) */
+var SOURCES_OTHER=[
   ['OpenStreetMap contributors','Roads, places and context, under ODbL',
-   'https://www.openstreetmap.org/copyright']];
+   'https://www.openstreetmap.org/copyright'],
+  ['AWS Terrain Tiles','Elevation for climbs, profiles and hillshade (USGS 3DEP over the U.S.)',
+   'https://registry.opendata.aws/terrain-tiles/']];
+function srcRows(list){return '<div class="sbox">'+list.map(function(r){
+  return srowHTML({tag:'a',attrs:' href="'+r[2]+'" target="_blank" rel="noopener"',icon:'sources',label:r[0],sub:r[1],trail:'external'})}).join('')+'</div>'}
 /* take 181 · A195 · the policy Play requires inside the app as well as on the
    listing. The Pages URL is the maintainer's to give; the row draws only
    when this is set. */
 var PRIVACY_URL='https://sergeantcs2.github.io/apex-orv/privacy.html';
 function sourcesCard(){
   logAct('tap  data sources');
-  show('<b>Where the data comes from</b>'+
-    '<div class="sub">APEX ORV is an <b>independent app</b>. It is not '+
+  /* take 190 · A257 · artboard 21: the independence notice first, in its
+     own box; the agencies as rows that open their site; then the data that
+     is not an agency's; then the software and type notices, whole (the
+     licences ask for them; the board's one-line summary is not built) */
+  show('<div class="srcnote">APEX ORV is an <b>independent app</b>. It is not '+
     'affiliated with, endorsed by, or acting on behalf of the State of '+
     'Michigan, the Michigan Department of Natural Resources, the U.S. Forest '+
     'Service, the U.S. Geological Survey, or any other government agency.</div>'+
     '<div class="k">OFFICIAL SOURCES</div>'+
     '<div class="sub">These agencies are the authority; this app is a '+
     'convenience. Check the official source, and the signs on the ground, '+
-    'before you ride.</div>'+
-    '<div class="sub">'+SOURCES.map(function(r){
-      return '<b>'+r[0]+'</b><br>'+r[1]+'<br><a href="'+r[2]+
-        '" target="_blank" rel="noopener" style="color:var(--link)">'+r[2]+'</a>'
-      }).join('<br><br>')+'</div>'+
+    'before you ride.</div>'+srcRows(SOURCES)+
+    '<div class="k">OTHER DATA</div>'+
+    '<div class="sub">Not agencies: OpenStreetMap is mapped by its contributors, and '+
+    'AWS Terrain Tiles host elevation drawn from public surveys.</div>'+srcRows(SOURCES_OTHER)+
     /* take 188 · A216 · the notices the licences ask for (Lucide, Barlow,
        MapLibre GL JS, Capacitor); the full texts ship in www/licenses.txt.
        No URL here (tools/gate.py check_licences) */
@@ -7462,14 +8041,18 @@ function backOpen(){
   if(TOUR.on)return 'tour';
   if(panelOpen())return 'panel';
   var g=el('guide');if(g&&!g.hidden)return 'guide';
-  var sr=el('srch');if(sr&&String(sr.className).indexOf('on')>=0)return 'search';
-  var r=el('rail');if(r&&r.className!=='folded')return 'rail';
+  if(SRCH.on)return 'search';
+  var r=el('rail');
+  /* take 190 · A247 · a tool goes back to its index, an index folds */
+  if(r&&r.className!=='folded'&&SHEET.tool&&SHEET.tab)return 'sheet';
+  if(r&&r.className!=='folded')return 'rail';
   return null}
 function backClose(w){
   if(w==='tour')return tourClose('notnow');
   if(w==='panel')return panelsClose();
   if(w==='guide')return guideClose(true);
-  if(w==='search'){el('srch').className='';el('c-search').className='chip';return}
+  if(w==='search')return searchClose('back');
+  if(w==='sheet')return sheetBack();
   if(w==='rail'){RAIL_MANUAL=true;railSet(false)}}
 function onBack(){
   var w=backOpen();
@@ -7532,6 +8115,63 @@ try{window.addEventListener('resize',ridePublish)}catch(e){}
    action row appearing as a ride starts, landmine 224's ground) */
 try{el('rail').addEventListener('transitionend',ridePublish)}catch(e){}
 try{el('rail').addEventListener('transitionend',stripH)}catch(e){}
+/* take 190 · A264 · A TAPPED PIN STAYS IN VIEW. Opening the drawer shrinks
+   the map (a grid row under #stage) and MapLibre keeps the CENTRE, so a pin
+   tapped low on the screen ends up under the card about it — take 189's
+   final shot 09 (PROVEN at 360 x 800: A240's read has a pin tapped at y 24
+   end at y -47). When the drawer has finished sliding open on a card about
+   a place, the map eases ONCE, by the app (no input event, so A240's fold
+   never answers it), to put that place in the open band: 45 % down it,
+   inside a 48 px margin. Not in a sheet (its card is a tool, not a place),
+   not on a ride (the camera follows the rider), and once per place. */
+var PIN_EASED=null,PIN_LAST='',PIN_DBG=null;
+function pinInView(){return (PIN_LAST=pinWhy())}
+function pinWhy(){try{
+  var r=el('rail');
+  /* each refusal names itself, for the harness to read (PIN_LAST) */
+  if(!RAIL_AT)return 'no subject';
+  if(!r||r.className==='folded')return 'folded';
+  if(sheetKind())return 'in a sheet';
+  if(rideUp())return 'riding';
+  if(PIN_EASED===RAIL_AT)return 'eased already';
+  /* take 190 · the second review's full render: a flat offset-from-centre
+     guess was wrong on a PITCHED map (the ride's follow camera leaves 55°,
+     and nothing flattens it after the ride): the pan moved the centre 228
+     px of ground and the pin, near the top, 28. So the ease waits until
+     MapLibre has taken the drawer's final size, reads where the pin really
+     is, and moves the ground point under the target to the pin — exact at
+     any pitch and bearing. MapLibre's panBy(offset) puts the current centre
+     at the screen point centre − offset (camera.ts: panTo(center,
+     {offset: −offset})), so on a pitched map its ground shift is measured
+     BELOW the centre, where a pixel is less ground (the second full run:
+     the centre moved 0.008° for a 0.033° need). It is given the offset of
+     the point that shift starts from: the centre moved back by the shift,
+     projected. The harness's controls, which take panBy out, still bind */
+  var c=map.getContainer().getBoundingClientRect(),M=48;
+  if(!(c.height>0))return 'no size';
+  var gl=map.getCanvas().clientHeight;
+  if(Math.abs(gl-c.height)>1){try{map.once('resize',pinInViewSoon)}catch(e){}return 'waiting for the resize'}
+  var p=map.project(RAIL_AT),y=p.y,x=p.x;
+  if(y>=M&&y<=c.height-M&&x>=M&&x<=c.width-M)return 'inside';
+  PIN_EASED=RAIL_AT;
+  var tx=Math.min(Math.max(x,M),c.width-M),ty=Math.round(c.height*0.45);
+  var under=map.unproject([tx,ty]),ctr=map.getCenter(),
+      back=[ctr.lng-(RAIL_AT[0]-under.lng),ctr.lat-(RAIL_AT[1]-under.lat)],
+      q=map.project(back),o=map.project([ctr.lng,ctr.lat]);
+  /* what the ease was worked out from, for the harness's read */
+  PIN_DBG={h:Math.round(c.height),gl:Math.round(gl),y:Math.round(y),ty:ty,pitch:Math.round(map.getPitch()),
+    dy:Math.round(o.y-q.y),at:RAIL_AT.slice(),ms:Date.now()};
+  map.panBy([o.x-q.x,o.y-q.y],{duration:400,essential:true});
+  logAct('pin in view '+Math.round(y)+' -> '+ty+(map.getPitch()>1?' (pitched '+Math.round(map.getPitch())+')':''));
+  return 'eased'}catch(e){return 'threw'}}
+/* the body's max-height ends the slide (its opacity and padding end at other
+   times, and #actions has transitions of its own) */
+/* …and two frames later: MapLibre answers the stage's last size change with
+   resize() from its ResizeObserver, keeping the centre, which moves the pin
+   again after the slide has ended (render at 360 x 800: an ease measured at
+   transitionend left the pin at y -10) */
+function pinInViewSoon(){try{requestAnimationFrame(function(){requestAnimationFrame(pinInView)})}catch(e){pinInView()}}
+try{el('rail').addEventListener('transitionend',function(e){if(e&&e.target===el('railbody')&&e.propertyName==='max-height')pinInViewSoon()})}catch(e){}
 /* ══ DESTINATIONS (A113) ════════════════════════════════════════════════════
    Which chips are on screen, and nothing else. Every handler, id and DOM
    position is untouched — a chip in a closed destination is `hidden`, which the
@@ -7543,7 +8183,18 @@ try{el('rail').addEventListener('transitionend',stripH)}catch(e){}
    the thing you are looking at. */
 var TAB='map';
 function showTab(t){
+  /* take 190 · A260 · the rider left Mark this spot's wait for another tab */
+  if(MARK.stop&&t!=='plan'&&t!=='tools'&&!rideUp())markCancel();
+  /* take 190 · A252 · a tab ends search (its address arm with it) */
+  if(SRCH.on){searchEnd('tab');sheetPaint()}
+  /* take 190 · A262 · leaving the Ride tab puts the Ride card away (plan190
+     §3 item 14): its Start goes, and on Map the drawer folds */
+  var rcUp=TAB==='ride'&&t!=='ride'&&el('rt-start')&&!el('rt-start').hidden&&
+    String(el('panel').innerHTML||'').indexOf('id="rt-start"')>=0;
+  if(rcUp){el('rt-start').hidden=true;logAct('ride card put away')}
   TAB=t;
+  /* take 190 · A262 · the destination on the shell, for its CSS */
+  try{var shd=el('shell');if(shd&&shd.dataset)shd.dataset.dest=t}catch(e){}
   /* take 186 · A200 · an armed "tap the map" does not outlive the tab it was
      armed on — its highlight lives on the Plan chip and would be invisible
      elsewhere; the address arm stays, it needs the map tab's search. */
@@ -7560,6 +8211,10 @@ function showTab(t){
   var cp=el('cmppanel'); if(cp&&t!=='tools'){cp.hidden=true;CMP_ON=false}
   var lp=el('lyrpanel'); if(lp&&t!=='map')lp.hidden=true;
   var ap=el('actpanel'); if(ap&&t!=='map')ap.hidden=true;
+  /* take 190 · A247 · Plan and Tools open their sheet (a tab already open
+     goes back to its index); Map and Ride put a sheet away */
+  if(t==='plan'||t==='tools'){if(SHEET.tab!==t||SHEET.tool||el('rail').className==='folded')sheetIndex(t)}
+  else if(sheetExit()||(rcUp&&t==='map')){RAIL_MANUAL=false;railSet(false)}
   /* take 188 · A215 · the Ride tab's strip is taller (its Ride chip is a
      56 px ride control): the panels and the ride sheet read the height of
      the strip on screen, so it is measured on every switch */
@@ -7567,7 +8222,33 @@ function showTab(t){
   logAct('tap  tab '+t)}
 
 Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'),function(b){
-  b.addEventListener('click',function(){showTab(b.dataset.go)})});
+  b.addEventListener('click',function(){tabTap(b.dataset.go)})});
+/* a tap on the tab bar: the destination, and before a ride the Ride card —
+   unless route cards are the drawer's card: then their Ride it is the Ride
+   tab's Start and the cards stay (the full render: replacing them lost a
+   planned route's options, Save and Turns, to one tap on the tab) */
+function routesUp(){return String(el('panel').innerHTML||'').indexOf('id="routes"')>=0}
+function tabTap(t){showTab(t);
+  if(t==='ride'&&!rideMode&&!riding){if(routesUp()){RAIL_MANUAL=false;railSet(true)}else rideTabCard()}}
+/* take 190 · A262 · the Ride tab before a ride (artboard 22): one card,
+   "Ride from here" (or the route chosen), the truck and Retrace line, where
+   GPS is, and the one Start — Start riding, the strip's own Ride it —
+   beside Plan first. Opened by the tab bar only: the paths that start a
+   ride themselves (Ride it, the folded drawer's Ride) go straight to it, so
+   no card is left holding a Start (A217: once a ride runs its Start hides,
+   as Ride it's does) */
+function rideTabCard(){
+  var lf=liveFix(),route=(last&&sel!==null)?last[sel]:null;
+  show('<div class="k">Ride</div><div class="tn">'+(route?'Ride the route':'Ride from here')+'</div>'+
+    '<div class="sub">'+(route?'Turn by turn on <b>'+route.h+'</b>. The truck pins where you start, and <b>Retrace</b> leads you back on your own track.'
+      :'No route needed: the truck pins where you started, and <b>Retrace</b> leads you back on your own track.')+'</div>'+
+    '<div class="sub lpstart'+(lf?'':' warn')+'" id="rt-gps">'+ic('locate')+'<span>'+
+      (lf?'GPS is on \u2014 the ride starts where you are':'Waiting for GPS \u2014 the ride starts on the first fix')+'</span></div>'+
+    '<div class="mkrow"><button class="chip primary" id="rt-start">'+ic('ride')+'<span>Start riding</span></button>'+
+    '<button class="chip" id="rt-plan">'+ic('route')+'<span>Plan first</span></button></div>','');
+  el('rt-start').addEventListener('click',function(){if(rideMode||riding)return;
+    logAct('act  start riding (ride card)');el('c-ride').click()});
+  el('rt-plan').addEventListener('click',function(){logAct('act  plan first (ride card)');showTab('plan')})}
 
 el('c-howto').addEventListener('click',function(){guideShow()});
 el('c-tour').addEventListener('click',function(){logAct('tap  c-tour');tourStart()});
@@ -7577,7 +8258,19 @@ el('guide-go').addEventListener('click',function(){guideClose(true)});
 el('guide').addEventListener('click',function(e){
   if(e.target===el('guide'))guideClose(true)});
 
+/* take 190 · A258 · artboard 17: off a ride the compass opens in the Tools
+   sheet — the dial, its heading line, the bearings — with Mark this spot and
+   Set home under it; riding, it floats as take 189 built it (the maintainer,
+   2026-10-02) */
+function cmpSheetCard(){
+  CMP_WHERE='sheet';CMP_ON=true;magStart();el('diagpanel').hidden=true;
+  show('<div id="cmpsheet"></div><div class="sbox">'+
+    srowHTML({attrs:' data-cmp="markme"',icon:'spot',label:'Mark this spot',sub:'Saved on this phone, then a bearing to it here'})+
+    srowHTML({attrs:' data-cmp="home"',icon:'home',label:'Set home',sub:'Your location, an address, or a tap on the map'})+'</div>','');
+  handOff('cmp');
+  cmpPaint()}
 el('c-compass').addEventListener('click',function(){
+  if(!rideUp()){logAct('tap  c-compass');return cmpSheetCard()}
   var p=el('cmppanel');CMP_ON=p.hidden;p.hidden=!p.hidden;
   if(CMP_ON){magStart();el('diagpanel').hidden=true;cmpPaint()}
   /* take 189 · A231 · riding, an open panel changes the strip's height */
@@ -7585,18 +8278,73 @@ el('c-compass').addEventListener('click',function(){
   logAct('tap  c-compass')});
 
 /* One tap where you are, rather than long-pressing a map you may not be able to
-   see. Same store and same auto-naming as a dropped waypoint (take 92). */
-el('c-markme').addEventListener('click',function(){
-  if(!ME)return show('<b>No position yet.</b> Wait for a fix, or long-press the '+
-    'map to mark a spot by hand.','fail');
-  var nm=wpName(ME);
-  if(!wpAdd({n:nm,p:ME.slice(),r:BUNDLE.region||null,ts:Date.now()}))
-    return show('<b>Could not save.</b> This phone would not let the app store '+
+   see. Same store and same auto-naming as a dropped waypoint (take 92).
+   take 190 · A260 · artboard 19, and the maintainer, 2026-10-02: Mark this
+   spot marks a FRESH fix. A fix of GPS_STALE_MS (15 s) or newer is used at
+   once; otherwise it asks for one — "Getting a GPS fix…" with Cancel — and
+   after 30 s with none it says so and offers Try again. It never marks the
+   last fix, the start pin or a guess (take 189 marked the start pin: its !ME
+   guard was dead, ME is never empty). After a mark the map eases to z12.5
+   (2026-10-02 23:20) so the mark's name draws under the "you" marker; its
+   pin is the app's orange, not the board's green (green is an easy ORV
+   route here). The card names it, and offers a name, Done and Undo. A name
+   already used is never overwritten: the automatic one gets a number, a
+   typed one is refused. Opened from the sheet, every step stays in the
+   sheet (toolShow); a step that comes after the rider left is dropped. */
+var MARK={gen:0,stop:null,rec:null,MS:30000};
+function toolShow(id,h,s){if(SHEET.tool===id&&SHEET.tab)SHEET_PENDING=id;show(h,s)}
+function markUnique(n){var have={};wpLoad().forEach(function(x){have[x.n]=1});
+  if(!have[n])return n;for(var i=2;i<1000;i++)if(!have[n+' '+i])return n+' '+i;return n+' '+Date.now()}
+function markCancel(){MARK.gen++;if(MARK.stop){try{MARK.stop()}catch(e){}MARK.stop=null}}
+function markAt(at){
+  var nm=markUnique(wpName(at)),rec={n:nm,p:at.slice(),r:BUNDLE.region||null,ts:Date.now()};
+  if(!wpAdd(rec))
+    return toolShow('c-markme','<b>Could not save.</b> This phone would not let the app store '+
       'it \u2014 its storage may be full or blocked.','fail');
-  logAct('act  marked this spot '+nm);
-  wpDraw();
-  show('Marked <b>'+nm+'</b>.<br><span class="sub">On this phone only. '+
-    'Find it again under <b>Saved</b> on the Plan tab.</span>','pass')});
+  MARK.rec=rec;logAct('act  marked this spot '+nm);
+  wpDraw();sheetVals();
+  try{map.easeTo({center:at,zoom:Math.max(map.getZoom(),12.5),duration:600,essential:true})}catch(e){}
+  toolShow('c-markme','<div class="k">MARKED \u00b7 ON THIS PHONE ONLY</div>'+
+    '<div class="v">'+at[1].toFixed(4)+', '+at[0].toFixed(4)+'</div>'+
+    '<div class="sub">Find it again under <b>Saved</b> on the Plan tab.</div>'+
+    '<label class="sub" for="mk-name">Name (optional)</label>'+
+    '<input id="mk-name" type="text" maxlength="42" autocomplete="off" value="'+nm.replace(/"/g,'&quot;')+'">'+
+    '<div class="sub" id="mk-note"></div>'+
+    '<div class="mkrow"><button class="chip primary" id="mk-done"><span>Done</span></button>'+
+    '<button class="chip" id="mk-undo"><span>Undo</span></button></div>','pass');
+  el('mk-done').addEventListener('click',function(){
+    var v=(el('mk-name').value||'').trim();
+    if(v&&v!==rec.n){
+      if(wpLoad().some(function(x){return x.n===v})){el('mk-note').textContent='"'+v+'" is already a saved spot \u2014 pick another name.';return}
+      var a=wpLoad();a.forEach(function(x){if(x.n===rec.n&&x.ts===rec.ts)x.n=v});wpWrite(a);rec.n=v;wpDraw();
+      logAct('act  mark named '+v)}
+    MARK.rec=null;
+    if(SHEET.tool==='c-markme'&&SHEET.tab)sheetBack();else{RAIL_MANUAL=false;railSet(false)}});
+  el('mk-undo').addEventListener('click',function(){
+    var a=wpLoad().filter(function(x){return !(x.n===rec.n&&x.ts===rec.ts)});wpWrite(a);wpDraw();sheetVals();
+    MARK.rec=null;logAct('act  mark undone '+rec.n);
+    ack('<b>Mark removed.</b> Nothing is saved for that spot.')})}
+function markHere(){
+  markCancel();
+  var lf=liveFix();
+  if(lf)return markAt(lf.at);
+  var g=MARK.gen;
+  var wait=function(){
+    toolShow('c-markme','<b>Getting a GPS fix\u2026</b><div class="sub">Mark this spot uses a fresh fix '+
+      '\u2014 never your last one, the start pin or a guess.</div>'+
+      '<div class="mkrow"><button class="chip" id="mk-cancel"><span>Cancel</span></button></div>','');
+    el('mk-cancel').addEventListener('click',function(){markCancel();logAct('act  mark cancelled');
+      ack('Cancelled \u2014 nothing was marked.')})};
+  wait();
+  MARK.stop=locateOnce(function(at,why){
+    if(g!==MARK.gen)return;MARK.stop=null;
+    if(at)return markAt(at);
+    toolShow('c-markme','<b>'+(why==='none'?'This phone reports no GPS receiver.'
+      :why==='error'?'The GPS gave no fix \u2014 location may be off for this app.':'No GPS fix in 30 s.')+'</b> '+
+      'Nothing was marked.<div class="sub">Try again in the open, or long-press the map to mark a spot by hand.</div>'+
+      '<div class="mkrow"><button class="chip" id="mk-retry"><span>Try again</span></button></div>','fail');
+    el('mk-retry').addEventListener('click',function(){logAct('act  mark retry');markHere()})},MARK.MS)}
+el('c-markme').addEventListener('click',function(){logAct('tap  c-markme');markHere()});
 
 el('peek').addEventListener('click',function(){
   var folded=el('rail').className==='folded';
@@ -7604,7 +8352,12 @@ el('peek').addEventListener('click',function(){
   railSet(folded);
   logAct('tap  rail '+(folded?'open':'fold'))});
 
+/* take 190 · A247 · each floating panel's own close */
+el('cmp-x').addEventListener('click',function(){panelsClose(['cmppanel']);logAct('tap  cmp-x')});
+el('diag-x').addEventListener('click',function(){panelsClose(['diagpanel']);logAct('tap  diag-x')});
 el('c-diag').addEventListener('click',function(){
+  /* take 190 · A256 · off a ride, in the sheet; riding, the floating panel */
+  if(!rideUp()){logAct('tap  c-diag');return diagCard()}
   var p=el('diagpanel');p.hidden=!p.hidden;stripH();ridePublish();logAct('tap  c-diag')});
 
 el('c-layers').addEventListener('click',function(){
@@ -7973,8 +8726,7 @@ function placeCard(at,kind,title){
     /* take 186 · A200 · refuse only while a watch is actually running (a
        ride, or the one-shot locate still open); after locateOnce stops,
        nothing follows the pin and moving it by hand is legitimate planning. */
-    if(posMode==='gps'&&(watchId!==null||LOCATE_N>0))return show('A live GPS fix is driving your position — '+
-      'the start pin follows you and cannot be moved by hand.','');
+    if(meDriven())return show(ME_DRIVEN,'');
     ME=at.slice();mM.setLngLat(ME);paint();syncSafety();clearRoute();
     if(kind==='drop')clearDrop();
     show('<b>Start is here now.</b> The start pin holds this spot and routes measure '+
@@ -8030,7 +8782,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.headingNow=headingNow;window.railSet=railSet;window.railFoldIfAway=railFoldIfAway;
     window.cmpFit=cmpFit;   /* take 189 · cold audit r2 · render's cap read */
     window.guideShow=guideShow;window.guideClose=guideClose;
-    window.showQuiet=showQuiet;
+    window.showQuiet=showQuiet;window.show=show;
     window.railState=function(){var b=el('railbody');
       return{folded:el('rail').className==='folded',
              h:b?Math.round(b.getBoundingClientRect().height):-1}};
@@ -8106,7 +8858,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         craft:function(){return machine}};
       window.__gauge=GAUGE;
       window.__gauges=(typeof GAUGES!=='undefined')?GAUGES:null;
-      window.__search=function(q){return search(q)};
+      window.__search=function(q,all){return all?searchAll(q):search(q)};
       window.__voice=VOICE;window.__say=navSay;window.__voiceProbe=navVoiceProbe;
       window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,
         /* take 188 · A217 · the simulator, driven directly (landmine 111): a
@@ -9022,15 +9774,33 @@ function selfTest(opts,done){
     stGps(function(){finish()})})})});
 }
 try{window.__selfTest=selfTest}catch(e){}
-el('c-loop').addEventListener('click',function(){
-  show('<b>Loop from here</b> — a ride that ends where it starts, on legal line '+
-    'for a '+MACHINE[machine].lbl+'.<br>'+
-    '<div style="margin-top:8px">'+LOOP_CHOICES.map(function(m){
-      return '<button class="chip" data-loop="'+m+'">'+m+' mi</button>'}).join(' ')+
-    '</div>','');
-  Array.prototype.forEach.call(document.querySelectorAll('[data-loop]'),function(b){
+/* take 190 · A253 · Loop from here (artboard 12): pick a distance, then Find
+   (a distance tap only chooses). The start line tells the truth: a loop
+   starts at the start pin (nearestNode(ME)), so it says what the pin is now
+   (meIs) — never "the map centre", the board's line (plan190 §5 item 7) */
+var LOOP_PICK=null;
+function loopStart(){var w=meIs();
+  return w==='you'?'Starts where you are':w==='last'?'Starts at your last GPS fix ('+meClock()+')':
+    w==='sim'?'Starts at the simulated position':w==='away'?'Starts at the planning start \u2014 you are off this map':
+    meDriven()?'Starts at the start pin \u2014 GPS is on, so the next fix moves it':
+    'Starts at the start pin \u2014 move it with Start from my position'}
+function loopCard(){
+  var cur=LOOP_PICK===null?LOOP_MI:LOOP_PICK;LOOP_PICK=cur;
+  toolShow('c-loop','<div class="sub">A ride that ends where it starts, on legal line for your '+
+    MACHINE[machine].lbl+'.</div><div class="k">How far</div><div class="lpd">'+
+    LOOP_CHOICES.map(function(m){return '<button class="chip'+(m===cur?' on':'')+'" data-loop="'+m+'"><span>'+m+' mi</span></button>'}).join('')+
+    '</div><div class="sub lpstart'+(meIs()==='you'?'':' warn')+'" id="lp-start">'+ic('start')+'<span>'+loopStart()+'</span></div>'+
+    '<div class="mkrow"><button class="chip primary" id="lp-find">'+ic('loop')+'<span id="lp-find-t">Find '+cur+' mi loops</span></button></div>','');
+  var picks=document.querySelectorAll('[data-loop]');
+  Array.prototype.forEach.call(picks,function(b){
     b.addEventListener('click',function(){
-      var want=+b.dataset.loop;LOOP_MI=want;
+      LOOP_PICK=+b.dataset.loop;logAct('act  loop pick '+LOOP_PICK+' mi');
+      Array.prototype.forEach.call(picks,function(c){c.className='chip'+(c===b?' on':'')});
+      var t=el('lp-find-t');if(t)t.textContent='Find '+LOOP_PICK+' mi loops'})});
+  el('lp-find').addEventListener('click',function(){loopFind(LOOP_PICK)})}
+el('c-loop').addEventListener('click',function(){loopCard()});
+function loopFind(want){
+      LOOP_MI=want;
       logAct('act  loop '+want+' mi');
       show('Building a '+want+' mi loop…','');
       setTimeout(function(){
@@ -9051,7 +9821,7 @@ el('c-loop').addEventListener('click',function(){
           o.h+=' · '+o.s.mi.toFixed(1)+' mi';
           if(o.repeat>0.25)o.h+=' \u00b7 '+Math.round(o.repeat*100)+'% ridden twice'});
         logAct('loop '+out.length+' options, '+out[0].s.mi.toFixed(1)+' mi');
-        presentRoutes(out)},30)})})});
+        presentRoutes(out)},30)}
 
 el('c-selftest').addEventListener('click',function(){
   setChip('c-selftest','selftest','Running…');
@@ -9424,7 +10194,10 @@ map.on('load',function(){makeBadges();setBasemap(bmi);wpDraw();showTab('map');
    nothing (take 27 field report). Knowing early costs one fix and changes the
    whole first screen. */
 var YOU=null,YOU_T=0,youM=null,LOCATE_N=0,LOCATE_MS=25000;
-function locateOnce(cb){
+function locateOnce(cb,ms){
+  /* take 190 · A260 · a caller may give its own limit (Mark this spot: 30 s,
+     the maintainer, 2026-10-02); the rest keep 25 s */
+  ms=ms||LOCATE_MS;
   /* Take 30 used getCurrentPosition with enableHighAccuracy:false and a 10s
      timeout. On the Fold it never produced a fix — the self-test reported
      posMode=none while its OWN watch got one in 1.0s at +/-17m. So: use the same
@@ -9446,7 +10219,7 @@ function locateOnce(cb){
   h=gpsWatch(function(at){
     if(done)return; done=true;
     fin();handle(at,null);
-  },function(){ if(!done){done=true; fin(); if(cb)try{cb(null,'error')}catch(e){}} },LOCATE_MS);
+  },function(){ if(!done){done=true; fin(); if(cb)try{cb(null,'error')}catch(e){}} },ms);
   if(!h){if(done)return;if(cb)try{cb(null,'none')}catch(e){};return}   /* no receiver at all: say so, not "no fix" */
   /* (a driver that answered inside gpsWatch, before the handle existed,
      left nothing for fin to close: close it here) */
@@ -9454,7 +10227,10 @@ function locateOnce(cb){
   /* Give up quietly after 25s rather than holding the receiver open — and
      tell a caller that asked (take 186: Set home → my location). */
   setTimeout(function(){ if(!done){done=true; fin();
-    if(cb)try{cb(null,'timeout')}catch(e){} } },LOCATE_MS);}
+    if(cb)try{cb(null,'timeout')}catch(e){} } },ms);
+  /* take 190 · A260 · a caller that gives up early (Mark's Cancel) closes the
+     watch through the same driver */
+  return function(){if(!done){done=true;fin()}}}
 
 function showAway(acc){
   showQuiet('<b>You are about '+Math.round(awayMi)+' mi from '+(BUNDLE.name||'this region')+
@@ -9747,6 +10523,10 @@ function railSet(open,at){
   }else{
     RAIL_AT=null;
     r.className='folded';
+    /* take 190 · A247 · every fold ends the sheet, and from Plan or Tools
+       lands on Map — unless a Tools panel is open or a map tap is armed */
+    sheetExit();
+    if(!SHEET_KEEP&&(TAB==='plan'||TAB==='tools')&&!arm&&!panelOpen(['cmppanel','diagpanel']))showTab('map');
   }
   var t=el('peek-txt');
   if(t)t.textContent=open?railPeekText():
@@ -9754,7 +10534,7 @@ function railSet(open,at){
   sheetH();
   /* take 188 · step 13b · the route cards' whole rows (a slide fits them
      when it ends; with reduced motion there is no slide to wait for) */
-  rcFit()}
+  rcFit();sheetCap()}
 
 function railFoldIfAway(e){
   /* Pan far enough that the thing the card is about has left the screen and the
@@ -9789,6 +10569,7 @@ function cardHTML(h,s){show(h,s)}
    quiet=true sets the content and a peek summary and leaves the fold alone —
    the full text is one handle-tap away. */
 function showQuiet(h,peekLine){
+  sheetExit();   /* take 190 · A247 · a status card ends a sheet */
   var p=el('panel');p.innerHTML=h;p.className='';
   var t=el('peek-txt');
   if(t&&peekLine)t.textContent=peekLine;}
@@ -9814,6 +10595,10 @@ function rideCard(h,s,peekLine){
   show(h,s)}
 
 function show(h,s){
+  /* take 190 · A247 · the card a sheet row asked for opens inside the sheet,
+     under the back row; any other card ends the sheet (the tab stays marked) */
+  if(SHEET_PENDING&&SHEET.tab){SHEET.tool=SHEET_PENDING;SHEET_PENDING=null;sheetPaint()}
+  else sheetExit();
   var p=el('panel');p.innerHTML=h;
   /* Restart the animation on every card. Setting the class alone does nothing
      when it is already there — the browser will not replay an animation for an
@@ -9825,7 +10610,10 @@ function show(h,s){
   /* Every card in the app goes through here — place cards, route options,
      search hits, the self-test, dispatch. One hook, so a new card cannot forget
      to open the rail (landmine 107's shape applied to behaviour). */
-  RAIL_MANUAL=false;railSet(true);}
+  RAIL_MANUAL=false;railSet(true);
+  /* take 190 · A264 · a reduced-motion phone slides nothing, so no
+     transitionend comes: check once the drawer has had its frame */
+  try{if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)setTimeout(pinInViewSoon,60)}catch(e){}}
 
 var geo=new maplibregl.GeolocateControl({positionOptions:{enableHighAccuracy:true},
   trackUserLocation:true,showAccuracyCircle:true});
@@ -9848,7 +10636,7 @@ el('c-locate').addEventListener('click',function(){
         'moved since. Try again in the open.','')})}
   locateOnce();
   setTimeout(function(){if(!flyToYou())geo.trigger()},1200)});
-geo.on('error',function(){show('Location unavailable — this phone did not give a position (location permission off, or no fix yet). Place yourself by hand with <b>I&#39;m here</b> on the Plan tab.','fail')});
+geo.on('error',function(){show('Location unavailable — this phone did not give a position (location permission off, or no fix yet). Place yourself by hand with <b>Start from my position</b> on the Plan tab.','fail')});
 
 /* ── THE PLACE STRIP FOLDS INTO SEARCH (take 113) ─────────────────────────
    Neither reference keeps a permanent row of place pills eating the top of the
@@ -9859,15 +10647,20 @@ geo.on('error',function(){show('Location unavailable — this phone did not give
 el('chips').innerHTML='';
 el('chips').style.display='none';
 function jumpChipsHTML(){
-  return '<div class="sub" style="margin:2px 0 7px">Jump to</div>'+
+  return '<div class="k">Jump to a place</div>'+
     PLACES.map(function(p,i){
-      return '<button class="chip" data-jump="'+i+'" style="margin:0 6px 6px 0">'+
-        p[0]+'</button>'}).join('')}
-function wireJumpChips(root){
-  Array.prototype.forEach.call(root.querySelectorAll('[data-jump]'),function(c){
+      return '<button class="chip" data-jump="'+i+'"><span>'+p[0]+'</span></button>'}).join('')}
+/* the chips are found by attribute in the document, as the loop chooser's
+   and Saved's are (smoke's DOM answers [data-x] only there — an element's
+   own query read classes, so take 189's jumps were never executed) */
+function wireJumpChips(){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-jump]'),function(c){
     c.addEventListener('click',function(){var p=PLACES[+c.dataset.jump];
+      logAct('act  jump '+p[0]);
       map.easeTo({center:[p[1],p[2]],zoom:p[3]==='town'?13.2:13.8,
-        duration:700,essential:true});railSet(false)})})}
+        duration:700,essential:true});
+      /* take 190 · A252 · a jump closes search (take 189 left it on) */
+      if(!searchClose('jump')){RAIL_MANUAL=true;railSet(false)}})})}
 
 function refreshReadout(){
   var c=map.getCenter(),e=elevAt([c.lng,c.lat]);
@@ -9932,6 +10725,10 @@ function done(){var d=cap.slice().sort(function(a,b){return a-b});cap=null;
      pass?'Holds up with the full routable network loaded.'
    :'Below threshold — note both numbers before comparing to the APK.'),
    pass?'pass':'fail')}
+/* take 190 · A247 · registered last, so it runs after every handler a sheet
+   row has: a row that wrote no card leaves nothing pending for the next one */
+Object.keys(SHEET_TOOLS).forEach(function(id){var b=el(id);if(!b)return;
+  b.addEventListener('click',function(){SHEET_PENDING=null})});
 </script>
 </body>
 </html>

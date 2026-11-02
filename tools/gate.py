@@ -66,6 +66,37 @@ def check_stamps():
         notes.append("doc stamps agree")
 
 
+# ── 2b. Release notes current (take 190 · A267) ─────────────────────────────
+# ci/RELEASE.md is the release's notes (the workflow's --notes-file) and Play's
+# (tools/play_assets.py cuts them from it). It said "Take 186" through the
+# releases of takes 187, 188 and 189. Its first line names the take BUILD ships.
+def _release_fault(text, t):
+    if text is None:
+        return "ci/RELEASE.md missing (the release's notes)"
+    first = next((l for l in text.splitlines() if l.strip()), "")
+    m = re.search(r"\bTake (\d+)\b", first)
+    if not m:
+        return f"ci/RELEASE.md's first line names no take: {first[:60]!r} (A267)"
+    if int(m.group(1)) != t:
+        return f"ci/RELEASE.md describes take {m.group(1)}, BUILD is take {t} (A267: write the take's own notes)"
+    return None
+
+
+def check_release_notes():
+    t = take()
+    if t is None:
+        return
+    # its controls: a note from an earlier take and a first line naming none
+    # are caught, and the current one is not
+    if (not _release_fault(f"**Take {t - 1} — notes**", t) or not _release_fault("Notes", t)
+            or _release_fault(f"**Take {t} — notes**", t)):
+        return fails.append("check_release_notes cannot tell a stale note from a current one (its planted controls)")
+    f = _release_fault(read("ci", "RELEASE.md"), t)
+    if f:
+        return fails.append(f)
+    notes.append(f"release notes describe take {t} (stale and take-less controls caught)")
+
+
 # ── 3. Offline integrity ────────────────────────────────────────────────────
 # PROTOCOL §8. One CDN reference passes every test on wifi and dies in the woods.
 # basemap.nationalmap.gov: the §8 take-145 in-app provisioning allowlist —
@@ -82,6 +113,10 @@ ALLOW = re.compile(r"openstreetmap\.org|maplibre\.org|github\.com/maplibre"
                    r"|michigan\.gov|gis-midnr\.opendata\.arcgis\.com"
                    r"|data\.fs\.usda\.gov|apps\.nationalmap\.gov"
                    r"|waterdata\.usgs\.gov"
+                   # take 190 · A257: two more attribution links on the same
+                   # card — the Census Bureau's TIGER page and the AWS
+                   # registry's terrain-tiles page. Displayed, never fetched.
+                   r"|www\.census\.gov|registry\.opendata\.aws"
                    # take 181 · A195: the privacy policy link on the same card —
                    # the app's own Pages site. Displayed, never fetched; Play's
                    # User Data policy wants the policy reachable from inside
@@ -3124,7 +3159,7 @@ def check_ledger_order():
     notes.append(f"landmine file order: {len(nums)} entries, strictly ascending")
 
 
-for fn in (check_handoff, check_stamps, check_offline, check_splash, check_scrub,
+for fn in (check_handoff, check_stamps, check_release_notes, check_offline, check_splash, check_scrub,
            check_style, check_palette, check_badges, check_tokens, check_scale, check_icons, check_glyphs,
            check_licences, check_machine_legality,
            check_ledgers, check_osm_fallback, check_gauges_fallback, check_drawn,

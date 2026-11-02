@@ -228,9 +228,15 @@ rather than sitting in the sheet (2026-10-02).
 
 ## 6 · Open at the end, never answered
 
-- The offer to run one lane at a time (2026-10-04).
-- Mark this spot accepted a fix up to 15 s old: "Say if you want a new fix
-  every time."
+Answered in the rebuild's session (the maintainer, 2026-11-01): one piece
+at a time, no parallel lanes; "15 seconds is fine" for Mark's fresh fix;
+"keep the full licences" in Data sources; a fold keeps Plan or Tools while
+a map tap is armed or a Tools panel is open ("Keep the tab"); re-tapping
+the open tab goes back to its index and never folds ("Back to its index").
+
+- ~~The offer to run one lane at a time (2026-10-04).~~ Answered above.
+- ~~Mark this spot accepted a fix up to 15 s old: "Say if you want a new fix
+  every time."~~ Answered above.
 - A reviewer's blocking finding in the last run: Retrace and Dispatch from
   the Ride tab went from 2 taps to 3, a landmine-135 rise never brought to
   the maintainer (default 2 above accepted Dispatch 1–2 → 2–3 off a ride,
