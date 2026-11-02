@@ -326,7 +326,7 @@ SOURCES = [
         # take 188 · A216 · pasted, never fetched: the icon strings live in
         # the app's source, so no host and no build step reads the package
         "file": "src/app.html (LUCIDE)",
-        "filenote": "74 inner-SVG strings, one per icon, keyed by Lucide name (tools/gate.py check_icons holds the count to the table)",
+        "filenote": "79 inner-SVG strings, one per icon, keyed by Lucide name (tools/gate.py check_icons holds the count to the table)",
         "name": "Lucide icons (pasted, not fetched)",
         "what": "the line icons on every control, marker and card, pasted from "
                 "the lucide-static npm package 1.37.0; tools/gate.py check_icons "

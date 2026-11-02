@@ -34,7 +34,8 @@ pipeline or the data is proven by CI's run, which builds everything.
 ## How a take works here
 1. Record first: HANDOFF entry, AGENDA item with a `Ruled out:` line, a
    landmine for anything that bit, `BUILD` and the title in `src/app.html`,
-   then `python3 tools/stamp.py`.
+   the take's own `ci/RELEASE.md` (the release's and Play's notes; gate
+   check_release_notes), then `python3 tools/stamp.py`.
 2. Build the app: `python3 tools/build_app.py split` turns `src/app.html`
    into `www/`, then `bash ci/cloud_setup.sh bundle` puts back the bundle
    `split` clears (landmine 250). The pipeline runs in CI (above).

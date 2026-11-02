@@ -178,7 +178,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 
 ### Lucide icons (pasted, not fetched)
 
-- **File** `src/app.html (LUCIDE)` — 74 inner-SVG strings, one per icon, keyed by Lucide name (tools/gate.py check_icons holds the count to the table)
+- **File** `src/app.html (LUCIDE)` — 79 inner-SVG strings, one per icon, keyed by Lucide name (tools/gate.py check_icons holds the count to the table)
 - **Provides** the line icons on every control, marker and card, pasted from the lucide-static npm package 1.37.0; tools/gate.py check_icons compares each string to node_modules/lucide-static
 - **Licence** ISC (Lucide Icons and Contributors); the icons derived from Feather are MIT (Cole Bemis). Full texts in www/licenses.txt; the notice is in Tools -> Data sources
 - **Fetched by** nobody at build time — pasted by hand from a script's output; the gate reads the npm package after `npm ci`

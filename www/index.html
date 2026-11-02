@@ -14,6 +14,12 @@
     --text-1:#F5EFE2;--text-2:#CFC7B8;--text-3:#A39A8B;
     --divider:#34312B;--border:rgba(255,255,255,.12);--border-strong:rgba(255,255,255,.28);
     --press:rgba(255,255,255,.05);--wash:rgba(255,255,255,.06);
+     
+     --sheet-group:rgba(255,255,255,.03);
+     
+     --row-h:calc(var(--tap) + var(--s-2));--row-ic:calc(var(--s-6) + var(--s-2));--dial:128px;
+     
+     --warn-tint:rgba(224,162,75,.1);--warn-line:rgba(224,162,75,.35);
     --accent:#E2570F;--accent-tint:rgba(226,87,15,.2);--on-accent:#17130F;
     --warn:#E0A24B;--danger:#C1121F;--danger-text:#FFB3B8;--on-danger:#FFFFFF;
     --ok:#8FAE63;--ok-tint:rgba(143,174,99,.22);--route:#00A8E8;
@@ -110,7 +116,9 @@
   #tour-btns .chip{margin:0}
   
   #tour-btns .quiet{background:transparent;border:1px solid var(--border-strong);box-shadow:none}
-  #tour-n{margin-left:auto;font-size:var(--t-xs);color:var(--text-3)}
+  
+  #tour-n{font:700 var(--t-xs)/1 Barlow,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--text-3);margin-bottom:var(--s-2)}
   
   #toast{position:fixed;left:50%;bottom:calc(var(--dock-h,var(--strip-h,72px)) + var(--sheet-h,0px) + var(--s-4));
     transform:translateX(-50%);width:max-content;max-width:calc(100vw - 2 * var(--s-4));
@@ -284,7 +292,7 @@
     background:var(--surface-1);border:1px solid var(--border);
     border-radius:var(--r-lg);padding:var(--s-2) var(--s-3);box-shadow:var(--e-2);
     color:var(--text-1);font:600 var(--t-sm)/1.5 Barlow,Roboto,system-ui,sans-serif;
-    max-height:calc(min(62vh,calc(100% - var(--ride-top) - var(--strip-h,64px) - var(--sheet-h,0px) - var(--s-4))) - var(--cmp-trim,0px));overflow-y:auto;transform-origin:bottom left;
+    max-height:calc(min(62vh,calc(100% - var(--ride-top) - var(--alert-room,0px) - var(--strip-h,64px) - var(--sheet-h,0px) - var(--s-4))) - var(--cmp-trim,0px));overflow-y:auto;transform-origin:bottom left;
     transition:opacity var(--m-base) var(--m-ease),
                transform var(--m-base) var(--m-ease)}
   
@@ -298,7 +306,7 @@
     background:var(--surface-1);border:1px solid var(--border);
     border-radius:var(--r-lg);padding:var(--s-2);box-shadow:var(--e-2);
     display:flex;flex-direction:column;gap:var(--s-1);
-    max-height:calc(100% - var(--ride-top) - var(--strip-h,64px) - var(--sheet-h,0px) - var(--s-4));overflow-y:auto;
+    max-height:calc(100% - var(--ride-top) - var(--alert-room,0px) - var(--strip-h,64px) - var(--sheet-h,0px) - var(--s-4));overflow-y:auto;
     transform-origin:bottom left;
     transition:opacity var(--m-base) var(--m-ease),
                transform var(--m-base) var(--m-ease)}
@@ -308,8 +316,25 @@
     letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);padding:var(--s-1) var(--s-2) 2px}
   #diagpanel .chip{width:100%;justify-content:flex-start}
   
-  @media (max-width:400px) and (max-height:860px){
-    #shell[data-ride]:has(#cmppanel:not([hidden]),#diagpanel:not([hidden])) #tools .chip:not(#c-compass):not(#c-markme):not(#c-diag){display:none}}
+  
+  
+  .phead{display:flex;align-items:center;justify-content:space-between;gap:var(--s-2);
+    position:sticky;top:0;z-index:1;background:var(--surface-1)}
+  .phead .sect{font:700 var(--t-xs)/1 Barlow,Roboto,system-ui,sans-serif;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--text-3)}
+  .pclose{appearance:none;border:0;background:none;color:var(--text-2);cursor:pointer;flex:0 0 auto;
+    min-width:var(--tap);min-height:var(--tap);border-radius:var(--r-pill);padding:0;
+    display:flex;align-items:center;justify-content:center}
+  .pclose:active{background:var(--press)}
+  .pclose .ic{margin:0;opacity:1}
+  
+  .phead.ov{height:0;overflow:visible;justify-content:flex-end;align-items:flex-start;background:none}
+  .phead.ov .pclose{background:var(--surface-1)}
+  
+  #shell[data-ride] .phead.ov .pclose{min-width:var(--tap-ride);min-height:var(--tap-ride)}
+  
+  @media (max-height:860px){
+    #shell[data-ride]:has(#alert.on) #cmpbox>div:first-child>svg{width:calc(var(--dial) - var(--s-4));height:calc(var(--dial) - var(--s-4))}}
   #lyrpanel .sect{font:700 var(--t-xs)/1 Barlow,Roboto,system-ui,sans-serif;letter-spacing:.14em;
     text-transform:uppercase;color:var(--text-3);padding:var(--s-2) var(--s-2) var(--s-1)}
   #lyrpanel .pnote{font:500 var(--t-md)/1.35 Barlow,Roboto,system-ui,sans-serif;color:var(--text-3);padding:0 var(--s-2) var(--s-1)}
@@ -406,6 +431,8 @@
   .chip.on .ic,.chip.arm .ic{opacity:1}
   
   .chip.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  
+  .chip.primary{font-weight:800;letter-spacing:.06em;text-transform:uppercase}
   .chip.primary .ic{opacity:1}
   
   #c-ride{min-height:var(--tap-ride)}
@@ -522,6 +549,118 @@
   #rail:not(.folded) #peek{min-height:var(--tap);padding:var(--s-2) var(--s-3) var(--s-1)}
   #rail:not(.folded) #peek-txt{display:none}
   
+  .sheetix{display:flex;flex-direction:column;gap:var(--s-3)}
+  .sheetix[hidden],.sheetbar[hidden]{display:none}
+  #rail[data-sheet]:not([data-sheet="search"]) #srch,#rail[data-sheet="index"] #panel,#rail[data-sheet="search"] #panel{display:none}
+  
+  #rail[data-sheet="search"] #srch{margin-top:0}
+  #rail[data-sheet="search"] #q{position:sticky;top:0;z-index:1}
+  #rail[data-sheet="search"] #hits{max-height:none;overflow:visible}
+  #hits .sbox{margin:var(--s-2) 0 var(--s-3)}
+  #sjump{display:flex;flex-wrap:wrap;gap:var(--s-2);margin:var(--s-2) 0 var(--s-3)}
+  #sjump .k{flex:0 0 100%;margin-top:var(--s-2)}
+  #snote{margin-bottom:var(--s-2)}
+  #shell:not([data-ride]) #rail[data-sheet]:not(.folded) #grid,
+  #shell:not([data-ride]) #rail[data-sheet]:not(.folded) #coords,
+  #shell:not([data-ride]) #rail[data-sheet]:not(.folded):not([data-sheet="search"]) #actions{display:none}
+  
+  
+  #shell:not([data-ride]) #rail[data-sheet]:not(.folded) #railbody{max-height:var(--sheet-cap,38vh)}
+  
+  #shell[data-ride] #ix-home{display:none}
+  #shell[data-sheet]:not([data-sheettool="c-markme"]) #readout,#shell[data-sheet]:not([data-sheettool="c-markme"]) .maplibregl-ctrl-bottom-left,
+  #shell[data-sheet]:not([data-sheettool="c-markme"]) #c-base,#shell[data-sheet]:not([data-sheettool="c-markme"]) #c-hd,
+  #shell[data-sheet]:not([data-sheettool="c-markme"]) #c-mode,#shell[data-sheet]:not([data-sheettool="c-markme"]) #c-act,
+  #shell[data-sheet] #actpanel,#shell[data-sheet] #modepanel,#shell[data-sheet] #lyrpanel{display:none}
+  .sheetbar{display:flex;align-items:center;gap:var(--s-1);padding:0 var(--s-3) var(--s-1)}
+  .sh-back{appearance:none;border:0;background:none;color:var(--text-1);cursor:pointer;
+    min-width:var(--tap);min-height:var(--tap);border-radius:var(--r-pill);padding:0;
+    display:flex;align-items:center;justify-content:center}
+  .sh-back:active{background:var(--press)}
+  .sh-back .ic{margin:0;width:var(--ic-ride);height:var(--ic-ride);opacity:1}
+  #sh-title{font:700 var(--t-lg)/1.2 Barlow,system-ui,sans-serif;color:var(--text-1);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sx-search,.sx-home{appearance:none;cursor:pointer;min-height:var(--tap);border-radius:var(--r-pill);
+    display:flex;align-items:center;gap:var(--s-3);width:100%;box-sizing:border-box}
+  .sx-search{background:var(--surface-2);border:1px solid var(--divider);color:var(--text-3);
+    padding:0 var(--s-4);font:400 var(--t-md)/1.2 Barlow,system-ui,sans-serif;text-align:left}
+  .sx-search .ic{margin:0;color:var(--text-2);opacity:1}
+  .sx-home{min-height:var(--tap-ride);background:var(--accent);border:0;color:var(--on-accent);justify-content:center;
+    font:800 var(--t-lg)/1 'Barlow Condensed',Barlow,system-ui,sans-serif;letter-spacing:.06em;
+    text-transform:uppercase}
+  .sx-home .ic{margin:0;width:var(--ic-ride);height:var(--ic-ride);opacity:1}
+  .sx-home:active{filter:brightness(.85)}
+  .sgrp{display:flex;flex-direction:column;gap:var(--s-2)}
+  .sbox{display:flex;flex-direction:column;background:var(--sheet-group);border:1px solid var(--divider);
+    border-radius:var(--r-md);padding:0;overflow:hidden}
+  .srow{appearance:none;border:0;background:none;cursor:pointer;color:var(--text-1);text-align:left;
+    width:100%;box-sizing:border-box;min-height:var(--row-h);display:flex;align-items:center;
+    gap:var(--s-3);padding:var(--s-2) var(--s-3);border-radius:0;
+    font:600 var(--t-md)/1.2 Barlow,system-ui,sans-serif}
+  .srow:active{background:var(--press)}
+  .sr-i{width:var(--row-ic);height:var(--row-ic);border-radius:var(--r-md);background:var(--surface-2);flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;color:var(--text-1)}
+  .sr-i .ic{margin:0;opacity:1}
+  .sr-t{display:flex;flex-direction:column;gap:var(--s-1);flex:1 1 auto;min-width:0}
+  .sr-l{font:600 var(--t-md)/1.2 Barlow,system-ui,sans-serif;color:var(--text-1)}
+  .sr-s{font:500 var(--t-sm)/1.3 Barlow,system-ui,sans-serif;color:var(--text-3)}
+  .sr-v{font:600 var(--t-md)/1 Barlow,system-ui,sans-serif;color:var(--text-2);
+    font-variant-numeric:tabular-nums;white-space:nowrap;flex:0 0 auto}
+  .sr-c{display:flex;color:var(--text-3);flex:0 0 auto}
+  .sr-c .ic{margin:0;opacity:1}
+  
+  .srow.arm .sr-l{color:var(--accent)}
+  
+  .srow.on .sr-l{font-weight:700}
+  .srow.on>.sr-t{position:relative}
+  .srow.on>.sr-t::before{position:absolute;left:calc(-1 * var(--s-2) - var(--s-1));top:50%;margin:calc(-1 * var(--s-1)) 0 0}
+  .srow.on{box-shadow:inset 0 0 0 1px var(--sel),var(--e-1)}
+  .srow.off .sr-l{color:var(--text-2)}
+  .mnote{margin-bottom:var(--s-2)}
+  
+  .srow.sfuel{cursor:default;padding-top:var(--s-1);padding-bottom:var(--s-1)}
+  .srow.sfuel:active{background:none}
+  .sstep{display:flex;align-items:center;gap:var(--s-1);flex:0 0 auto}
+  .sstep .sr-v{min-width:calc(var(--s-6) + var(--s-5));text-align:center;color:var(--text-1)}
+  .sbtn{appearance:none;cursor:pointer;min-width:var(--tap);min-height:var(--tap);border-radius:var(--r-pill);
+    background:var(--surface-2);border:1px solid var(--divider);color:var(--text-1);padding:0;
+    display:flex;align-items:center;justify-content:center}
+  .sbtn .ic{margin:0;opacity:1}
+  .sbtn:active{background:var(--press)}
+  .sbtn:disabled{cursor:default;opacity:.4}
+  
+  .lpd{display:flex;flex-wrap:wrap;gap:var(--s-2);margin:var(--s-2) 0 var(--s-3)}
+  .lpstart{display:flex;align-items:center;gap:var(--s-2)}
+  .lpstart .ic{margin:0;flex:0 0 auto;opacity:1}
+  .lpstart.warn{color:var(--warn)}
+  
+  .svrec{display:flex;align-items:center}
+  .svrec .srow{flex:1 1 auto;min-width:0}
+  .sv-x{appearance:none;cursor:pointer;flex:0 0 auto;min-width:var(--tap);min-height:var(--tap);border:0;
+    background:none;color:var(--text-2);border-radius:var(--r-pill);padding:0;display:flex;align-items:center;justify-content:center}
+  .sv-x .ic{margin:0;opacity:1}
+  .sv-x:active{background:var(--press)}
+  .svempty{width:calc(2 * var(--s-6));height:calc(2 * var(--s-6));border-radius:50%;background:var(--surface-2);
+    margin:var(--s-2) auto var(--s-3);display:flex;align-items:center;justify-content:center;color:var(--text-2)}
+  .svempty .ic{margin:0;width:var(--s-6);height:var(--s-6);opacity:1}
+  .svh{text-align:center;font:700 var(--t-lg)/1.2 Barlow,system-ui,sans-serif;color:var(--text-1);margin-bottom:var(--s-2)}
+  
+  .srcnote{padding:var(--s-3);border-radius:var(--r-md);background:var(--warn-tint);
+    border:1px solid var(--warn-line);color:var(--text-1);font:500 var(--t-sm)/1.4 Barlow,system-ui,sans-serif}
+  #panel .sbox{margin:var(--s-2) 0 var(--s-3)}
+  a.srow{text-decoration:none}
+  
+  .mkrow{display:flex;gap:var(--s-2);margin-top:var(--s-3)}
+  
+  .hdtier{margin-top:var(--s-3);padding:var(--s-3);border-radius:var(--r-md);background:var(--sheet-group);
+    border:1px solid var(--divider)}
+  .hdtier .chip{margin-top:var(--s-2)}
+  .hdt-n{font:600 var(--t-md)/1.2 Barlow,system-ui,sans-serif;color:var(--text-1)}
+  #mk-name{width:100%;box-sizing:border-box;min-height:var(--tap);margin-top:var(--s-1);padding:0 var(--s-3);
+    border-radius:var(--r-md);border:1px solid var(--divider);background:var(--surface-2);color:var(--text-1);
+    font:500 var(--t-md)/1.2 Barlow,system-ui,sans-serif}
+  #panel .k{margin-top:var(--s-3)}
+  
   #coords{font-size:var(--t-sm);color:var(--text-3);margin-top:var(--s-2);
     font-family:ui-monospace,"Roboto Mono",monospace;
     font-variant-numeric:tabular-nums}
@@ -574,7 +713,11 @@
   .hit b{color:var(--text-1);font-weight:700;font-size:var(--t-md)}
   .hit i{font-style:normal;color:var(--text-3);font-size:var(--t-xs);letter-spacing:.08em;
     text-transform:uppercase;margin-left:var(--s-1)}
-  #steps{max-height:150px;overflow-y:auto;margin-top:var(--s-1)}
+  
+  #steps{margin-top:var(--s-1)}
+  .stfoot{position:sticky;bottom:0;z-index:1;background:var(--surface-1);padding:var(--s-2) 0 var(--s-1);
+    display:flex;flex-direction:column;gap:var(--s-2)}
+  .stfoot .chip.primary{align-self:stretch;justify-content:center}
   .st{display:flex;gap:var(--s-2);padding:var(--s-2) 0;border-bottom:1px solid var(--divider)}
   .st .ar{flex:0 0 22px;font:700 var(--t-lg)/1.2 Barlow,Roboto,system-ui,sans-serif;color:var(--text-1);
     text-align:center}
@@ -633,7 +776,7 @@
   button.act.primary:active{filter:brightness(.92)}
   
   .chip.on>span:first-of-type::before,.chip.arm>span:first-of-type::before,.basebtn.on>span::before,
-  .actrow.on>span:last-child::before,.moderow.on>span:first-child::before,.rc.sel h5::before{
+  .actrow.on>span:last-child::before,.moderow.on>span:first-child::before,.rc.sel h5::before,.srow.on>.sr-t::before{
     content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--sel);
     margin-right:var(--s-2);vertical-align:1px}
   #hudbtns button.on::before{content:'';position:absolute;top:var(--s-2);right:var(--s-2);
@@ -654,6 +797,10 @@
   
   #btn-ride{display:none}
   #shell:not([data-ride]) #rail.folded #actions #btn-ride{display:inline-block;flex:0 0 auto;padding:0 var(--s-4)}
+  
+  #shell[data-dest="ride"] #rail.folded #actions #btn-ride{display:none}
+  #shell:has(#rail:not(.folded) #rt-start:not([hidden])) #c-ride,
+  #shell[data-dest="ride"]:has(#rail:not(.folded) #rc-ride:not([hidden])) #c-ride{display:none}
   #shell:not([data-ride]) #rail.folded #btn-home{flex:0 0 auto;padding:0 var(--s-4);
     background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
   #rail:not(.folded) #btn-home,#shell[data-ride] #btn-home{background:var(--surface-2);color:var(--text-1);border-color:var(--accent)}
@@ -675,7 +822,7 @@
 <div id="shell">
   
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 189</span>
+    <span id="title"><b>APEX</b> ORV · Take 190</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -699,9 +846,9 @@
     <div id="tour" hidden><div id="tour-ring"></div><div id="tour-card"></div></div>
     
     
-    <div id="cmppanel" hidden><div id="cmpbox"></div><div id="cmpmore" hidden>More below — scroll</div></div>
+    <div id="cmppanel" hidden><div class="phead ov"><button class="pclose" id="cmp-x" aria-label="Close the compass">__IC_close__</button></div><div id="cmpbox"></div><div id="cmpmore" hidden>More below — scroll</div></div>
     <div id="diagpanel" hidden>
-      <div class="sect">Diagnostics</div>
+      <div class="phead"><div class="sect">Diagnostics</div><button class="pclose" id="diag-x" aria-label="Close diagnostics">__IC_close__</button></div>
       <button class="chip" id="c-about">__IC_about__<span>About this build</span></button>
       <button class="chip" id="c-selftest">__IC_selftest__<span>Self-test</span></button>
       <button class="chip" id="c-pan">__IC_pantest__<span>Pan test</span></button>
@@ -730,23 +877,10 @@
     <div id="alert"></div>
     <div class="strip" id="tools">
       
-      <button class="chip" data-tab="tools" id="c-tour">__IC_tour__<span>Take the tour</span></button>
-      <button class="chip" data-tab="tools" id="c-howto">__IC_guide__<span>How to use</span></button>
-      <button class="chip" data-tab="tools" id="c-compass">__IC_compass__<span>Compass</span></button>
-      <button class="chip" data-tab="tools" id="c-markme">__IC_spot__<span>Mark this spot</span></button>
-      <button class="chip" data-tab="tools" id="c-hdmanage">__IC_hd__<span>Saved HD imagery</span></button>
-      <button class="chip" data-tab="tools" id="c-sources">__IC_sources__<span>Data sources</span></button>
-      <button class="chip" data-tab="tools" id="c-diag">__IC_diag__<span>Diagnostics</span></button>
       <button class="chip" data-tab="map" id="c-layers">__IC_layers__<span>Layers</span></button>
-      <button class="chip" data-tab="plan" id="c-machine">__IC_dirtbike__<span>Dirt bike 24&quot;</span></button>
-      <button class="chip" data-tab="plan" id="c-home">__IC_home__<span>Set home</span></button>
-      <button class="chip" data-tab="plan" id="c-me">__IC_start__<span>I'm here</span></button>
-      <button class="chip" data-tab="plan" id="c-fuel">__IC_fuel__<span>50 mi</span></button>
       <button class="chip" data-tab="ride" id="c-ride">__IC_ride__<span>Ride it</span></button>
       <button class="chip" id="c-lost" hidden>__IC_warn__<span>Wrong turn</span></button>
       <button class="chip" data-tab="map" id="c-locate">__IC_locate__<span>Locate</span></button>
-      <button class="chip" data-tab="plan" id="c-loop">__IC_loop__<span>Loop</span></button>
-      <button class="chip" data-tab="plan" id="c-saved">__IC_saved__<span>Saved</span></button>
       <button class="chip" data-tab="map" id="c-search">__IC_search__<span>Search</span></button>
     </div>
   </div>
@@ -758,11 +892,47 @@
       
       <span id="peek-chev">&#x25BE;</span>
     </button>
+    
+    <div class="sheetbar" id="sheetbar" hidden><button class="sh-back" id="sh-back" aria-label="Back">__IC_back__</button><span id="sh-title"></span></div>
     <div id="railbody">
+    
+    <div class="sheetix" id="ix-plan" hidden>
+      <button class="sx-search" id="ix-search">__IC_search__<span>Where to? Places, trails, addresses</span></button>
+      <button class="sx-home" id="ix-home">__IC_home__<span>Return home</span></button>
+      <div class="sgrp" id="g-from"><div class="k">From here</div><div class="sbox">
+        <button class="srow" data-tab="plan" id="c-loop"><span class="sr-i" id="c-loop-i">__IC_loop__</span><span class="sr-t"><span class="sr-l">Loop from here</span><span class="sr-s" id="c-loop-s">Ends where it starts · legal for your machine</span></span><span class="sr-c">__IC_next__</span></button>
+        <button class="srow" data-tab="plan" id="c-me"><span class="sr-i" id="c-me-i">__IC_start__</span><span class="sr-t"><span class="sr-l">Start from my position</span><span class="sr-s" id="c-me-s">Tap where you stand — plans start there, not the map centre</span></span><span class="sr-c">__IC_next__</span></button>
+        <button class="srow" data-tab="plan" id="c-saved"><span class="sr-i" id="c-saved-i">__IC_saved__</span><span class="sr-t"><span class="sr-l">Saved</span><span class="sr-s" id="c-saved-s">Routes and marked spots, on this phone only</span></span><span class="sr-v" id="c-saved-v">0</span><span class="sr-c">__IC_next__</span></button>
+      </div></div>
+      <div class="sgrp" id="g-ride"><div class="k">Your ride</div><div class="sbox">
+        <button class="srow" data-tab="plan" id="c-machine"><span class="sr-i" id="c-machine-i">__IC_dirtbike__</span><span class="sr-t"><span class="sr-l">Machine</span></span><span class="sr-v" id="c-machine-v">Dirt bike 24&quot;</span><span class="sr-c">__IC_next__</span></button>
+        <div class="srow sfuel" data-tab="plan" id="c-fuel"><span class="sr-i" id="c-fuel-i">__IC_fuel__</span><span class="sr-t"><span class="sr-l">Fuel range</span><span class="sr-s" id="c-fuel-s">Routes warn past it</span></span><span class="sstep"><button class="sbtn" id="c-fuel-dn" aria-label="Less range">__IC_less__</button><span class="sr-v" id="c-fuel-v">50 mi</span><button class="sbtn" id="c-fuel-up" aria-label="More range">__IC_more__</button></span></div>
+        <button class="srow" data-tab="plan" id="c-home"><span class="sr-i" id="c-home-i">__IC_home__</span><span class="sr-t"><span class="sr-l">Home</span><span class="sr-s" id="c-home-s">Long-press a spot, or use your position</span></span><span class="sr-v" id="c-home-v">Not set</span><span class="sr-c">__IC_next__</span></button>
+      </div></div>
+    </div>
+    <div class="sheetix" id="ix-tools" hidden>
+      <div class="sgrp" id="g-trail"><div class="k">On the trail</div><div class="sbox">
+        <button class="srow" data-tab="tools" id="c-compass"><span class="sr-i" id="c-compass-i">__IC_compass__</span><span class="sr-t"><span class="sr-l">Compass</span><span class="sr-s" id="c-compass-s">Bearing to your truck, home or a waypoint</span></span><span class="sr-c">__IC_next__</span></button>
+        <button class="srow" data-tab="tools" id="c-markme"><span class="sr-i" id="c-markme-i">__IC_spot__</span><span class="sr-t"><span class="sr-l">Mark this spot</span><span class="sr-s" id="c-markme-s">Saved on this phone, found under Saved</span></span><span class="sr-c">__IC_next__</span></button>
+      </div></div>
+      <div class="sgrp" id="g-off"><div class="k">Offline</div><div class="sbox">
+        <button class="srow" data-tab="tools" id="c-hdmanage"><span class="sr-i" id="c-hdmanage-i">__IC_hd__</span><span class="sr-t"><span class="sr-l">HD imagery</span><span class="sr-s" id="c-hdmanage-s">Sharper satellite for places you choose</span></span><span class="sr-c">__IC_next__</span></button>
+      </div></div>
+      <div class="sgrp" id="g-learn"><div class="k">Learn</div><div class="sbox">
+        <button class="srow" data-tab="tools" id="c-tour"><span class="sr-i" id="c-tour-i">__IC_tour__</span><span class="sr-t"><span class="sr-l">Take the tour</span><span class="sr-s" id="c-tour-s">A short walk over the real screen</span></span><span class="sr-c">__IC_next__</span></button>
+        <button class="srow" data-tab="tools" id="c-howto"><span class="sr-i" id="c-howto-i">__IC_guide__</span><span class="sr-t"><span class="sr-l">How to use</span><span class="sr-s" id="c-howto-s">What each control does</span></span><span class="sr-c">__IC_next__</span></button>
+      </div></div>
+      <div class="sgrp" id="g-about"><div class="k">About</div><div class="sbox">
+        <button class="srow" data-tab="tools" id="c-sources"><span class="sr-i" id="c-sources-i">__IC_sources__</span><span class="sr-t"><span class="sr-l">Data sources</span><span class="sr-s" id="c-sources-s">Who publishes each layer, and the licences</span></span><span class="sr-c">__IC_next__</span></button>
+        <button class="srow" data-tab="tools" id="c-diag"><span class="sr-i" id="c-diag-i">__IC_diag__</span><span class="sr-t"><span class="sr-l">Diagnostics</span><span class="sr-s" id="c-diag-s">About this build, self-test, pan test</span></span><span class="sr-c">__IC_next__</span></button>
+      </div></div>
+    </div>
     <div id="srch">
-      <input id="q" type="search" placeholder="Trail, road, junction, place…"
+      <input id="q" type="search" placeholder="Where to? Places, trails, addresses"
         autocomplete="off" autocapitalize="off" spellcheck="false">
       <div id="hits"></div>
+      <div id="sjump"></div>
+      <div class="sub" id="snote">A trail code like H58, a town, a river or a street address — all of it offline.</div>
     </div>
     
     <div id="panel">Waiting for a GPS fix. To plan a ride: <b>Set home</b> (Plan) — your location, an address, or a tap on the map; then press and hold where you want to go, tap <b>Route here</b>, then <b>Ride it</b>. <b>Return home</b> sits at the bottom of the map.</div>

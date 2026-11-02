@@ -242,13 +242,18 @@ The screens are outside the repo: the "before" screens in
   Next numbers: take 190; agenda A247, and take 190's items keep the
   numbers the lost `v6` gave them, A247–A266 (docs/RECOVERY-t190.md), so
   the recovered decisions still cite the right items; landmine 251.
+- At take 190's seal (2026-11-02): agenda A269, landmine 255. Next
+  numbers: take 191; agenda A270; landmine 256.
 
 ## Order (as of 2026-11-01)
 
 0. **Take 190, rebuilt** — the maintainer, 2026-11-01: one take, one piece
    at a time in a cloud session, from the V4 mockup's artboards 10–23 and
    the decisions in docs/RECOVERY-t190.md, verified here and by a CI build
-   of its pull request before he merges.
+   of its pull request before he merges. Sealed 2026-11-02 as one commit on
+   its pull request; CI's build of that pull request is its proof, then
+   the maintainer's Fold session. Open for him: A268 (search's scrim),
+   A269 (the map stays pitched after a ride).
 
 The order as of 2026-10-01 follows; its item 3 is the take above.
 

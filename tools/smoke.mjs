@@ -206,6 +206,8 @@ class MapStub {
   once(t, cb) { const f = (...a) => { cb(...a); this._on[t] = (this._on[t] || []).filter((x) => x !== f); }; (this._on[t] ||= []).push(f); return this; }
   fire(t, ev) { for (const cb of [...(this._on[t] || [])]) cb(ev || {}); }
   easeTo(o) { record.eased.push(o); this.fire("moveend"); }
+  /* take 190 · A264 · a pin eased into view: recorded like an ease */
+  panBy(off, o) { record.eased.push({ panBy: off, ...(o || {}) }); this.fire("moveend"); }
   fitBounds() { record.fitted++; }
   /* take 145 · hdCard reads the view, refreshSat pokes the painter */
   getBounds() { return { getWest: () => -84.30, getSouth: () => 44.50,
@@ -213,7 +215,10 @@ class MapStub {
   /* take 169 · stackCard computes the camera before easing so a refused
      fit is visible; the stub answers with a plausible camera */
   /* take 170 · the follow camera and the nav strip read these */
-  getBearing() { return 0; } getPitch() { return 0; }
+  getBearing() { return 0; }
+  /* (one method a line: tools/gate.py check_stubs reads them so — take 190's
+     A264 pitch read was refused as missing while it sat beside getBearing) */
+  getPitch() { return 0; }
   cameraForBounds(b) { const w = b[0][0], s0 = b[0][1], e = b[1][0], n = b[1][1];
     return { center: [(w + e) / 2, (s0 + n) / 2], zoom: 12 }; }
   triggerRepaint() { record.repaints = (record.repaints || 0) + 1; }
@@ -445,7 +450,8 @@ const chips = documentStub.querySelectorAll(".chip").filter((c) => c.dataset.i !
   ok(!(grab("chips")._html || "").trim(),
      "the place strip renders nothing — quick-jumps moved into Search");
   grab("c-search").click();
-  const jumps = grab("panel")._html.match(/data-jump=/g) || [];
+  /* take 190 · A251 · the jump chips live in the search sheet (#sjump) */
+  const jumps = (grab("sjump")._html || "").match(/data-jump=/g) || [];
   ok(jumps.length >= 8,
      `empty search offers every anchor as a jump chip (${jumps.length})`);
   grab("c-search").click();
@@ -1011,7 +1017,8 @@ ok(/No home set/i.test(grab("panel")._html || ""),
   if (rev) {
     grab("c-home").fire("click"); flushTimeouts();
     grab("hc-addr").fire("click"); flushTimeouts();
-    ok(/Type the address/.test(grab("panel")._html), "Type an address opens the search armed for home");
+    ok(/Type the address/.test(grab("snote")._html || "") && sandbox.window.__sheet.state().kind === "search",
+       "Type an address opens the search sheet armed for home, its words in the sheet");
     const q2 = grab("q"); q2.value = rev.n + " " + rev.street; q2.fire("input"); flushTimeouts();
     const hits = documentStub.querySelectorAll(".hit");
     ok(hits.length > 0, `the typed address returns ${hits.length} hit(s)`);
@@ -2302,7 +2309,8 @@ if (!NO_GPS) {
   {
     grab("c-loop").fire("click");
     const pick = documentStub.querySelectorAll("[data-loop]")[0];
-    if (pick) { pick.fire("click"); flushTimeouts(); }
+    /* take 190 · A253 · a distance only chooses; Find builds */
+    if (pick) { pick.fire("click"); grab("lp-find").fire("click"); flushTimeouts(); }
     const G0 = pick ? N.plan() : null;
     ok(!!G0 && G0.loop === true && G0.lbl === "the start" && G0.pts.length > 10,
        `the loop chooser plans a ${pick ? pick.dataset.loop : "?"} mi loop from here (${G0 ? (G0.total / 1609.34).toFixed(1) + " mi, " + G0.pts.length + " points" : "NONE"}), `
@@ -2538,7 +2546,7 @@ if (!NO_GPS) {
   const REJOINED = { rj: true, peek: "Back to the loop · 0.6 mi to it, 1.2 mi of it left" };
   const pickLoop = (mi) => { grab("c-loop").fire("click"); const b = documentStub.querySelectorAll("[data-loop]").find((x) => x.dataset.loop === String(mi))
       || documentStub.querySelectorAll("[data-loop]")[0];
-    if (b) { b.fire("click"); flushTimeouts(); } return b ? b.dataset.loop : null; };
+    if (b) { b.fire("click"); grab("lp-find").fire("click"); flushTimeouts(); } return b ? b.dataset.loop : null; };
   /* the start pin moved by hand, as the pin card's "Start from here" does
      (planning: the drills are off a ride, so the pin is the rider's to move) */
   const pinAt = (p) => { N.pos("none"); grab("pc-start")._listeners = {}; theMap._hit = [];
@@ -2663,7 +2671,7 @@ if (!NO_GPS) {
     try {
       grab("c-loop").fire("click");
       const chip = documentStub.querySelectorAll("[data-loop]")[0];
-      if (chip) { chip.dataset.loop = "0"; chip.fire("click"); flushTimeouts(); }
+      if (chip) { chip.dataset.loop = "0"; chip.fire("click"); grab("lp-find").fire("click"); flushTimeouts(); }
       e1 = endOf(); c1 = text("panel");
       R.setMachine("kayak");
       grab("pc-route")._listeners = {}; theMap._hit = [];
@@ -2938,7 +2946,7 @@ if (!NO_GPS) {
       const mOf = (p, q) => { const k = Math.cos(p[1] * Math.PI / 180) * 111320; return Math.hypot((q[0] - p[0]) * k, (q[1] - p[1]) * 111320); };
       grab("c-loop").fire("click");
       const b15 = documentStub.querySelectorAll("[data-loop]").find((x) => x.dataset.loop === "15") || documentStub.querySelectorAll("[data-loop]")[0];
-      if (b15) { b15.fire("click"); flushTimeouts(); }
+      if (b15) { b15.fire("click"); grab("lp-find").fire("click"); flushTimeouts(); }
       const G = N.plan();
       const pts = G ? G.pts.slice() : [], cum = G ? G.cum.slice() : [], path0 = G ? G.o.s.path.map((e) => e.i) : [];
       const k1 = G ? cum.findIndex((m) => m >= 2414) : -1;
@@ -3210,6 +3218,568 @@ if (!NO_GPS) {
          + `the judge rejects "live GPS" and a truck distance through the dropout, and the dropout line left after the fix`);
     }
   } finally { sandbox.Date = Real1; }
+}
+
+/* 9c · take 190 · A247 · THE SHEET, executed in the shipped app. The Plan and
+   Tools tabs open sheets of rows (#ix-plan, #ix-tools); a row in SHEET_TOOLS
+   opens its card inside the sheet under the back row; any other card ends the
+   sheet; back goes from a tool to its index, and from an index folds; a fold
+   lands on Map. Each judge is a named predicate, and each is shown failing on
+   a forged state (its planted control) before its verdict counts. */
+{
+  const SX = sandbox.window.__sheet, N = sandbox.window.__nav, B = sandbox.window.__back;
+  if (!SX || !N || !B) ok(false, "take 190 · the sheet hooks are missing (__sheet, __nav, __back)");
+  else {
+    try { sandbox.window.__tour.close("notnow"); } catch (e) {}
+    /* the stub starts every panel unhidden (markup's hidden is not parsed):
+       put them away, or back closes a picker first */
+    for (const id of ["modepanel", "actpanel", "lyrpanel", "diagpanel", "cmppanel", "guide"]) grab(id).hidden = true;
+    const st = () => SX.state();
+    const rail = grab("rail"), ip = grab("ix-plan"), it = grab("ix-tools"), bar = grab("sheetbar");
+    const view = () => ({ k: st().kind, tab: st().tab, tool: st().tool, ds: rail.dataset.sheet || null,
+      folded: rail.className === "folded", ip: !ip.hidden, it: !it.hidden, bar: !bar.hidden,
+      title: grab("sh-title").textContent || "", pend: st().pending });
+    /* (1) Plan opens its index, and only its index */
+    const isIndex = (v, tab) => v.k === "index" && v.tab === tab && v.ds === "index" && !v.folded
+      && v.ip === (tab === "plan") && v.it === (tab === "tools") && !v.bar;
+    SX.tab("plan"); flushTimeouts();
+    const v1 = view();
+    ok(isIndex(v1, "plan") && !isIndex({ ...v1, it: true }, "plan") && !isIndex({ ...v1, folded: true }, "plan"),
+       `the Plan tab opens the Plan index in the drawer: ${JSON.stringify(v1)}; `
+       + `the judge rejects the Tools rows drawn with it, and a folded drawer`);
+    /* (2) a tool row opens its card inside the sheet, under the back row */
+    grab("c-saved").fire("click"); flushTimeouts();
+    const v2 = view(), p2 = grab("panel")._html || "";
+    const isTool = (v, id, title) => v.k === "tool" && v.tool === id && v.ds === "tool" && v.bar && v.title === title
+      && !v.ip && !v.it && !v.folded && v.pend === null;
+    /* the Saved card: its rows (earlier drills leave waypoints) or its empty
+       state (A254's groups: "Marked spots · N", "Routes · N") */
+    ok(isTool(v2, "c-saved", "Saved") && /Marked spots ·|Routes ·|Nothing saved (yet|for this map)/.test(p2) && !isTool({ ...v2, bar: false }, "c-saved", "Saved")
+       && !isTool({ ...v2, pend: "c-saved" }, "c-saved", "Saved"),
+       `Saved opens inside the sheet under "${v2.title}": ${JSON.stringify(v2)}, the card "${p2.replace(/<[^>]*>/g, "").slice(0, 60)}"; `
+       + `the judge rejects a missing back row and a row left pending`);
+    /* (3) back: the tool goes to its index, the index folds and lands on Map */
+    const b1 = SX.back(); flushTimeouts(); const v3 = view();
+    const b2 = SX.back(); flushTimeouts(); const v4 = view();
+    const backOk = (r1, a, r2, b) => r1 === "index" && isIndex(a, "plan") && r2 === "fold" && b.k === null && b.ds === null && b.folded;
+    ok(backOk(b1, v3, b2, v4) && !backOk(b1, v2, b2, v4) && !backOk(b1, v3, b2, v3),
+       `back from Saved returns to the Plan index (${b1}), back again folds it (${b2}, ${JSON.stringify(v4)}); `
+       + `the judge rejects a back that left the tool up, and an index left open`);
+    /* (4) the hardware back takes the same path */
+    SX.tab("tools"); flushTimeouts(); grab("c-sources").fire("click"); flushTimeouts();
+    const vt = view(); const hb = B.onBack(); flushTimeouts(); const vh = view();
+    const hwOk = (a, h, b) => isTool(a, "c-sources", "Data sources") && h === "closed:sheet" && isIndex(b, "tools");
+    ok(hwOk(vt, hb, vh) && !hwOk(vt, "closed:rail", vh) && !hwOk(vt, hb, { ...vh, k: null, folded: true }),
+       `the hardware back from Data sources (${JSON.stringify(vt)}) reads "${hb}" and lands on the Tools index (${JSON.stringify(vh)}); `
+       + `the judge rejects a back that folded the drawer instead`);
+    /* (5) a row that writes no card leaves nothing pending, and the index up:
+       Fuel range's stepper (A250). − and + stop at the ends — 120 never
+       turns into Off by one tap more — and the line says "Routes warn past
+       it" only while a range is set */
+    SX.tab("plan"); flushTimeouts();
+    const fv = () => ({ v: grab("c-fuel-v").innerHTML || "", s: grab("c-fuel-s").textContent || "",
+      dn: !!grab("c-fuel-dn").disabled, up: !!grab("c-fuel-up").disabled });
+    grab("c-fuel-up").fire("click"); flushTimeouts(); const f1 = fv(), v5 = view();
+    for (let i = 0; i < 6; i++) grab("c-fuel-up").fire("click");
+    flushTimeouts(); const fTop = fv();
+    for (let i = 0; i < 8; i++) grab("c-fuel-dn").fire("click");
+    flushTimeouts(); const fOff = fv();
+    grab("c-fuel-up").fire("click"); grab("c-fuel-up").fire("click"); flushTimeouts(); const fBack = fv();
+    const stayOk = (v) => isIndex(v, "plan") && v.pend === null;
+    const endsOk = (top, off) => top.v === "120 mi" && top.up && !top.dn && /Routes warn past it/.test(top.s)
+      && off.v === "Off" && off.dn && !off.up && !/warn/.test(off.s);
+    ok(stayOk(v5) && f1.v === "80 mi" && endsOk(fTop, fOff) && fBack.v === "50 mi"
+       && !stayOk({ ...v5, pend: "c-fuel" }) && !stayOk({ ...v5, k: "tool" })
+       && !endsOk({ ...fTop, v: "Off" }, fOff) && !endsOk(fTop, { ...fOff, s: "Routes warn past it" }),
+       `Fuel range steps in the row (50 → "${f1.v}"; up to "${fTop.v}" and it stays, + ${fTop.up ? "off" : "ON"}; down to "${fOff.v}", `
+       + `"${fOff.s}"; back to "${fBack.v}") and the index stays up with nothing pending; the judge rejects the row left pending, `
+       + `a tool opened for it, 120 wrapping to Off, and "Routes warn past it" while Off`);
+    /* (6) any other card ends the sheet: Start from my position is not a sheet
+       tool — it arms a map tap and says so in an ordinary card, the drawer open
+       on that card; its second press cancels (a toast, the drawer folds) */
+    SX.tab("plan"); flushTimeouts();
+    grab("c-me").fire("click"); flushTimeouts();
+    const v6 = view(), p6 = (grab("panel")._html || "").replace(/<[^>]*>/g, "");
+    const endOk = (v, p) => v.k === null && v.ds === null && !v.ip && !v.it && !v.bar && !v.folded && /Tap the map/.test(p);
+    ok(endOk(v6, p6) && !endOk({ ...v6, k: "index" }, p6) && !endOk({ ...v6, ip: true }, p6),
+       `a card that is not a sheet tool ends the sheet and opens as itself: ${JSON.stringify(v6)}, "${p6.slice(0, 50)}"; `
+       + `the judge rejects the index left up under it`);
+    grab("c-me").fire("click"); flushTimeouts();
+    /* (7) a fold from a sheet lands on Map; off a ride the compass opens IN
+       the sheet (A258), its floating panel left down, its box painted */
+    SX.tab("tools"); flushTimeouts(); N.rail(false); flushTimeouts(); const v7 = view();
+    SX.tab("tools"); flushTimeouts(); grab("c-compass").fire("click"); flushTimeouts();
+    const v8 = view(), cmpUp = !grab("cmppanel").hidden, cmpSheet = (grab("cmpsheet")._html || "").length;
+    SX.back(); flushTimeouts(); const v8b = view();
+    const cmpOk = (v, up, n) => isTool(v, "c-compass", "Compass") && !up && n > 0;
+    ok(v7.k === null && v7.folded && cmpOk(v8, cmpUp, cmpSheet) && !cmpOk(v8, true, cmpSheet) && !cmpOk(v8, cmpUp, 0) && isIndex(v8b, "tools"),
+       `a fold ends the sheet (${JSON.stringify(v7)}); off a ride Compass opens in the sheet `
+       + `(${JSON.stringify(v8)}, its box ${cmpSheet} chars, the floating panel ${cmpUp ? "UP" : "down"}), and back returns to the Tools index; `
+       + `the judge rejects the floating panel up beside it, and an empty box`);
+    /* (8) setChip writes a row's value, never its label: Machine, picked
+       from its rows (A249) */
+    SX.tab("plan"); flushTimeouts();
+    const mv0 = grab("c-machine-v").innerHTML || "", ml0 = grab("c-machine")._html || "";
+    const mrows = () => documentStub.querySelectorAll("[data-mach]");
+    grab("c-machine").fire("click"); flushTimeouts();
+    const was = (mrows().find((b) => /\bon\b/.test(b.className)) || {}).dataset || {};
+    const other = mrows().find((b) => !/\b(on|off)\b/.test(b.className));
+    if (other) { other.fire("click"); flushTimeouts(); }
+    const mv1 = grab("c-machine-v").innerHTML || "", ml1 = grab("c-machine")._html || "", v9 = view();
+    const machOk = (a, b, la, lb, v) => a !== b && la === lb && isTool(v, "c-machine", "Your machine");
+    ok(!!other && machOk(mv0, mv1, ml0, ml1, v9) && !machOk(mv0, mv1, ml0, ml1 + "<span>Quad</span>", v9) && !machOk(mv0, mv0, ml0, ml1, v9),
+       `Machine writes its value ("${mv0}" → "${mv1}", picked from its rows) and keeps its row; its card stays in the sheet (${JSON.stringify(v9)}); `
+       + `the judge rejects a row whose markup the value overwrote, and a value that did not move`);
+    { const back = mrows().find((b) => b.dataset.mach === was.mach); if (back) { back.fire("click"); flushTimeouts(); } }
+    SX.back(); SX.back(); flushTimeouts();
+  }
+}
+
+/* 9d · take 190 · A260 · MARK THIS SPOT marks a fresh fix, never a guess (the
+   maintainer, 2026-10-02). With no live fix it says "Getting a GPS fix…" and
+   saves nothing; Cancel saves nothing; 30 s with no fix says so, offers Try
+   again and saves nothing; a fix that arrives is saved where the fix is (not
+   the start pin); a typed name already in use is refused; Undo removes the
+   mark. Each judge rejects a forged outcome. */
+{
+  const SX = sandbox.window.__sheet, ls = sandbox.window.localStorage;
+  const wps = () => { try { return JSON.parse(ls.getItem("apex.waypoints.v1") || "[]"); } catch (e) { return []; } };
+  const txt = () => (grab("panel")._html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  if (!SX) ok(false, "take 190 · A260 · no __sheet hook");
+  else {
+    const Real = sandbox.Date, wp0 = JSON.stringify(wps());
+    /* every fix old: 10 minutes on, nothing is live */
+    sandbox.Date = class extends Real { constructor(...a) { if (a.length) super(...a); else super(Real.now() + 600000); }
+      static now() { return Real.now() + 600000; } };
+    try {
+      SX.tab("tools"); flushTimeouts();
+      if (NO_GPS) {
+        /* no receiver on this pass: Mark says so at once and marks nothing —
+           a wait that can never end, or a guess, is the failure */
+        grab("c-markme").fire("click"); flushTimeouts();
+        const t0 = txt(), n0 = wps().length, st0 = SX.state();
+        const noRxOk = (t, n, st) => /no GPS receiver/.test(t) && /Nothing was marked/.test(t) && n === JSON.parse(wp0).length
+          && st.tool === "c-markme" && !/Getting a GPS fix/.test(t);
+        ok(noRxOk(t0, n0, st0) && !noRxOk("Getting a GPS fix… Mark this spot uses a fresh fix", n0, st0) && !noRxOk(t0, n0 + 1, st0),
+           `A260 · with no GPS receiver Mark this spot says so and marks nothing: "${t0.slice(0, 64)}" (${st0.tool}, ${n0} spots); `
+           + `the judge rejects a wait that cannot end, and a saved guess`);
+        SX.exit(); flushTimeouts();
+      } else {
+      /* (1) waiting, then Cancel */
+      grab("c-markme").fire("click");
+      const t1 = txt(), n1 = wps().length, st1 = SX.state();
+      grab("mk-cancel").fire("click"); flushTimeouts();
+      const t2 = txt(), n2 = wps().length;
+      const waitOk = (t, n, st) => /Getting a GPS fix/.test(t) && n === JSON.parse(wp0).length && st.tool === "c-markme";
+      ok(waitOk(t1, n1, st1) && /nothing was marked/i.test(t2) && n2 === n1 && !waitOk(t1, n1 + 1, st1) && !waitOk("Marked", n1, st1),
+         `A260 · with no live fix Mark this spot waits — "${t1.slice(0, 48)}" in the sheet (${st1.tool}), nothing saved (${n1}); `
+         + `Cancel: "${t2.slice(0, 40)}", still ${n2}; the judge rejects a mark saved while waiting, and a "Marked" with no fix`);
+      /* (2) 30 s with no fix */
+      SX.tab("tools"); flushTimeouts(); grab("c-markme").fire("click");
+      flushTimeouts(30000);   /* flushTimeouts runs timers up to 5 s by default: the wait is 30 s */
+      const t3 = txt(), n3 = wps().length;
+      const noFixOk = (t, n) => /No GPS fix in 30 s/.test(t) && /Nothing was marked/.test(t) && /Try again/.test(t) && n === JSON.parse(wp0).length;
+      ok(noFixOk(t3, n3) && !noFixOk(t3, n3 + 1) && !noFixOk("Marked", n3),
+         `A260 · 30 s with no fix: "${t3.slice(0, 70)}" — nothing saved (${n3}); the judge rejects a guessed mark`);
+      /* (3) Try again, then a fix arrives: saved where the fix is */
+      grab("mk-retry").fire("click");
+      const at = [-84.6123, 44.6789];
+      geo.cb && geo.cb({ coords: { longitude: at[0], latitude: at[1], accuracy: 5 } }); flushTimeouts();
+      const t4 = txt(), w4 = wps(), mk = w4[0] || {}, ease = record.eased[record.eased.length - 1] || {};
+      const savedOk = (t, rec) => /MARKED/.test(t) && !!rec.p && Math.abs(rec.p[0] - at[0]) < 1e-9 && Math.abs(rec.p[1] - at[1]) < 1e-9;
+      ok(savedOk(t4, mk) && w4.length === JSON.parse(wp0).length + 1 && !savedOk(t4, { p: [-84.6, 44.62] }),
+         `A260 · a fix that arrives is marked where it is: "${t4.slice(0, 44)}", ${JSON.stringify(mk.p)} named "${mk.n}"; `
+         + `the judge rejects a mark at the start pin`);
+      /* the ease after a mark (the maintainer, 2026-10-02 23:20): to z12.5 or
+         closer, centred on the mark; its planted control, an ease to z11 */
+      const zOk = (e) => !!e && e.zoom >= 12.5 - 1e-9 && !!e.center && Math.abs(e.center[0] - at[0]) < 1e-9 && Math.abs(e.center[1] - at[1]) < 1e-9;
+      ok(zOk(ease) && !zOk({ ...ease, zoom: 11 }),
+         `A260 · after the mark the map eases to z${ease.zoom} on it (${JSON.stringify(ease.center)}); the judge rejects take 190's first z11`);
+      /* (4) a typed name already in use is refused — against a spot this drill
+         saves itself (no state from an earlier block); (5) Undo removes the mark */
+      const clash = { n: "Smoke collision spot", p: [-84.5, 44.5], r: null, ts: 1 };
+      ls.setItem("apex.waypoints.v1", JSON.stringify(wps().concat([clash])));
+      grab("mk-name").value = clash.n; grab("mk-done").fire("click"); flushTimeouts();
+      const refused = { note: grab("mk-note").textContent || "", names: wps().filter((x) => x.n === clash.n).length,
+        markName: (wps().find((x) => x.ts === mk.ts) || {}).n };
+      const refOk = (r) => /already a saved spot/.test(r.note) && r.names === 1 && r.markName === mk.n;
+      ok(refOk(refused) && !refOk({ ...refused, names: 2 }) && !refOk({ ...refused, markName: clash.n }),
+         `A260 · a typed name already used ("${clash.n}") is refused ("${refused.note.slice(0, 40)}"), one spot by that name, the mark still "${refused.markName}"; `
+         + `the judge rejects a second spot by that name, and the mark renamed over it`);
+      ls.setItem("apex.waypoints.v1", JSON.stringify(wps().filter((x) => x.ts !== clash.ts)));
+      const before = wps();
+      grab("mk-undo").fire("click"); flushTimeouts();
+      const w5 = wps(), t5 = txt();
+      const undoOk = (w) => w.length === JSON.parse(wp0).length && !w.some((x) => x.ts === mk.ts);
+      ok(undoOk(w5) && !undoOk(before) && /Mark removed/.test(t5 + (grab("toast").textContent || "")),
+         `A260 · Undo removes the mark (${before.length} → ${w5.length} spots); the judge rejects the list as it was before Undo`);
+      SX.exit(); flushTimeouts();
+      }
+    } finally { sandbox.Date = Real; }
+    if (JSON.stringify(wps()) !== wp0) ls.setItem("apex.waypoints.v1", wp0);
+  }
+}
+
+/* 9e · take 190 · piece P, executed in the shipped app: Your machine as rows
+   (A249) with a craft refused by key in a land mode and a planned route
+   cleared in words above the list; Loop from here picks, then Finds, and its
+   start line says what the start pin is (A253); Saved counts what was saved
+   in another region and opens Mark under itself (A254); and while a watch is
+   open the start pin is GPS-driven — Start from my position and a place
+   card's Start from here both say so, though the fix is 40 s old (the
+   maintainer, 2026-10-03 (a); the words without the bracket, 2026-10-08
+   item 3). Each judge rejects a forged outcome. */
+{
+  const SX = sandbox.window.__sheet, N = sandbox.window.__nav, R = sandbox.window.__route;
+  const ls = sandbox.window.localStorage;
+  const txt = () => (grab("panel")._html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const mrows = () => documentStub.querySelectorAll("[data-mach]");
+  /* Loop's start line, read off the card's markup: its class and its text */
+  const lpLine = () => { const m = (grab("panel")._html || "").match(/<div class="([^"]*)" id="lp-start">([^]*?)<\/div>/);
+    return m ? { cls: m[1], t: m[2].replace(/<[^>]*>/g, "").trim() } : { cls: "", t: "(no start line)" }; };
+  const pickMach = (k) => { grab("c-machine").fire("click"); flushTimeouts();
+    const b = mrows().find((x) => x.dataset.mach === k); if (b) { b.fire("click"); flushTimeouts(); } return !!b; };
+  if (!SX || !N || !R || !R.MACHINE) ok(false, "take 190 · piece P · hooks missing (__sheet, __nav, __route)");
+  else {
+    try { sandbox.window.__tour.close("notnow"); } catch (e) {}
+    for (const id of ["modepanel", "actpanel", "lyrpanel", "diagpanel", "cmppanel", "guide"]) grab(id).hidden = true;
+    /* an earlier drill leaves a kayak set by hand (R.setMachine) in a land
+       mode: the block starts on the dirt bike, picked through its row, and
+       puts the machine back as it found it */
+    const MO = sandbox.window.__mode, modeFound = MO ? MO.get() : null;
+    if (MO && modeFound !== "ride") { MO.apply("ride", { silent: true }); flushTimeouts(); }
+    const mFound = R.machine, lbl = (k) => (R.MACHINE[k] || {}).lbl, pos0 = N.pos();
+    SX.tab("plan"); flushTimeouts(); pickMach("bike"); SX.back(); flushTimeouts();
+    const m0 = R.machine, land = R.MACHINE[m0] && !R.MACHINE[m0].mph;
+    /* (1) a craft in a land mode is refused by key */
+    SX.tab("plan"); flushTimeouts(); grab("c-machine").fire("click"); flushTimeouts();
+    const keys = [...new Set(mrows().map((b) => b.dataset.mach))];
+    const kayak = mrows().find((b) => b.dataset.mach === "kayak");
+    if (kayak) { kayak.fire("click"); flushTimeouts(); }
+    const ref = { m: R.machine, t: txt(), tool: SX.state().tool };
+    const refOk = (x) => x.m === m0 && /Kayak is used in Water mode/.test(x.t) && x.tool === "c-machine";
+    ok(land && keys.length === 7 && refOk(ref) && !refOk({ ...ref, m: "kayak" }) && !refOk({ ...ref, t: "Machine set to Kayak." }),
+       `A249 · Your machine lists its ${keys.length} rows (${keys.join(", ")}); in a land mode (${MO ? MO.get() : "?"}, the bike picked: ${land}) a tap on Kayak is refused by key — `
+       + `the machine stays ${ref.m}, "${(ref.t.match(/Kayak is used[^.]*\./) || ["(no refusal)"])[0]}", still in ${ref.tool}; `
+       + `the judge rejects the kayak taken, and a pick made in silence`);
+    SX.back(); flushTimeouts();
+    /* (2) Loop from here: a distance only chooses; Find builds; the start
+       line is the start pin's truth, never the board's "map centre" */
+    SX.tab("plan"); flushTimeouts();
+    const planBefore = N.plan();
+    grab("c-loop").fire("click"); flushTimeouts();
+    /* the distance the older loop drills build (6 or 15 mi), whichever is
+       not chosen now, so the tap changes the choice */
+    const curOn = (documentStub.querySelectorAll("[data-loop]").find((b) => /\bon\b/.test(b.className)) || {}).dataset || {};
+    const want = curOn.loop === "6" ? "15" : "6";
+    const d10 = documentStub.querySelectorAll("[data-loop]").find((b) => b.dataset.loop === want);
+    if (d10) { d10.fire("click"); flushTimeouts(); }
+    const picked = { tool: SX.state().tool, find: grab("lp-find-t").textContent || "", same: N.plan() === planBefore,
+      start: lpLine().t };
+    const pickOk = (x) => x.tool === "c-loop" && x.find === `Find ${want} mi loops` && x.same;
+    const honest = (t) => /^Starts (where you are|at your last GPS fix \(|at the simulated position|at the planning start|at the start pin)/.test(t)
+      && !/map centre/.test(t);
+    ok(!!d10 && pickOk(picked) && honest(picked.start) && !pickOk({ ...picked, same: false })
+       && !honest("Starts at the map centre — no GPS fix yet"),
+       `A253 · a tap on ${want} mi chooses ("${picked.find}", nothing built, still in ${picked.tool}); the start line reads "${picked.start}"; `
+       + `the judge rejects a loop built on the tap, and the board's "Starts at the map centre"`);
+    grab("lp-find").fire("click"); flushTimeouts();
+    const G = N.plan();
+    const builtOk = (g) => !!g && g !== planBefore && g.loop === true && g.lbl === "the start";
+    ok(builtOk(G) && !builtOk(planBefore) && !builtOk(G && { ...G, loop: false }),
+       `A253 · Find builds the loop (${G ? (G.total / 1609.34).toFixed(1) + " mi, ends at " + G.lbl : "NONE: " + txt().slice(0, 90)}); `
+       + `the judge rejects the plan as it was before Find, and a point-to-point route`);
+    /* (A250) Fuel range stepped with that route planned stays in the sheet,
+       and the route cards are written under it (the review: renderRoutes
+       ended the sheet, one trip back to Plan per step) */
+    SX.tab("plan"); flushTimeouts();
+    grab("c-fuel-up").fire("click"); flushTimeouts();
+    const fz = { st: SX.state(), routes: /id="routes"/.test(grab("panel")._html || "") };
+    grab("c-fuel-dn").fire("click"); flushTimeouts();
+    const fzOk = (x) => x.st.kind === "index" && x.st.tab === "plan" && x.routes;
+    ok(fzOk(fz) && !fzOk({ ...fz, st: { ...fz.st, kind: null } }),
+       `A250 · with a route planned, Fuel range's + keeps the Plan index up (${JSON.stringify(fz.st)}), the route cards written under it (${fz.routes}); `
+       + `the judge rejects the sheet ended for the cards`);
+    /* the pin's own truth: with no GPS it is the start pin */
+    N.pos("none"); SX.tab("plan"); flushTimeouts(); grab("c-loop").fire("click"); flushTimeouts();
+    const pl0 = lpLine(), pinLine = pl0.t, pinWarn = /\bwarn\b/.test(pl0.cls);
+    N.pos(pos0);
+    const pinOk = (t, w) => /^Starts at the start pin/.test(t) && w;
+    ok(pinOk(pinLine, pinWarn) && !pinOk("Starts where you are", true) && !pinOk(pinLine, false),
+       `A253 · with no GPS fix the line says "${pinLine}", drawn as a caution (${pinWarn}); the judge rejects "where you are", and the line drawn plain`);
+    SX.back(); flushTimeouts();
+    /* (3) a planned route cleared by a new machine, said above the list */
+    if (land && G) {
+      const to = ["quad", "bike", "sxs"].find((k) => k !== m0);
+      pickMach(to);
+      const h = grab("panel")._html || "", t = txt();
+      const want = `Route cleared — it was planned for ${lbl(m0)}. Plan it again for ${lbl(to)}.`;
+      const clrOk = (html, text) => text.includes(want) && html.indexOf("mach-note") >= 0 && html.indexOf("mach-note") < html.indexOf("data-mach");
+      const moved = h.replace(/<div class="mnote" id="mach-note">[^]*?<\/div>/, "") + '<div class="mnote" id="mach-note">' + want + "</div>";
+      ok(clrOk(h, t) && R.machine === to && !N.plan() && !clrOk(moved, t),
+         `A249 · picking ${lbl(to)} with a loop planned clears it and says so above the rows: "${(t.match(/Route cleared[^]*?\.[^.]*\./) || ["(none)"])[0]}"; `
+         + `the judge rejects the note under the list`);
+      pickMach(m0); SX.back(); flushTimeouts();
+    }
+    /* (4) Saved counts what was saved in another region; (5) Mark from
+       Saved opens under it, the Plan tab still marked, and back returns */
+    const sv0 = ls.getItem("apex.routes.v1"), wp0 = ls.getItem("apex.waypoints.v1");
+    const Real = sandbox.Date;
+    try {
+      ls.setItem("apex.routes.v1", "[]");
+      ls.setItem("apex.waypoints.v1", JSON.stringify([{ n: "Far spot", p: [-85.1, 46.4], r: "smoke-elsewhere", ts: 2 }]));
+      SX.tab("plan"); flushTimeouts(); grab("c-saved").fire("click"); flushTimeouts();
+      const s1 = { t: txt(), tool: SX.state().tool };
+      const awayOk = (x) => x.tool === "c-saved" && /Nothing saved for this map/.test(x.t) && /1 more saved in a different region/.test(x.t)
+        && !/Nothing saved yet/.test(x.t);
+      ok(awayOk(s1) && !awayOk({ ...s1, t: "Nothing saved yet. Plan a route or a loop…" }),
+         `A254 · with one spot saved in another region Saved says "${(s1.t.match(/Nothing saved[^.]*?map|Nothing saved yet/) || ["?"])[0]}" `
+         + `and "${(s1.t.match(/\d+ more saved[^.]*\./) || ["(no count)"])[0]}"; the judge rejects "Nothing saved yet"`);
+      sandbox.Date = class extends Real { constructor(...a) { if (a.length) super(...a); else super(Real.now() + 600000); }
+        static now() { return Real.now() + 600000; } };
+      const mk = documentStub.querySelectorAll('[data-svto]').find((b) => b.dataset.svto === "markme");
+      if (mk) { mk.fire("click"); flushTimeouts(); }
+      const inMark = SX.state();
+      SX.back(); flushTimeouts();
+      const backTo = SX.state();
+      const fromOk = (a, b) => a.tool === "c-markme" && a.tab === "plan" && b.tool === "c-saved" && b.tab === "plan";
+      ok(!!mk && fromOk(inMark, backTo) && !fromOk({ ...inMark, tab: "tools" }, backTo) && !fromOk(inMark, { ...backTo, tool: null }),
+         `A254 · Mark this spot from Saved opens under it (${JSON.stringify(inMark)}) and back returns to Saved (${JSON.stringify(backTo)}); `
+         + `the judge rejects the Tools tab marked while Mark is up, and a back to the index`);
+    } finally {
+      sandbox.Date = Real;
+      if (sv0 === null) ls.removeItem("apex.routes.v1"); else ls.setItem("apex.routes.v1", sv0);
+      if (wp0 === null) ls.removeItem("apex.waypoints.v1"); else ls.setItem("apex.waypoints.v1", wp0);
+      SX.back(); flushTimeouts();
+    }
+    /* (6) a watch open (Home's "Use my location" waiting) and the fix 40 s
+       old: the start pin is still GPS-driven. Start from my position and a
+       place card's Start from here both refuse, in the same words, and the
+       pin does not move; when the wait ends, Start from my position arms */
+    const RD = sandbox.Date;
+    sandbox.Date = class extends RD { constructor(...a) { if (a.length) super(...a); else super(RD.now() + 40000); }
+      static now() { return RD.now() + 40000; } };
+    let gp = null;
+    try {
+      N.pos("gps");
+      SX.tab("plan"); flushTimeouts(); grab("c-home").fire("click"); flushTimeouts(); grab("hc-me").fire("click");
+      const waiting = /Waiting for a GPS fix/.test(txt());
+      SX.tab("plan"); flushTimeouts();
+      const me0 = JSON.stringify(R.ME), live = N.live();
+      grab("c-me").fire("click"); flushTimeouts();
+      const tMe = txt(), armed = /\barm\b/.test(grab("c-me").className || "");
+      const c = R.ME; grab("pc-start")._listeners = {}; theMap._hit = [];
+      theMap.fire("contextmenu", { lngLat: { lng: c[0] + 0.012, lat: c[1] - 0.006 } }); flushTimeouts();
+      grab("pc-start").fire("click"); flushTimeouts();
+      const tPc = txt(), me1 = JSON.stringify(R.ME);
+      flushTimeouts(30000);
+      SX.tab("plan"); flushTimeouts(); grab("c-me").fire("click"); flushTimeouts();
+      const after = { t: txt(), armed: /\barm\b/.test(grab("c-me").className || "") };
+      grab("c-me").fire("click"); flushTimeouts();
+      gp = { waiting, live, tMe, armed, tPc, moved: me0 !== me1, after };
+    } finally { sandbox.Date = RD; N.pos(pos0); }
+    const SAY = "GPS is on — the next fix in the region moves the start pin to where you are, so it cannot be placed by hand.";
+    const drivenOk = (x) => x.waiting && x.live === null && x.tMe.includes(SAY) && !x.armed && x.tPc.includes(SAY) && !x.moved
+      && !/\(a ride/.test(x.tMe + x.tPc) && /Tap the map/.test(x.after.t) && x.after.armed;
+    const noGpsOk = (x) => !x.waiting && /Tap the map/.test(x.tMe) && x.armed;
+    ok(NO_GPS || AWAY ? true : (drivenOk(gp) && !drivenOk({ ...gp, moved: true }) && !drivenOk({ ...gp, armed: true })
+         && !drivenOk({ ...gp, tMe: "GPS is on (a ride, or a Locate waiting for its fix) — " + SAY.slice(13) })),
+       NO_GPS || AWAY ? `the GPS-driven start pin: no in-region watch on this pass (${NO_GPS ? "no receiver" : "away"}); ${gp && noGpsOk(gp) ? "Start from my position arms as ever" : JSON.stringify(gp)}`
+       : `with Home's wait holding GPS (${gp.waiting}) and the fix 40 s old (live ${gp.live === null ? "no" : "YES"}), Start from my position says `
+         + `"${gp.tMe.slice(0, 40)}…" and does not arm; Start from here says the same and the pin ${gp.moved ? "MOVED" : "stays"}; `
+         + `once the wait ends it arms ("${gp.after.t.slice(0, 32)}"); the judge rejects a moved pin, an armed tap, and the old bracket`);
+    if (NO_GPS || AWAY) ok(!!gp && noGpsOk(gp), `…and with no watch open nothing refuses: Start from my position arms ("${gp ? gp.tMe.slice(0, 40) : "?"}")`);
+    if (MO && modeFound && MO.get() !== modeFound) { MO.apply(modeFound, { silent: true }); flushTimeouts(); }
+    R.setMachine(mFound);
+  }
+}
+
+/* 9f · take 190 · A251, A252 · SEARCH AS A SHEET, executed in the shipped
+   app. "Where to?" on the Plan index opens it with the Map tab marked; typed
+   results are rows with an honest count; ONE back closes it and lands on Map
+   (take 189 took two: the results, then the drawer); a jump chip closes it
+   (take 189 left it on); a tab ends it; and Home's address arm dies with it
+   (take 189's survived and took the next hit). Each judge rejects a forged
+   state. */
+{
+  const SX = sandbox.window.__sheet, B = sandbox.window.__back;
+  const st = () => SX.state(), rail = grab("rail");
+  /* (the Map tab's mark is judged in render: the stub does not parse the
+     static tab markup) */
+  const v = () => ({ k: st().kind, srch: /\bon\b/.test(grab("srch").className || ""), folded: rail.className === "folded" });
+  if (!SX || !B) ok(false, "take 190 · A251 · hooks missing (__sheet, __back)");
+  else {
+    try { sandbox.window.__tour.close("notnow"); } catch (e) {}
+    for (const id of ["modepanel", "actpanel", "lyrpanel", "diagpanel", "cmppanel", "guide"]) grab(id).hidden = true;
+    grab("q").value = "";
+    SX.tab("plan"); flushTimeouts(); grab("ix-search").fire("click"); flushTimeouts();
+    const v1 = v(), j1 = ((grab("sjump")._html || "").match(/data-jump=/g) || []).length;
+    const openOk = (x, j) => x.k === "search" && x.srch && !x.folded && j >= 8;
+    ok(openOk(v1, j1) && !openOk({ ...v1, k: "index" }, j1) && !openOk(v1, 0),
+       `A251 · "Where to?" opens search as a sheet ${JSON.stringify(v1)} with ${j1} jump chips; the judge rejects the Plan index left under it, and no chips`);
+    /* results as rows, with their count */
+    const q = grab("q"); q.value = "mi"; q.fire("input"); flushTimeouts();
+    const hh = grab("hits")._html || "", nRows = (hh.match(/class="srow hit"/g) || []).length;
+    const cnt = ((hh.match(/<div class="k" id="hits-n">([^<]*)<\/div>/) || [])[1] || "");
+    /* the count is judged against every match (search's own uncapped list),
+       not against the rows: "9 results" over a cap of nine is the lie */
+    const total = (sandbox.window.__search("mi", true) || []).length;
+    const want = (n) => n > 9 ? `First 9 of ${n} · offline` : `${n} result${n === 1 ? "" : "s"} · offline`;
+    const cntOk = (c, rows, n) => c === want(n) && rows === Math.min(9, n);
+    const chipsUnder = ((grab("sjump")._html || "").match(/data-jump=/g) || []).length;
+    ok(total > 0 && cntOk(cnt, nRows, total) && !cntOk("9 results · offline", 9, total > 9 ? total : 10) && !cntOk(cnt, nRows, total + 1)
+       && chipsUnder >= 8,
+       `A251 · typing "mi": ${nRows} result rows under "${cnt}", of ${total} matches, the jump chips still under them (${chipsUnder}); `
+       + `the judge rejects "9 results" for more than nine, and a count off by one`);
+    /* (A252) one back closes it, onto Map */
+    const hb = B.onBack(); flushTimeouts(); const v2 = v();
+    const backOk = (h, x) => h === "closed:search" && x.k === null && !x.srch && x.folded;
+    ok(backOk(hb, v2) && !backOk(hb, { ...v2, folded: false }) && !backOk("closed:rail", v2),
+       `A252 · one back closes search and folds onto Map ("${hb}", ${JSON.stringify(v2)}); the judge rejects search closed with the drawer left open (a second press)`);
+    /* a jump chip closes it */
+    grab("q").value = ""; grab("c-search").fire("click"); flushTimeouts();
+    const jc = documentStub.querySelectorAll("#sjump [data-jump]")[0] || documentStub.querySelectorAll("[data-jump]").slice(-1)[0];
+    if (jc) { jc.fire("click"); flushTimeouts(); }
+    const v3 = v();
+    const jumpOk = (x) => x.k === null && !x.srch && x.folded;
+    ok(!!jc && jumpOk(v3) && !jumpOk({ ...v3, srch: true }),
+       `A252 · a jump chip closes search (${JSON.stringify(v3)}); the judge rejects search left on behind the jump`);
+    /* a tab ends it */
+    grab("c-search").fire("click"); flushTimeouts(); SX.tab("tools"); flushTimeouts(); const v4 = v();
+    const tabOk = (x) => x.k === "index" && !x.srch;
+    ok(tabOk(v4) && !tabOk({ ...v4, srch: true }) && !tabOk({ ...v4, k: "search" }),
+       `A252 · the Tools tab ends search (${JSON.stringify(v4)}); the judge rejects search left on under the Tools index`);
+    /* the address arm dies with search: Home → Type an address, then back */
+    SX.tab("plan"); flushTimeouts(); grab("c-home").fire("click"); flushTimeouts(); grab("hc-addr").fire("click"); flushTimeouts();
+    const armed = { k: st().kind, arm: /\barm\b/.test(grab("c-home").className || "") };
+    B.onBack(); flushTimeouts();
+    const after = { k: st().kind, arm: /\barm\b/.test(grab("c-home").className || "") };
+    const armOk = (a, b) => a.k === "search" && a.arm && b.k === null && !b.arm;
+    ok(armOk(armed, after) && !armOk(armed, { ...after, arm: true }),
+       `A252 · Type an address arms search for home (${JSON.stringify(armed)}); back ends the arm with it (${JSON.stringify(after)}); `
+       + `the judge rejects the arm surviving search`);
+    /* …and a river hit ends it too: it has no point to make home (the
+       review: the arm survived it and moved the start pin on the next tap) */
+    const riv = ["river", "au sable", "manistee", "creek"].map((w) => (sandbox.window.__search(w, true) || []).findIndex((x) => x.k === "river") >= 0 ? w : null).find(Boolean);
+    if (riv) {
+      SX.tab("plan"); flushTimeouts(); grab("c-home").fire("click"); flushTimeouts(); grab("hc-addr").fire("click"); flushTimeouts();
+      grab("q").value = riv; grab("q").fire("input"); flushTimeouts();
+      const list = sandbox.window.__search(riv, true).slice(0, 9), ri = list.findIndex((x) => x.k === "river");
+      const hit = documentStub.querySelectorAll(".hit").filter((h) => h.dataset.i === String(ri)).slice(-1)[0];
+      const armB = /\barm\b/.test(grab("c-home").className || "");
+      if (hit) { hit.fire("click"); flushTimeouts(); }
+      const armA = /\barm\b/.test(grab("c-home").className || "");
+      const rivOk = (b, a) => b && !a;
+      ok(!!hit && rivOk(armB, armA) && !rivOk(armB, true),
+         `A252 · with the address arm on (${armB}), a river hit ("${riv}") ends it (${armA ? "STILL ARMED" : "cleared"}); the judge rejects the arm kept`);
+    } else ok(true, "A252 · no river in this bundle's index to tap (the river-hit arm is judged where one is)");
+    SX.exit(); flushTimeouts();
+  }
+}
+
+/* 9g · take 190 · piece R, executed in the shipped app: Turns pins its own
+   Ride it, which starts the ride, and a Turns opened mid-ride has none
+   (A261); the Ride tab before a ride opens the Ride card — Plan first goes to
+   Plan, Start riding starts the ride and its Start then hides (A262); the
+   tour counts the steps it shows, and Skip is never again (A263). Each
+   judge rejects a forged state. */
+{
+  const SX = sandbox.window.__sheet, N = sandbox.window.__nav, T = sandbox.window.__tour, R = sandbox.window.__route;
+  const sh = grab("shell");
+  const html = () => grab("panel")._html || "";
+  const rideOn = () => "ride" in sh.dataset;
+  const stop = () => { for (let i = 0; i < 3 && rideOn(); i++) { grab("c-ride").fire("click"); flushTimeouts(); }
+    try { sandbox.window.__tour.close("notnow"); } catch (e) {} };
+  /* a spy ahead of the Ride tab's own Start (c-ride): the hand-off is judged
+     on every pass; the ride itself where there is a receiver (with none,
+     c-ride says so — the GPS refusal) */
+  let crHits = 0; const crSpy = () => { crHits++; };
+  (grab("c-ride")._listeners.click ||= []).unshift(crSpy);
+  const canRide = !NO_GPS && !AWAY;
+  if (!SX || !SX.tap || !N || !T || !R) ok(false, "take 190 · piece R · hooks missing (__sheet.tap, __nav, __tour, __route)");
+  else {
+    try { T.close("notnow"); } catch (e) {}
+    for (const id of ["modepanel", "actpanel", "lyrpanel", "diagpanel", "cmppanel", "guide"]) grab(id).hidden = true;
+    stop();
+    /* (A261) a route, its Turns, and Turns' own Ride it */
+    SX.tab("plan"); flushTimeouts(); grab("c-loop").fire("click"); flushTimeouts();
+    const d6 = documentStub.querySelectorAll("[data-loop]").find((b) => b.dataset.loop === "6");
+    if (d6) { d6.fire("click"); grab("lp-find").fire("click"); flushTimeouts(); }
+    const planned = !!N.plan();
+    /* the stub keeps one element per id: an earlier Turns card's listener
+       would press c-ride again (a browser makes the button anew) */
+    grab("st-ride")._listeners = {};
+    grab("btn-steps").fire("click"); flushTimeouts();
+    const t1 = html();
+    const turnsOk = (h) => /id="steps"/.test(h) && /id="st-foot"/.test(h) && /id="st-ride"/.test(h) && /<span>Ride it<\/span>/.test(h)
+      && h.indexOf('id="st-foot"') > h.indexOf('id="steps"');
+    ok(planned && turnsOk(t1) && !turnsOk(t1.replace('id="st-ride"', 'id="x"')),
+       `A261 · Turns lists the steps with Ride it pinned under them (${planned ? "a 6 mi loop planned" : "NO ROUTE"}); the judge rejects a Turns with no Ride it`);
+    crHits = 0; grab("st-ride").fire("click"); flushTimeouts();
+    const r1 = rideOn(), h1 = crHits;
+    grab("btn-steps").fire("click"); flushTimeouts();
+    const t2 = html();
+    ok(h1 === 1 && (!canRide || (r1 && /id="steps"/.test(t2) && !/id="st-ride"/.test(t2))),
+       `A261 · Turns' Ride it hands to the Ride tab's Start (c-ride pressed ${h1} time${h1 === 1 ? "" : "s"})`
+       + (canRide ? `, the ride starts (${r1 ? "riding" : "NOT riding"}), and a Turns opened mid-ride has no Ride it (${/id="st-ride"/.test(t2) ? "IT HAS ONE" : "none"})`
+         : ` — no receiver on this pass, so c-ride refuses as it should; the ride is judged on the GPS pass`));
+    stop();
+    /* (A262) the Ride card */
+    SX.tap("ride"); flushTimeouts();
+    const c1 = html();
+    const cardOk = (h) => /id="rt-start"/.test(h) && /<span>Start riding<\/span>/.test(h) && /id="rt-plan"/.test(h)
+      && /Ride (from here|the route)/.test(h) && /Retrace/.test(h) && /id="rt-gps"/.test(h);
+    ok(!rideOn() && cardOk(c1) && !cardOk(c1.replace("Start riding", "Ride")),
+       `A262 · the Ride tab before a ride opens the Ride card ("${(c1.match(/Ride (from here|the route)/) || ["?"])[0]}", Start riding, Plan first, the GPS line); `
+       + `the judge rejects a card without its Start`);
+    grab("rt-plan").fire("click"); flushTimeouts();
+    const p1 = SX.state();
+    grab("rt-start")._listeners = {};
+    SX.tap("ride"); flushTimeouts(); crHits = 0; grab("rt-start").fire("click"); flushTimeouts();
+    const r2 = rideOn(), hid = !!grab("rt-start").hidden, h2 = crHits;
+    ok(p1.tab === "plan" && p1.kind === "index" && h2 === 1 && hid && (!canRide || r2),
+       `A262 · Plan first opens the Plan index (${JSON.stringify(p1)}); Start riding is the Ride tab's Start (c-ride pressed ${h2}), `
+       + (canRide ? `the ride starts (${r2}),` : "refused with no receiver on this pass,") + ` and the card's Start then hides (${hid})`);
+    if (canRide) {
+      const before = html(); SX.tap("ride"); flushTimeouts(); const c2 = html();
+      const midOk = (a, b) => rideOn() && a === b;
+      ok(midOk(before, c2) && !midOk(before, c2 + '<button class="chip primary" id="rt-start"><span>Start riding</span></button>'),
+         `A262 · the Ride tab mid-ride leaves the ride's screen as it is — no Ride card, no second Start; the judge rejects a card drawn over the ride`);
+    }
+    stop();
+    /* leaving the Ride tab puts the card away: its Start goes, on Map the
+       drawer folds (plan190 §3 item 14) */
+    /* (a fresh card's Start, as a browser makes one: the stub's element
+       keeps the earlier card's hidden flag) */
+    grab("rt-start")._listeners = {}; grab("rt-start").hidden = false;
+    SX.tap("ride"); flushTimeouts(); const cardUp = /id="rt-start"/.test(html());
+    SX.tap("map"); flushTimeouts();
+    const away = { cardUp, hid: !!grab("rt-start").hidden, folded: grab("rail").className === "folded" };
+    const awayOk = (x) => x.cardUp && x.hid && x.folded;
+    ok(awayOk(away) && !awayOk({ ...away, folded: false }),
+       `A262 · leaving the Ride tab for Map puts the Ride card away (${JSON.stringify(away)}); the judge rejects the card left open over Map`);
+    /* with route cards up, the Ride tab keeps them: their Ride it is its Start */
+    SX.tab("plan"); flushTimeouts(); grab("c-loop").fire("click"); flushTimeouts();
+    { const b = documentStub.querySelectorAll("[data-loop]").find((x) => x.dataset.loop === "6"); if (b) { b.fire("click"); grab("lp-find").fire("click"); flushTimeouts(); } }
+    const cardsBefore = /id="routes"/.test(html());
+    SX.tap("ride"); flushTimeouts();
+    const kept = { routes: /id="routes"/.test(html()), card: /id="rt-start"/.test(html()), open: grab("rail").className !== "folded" };
+    const keptOk = (x) => x.routes && !x.card && x.open;
+    ok(cardsBefore && keptOk(kept) && !keptOk({ ...kept, routes: false, card: true }),
+       `A262 · with route cards up the Ride tab keeps them (${JSON.stringify(kept)}): their Ride it is its Start; the judge rejects the cards replaced by the Ride card`);
+    SX.tab("map"); flushTimeouts();
+    /* (A263) the tour's count and Skip */
+    T.reset(); T.start(); flushTimeouts();
+    const n1 = (((grab("tour-card")._html || "").match(/id="tour-n">([^<]*)</) || [])[1] || "").trim();
+    const all = T.steps.length;
+    grab("tour-never").fire("click"); flushTimeouts();
+    const sk = { on: T.state().on, seen: T.seen() };
+    const tourOk = (n, k) => n === `1 of ${all}` && !k.on && k.seen;
+    ok(tourOk(n1, sk) && !tourOk("1 of 99", sk) && !tourOk(n1, { ...sk, seen: false }),
+       `A263 · the tour opens on "${n1}" (every chip drawn here: ${all} steps); Skip closes it and it is not shown again (${JSON.stringify(sk)}); `
+       + `the judge rejects a wrong count and a Skip that leaves the flag clear`);
+    { const L = grab("c-ride")._listeners.click; const i = L.indexOf(crSpy); if (i >= 0) L.splice(i, 1); }
+  }
 }
 
 /* 10 · nothing ever left the origin */

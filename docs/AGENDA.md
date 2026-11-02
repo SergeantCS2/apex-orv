@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 189.* Ranked by blocking-ness, not by interest.
+*Current as of take 190.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -5194,3 +5194,212 @@ fresh data, so the old judge would have been red there too (INFERRED).
 - **Ruled out:** `casing >= fsroad` (it passes a casing drawn where no road
   is); moving the test's centre (the next data change can put a road on the
   new edge); querying an inset box (a stroke reaches across any box's edge).
+
+## A247 — The sheet framework: Plan and Tools open sheets of labelled rows, each tool inside the sheet with a back row · BUILT take 190 (the rebuild, 2026-11-01)
+Artboards 10 and 16 (V4 mockup), approved 2026-09-30. One sheet state on
+`#rail` (`dataset.sheet`: index or tool, sheetPaint), mirrored to
+`#shell`, which also carries `dataset.sheettool`; one row component
+(`.srow`: icon tile, label, sub-line, value, chevron); one pinned back row
+(`#sheetbar`); one fold rule (every fold clears the sheet and lands on Map
+from Plan or Tools, unless a Tools panel is open or a map tap is armed —
+the maintainer, 2026-11-01, "Keep the tab"); re-tapping the open tab goes
+back to its index and never folds (2026-11-01, "Back to its index"); one
+icon registry; one window hook (`window.__sheet`). `show()` ends the sheet
+unless a row's tool is pending; `showQuiet()` ends it and writes the peek
+line when it is given one (src/app.html showQuiet; A230's `peekGps`
+refreshes only its own lines). The footer (grid, coords, actions) hides in a sheet off a
+ride and stays while riding. The contract is docs/recovery-t190/plan190.md
+§1, as corrected by plan190-delta.md.
+- **Ruled out:** five sheet mechanisms (the lost specs' data-tabsheet, #toolsheet,
+  data-view, data-card and #shell[data-sheet=search]) — one attribute; a
+  router with separate screens (A113: the map stays visible); deferring
+  showQuiet while a tool is open (it left ride cards dead and the peek on
+  "Waiting…"); lowering a render section floor (render.mjs's floors only
+  rise).
+
+## A248 — The Plan index: search entry, Return home, From here and Your ride rows · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 10. "Where to?" opens search; Return home is the one primary;
+From here: Loop from here, Start from my position, Saved; Your ride:
+Machine, Fuel range, Home. If Return home would need a scroll at 360x800 or
+749x832, a slim Return home row is pinned at the sheet's foot (the
+maintainer, 2026-10-02). Start from my position carries a chevron and the
+sub-line "Tap where you stand — plans start there, not the map centre"
+(2026-10-08 item 6).
+- **Ruled out:** chips floating over the map (artboard 10's note, read3 item 1); a
+  Return home reached only by scrolling at 360x800 or 749x832 (2026-10-02);
+  "≤7 per tab" for a sheet (it was written for strips: every row fully on
+  screen instead, with a fit guard).
+
+## A249 — The Machine picker · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 14. Rows for the seven machines, the selected one marked;
+picking applies the legality and clears a route planned for another
+machine with the existing note "Route cleared — it was planned for X. Plan
+it again for Y." above the list. A craft row in a land mode (and a land
+row in Water) is refused by key, with "Used in Water mode" / "Used in the
+land modes".
+- **Ruled out:** the tap-to-cycle chip (read3 item 4); `disabled` in markup (smoke's
+  DOM does not parse it; refused by key instead).
+
+## A250 — The fuel range stepper · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 10's Fuel range row: a stepper you can read, instead of a chip
+that cycles. "Routes warn past it" only while a range is set.
+- **Ruled out:** the tap-to-cycle chip (read3 item 4); a warning sub-line while the
+  range is Off (the copy would lie).
+
+## A251 — Search as a sheet · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 11. A sticky field, results as rows with their kind and an
+honest count ("N results · offline", or "First 9 of N"), jump chips under
+"Jump to a town", "all of it offline". Search is one layer, a sheet kind
+of its own (`data-sheet="search"`): one back closes it and lands on Map
+(plan190 §4: "Back closes the innermost layer"); the Map tab stays marked.
+The action row stays drawn (take 189's search had it: no landmine-135
+rise); "Jump to a place" and its chips stay under the results. The scrim
+is A268.
+- **Ruled out:** folding search on `moveend` (MapLibre fires it on every resize step;
+  A240 folds only on a rider's gesture); a back that closes the results
+  first and the drawer second (A252's defect); `route` as the road icon
+  (one meaning per icon, A216: results carry their kind in words);
+  re-sorting the results into kind sections; a second search engine.
+
+## A252 — Search's back, jump chip and address arm · BUILT take 190 (the rebuild, 2026-11-01)
+Three defects the lost lane S found: back takes two presses (results,
+then the sheet); a jump chip leaves search on; an armed address search
+survives the sheet.
+- **Ruled out:** leaving them as they were (each is a dead end for a rider).
+
+## A253 — Loop from here: pick a distance, then Find · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 12. Distances as a choice, one primary "Find N mi loops", and
+an honest start line: loops start at the start pin (`nearestNode(ME)`),
+so the line says where that is, never "the map centre".
+- **Ruled out:** "Starts at the map centre" (the code starts at the start pin); a loop
+  that runs on tap of a distance (pick, then Find).
+
+## A254 — Saved as rows · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 13. Routes and marked spots as rows; the empty state says how
+to fill it; records saved in another region are counted ("N more saved in
+a different region") instead of "Nothing saved yet". Mark this spot from
+Saved opens Mark and returns to Saved, which keeps the Plan tab marked
+(2026-10-08 item 2).
+- **Ruled out:** "Nothing saved yet" while records exist in another region; marking
+  the Tools tab while Mark is up from Saved (2026-10-08 item 2).
+
+## A255 — The Tools index · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 16. Grouped On the trail (Compass, Mark this spot), Offline
+(HD imagery), Learn (Take the tour, How to use), About (Data sources,
+Diagnostics). No accent on the index.
+- **Ruled out:** repeating the grabber and kicker; Self-test and Pan test inside the
+  sheet (they measure the map, so they keep `show()`).
+
+## A256 — Diagnostics and About this build · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 20: About this build, Self-test and Pan test as rows, and the
+line on sharing a self-test. Diagnostics floats like the compass during a
+ride (the maintainer, 2026-10-02 23:20).
+- **Ruled out:** Self-test and Pan test drawn in the sheet (they leave through
+  `show()`).
+
+## A257 — Data sources · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 21: the independence notice first, then the agencies as
+linked sources, then OTHER DATA with OpenStreetMap and AWS Terrain Tiles
+named in one sentence (2026-10-08 item 4), the U.S. Census Bureau (TIGER
+county lines, address ranges) added (2026-10-02), then the software and
+type licences on one line each. The new links are displayed, never
+fetched; gate.py's check_offline ALLOW list names their hosts.
+- **Ruled out:** OpenStreetMap under "These agencies are the authority" (it is not an
+  agency, 2026-10-08 item 4); fetching any of the new links (§8).
+
+## A258 — The compass in the sheet off a ride; floating during a ride · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 17: dial, heading, bearings to truck, home and waypoints, and
+an honest line when the phone reports no compass. During a ride it keeps
+take 189's floating panel (#cmppanel, cmpFit) — the maintainer,
+2026-10-02.
+- **Ruled out:** the compass in the sheet during a ride (the ride cap is about 120 px
+  at 360x800, under the 136 px dial; the maintainer chose floating).
+
+## A259 — HD imagery's three tier cards · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 18: This view, the county, the whole state, each with its
+tiles and size and its own Save. Nothing downloads on its own; no accent
+on Save (read4).
+- **Ruled out:** an accent on the Save buttons (read4: saves stay deliberate); any
+  automatic download.
+
+## A260 — Mark this spot: a fresh fix, never a guess · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 19. Pressing Mark asks for a fresh GPS fix ("Getting a GPS
+fix…" with Cancel); after 30 s with none it says so and offers Try again,
+never marking a guessed spot or the last fix (the maintainer, 2026-10-02).
+After a mark the map eases to z12.5 so the mark's name draws below the
+"you" marker (2026-10-02 23:20); the pin stays the app's orange. Name
+(optional), Done, Undo; no silent overwrite of a same-named mark.
+- **Ruled out:** marking the last fix or the region centre (take 189 does, its !ME
+  guard is dead); a temporary marker; a green pin (green means an easy ORV
+  route on this map); A265's place-card path (not changed here).
+
+## A261 — Turns: one scroller, Ride it pinned · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 15: the steps in one scroller, "N more steps below", Ride it
+pinned, and the action row kept under the list (2026-10-08 item 1).
+- **Ruled out:** hiding the action row (Return home, Retrace and Dispatch from 1 tap
+  to 2, landmine 135; 2026-10-08 item 1).
+
+## A262 — The Ride tab before a ride: one Start · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 22: the Ride card ("Ride from here", the truck and Retrace
+line, the GPS line, Start riding, Plan first). "Start riding" is the only
+Start on the Ride tab; the folded drawer's Ride (#btn-ride) hides there
+(the maintainer, 2026-10-02). The card is for no route: with route cards
+up the tab keeps them and their Ride it is the one Start (take 190's full
+render: replacing them lost a planned route's options, Save and Turns).
+Leaving the tab puts the card away, folding on Map (plan190 §3 item 14).
+- **Ruled out:** two Starts on the folded Ride tab (c-ride and btn-ride both drawn,
+  2026-10-02).
+
+## A263 — The tour card · BUILT take 190 (the rebuild, 2026-11-01)
+Artboard 23: "N of M", Next and Skip, the ring re-placed after the
+drawer's slide, TOURKEY bumped once. Skip = never show again (Tools → Take
+the tour replays it); back = not now. The step count follows the steps
+actually shown.
+- **Ruled out:** "Seven steps" as fixed copy (the tour skips hidden steps).
+
+## A264 — A tapped pin stays in view when its card opens · BUILT take 190 (the rebuild, 2026-11-01)
+Found at take 189's final shot 09: the card opens over the pin it
+describes. The map eases once so the pin sits in the clear band above the
+drawer; A240 (a card does not fold itself on a resize) holds.
+- **Ruled out:** easing on every resize step (MapLibre fires moveend on each; A240);
+  leaving the pin under the card.
+
+## A265 — The place card's Save as waypoint silently replaces a same-named waypoint · OPEN
+`wpAdd` replaces a waypoint whose name matches, with no word to the
+rider. Found by the lost take 190's lanes; not built there or here.
+- **Ruled out:** changing it inside take 190 (A260's no-overwrite rule covers Mark's
+  own names only).
+
+## A266 — HD progress is drawn as a snapshot · OPEN
+`hdCard` draws the download's progress once; it does not follow the
+download. Found by the lost take 190's lanes; not built there or here.
+- **Ruled out:** a timer that redraws on a guess (real progress bars, never timers —
+  the standing rules).
+
+## A267 — ci/RELEASE.md was frozen at take 186 · BUILT take 190 (the rebuild, 2026-11-01)
+The release notes file still describes take 186, so the releases of
+takes 187, 188 and 189 carried take 186's notes (PROVEN 2026-11-01: the
+file's first line is "Take 186 — choose your pins; set home in one
+button."). Take 190 writes its own and the brief says to.
+- **Ruled out:** leaving release notes out of the take's record (the phone reads
+  them).
+
+## A268 — Search's scrim: the board dims the map behind it · OPEN (the maintainer's call)
+Artboard 11 draws the map dimmed behind the search sheet, and plan190's
+default kept a scrim ("Search keeps its scrim (modal)", §3 item 1). Take
+190 builds search as a sheet without one: a scrim has to decide what a tap
+on it does — close search, or reach the map under it (today a map tap
+opens that place's card, which ends search) — and that is the
+maintainer's to say.
+- **Ruled out:** a scrim that takes taps without that decision (it would make the
+  map under search dead, or a tap on it a silent close).
+
+## A269 — The map stays pitched after a ride · OPEN
+The ride's follow camera pitches the map 55° with bearing up the course
+(src/app.html navFollow, `pitch:NAV.northUp?0:55`); when the ride stops,
+nothing flattens it. Found by take 190's full render (landmine 253: a
+pitched map broke A264's flat placement, now exact at any pitch). Whether
+the map should return flat and north-up after a ride is the maintainer's
+to decide; INFERRED from the code, not seen on the Fold.
+- **Ruled out:** flattening it inside take 190 unasked (a rider may want the view
+  they rode with).
