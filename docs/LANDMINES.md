@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 190.*
+*Current as of take 191.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -165,6 +165,7 @@ Start here. Do not read top to bottom.
 | A camera move lands short of a computed target, only after a ride or in a full run | 253 |
 | A smoke drill that clicks a card's chip changes nothing, though the app wires it | 254 |
 | A section run is green and the full run fails a later section the change never touched | 255 |
+| A tap the app makes for the rider lands on what the map drew before it moved | 256 |
 
 ---
 
@@ -3407,3 +3408,17 @@ A264's pitched pin (253) also showed only there. Rule: a change to what a
 tab, a fold or a card does is proven by a full render, not by the sections
 it names; and state a change leaves behind (a card replaced, a camera
 pitched) is a change to every section after it.
+
+**256. A fixed ceiling taps the frame before, not the frame after.** A
+stack tray's row eases to a zoom and then taps the place for the rider
+(take 188, A197 P3), on 'moveend' then 'idle', with a 2 s ceiling. On main's
+CI run 101 the ceiling won: the map had moved but the restack's new badges
+were not drawn, and the tap hit the last band's stack and reopened it
+(PROVEN: the same failure text, reproduced by holding the restack's draw
+back 2.5 s; runs 99 and 103 and a local run on run 101's own data passed).
+Rule: an action that reads what the map drew (queryRenderedFeatures, a
+synthetic click) checks that the frame it reads is the one its own change
+made — here, that no drawn stack still holds a place the model says is
+alone — and waits for it, with a ceiling that only answers a frame that
+never comes.
+

@@ -1825,7 +1825,8 @@ function sheetPaint(){
   if(sh&&sh.dataset){if(k)sh.dataset.sheet=k;else delete sh.dataset.sheet;
      
     if(SHEET.tool)sh.dataset.sheettool=SHEET.tool;else delete sh.dataset.sheettool}
-  var ip=el('ix-plan'),it=el('ix-tools'),b=el('sheetbar'),t=el('sh-title');
+  var ip=el('ix-plan'),it=el('ix-tools'),b=el('sheetbar'),t=el('sh-title'),sc=el('scrim');
+  if(sc)sc.hidden=(k!=='search');
   if(ip)ip.hidden=!(k==='index'&&SHEET.tab==='plan');
   if(it)it.hidden=!(k==='index'&&SHEET.tab==='tools');
    
@@ -1914,6 +1915,8 @@ var SHEET_KEEP=false;
 try{el('sh-back').addEventListener('click',function(){sheetBack()})}catch(e){}
 try{el('ix-home').addEventListener('click',function(){
   logAct('tap  ix-home');sheetExit();el('btn-home').click()})}catch(e){}
+try{el('scrim').addEventListener('click',function(e){if(e&&e.stopPropagation)e.stopPropagation();
+  logAct('tap  scrim');searchClose('scrim')})}catch(e){}
 try{el('ix-search').addEventListener('click',function(){
   logAct('tap  ix-search');searchOpen({from:'plan'})})}catch(e){}
 try{window.__sheet={state:function(){return {tab:SHEET.tab,tool:SHEET.tool,kind:sheetKind(),pending:SHEET_PENDING}},
@@ -3884,7 +3887,7 @@ function simPath(){
   return path.length?path:null}
 
 function stopRide(){if(riding){clearInterval(riding);riding=null;
-  hudShow(false);
+  hudShow(false);rideCameraFlat();
   setChip('c-ride','ride','Ride it');rideFlag()}}
  
 function rideFlag(){try{var s=el('shell');if(!s)return;
@@ -4011,7 +4014,11 @@ function navWake(on){try{if(on)WAKE.hold('nav');else WAKE.drop('nav')}catch(e){}
 function navStart(){NAV.on=true;NAV.follow=true;NAV.lastAt=null;FIX_T=0;navWake(true);
   RIDE_G_ROOM=52;    
   navChip()}
-function navStop(){NAV.on=false;navWake(false);navChip();navGuideClear();navSay('',true)}
+function navStop(){NAV.on=false;navWake(false);navChip();navGuideClear();navSay('',true);rideCameraFlat()}
+ 
+function rideCameraFlat(){try{
+  if(map.getPitch()>0.5||Math.abs(map.getBearing())>0.5){
+    map.easeTo({pitch:0,bearing:0,duration:600,essential:true});logAct('ride end: the map flat, north up')}}catch(e){}}
 
  
 var VOICE={ok:false,on:false,last:'',near:''};
@@ -6400,8 +6407,15 @@ function stackCard(f){
     b.addEventListener('click',function(){
       var o=recs[+b.dataset.si];if(!o)return;
        
-      var tz=stackRevealZ(o.i,map.getZoom()),fired=false;
-      function tapIt(){if(fired)return;fired=true;
+      var tz=stackRevealZ(o.i,map.getZoom()),fired=false,t0=Date.now();
+       
+      function staleHere(){try{var S=stackAt(stackBand(map.getZoom()),o.i);if(S&&S.m.length>1)return false;
+        var pt=map.project(o.r.p),sf=map.queryRenderedFeatures([[pt.x-18,pt.y-18],[pt.x+18,pt.y+18]],{layers:['poi-stack-bg','poi-stack']});
+        return sf.some(function(f){return +f.properties.n>1&&String(f.properties.ids).split(',').indexOf(String(o.i))>=0})}catch(e){return false}}
+      function tapIt(){if(fired)return;
+        if(staleHere()&&Date.now()-t0<6000){logAct('stack row: waiting for the restack to draw');
+          map.once('idle',tapIt);setTimeout(tapIt,700);return}
+        fired=true;
         var pt=map.project(o.r.p),rc=map.getCanvasContainer().getBoundingClientRect();
         map.getCanvasContainer().dispatchEvent(new MouseEvent('click',
           {bubbles:true,cancelable:true,clientX:rc.left+pt.x,clientY:rc.top+pt.y}))}

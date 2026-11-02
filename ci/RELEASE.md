@@ -1,16 +1,11 @@
-**Take 190 — Plan and Tools as sheets of rows; the screens the V4 mockup drew.**
+**Take 191 — a tap on search's dimmed map closes it; the map goes back flat when a ride stops.**
 
-Plan and Tools open sheets of labelled rows; each tool opens inside with a
-back row. Machine is a picker, fuel range a stepper. Loop: pick a distance,
-then Find. Saved lists routes and marked spots. Search is a sheet that one
-back closes. Mark this spot marks a fresh GPS fix or says there is none.
-The Ride tab opens a Ride card with one Start. Data sources credits the
-Census Bureau and AWS Terrain Tiles.
+Search now dims the map behind it, as the mockup draws it; a tap on the dim
+closes search, as back does. When a ride stops, the map eases back to flat
+and north-up, keeping where it is and its zoom. A place picked from a
+stack's list opens its own card, even on a slow frame. Take 190's screens
+(Plan and Tools as sheets, Search, the Ride card) are all here.
 
-On the phone: Plan — does every row fit with Return home on screen, at
-both screens of the Fold? Machine: pick Quad with a route planned — does
-it say the route was cleared? Fuel range: − to Off, + to 120, and no
-further? Loop: tap 10 mi, then Find. Search from "Where to?", then one
-back: are you on the map? Tools → Mark this spot indoors: does it wait,
-and after 30 s say no fix? Ride tab: one Start on screen, open and
-folded? Tap a pin near the top: does it stay in view as the card opens?
+On the phone: open Search, tap the dim above it — are you on the map,
+search closed, nothing else opened? Ride with North up off until the map
+tilts, then Stop: does it go flat and north-up where you were?

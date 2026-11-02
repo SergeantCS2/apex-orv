@@ -3782,6 +3782,45 @@ if (!NO_GPS) {
   }
 }
 
+/* 9h · take 191 · the maintainer's answers of 2026-11-02. A268 "Close
+   search": search dims the map (#scrim) and a tap on the dim closes search
+   onto the map, as back does. A269 "Flatten on Stop": a ride that ends
+   (Stop, or refused with no receiver) eases a tilted map back flat and
+   north-up. Each judge rejects a forged state. */
+{
+  const SX = sandbox.window.__sheet;
+  if (!SX) ok(false, "take 191 · no __sheet hook");
+  else {
+    try { sandbox.window.__tour.close("notnow"); } catch (e) {}
+    for (const id of ["modepanel", "actpanel", "lyrpanel", "diagpanel", "cmppanel", "guide"]) grab(id).hidden = true;
+    const sc = grab("scrim");
+    SX.tab("map"); flushTimeouts(); const off0 = !!sc.hidden;
+    grab("q").value = ""; grab("c-search").fire("click"); flushTimeouts();
+    const on1 = !sc.hidden, k1 = SX.state().kind;
+    sc.fire("click", { stopPropagation() {} }); flushTimeouts();
+    const after = { k: SX.state().kind, srch: /\bon\b/.test(grab("srch").className || ""), folded: grab("rail").className === "folded", dim: !sc.hidden };
+    const scrimOk = (o0, o1, kk, a) => o0 && o1 && kk === "search" && a.k === null && !a.srch && a.folded && !a.dim;
+    ok(scrimOk(off0, on1, k1, after) && !scrimOk(off0, on1, k1, { ...after, srch: true }) && !scrimOk(false, on1, k1, after),
+       `A268 · search dims the map (scrim ${on1 ? "up" : "DOWN"} in search, ${off0 ? "down" : "UP"} before); a tap on it closes search onto the map `
+       + `(${JSON.stringify(after)}); the judge rejects search left on, and a dim drawn outside search`);
+    /* A269 · the map tilted 55° and turned 45°, as the follow camera leaves it */
+    const gp = theMap.getPitch, gb = theMap.getBearing;
+    theMap.getPitch = () => 55; theMap.getBearing = () => 45;
+    const n0 = record.eased.length;
+    try {
+      SX.tab("ride"); flushTimeouts();
+      grab("c-ride").fire("click"); flushTimeouts();
+      for (let i = 0; i < 3 && "ride" in grab("shell").dataset; i++) { grab("c-ride").fire("click"); flushTimeouts(); }
+    } finally { theMap.getPitch = gp; theMap.getBearing = gb; }
+    const flat = record.eased.slice(n0).filter((e) => e && e.pitch === 0 && e.bearing === 0 && !e.center);
+    const flatOk = (f) => f.length >= 1 && f.every((e) => e.zoom === undefined);
+    ok(flatOk(flat) && !flatOk([]) && !flatOk([{ pitch: 0, bearing: 0, zoom: 12 }]),
+       `A269 · a ride that ends (${NO_GPS ? "refused: no receiver" : "Stop"}) eases a tilted map back flat and north-up, centre and zoom kept `
+       + `(${flat.length} ease${flat.length === 1 ? "" : "s"}: ${JSON.stringify(flat[0] || null)}); the judge rejects none, and one that moves the zoom`);
+    SX.tab("map"); flushTimeouts();
+  }
+}
+
 /* 10 · nothing ever left the origin */
 ok(remoteAsked.length === 0, `zero remote requests (${remoteAsked.length})`);
 
