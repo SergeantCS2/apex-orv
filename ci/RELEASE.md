@@ -2,8 +2,9 @@
 
 Search now dims the map behind it, as the mockup draws it; a tap on the dim
 closes search, as back does. When a ride stops, the map eases back to flat
-and north-up, keeping where it is and its zoom. Everything take 190 brought
-(Plan and Tools as sheets of rows, Search as a sheet, the Ride card) is here.
+and north-up, keeping where it is and its zoom. A place picked from a
+stack's list opens its own card, even on a slow frame. Take 190's screens
+(Plan and Tools as sheets, Search, the Ride card) are all here.
 
 On the phone: open Search, tap the dim above it — are you on the map,
 search closed, nothing else opened? Ride with North up off until the map

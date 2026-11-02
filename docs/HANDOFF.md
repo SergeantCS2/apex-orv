@@ -1,6 +1,6 @@
 # HANDOFF — through Take 191 · V3
 
-## Take 191 — 2026-11-02 — the maintainer's two answers on take 190: a tap on search's dimmed map closes search (A268); the map goes back flat and north-up when a ride stops (A269)
+## Take 191 — 2026-11-02 — the maintainer's two answers on take 190: a tap on search's dimmed map closes search (A268); the map goes back flat and north-up when a ride stops (A269); a stack tray's row waits for the restack it asked for (A270)
 
 RECORDED FIRST. The maintainer, 2026-11-02, answering take 190's two open
 items: A268 — the mockup's dimmed map behind search, and "Close search": a
@@ -33,6 +33,23 @@ pitch 0, bearing 0, zoom 16 kept (PROVEN). Found on the way: the nav
 drill's north-up read waited a fixed 1000 ms for a 900 ms ease and read it
 2.9° and 4° short in one run; it now reads when the camera has stopped
 (the same judge).
+
+A270 — found by main's CI run 101 (take 190's merge, 6c0fe16): bundle
+failed on one render check, "a tray row opens its own place's card" — the
+row tap at z17 showed "2 places here … Tap one." for Backcountry Campsite
+#LS-13, which the stacker holds alone there; the gate inside the same job
+passed with render 673 green, so the standalone render's one check made the
+job red and the APK, release and Pages were skipped. Runs 99 and 103 passed
+it, and so did a local stacks run on run 101's own www/ artifact with take
+190's code (PROVEN, render --only=stacks in a worktree at 6c0fe16). Cause: a
+tray row taps its place on 'moveend' then 'idle', with a 2 s ceiling; on a
+slow frame the ceiling tapped the last band's badge, still drawn. The tap
+now waits while a drawn stack under the point still holds a place the model
+says is alone (6 s at most). Render (stacks): the same row tap with the
+restack's draw held back 2.5 s opens the place's own card; with the wait
+taken out it reads "2 places here Stacked at this zoom. Tap one. CAMPGROUND
+Back" — run 101's text (PROVEN, both runs here). Run 101's failed job was
+re-run once to confirm take 190's build on main (landmine 256).
 
 Measured (cloud, Chrome 138, the bundle from run 92's APK — take 189's
 data, main's newest green run when this was measured): smoke all five passes

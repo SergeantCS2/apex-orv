@@ -10117,8 +10117,20 @@ function stackCard(f){
          at z15.6/16.5, against a third under take 187). The tap lands once the
          camera has arrived and the restack it triggers is drawn (moveend,
          then idle); the ceiling answers a stalled frame instead of never. */
-      var tz=stackRevealZ(o.i,map.getZoom()),fired=false;
-      function tapIt(){if(fired)return;fired=true;
+      var tz=stackRevealZ(o.i,map.getZoom()),fired=false,t0=Date.now();
+      /* take 191 · A270 · main's CI run 101: on a slow runner 'idle' came
+         after the 2 s ceiling, whose tap landed on the LAST band's badge —
+         still drawn there — and reopened a stack card for a place the
+         stacker holds alone at this zoom. While the model says alone and a
+         drawn stack under the point still holds the place, the tap waits for
+         the next drawn frame (6 s at most); a true pile taps at once */
+      function staleHere(){try{var S=stackAt(stackBand(map.getZoom()),o.i);if(S&&S.m.length>1)return false;
+        var pt=map.project(o.r.p),sf=map.queryRenderedFeatures([[pt.x-18,pt.y-18],[pt.x+18,pt.y+18]],{layers:['poi-stack-bg','poi-stack']});
+        return sf.some(function(f){return +f.properties.n>1&&String(f.properties.ids).split(',').indexOf(String(o.i))>=0})}catch(e){return false}}
+      function tapIt(){if(fired)return;
+        if(staleHere()&&Date.now()-t0<6000){logAct('stack row: waiting for the restack to draw');
+          map.once('idle',tapIt);setTimeout(tapIt,700);return}
+        fired=true;
         var pt=map.project(o.r.p),rc=map.getCanvasContainer().getBoundingClientRect();
         map.getCanvasContainer().dispatchEvent(new MouseEvent('click',
           {bubbles:true,cancelable:true,clientX:rc.left+pt.x,clientY:rc.top+pt.y}))}

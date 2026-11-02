@@ -5407,3 +5407,22 @@ to decide; INFERRED from the code, not seen on the Fold.
   they rode with); keeping the ride's view after Stop (the maintainer chose
   "Flatten on Stop", 2026-11-02: the map eases back flat and north-up,
   centre and zoom kept).
+
+## A270 — A stack tray's row can reopen the stack on a slow frame · FOUND 2026-11-02 (main's CI run 101, PROVEN) · BUILT take 191
+A row in a stack's tray eases to the zoom where its place stands alone,
+then taps the place once the camera has arrived and drawn ('moveend', then
+'idle'), with a 2 s ceiling for a stalled frame. Main's run 101 (take 190's
+merge) failed render's "a tray row opens its own place's card": the row
+tap landed at z17, where the stacker holds Backcountry Campsite #LS-13
+alone, and showed "2 places here … Tap one." — the ceiling's tap had hit
+the last band's badge, still drawn. The same code passed on run 101's own
+data here and in runs 99 and 103, and a planted slow frame (the restack's
+draw held back 2.5 s) reproduces the failure word for word with the wait
+taken out. Now, while the model says the place is alone and a drawn stack
+under its point still holds it, the tap waits for the next drawn frame (6 s
+at most); a true pile taps at once. A slow phone meets the same race.
+- **Ruled out:** a longer fixed ceiling (a slower frame still loses); re-running CI
+  until it passes (a flake is not a root cause; run 101 was re-run once, to
+  confirm take 190's build, beside this fix); opening the card directly
+  (the tap through the map's own click keeps one path for every pin).
+

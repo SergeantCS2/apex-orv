@@ -2148,12 +2148,25 @@ if (zoomed.trails > 0) {
           if (!f1) { g4 = { mode, notEmitted: "separable" }; break; }
           const a = await tapRow(f1, named(sep.n));
           const own = a.gone && a.txt.indexOf(sep.n) >= 0 && !/places here/.test(a.txt);
+          /* take 191 · A270 · the same row tap on a slow frame: the restack's
+             draw held back 2.5 s (main's CI run 101 tapped the last band's
+             badge, still drawn, and reopened the stack). The tap must wait for
+             the draw and open the place's own card */
+          let slow = null;
+          { m.jumpTo({ center: P[sep.i].p, zoom: 15.2 }); S.run(); await settle();
+            const f1b = emitted(sep.i);
+            if (f1b) { const src = m.getSource("poistack"), sd = src.setData;
+              src.setData = function (d) { setTimeout(() => sd.call(src, d), 2500); return src; };
+              try { const rr = await tapRow(f1b, named(sep.n));
+                slow = { z: rr.z, gone: rr.gone, own: rr.gone && rr.txt.indexOf(sep.n) >= 0 && !/places here/.test(rr.txt), txt: rr.txt.slice(0, 60) }; }
+              finally { src.setData = sd; }
+              await s(2700); S.run(); await settle(); } }
           m.jumpTo({ center: P[colo.ids[0]].p, zoom: 15.2 }); S.run(); await settle();
           const f2 = emitted(colo.ids[0]);
           if (!f2) { g4 = { mode, notEmitted: "pile" }; break; }
           const b = await tapRow(f2, () => true);
           const retray = b.gone && /places here/.test(b.txt);
-          g4 = { mode, sepN: sep.ids.length, sep16: sep.n16, sepName: sep.n, a, own, aBand: S.band(a.z), bTop,
+          g4 = { mode, sepN: sep.ids.length, sep16: sep.n16, sepName: sep.n, a, own, slow, aBand: S.band(a.z), bTop,
                  coloN: colo.ids.length, b, retray };
           break;
         }
@@ -2200,6 +2213,10 @@ if (zoomed.trails > 0) {
       else {
         ok(g4.own && /keep zooming in/.test(g4.a.sub) && g4.a.z >= 16.99 && g4.aBand === g4.bTop,
            `a tray row opens its own place's card: ${g4.sepName} from a ${g4.sepN}-place ${g4.mode} stack at z15.2, still in a ${g4.sep16}-place stack in band 16 and alone in the top band — the row tap must carry it there (landed z${g4.a.z}, band ${g4.aBand} of top ${g4.bTop}; tray said "${g4.a.sub}"; card "${(g4.a.txt || "").replace(/\s+/g, " ").slice(0, 60)}")`);
+        { const w = g4.slow || {};
+          ok(!!g4.slow && w.own && w.z >= 16.99,
+             `A270 · the same row tap on a slow frame (the restack's draw held back 2.5 s) waits for the draw and opens ${g4.sepName}'s own card `
+             + `(landed z${w.z}; card "${(w.txt || "").replace(/\s+/g, " ")}") — main's run 101 tapped the last band's badge and reopened the stack`); }
         ok(g4.retray && /Tap one\.$/.test(g4.b.sub) && !/keep zooming/.test(g4.b.sub),
            `planted: a ${g4.coloN}-place pile on one point never splits — its tray says "${g4.b.sub}" and a row tap reopens the tray (landed z${g4.b.z})`);
       }

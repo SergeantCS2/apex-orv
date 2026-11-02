@@ -6407,8 +6407,15 @@ function stackCard(f){
     b.addEventListener('click',function(){
       var o=recs[+b.dataset.si];if(!o)return;
        
-      var tz=stackRevealZ(o.i,map.getZoom()),fired=false;
-      function tapIt(){if(fired)return;fired=true;
+      var tz=stackRevealZ(o.i,map.getZoom()),fired=false,t0=Date.now();
+       
+      function staleHere(){try{var S=stackAt(stackBand(map.getZoom()),o.i);if(S&&S.m.length>1)return false;
+        var pt=map.project(o.r.p),sf=map.queryRenderedFeatures([[pt.x-18,pt.y-18],[pt.x+18,pt.y+18]],{layers:['poi-stack-bg','poi-stack']});
+        return sf.some(function(f){return +f.properties.n>1&&String(f.properties.ids).split(',').indexOf(String(o.i))>=0})}catch(e){return false}}
+      function tapIt(){if(fired)return;
+        if(staleHere()&&Date.now()-t0<6000){logAct('stack row: waiting for the restack to draw');
+          map.once('idle',tapIt);setTimeout(tapIt,700);return}
+        fired=true;
         var pt=map.project(o.r.p),rc=map.getCanvasContainer().getBoundingClientRect();
         map.getCanvasContainer().dispatchEvent(new MouseEvent('click',
           {bubbles:true,cancelable:true,clientX:rc.left+pt.x,clientY:rc.top+pt.y}))}
