@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 190.* Ranked by blocking-ness, not by interest.
+*Current as of take 191.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -5384,7 +5384,7 @@ button."). Take 190 writes its own and the brief says to.
 - **Ruled out:** leaving release notes out of the take's record (the phone reads
   them).
 
-## A268 — Search's scrim: the board dims the map behind it · OPEN (the maintainer's call)
+## A268 — Search's scrim: the board dims the map behind it · DECIDED 2026-11-02 (the maintainer: "Close search") · BUILT take 191
 Artboard 11 draws the map dimmed behind the search sheet, and plan190's
 default kept a scrim ("Search keeps its scrim (modal)", §3 item 1). Take
 190 builds search as a sheet without one: a scrim has to decide what a tap
@@ -5392,9 +5392,11 @@ on it does — close search, or reach the map under it (today a map tap
 opens that place's card, which ends search) — and that is the
 maintainer's to say.
 - **Ruled out:** a scrim that takes taps without that decision (it would make the
-  map under search dead, or a tap on it a silent close).
+  map under search dead, or a tap on it a silent close); a dim a tap
+  reaches through (the maintainer chose "Close search", 2026-11-02: the dim
+  is a modal's, a tap on it closes search as back does).
 
-## A269 — The map stays pitched after a ride · OPEN
+## A269 — The map stays pitched after a ride · DECIDED 2026-11-02 (the maintainer: "Flatten on Stop") · BUILT take 191
 The ride's follow camera pitches the map 55° with bearing up the course
 (src/app.html navFollow, `pitch:NAV.northUp?0:55`); when the ride stops,
 nothing flattens it. Found by take 190's full render (landmine 253: a
@@ -5402,4 +5404,6 @@ pitched map broke A264's flat placement, now exact at any pitch). Whether
 the map should return flat and north-up after a ride is the maintainer's
 to decide; INFERRED from the code, not seen on the Fold.
 - **Ruled out:** flattening it inside take 190 unasked (a rider may want the view
-  they rode with).
+  they rode with); keeping the ride's view after Stop (the maintainer chose
+  "Flatten on Stop", 2026-11-02: the map eases back flat and north-up,
+  centre and zoom kept).

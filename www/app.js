@@ -1825,7 +1825,8 @@ function sheetPaint(){
   if(sh&&sh.dataset){if(k)sh.dataset.sheet=k;else delete sh.dataset.sheet;
      
     if(SHEET.tool)sh.dataset.sheettool=SHEET.tool;else delete sh.dataset.sheettool}
-  var ip=el('ix-plan'),it=el('ix-tools'),b=el('sheetbar'),t=el('sh-title');
+  var ip=el('ix-plan'),it=el('ix-tools'),b=el('sheetbar'),t=el('sh-title'),sc=el('scrim');
+  if(sc)sc.hidden=(k!=='search');
   if(ip)ip.hidden=!(k==='index'&&SHEET.tab==='plan');
   if(it)it.hidden=!(k==='index'&&SHEET.tab==='tools');
    
@@ -1914,6 +1915,8 @@ var SHEET_KEEP=false;
 try{el('sh-back').addEventListener('click',function(){sheetBack()})}catch(e){}
 try{el('ix-home').addEventListener('click',function(){
   logAct('tap  ix-home');sheetExit();el('btn-home').click()})}catch(e){}
+try{el('scrim').addEventListener('click',function(e){if(e&&e.stopPropagation)e.stopPropagation();
+  logAct('tap  scrim');searchClose('scrim')})}catch(e){}
 try{el('ix-search').addEventListener('click',function(){
   logAct('tap  ix-search');searchOpen({from:'plan'})})}catch(e){}
 try{window.__sheet={state:function(){return {tab:SHEET.tab,tool:SHEET.tool,kind:sheetKind(),pending:SHEET_PENDING}},
@@ -3884,7 +3887,7 @@ function simPath(){
   return path.length?path:null}
 
 function stopRide(){if(riding){clearInterval(riding);riding=null;
-  hudShow(false);
+  hudShow(false);rideCameraFlat();
   setChip('c-ride','ride','Ride it');rideFlag()}}
  
 function rideFlag(){try{var s=el('shell');if(!s)return;
@@ -4011,7 +4014,11 @@ function navWake(on){try{if(on)WAKE.hold('nav');else WAKE.drop('nav')}catch(e){}
 function navStart(){NAV.on=true;NAV.follow=true;NAV.lastAt=null;FIX_T=0;navWake(true);
   RIDE_G_ROOM=52;    
   navChip()}
-function navStop(){NAV.on=false;navWake(false);navChip();navGuideClear();navSay('',true)}
+function navStop(){NAV.on=false;navWake(false);navChip();navGuideClear();navSay('',true);rideCameraFlat()}
+ 
+function rideCameraFlat(){try{
+  if(map.getPitch()>0.5||Math.abs(map.getBearing())>0.5){
+    map.easeTo({pitch:0,bearing:0,duration:600,essential:true});logAct('ride end: the map flat, north up')}}catch(e){}}
 
  
 var VOICE={ok:false,on:false,last:'',near:''};

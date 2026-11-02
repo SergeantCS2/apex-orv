@@ -841,6 +841,10 @@
      top while the results scroll in the drawer's own body (no inner
      scroller); results are rows with their kind; the jump chips wrap */
   #rail[data-sheet="search"] #srch{margin-top:0}
+  /* take 191 · A268 · the map dimmed behind search, a modal's: a tap on the
+     dim closes search (the maintainer, 2026-11-02, "Close search") and
+     nothing on the map under it is tapped */
+  #scrim{position:absolute;inset:0;z-index:var(--z-panel);background:var(--scrim)}
   #rail[data-sheet="search"] #q{position:sticky;top:0;z-index:1}
   #rail[data-sheet="search"] #hits{max-height:none;overflow:visible}
   #hits .sbox{margin:var(--s-2) 0 var(--s-3)}
@@ -1200,13 +1204,16 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 190</span>
+    <span id="title"><b>APEX</b> ORV · Take 191</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
 
   <div id="stage">
     <div id="map"></div>
+    <!-- take 191 · A268 · search's scrim: the map dimmed behind the search
+         sheet (artboard 11); a tap on it closes search, as back does -->
+    <div id="scrim" hidden></div>
     <!-- Scale and elevation, floated over the map where every off-road app puts
          them. A rider reads distance and height far more often than anything the
          old title bar showed. -->
@@ -4004,7 +4011,8 @@ function sheetPaint(){
   if(sh&&sh.dataset){if(k)sh.dataset.sheet=k;else delete sh.dataset.sheet;
     /* which tool: Mark this spot keeps the map's chrome (artboard 19) */
     if(SHEET.tool)sh.dataset.sheettool=SHEET.tool;else delete sh.dataset.sheettool}
-  var ip=el('ix-plan'),it=el('ix-tools'),b=el('sheetbar'),t=el('sh-title');
+  var ip=el('ix-plan'),it=el('ix-tools'),b=el('sheetbar'),t=el('sh-title'),sc=el('scrim');
+  if(sc)sc.hidden=(k!=='search');
   if(ip)ip.hidden=!(k==='index'&&SHEET.tab==='plan');
   if(it)it.hidden=!(k==='index'&&SHEET.tab==='tools');
   /* Mark this spot has no back row (artboard 19; plan190 §3.13): Done, Undo
@@ -4101,6 +4109,8 @@ var SHEET_KEEP=false;
 try{el('sh-back').addEventListener('click',function(){sheetBack()})}catch(e){}
 try{el('ix-home').addEventListener('click',function(){
   logAct('tap  ix-home');sheetExit();el('btn-home').click()})}catch(e){}
+try{el('scrim').addEventListener('click',function(e){if(e&&e.stopPropagation)e.stopPropagation();
+  logAct('tap  scrim');searchClose('scrim')})}catch(e){}
 try{el('ix-search').addEventListener('click',function(){
   logAct('tap  ix-search');searchOpen({from:'plan'})})}catch(e){}
 try{window.__sheet={state:function(){return {tab:SHEET.tab,tool:SHEET.tool,kind:sheetKind(),pending:SHEET_PENDING}},
@@ -6768,7 +6778,7 @@ function simPath(){
   return path.length?path:null}
 
 function stopRide(){if(riding){clearInterval(riding);riding=null;
-  hudShow(false);
+  hudShow(false);rideCameraFlat();
   setChip('c-ride','ride','Ride it');rideFlag()}}
 /* take 188 · landmine 135 · #shell[data-ride] while a ride runs (GPS pending
    or live, or the simulator): the folded drawer keeps its action row */
@@ -6955,7 +6965,15 @@ function navWake(on){try{if(on)WAKE.hold('nav');else WAKE.drop('nav')}catch(e){}
 function navStart(){NAV.on=true;NAV.follow=true;NAV.lastAt=null;FIX_T=0;navWake(true);
   RIDE_G_ROOM=52;   /* take 188 · A215 · a new ride starts from the default banner room */
   navChip()}
-function navStop(){NAV.on=false;navWake(false);navChip();navGuideClear();navSay('',true)}
+function navStop(){NAV.on=false;navWake(false);navChip();navGuideClear();navSay('',true);rideCameraFlat()}
+/* take 191 · A269 · the maintainer, 2026-11-02, "Flatten on Stop": the
+   follow camera tilts the map 55° up the course, and a stopped ride left it
+   so (take 190's full render: a pin placed on that tilted map landed short,
+   landmine 253). When a ride ends the map eases back flat and north-up,
+   its centre and zoom kept */
+function rideCameraFlat(){try{
+  if(map.getPitch()>0.5||Math.abs(map.getBearing())>0.5){
+    map.easeTo({pitch:0,bearing:0,duration:600,essential:true});logAct('ride end: the map flat, north up')}}catch(e){}}
 
 /* take 173 · A187 N5 · VOICE, feature-detected and never assumed. The Web
    Speech API rides the phone's own text-to-speech engine — Samsung's, with

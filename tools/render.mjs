@@ -2722,7 +2722,10 @@ if (zoomed.trails > 0) {
       // north-up: bearing goes to 0, pitch flat, on the next fix
       document.getElementById("nav-north").click(); await s(600);
       at = [at[0] + 0.0003, at[1] + 0.0002];
-      N.fix(at, 9, 8, 45); await s(1000);
+      /* the camera's ease is 900 ms: read it when it has stopped (take 191's
+         section run read it at 1000 ms, 2.9° and 4° short of done) */
+      N.fix(at, 9, 8, 45); await s(300);
+      for (let i = 0; i < 40 && m.isMoving(); i++) await s(100);
       const b2 = m.getBearing(), p2 = m.getPitch();
       document.getElementById("nav-north").click(); await s(300);
       // persistence: save, wipe the live state, restore, compare
@@ -2785,6 +2788,30 @@ if (zoomed.trails > 0) {
                recenterFolded, openCtl, plantYield, plantHidden, viaCard };
       } catch (e) { return { error: String((e && e.stack) || e) }; }
     });
+    /* take 191 · A269 · "Flatten on Stop" (the maintainer, 2026-11-02): a
+       ride whose follow camera tilted the map (North up off) ends, and the
+       map comes back flat and north-up at the same zoom. Its control: the
+       tilt read before Stop (a map that never tilted proves nothing) */
+    const fl = await page.evaluate(async () => {
+      const N = window.__nav, m = window.map, s = (ms) => new Promise((r) => setTimeout(r, ms));
+      if (!N || !N.start || !N.fix || !N.stopReal) return { missing: true };
+      const cam = { c: m.getCenter(), z: m.getZoom(), b: m.getBearing(), p: m.getPitch() }, pm0 = N.pos(), nu0 = N.state.northUp;
+      try {
+        N.state.northUp = false; N.state.follow = true;
+        N.start(); let at = [cam.c.lng, cam.c.lat];
+        for (let i = 0; i < 3; i++) { at = [at[0] + 0.0003, at[1] + 0.0002]; N.fix(at, 9, 8, 45); await s(450); }
+        await s(1000);
+        const tilt = { p: Math.round(m.getPitch()), b: Math.round(m.getBearing()) }, z0 = m.getZoom();
+        N.stopReal(); await s(1400);
+        return { tilt, z0: +z0.toFixed(2), flat: { p: Math.round(m.getPitch()), b: Math.round(m.getBearing()), z: +m.getZoom().toFixed(2) } };
+      } catch (e) { return { error: String(e) }; }
+      finally { N.state.northUp = nu0; try { N.rail(false); } catch (e) {} N.pos(pm0);
+        m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z, bearing: cam.b, pitch: cam.p }); }
+    });
+    { const t = fl.tilt || {}, f = fl.flat || {};
+      ok(!fl.missing && !fl.error && t.p >= 50 && Math.abs(f.p) <= 1 && Math.abs(f.b) <= 1 && Math.abs(f.z - fl.z0) < 0.05,
+         `A269 · a ride's camera tilted the map (pitch ${t.p}, bearing ${t.b}); after Stop it is flat and north-up (pitch ${f.p}, bearing ${f.b}), `
+         + `zoom kept (${fl.z0} → ${f.z})` + (fl.error ? " — " + fl.error : "") + (fl.missing ? " — hooks missing" : "")); }
     if (nv.missing) ok(false, "nav / ride hooks missing");
     else if (nv.error) ok(false, `the nav drill ran to the end (it threw: ${nv.error})`);
     else {
@@ -4361,8 +4388,23 @@ if (zoomed.trails > 0) {
         const pl = document.createElement("style"); pl.textContent = '#rail[data-sheet="search"] #q{position:static!important}';
         document.head.appendChild(pl); await s(80); rb.scrollTop = rb.scrollHeight; await s(120); out.fieldCtl = fieldIn(); pl.remove();
         q.value = ""; q.dispatchEvent(new Event("input", { bubbles: true }));
+        /* take 191 · A268 · the dim over the map takes the tap and closes
+           search; its control, the scrim planted away: the same point is
+           the map's */
+        const sg = document.getElementById("stage").getBoundingClientRect();
+        const px = sg.left + sg.width / 2, py = sg.top + Math.max(8, Math.min(sg.height / 2, 120));
+        const at = () => { const h = document.elementFromPoint(px, py); return h ? (h.id || h.className || h.tagName) : "nothing"; };
+        out.scrimAt = at();
+        { const p2 = document.createElement("style"); p2.textContent = "#scrim{display:none!important}"; document.head.appendChild(p2);
+          await s(60); out.scrimCtl = at(); p2.remove(); await s(60); }
+        const hit = document.elementFromPoint(px, py);
+        for (const t of ["mousedown", "mouseup", "click"]) hit && hit.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, clientX: px, clientY: py }));
+        await s(450);
+        out.afterScrim = { kind: window.__sheet.state().kind, folded: /\bfolded\b/.test(document.getElementById("rail").className),
+          card: /Dropped pin|Route here/.test(document.getElementById("panel").textContent || "") && !/\bfolded\b/.test(document.getElementById("rail").className),
+          dim: !document.getElementById("scrim").hidden };
       } catch (e) { out.error = String(e); }
-      try { window.__back && window.__back.onBack(); await s(300); window.railSet(false); await s(200); } catch (e) {}
+      try { if (window.__sheet.state().kind === "search") { window.__back.onBack(); await s(300); } window.railSet(false); await s(200); } catch (e) {}
       return out;
     });
     /* the action row stays drawn (take 189's search was a card over it:
@@ -4373,6 +4415,11 @@ if (zoomed.trails > 0) {
        + `of the footer only the action row (${(sr.footer || []).join(", ") || "none drawn"}), Return home one tap (${sr.home}); typed, ${sr.rows} rows under "${sr.count}", the first one tap (${sr.first}); `
        + (sr.scrolls ? `scrolled to the foot the field stays at the top (${sr.fieldStays}), its control the sticky rule away: ${sr.fieldCtl ? "STILL IN (not caught)" : "gone, caught"}`
          : "the results fit without a scroll here (the sticky field is not exercised)") + (sr.error ? " — " + sr.error : ""));
+    const as = sr.afterScrim || {};
+    const scrimOk = (hitId, a) => hitId === "scrim" && a.kind === null && a.folded && !a.card && !a.dim;
+    ok(!sr.error && scrimOk(sr.scrimAt, as) && !scrimOk(sr.scrimCtl, as),
+       `A268 · search dims the map: a tap above the drawer lands on the dim (${sr.scrimAt}) and closes search onto the map `
+       + `(${JSON.stringify(as)}), no place card opened; its control, the dim planted away, puts the same point on "${sr.scrimCtl}"`);
   }
   /* take 190 · A262 · one Start on the Ride tab (the maintainer,
      2026-10-02): the tab bar's Ride opens the Ride card, and of the three

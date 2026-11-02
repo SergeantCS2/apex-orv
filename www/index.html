@@ -554,6 +554,8 @@
   #rail[data-sheet]:not([data-sheet="search"]) #srch,#rail[data-sheet="index"] #panel,#rail[data-sheet="search"] #panel{display:none}
   
   #rail[data-sheet="search"] #srch{margin-top:0}
+  
+  #scrim{position:absolute;inset:0;z-index:var(--z-panel);background:var(--scrim)}
   #rail[data-sheet="search"] #q{position:sticky;top:0;z-index:1}
   #rail[data-sheet="search"] #hits{max-height:none;overflow:visible}
   #hits .sbox{margin:var(--s-2) 0 var(--s-3)}
@@ -822,13 +824,15 @@
 <div id="shell">
   
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 190</span>
+    <span id="title"><b>APEX</b> ORV · Take 191</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
 
   <div id="stage">
     <div id="map"></div>
+    
+    <div id="scrim" hidden></div>
     
     <div id="readout"><span id="ro-elev">—</span></div>
     
