@@ -175,7 +175,15 @@ jobs:
 
       - name: Restore region artifacts
         id: tilecache
-        uses: actions/cache@v4
+        # take 195 · A207 · restore and save are two steps now. The key ends
+        # in the hash of the step stamps (tools/stepstamp.py) the build that
+        # saved it wrote; a restore takes the newest cache for this region
+        # and DATA_V (the old exact key, region-ID-DATA_V, last). A build that
+        # re-ran a step saves again under its new stamps (below), so the
+        # stamps and the payloads they describe travel together. Before this
+        # an exact-key hit was never re-saved (landmine 220), so no stamp
+        # written after the first build could ever reach the next one.
+        uses: actions/cache/restore@v4
         with:
           # EVERY per-region payload, by the same *_payload.json convention
           # region.py clears by — plus the input caches. This was a hand-written
@@ -201,7 +209,11 @@ jobs:
             osm_cache
             auth_cache
             region_stamp.json
-          key: region-${{ steps.region.outputs.id }}-${{ env.DATA_V }}
+            step_stamps
+          key: region-${{ steps.region.outputs.id }}-${{ env.DATA_V }}-stamps
+          restore-keys: |
+            region-${{ steps.region.outputs.id }}-${{ env.DATA_V }}-
+            region-${{ steps.region.outputs.id }}-${{ env.DATA_V }}
 
       - uses: actions/setup-python@v5
         with:
@@ -211,6 +223,53 @@ jobs:
         # Every step that can change lives in ci/bundle.sh, which the seed job
         # updates. The workflow file is pasted by hand and cannot be (landmine 84).
         run: bash ci/bundle.sh
+
+      # take 195 · A207 · saved only after a green build, and only when a
+      # step ran (its stamp changed): the key is the stamps' hash, so a build
+      # whose every step skipped finds its key equal to the one it restored
+      # and saves nothing. The path list is the restore's, line for line
+      # (tools/gate.py holds the two equal).
+      - name: Key the region cache by its step stamps
+        id: stampkey
+        if: success()
+        run: |
+          # (the default shell runs with -e and pipefail: a build with no
+          # stamp at all must still key, not fail on an unmatched glob)
+          H=$( (cat step_stamps/*.json 2>/dev/null || true) | sha256sum | cut -c1-16)
+          K="region-${{ steps.region.outputs.id }}-${{ env.DATA_V }}-$H"
+          WAS="${{ steps.tilecache.outputs.cache-matched-key }}"
+          echo "key=$K" >> "$GITHUB_OUTPUT"
+          echo "step stamps: $( (ls step_stamps 2>/dev/null || true) | tr '\n' ' ')"
+          if [ "$K" = "$WAS" ]; then
+            echo "save=false" >> "$GITHUB_OUTPUT"
+            echo "the stamps equal the restored cache's ($K): nothing to save"
+          else
+            echo "save=true" >> "$GITHUB_OUTPUT"
+            echo "saving the region cache as $K (restored: ${WAS:-none})"
+          fi
+
+      - name: Save region artifacts
+        if: success() && steps.stampkey.outputs.save == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ./*_payload.json
+            hillshade.jpg
+            imagery.jpg
+            imagery_meta.json
+            imagery_budget.json
+            imagery_tiles.json
+            imagery_tiles
+            dem_meta.json
+            aoi.json
+            authoritative.json
+            dem_cache
+            img_cache
+            osm_cache
+            auth_cache
+            region_stamp.json
+            step_stamps
+          key: ${{ steps.stampkey.outputs.key }}
 
       # 2026-11-01 · uploaded when the build fails too: the data a failed
       # check ran on exists only on this runner, and a cloud session (which

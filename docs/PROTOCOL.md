@@ -1,6 +1,6 @@
 # PROTOCOL · V3
 
-*Revised 2026-09-03, take 194. Take 176 is the production baseline.*
+*Revised 2026-09-03, take 195. Take 176 is the production baseline.*
 
 ## §0 — Production line rules (V3)
 
@@ -151,6 +151,10 @@ it ships.** Copy the committed files into an empty directory, run
 Artifacts survive on disk and hide broken producers. Take 13 found four broken
 steps this way that thirteen takes of ordinary work had not surfaced, including
 one that had been silently reverted two takes earlier. Nothing else finds this.
+
+Since take 195 (A207) the compute steps skip when everything they read equals
+their stamp (tools/stepstamp.py). A clean run sets `APEX_NO_SKIP=1`, so every
+step runs, and a bump of DATA_V in the workflow still starts CI from nothing.
 
 ---
 

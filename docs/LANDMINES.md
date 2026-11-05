@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 194.*
+*Current as of take 195.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -167,6 +167,9 @@ Start here. Do not read top to bottom.
 | A section run is green and the full run fails a later section the change never touched | 255 |
 | A tap the app makes for the rider lands on what the map drew before it moved | 256 |
 | `git push origin <tag>` from a cloud session: HTTP 403, "RPC failed" | 257 |
+| A workflow step fails at a variable assignment with no error printed, only on a run with nothing to match | 258 |
+| Spoken guidance is silent on a phone whose text-to-speech works everywhere else, or the sheet says "no English voice" on a phone that has one | 259 |
+| Every planted control of a new check "passes", and the check still lets a real change through | 260 |
 
 ---
 
@@ -3432,4 +3435,39 @@ fault to retry or route around. Rule: CI makes the tags with its own token
 (`ci/tag_take.sh`: the build workflow after a green release of main, the
 `tag` workflow by hand), and a session that would need one says so instead
 of handing the maintainer a command.
+
+**258. A GitHub run step is `bash -eo pipefail`: a pipeline whose first
+command fails fails an assignment, and so the step.** Take 195's cache-key
+step read `H=$(cat step_stamps/*.json | sha256sum | cut -c1-16)`. With no
+stamp on disk (the first build after the change, and every build where no
+step can stamp) the glob stays literal, `cat` fails, pipefail carries that
+out of the pipeline, and an assignment's status is its substitution's:
+the step dies there with nothing printed (PROVEN 2026-11-05: the step's
+own text, run here under `bash --noprofile --norc -eo pipefail`, exit 1).
+Rule: a command that may legitimately match nothing in a run step gets
+`|| true` inside the pipeline, and a new run step is run locally under
+that exact shell, in its empty case, before CI sees it.
+
+**259. The phone's text-to-speech engine binds after the app starts, and
+says "not supported" until it has.** `@capacitor-community/text-to-speech`
+8.0.2 creates Android's TextToSpeech in the plugin's load() and is told it
+is ready later (onInit). Before that, isLanguageSupported answers false
+(Android's answer when no engine is bound), getSupportedVoices rejects, and
+speak answers "unavailable" (PROVEN by reading its TextToSpeech.java and
+TextToSpeechPlugin.java, take 195; on the Fold UNKNOWN). A probe at boot
+can therefore record "no English voice" for good on a phone that has one.
+Rule: a "no" from a service that starts asynchronously is asked again
+before it is believed (take 195: at 1, 3, 5 and 5 s), and the rider is told
+it is still asking meanwhile. Also from the source: Android 11+ binds the
+engine only with a `<queries>` entry for TTS_SERVICE in the merged
+manifest; tools/android_check.py requires it in the built APK.
+
+**260. A control that may fail for any reason proves nothing: assert the
+reason.** Take 195's stamp selftest planted seven changes and required each
+to re-run the step. All seven did. All seven did because the scratch root
+the test passed as `APEX_STAMP_ROOT` had entered the stamp's recorded
+environment, so the "unchanged" run re-ran too: the one failure that
+showed it. With that fixed, each plant must name its own cause (the file,
+the directory, the argv) in the reason the check gives. Landmine 54's
+family: a red that is the wrong red is as blind as a green.
 

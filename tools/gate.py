@@ -1245,7 +1245,7 @@ MAPLIBRE_VEND_RE = re.compile(r"@license ([^.\n]+)\. Full text of license: \S*/v
 CAPACITOR_HEAD = "\n== Capacitor (the app runtime and its plugins) ==\n"
 NOTICE_CARD_WORDS = ("MapLibre GL JS", "maplibregl.getVersion()", "BSD 3-Clause", "MapLibre contributors",
                      "Mapbox", "glfx.js", "Evan Wallace", "d3-color", "Mike Bostock", "Capacitor",
-                     "Drifty Co.", "Ionic")
+                     "Drifty Co.", "Ionic", "Text-to-speech", "Robin Genz")
 
 
 def _notice_block(lic_txt, head):
@@ -1363,7 +1363,9 @@ def check_licences():
         deps = json.load(open(os.path.join(ROOT, "package.json"), encoding="utf-8")).get("dependencies", {})
     except Exception:
         deps = {}
-    for name in sorted(k for k in deps if k.startswith("@capacitor/")):
+    # take 195 · A218 · a community plugin compiles into the APK as the
+    # official ones do, and its notice travels the same way
+    for name in sorted(k for k in deps if k.startswith(("@capacitor/", "@capacitor-community/"))):
         d = os.path.join(ROOT, "node_modules", *name.split("/"))
         try:
             ver = json.load(open(os.path.join(d, "package.json"), encoding="utf-8"))["version"]
@@ -1699,6 +1701,41 @@ def check_hazards_rules():
                  "two cameras on one spot, one crossing mapped twice)")
 
 
+def check_stepstamp():
+    """take 195 (A207): a compute step skips only on its stamp, and the stamp
+    is honoured only while everything the step read holds. Runs
+    tools/stepstamp.py's own planted controls in a scratch repo (an input,
+    a probed absent path, a listed directory, an imported module, the tool,
+    the output, the argv, osmium's file, a child process, a failed run, the
+    clean-run switch) and holds the pipeline's wiring: every skippable step
+    is a step, and the runner asks the stamp before it runs one."""
+    import importlib.util
+    sp = os.path.join(HERE, "stepstamp.py")
+    if not os.path.exists(sp):
+        return fails.append("tools/stepstamp.py missing (A207)")
+    spec = importlib.util.spec_from_file_location("stepstamp_gate", sp)
+    m = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(m)
+        bad, whys = m.selftest()
+    except Exception as e:
+        return fails.append(f"tools/stepstamp.py's selftest threw (A207): {e}")
+    if bad:
+        return fails.append("tools/stepstamp.py's controls (A207): " + "; ".join(bad))
+    pl = read("tools", "pipeline.py") or ""
+    names = set(re.findall(r'^\s*\("([a-z_-]+)",', pl, re.M))
+    stray = [n for n in m.SKIPPABLE if n not in names]
+    if stray:
+        fails.append(f"stepstamp.SKIPPABLE names {stray}, which are not pipeline steps (A207)")
+    for need in ("stepstamp.fresh(", '"stepstamp.py"), "run"', "name in stepstamp.SKIPPABLE"):
+        if need not in pl:
+            fails.append(f"tools/pipeline.py does not ask the stamp before a skippable step: {need} (A207)")
+    if fails and any("A207" in f for f in fails):
+        return
+    notes.append(f"step stamps (A207): {len(m.SKIPPABLE)} skippable steps wired; {len(whys)} planted changes "
+                 "each re-run the step for their own reason; a process, a failed run and no stamp never skip")
+
+
 def check_osm_fallback():
     ing = read("tools", "ingest.py")
     if not ing:
@@ -1953,6 +1990,37 @@ def check_layer_control():
 #
 # Checked against what the TOOLS ACTUALLY WRITE rather than against a list, so
 # the next payload someone invents is caught the day it is written.
+def _cache_pair(yml):
+    """take 195 · A207 · the region cache is restored and saved by two steps,
+    whose path lists must be the same, line for line: a path the save drops
+    is restored by no build after it, with every step that read it skipping
+    on a stamp that names it. The stamps travel with the payloads, the save
+    keys on them, and the restore falls back by prefix."""
+    try:
+        import yaml
+        d = yaml.safe_load(yml)
+        steps = d["jobs"]["bundle"]["steps"]
+    except Exception as e:
+        return [f"ci/build.yml unreadable as YAML for the cache check: {e}"]
+    rs = [x for x in steps if str(x.get("uses", "")).startswith("actions/cache/restore@")]
+    sv = [x for x in steps if str(x.get("uses", "")).startswith("actions/cache/save@")]
+    out = []
+    if len(rs) != 1 or len(sv) != 1:
+        return [f"the bundle job has {len(rs)} cache restore and {len(sv)} cache save steps, not one of each (A207)"]
+    pr = [l.strip() for l in str(rs[0]["with"].get("path", "")).splitlines() if l.strip()]
+    ps = [l.strip() for l in str(sv[0]["with"].get("path", "")).splitlines() if l.strip()]
+    if pr != ps:
+        out.append("the region cache's restore and save path lists differ: restore only "
+                   f"{sorted(set(pr) - set(ps))}, save only {sorted(set(ps) - set(pr))} (A207)")
+    if "step_stamps" not in pr:
+        out.append("the region cache does not carry step_stamps: no stamp reaches the next build (A207)")
+    if "restore-keys" not in rs[0]["with"]:
+        out.append("the region cache restore has no restore-keys: a stamp-keyed save is never found (A207)")
+    if "stampkey" not in str(sv[0]["with"].get("key", "")) or "success()" not in str(sv[0].get("if", "")):
+        out.append("the region cache save is not keyed by the stamps, or not only after a green build (A207)")
+    return out
+
+
 def check_region_clean():
     import importlib.util, glob as _g
     rp = os.path.join(HERE, "region.py")
@@ -2033,6 +2101,15 @@ def check_region_clean():
             if blk and need not in blk:
                 fails.append(f"ci/build.yml does not cache {need} — every build "
                              f"re-fetches it")
+        fails.extend(_cache_pair(yml))
+        # its controls: a save list one line short, a save that is gone, a
+        # stamp directory not cached, and no stamp-keyed restore
+        for label, bad in (("a save path list one line short", yml.replace("            step_stamps\n          key: ${{ steps.stampkey", "          key: ${{ steps.stampkey", 1)),
+                           ("no save step", yml.replace("actions/cache/save@v4", "actions/upload-artifact@v4")),
+                           ("step_stamps not cached", yml.replace("            step_stamps\n", "")),
+                           ("no restore-keys", yml.replace("restore-keys:", "restore-kees:"))):
+            if bad == yml or not _cache_pair(bad):
+                fails.append(f"control: the region cache check passed with {label} (A207)")
     dirs = getattr(m, "DERIVED_DIRS", [])
     if "imagery_tiles" not in dirs:
         return fails.append(
@@ -3127,6 +3204,20 @@ def check_manifest():
 # that is not called is the check that skipped (landmine 53) — and that the
 # source-side patches android.py promises are still in the file. When a built
 # APK is on disk (local proof builds), it runs the artifact check too.
+def _tts_links(android_py, pkg, lock, ac, app):
+    out = []
+    need = ((android_py, '"@capacitor-community/text-to-speech": "^8', "tools/android.py's package template"),
+            (pkg, '"@capacitor-community/text-to-speech": "^8', "package.json"),
+            (lock, '"node_modules/@capacitor-community/text-to-speech"', "package-lock.json"),
+            (ac, "Lcom/getcapacitor/community/tts/TextToSpeechPlugin;", "tools/android_check.py's kept classes"),
+            (ac, "def queries_missing", "tools/android_check.py's queries audit"),
+            (app, "window.Capacitor.Plugins.TextToSpeech", "src/app.html's driver"))
+    for src, s, where in need:
+        if s not in src:
+            out.append(f"A218 · {where} lost the text-to-speech link: {s}")
+    return out
+
+
 def check_play():
     import subprocess, shutil
     sh = read("ci", "apk.sh") or ""
@@ -3153,6 +3244,18 @@ def check_play():
         if need not in sh:
             fails.append(f"ci/apk.sh does not carry the R8 mapping through (A183): {need}")
     pkg = read("package.json") or ""
+    # take 195 · A218 · the phone's text-to-speech is five links: the app asks
+    # the plugin, the packaging template and package.json name it, the lockfile
+    # pins it (npm ci in the bundle job), and the artifact check proves the
+    # plugin class and the engine's <queries> entry in the built APK. One link
+    # gone is a silent strip on the phone with every harness green.
+    tts = (a, pkg, read("package-lock.json") or "", ac, read("src", "app.html") or "")
+    fails.extend(_tts_links(*tts))
+    for i in range(len(tts)):
+        cut = list(tts)
+        cut[i] = cut[i].replace("text-to-speech", "x").replace("TextToSpeech", "X").replace("queries_missing", "x")
+        if not _tts_links(*cut):
+            fails.append(f"control: the A218 links check passed with link {i + 1} of {len(tts)} removed")
     if '"@capacitor/android": "^8' not in pkg:
         fails.append("package.json is not on @capacitor/android ^8 — targetSdk 36 "
                      "is tied to the Capacitor major (A170)")
@@ -3254,7 +3357,7 @@ def check_ledger_order():
 for fn in (check_handoff, check_stamps, check_release_notes, check_offline, check_splash, check_scrub,
            check_style, check_palette, check_badges, check_tokens, check_scale, check_icons, check_glyphs,
            check_licences, check_machine_legality,
-           check_ledgers, check_osm_fallback, check_gauges_fallback, check_hazards_rules, check_drawn,
+           check_ledgers, check_osm_fallback, check_gauges_fallback, check_hazards_rules, check_stepstamp, check_drawn,
            check_region_clean, check_no_duplicate_defs, check_ledger_order,
            check_layer_control,
            check_artifacts_agree, check_agenda, check_syntax, check_stubs,

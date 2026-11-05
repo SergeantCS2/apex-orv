@@ -4142,6 +4142,111 @@ if (!NO_GPS) {
   }
 }
 
+/* 9l · take 195 · A218 · spoken turns through the phone's own engine (the
+   maintainer approved the design 2026-11-05). The Fold's WebView has no Web
+   Speech API, so the plugin @capacitor-community/text-to-speech is asked
+   first; Web Speech where it exists; else the honest mute. A stand-in
+   plugin answers as the real one does (its TextToSpeech.java, 8.0.2): a
+   promise per call, "not supported" and a rejected voice list until the
+   engine binds. Checked: which driver is chosen, what the ride sheet says
+   while it asks and after, what is spoken and how, and the self-test line.
+   Only the phone proves it speaks. */
+{
+  const V = sandbox.window.__voice, say = sandbox.window.__say, probe = sandbox.window.__voiceProbe,
+        line = sandbox.window.__voiceLine, N = sandbox.window.__nav;
+  const tick = async () => { for (let i = 0; i < 4; i++) await new Promise((r) => setImmediate(r)); };
+  if (!V || !say || !probe || !line || !N) ok(false, "A218 · the voice hooks (__voice, __say, __voiceProbe, __voiceLine) are exposed");
+  else {
+    const was = { ok: V.ok, on: V.on, drv: V.drv, nat: V.nat, voice: V.voice, last: V.last, near: V.near };
+    /* bindAt: the ask on which the engine has bound (Infinity: never);
+       english: what a bound engine says of en-US */
+    const plug = (bindAt, english, voices) => {
+      const P = { asks: 0, vox: 0, spoke: [], stops: 0 };
+      P.api = {
+        isLanguageSupported: (o) => { P.asks++; P.lang = o && o.lang;
+          return Promise.resolve({ supported: P.asks >= bindAt ? english : false }); },
+        getSupportedVoices: () => { P.vox++;
+          return P.vox >= bindAt ? Promise.resolve({ voices }) : Promise.reject(new Error("not bound")); },
+        speak: (o) => { P.spoke.push(o); return Promise.resolve(); },
+        stop: () => { P.stops++; return Promise.resolve(); },
+      };
+      return P;
+    };
+    const fresh = (P) => { V.nat = null; V.drv = null; V.ok = false; V.last = ""; V.near = "";
+      if (P) sandbox.Capacitor = { Plugins: { TextToSpeech: P.api } }; else delete sandbox.Capacitor; };
+    const read = () => ({ drv: V.drv, ok: V.ok, en: V.nat ? V.nat.en : undefined, tries: V.nat ? V.nat.tries : 0,
+      note: grab("hud-vnote").hidden ? "" : grab("hud-vnote").textContent, off: !!grab("nav-voice").disabled, line: line() });
+    /* run the retries the app sets, one at a time, until it stops asking */
+    const settle = async () => { for (let i = 0; i < 8; i++) { await tick(); flushTimeouts(); } await tick(); };
+    const EN = [{ voiceURI: "en-us-x-tpf-local", name: "English United States", lang: "en-US", localService: true, default: false },
+                { voiceURI: "en-us-x-tpf-network", name: "English United States", lang: "en-US", localService: false, default: false },
+                { voiceURI: "de-de-x-nfh-local", name: "German Germany", lang: "de-DE", localService: true, default: false }];
+    try {
+      /* A · the engine binds on the third ask, English supported */
+      const A = plug(3, true, EN); fresh(A);
+      const r0 = probe(); N.chip();
+      const asking = read();
+      await settle(); N.chip();
+      const bound = read();
+      V.on = true;
+      say("Turn left onto Forest Road 4001"); say("Turn left onto Forest Road 4001");
+      say("In 300 ft, turn right onto Mio Trail");
+      const spoke = A.spoke.slice();
+      say("", true);
+      const stops = A.stops;
+      V.on = false;
+      /* B · bound at once, no English: asked once and four times more */
+      const B = plug(1, false, EN.slice(2)); fresh(B);
+      probe(); await settle(); N.chip();
+      const noEn = read(), bAsks = B.asks;
+      /* C · no plugin and no Web Speech (the smoke sandbox has none) */
+      fresh(null); probe(); N.chip();
+      const none = read();
+      const judgeA = (x) => x.r0 === false && x.asking.drv === "native" && x.asking.ok === false && x.asking.en === null
+        && x.asking.off && /^Voice: asking the phone’s text-to-speech/.test(x.asking.note)
+        && /asking the engine/.test(x.asking.line)
+        && x.bound.drv === "native" && x.bound.ok === true && x.bound.en === true && x.bound.tries === 3
+        && !x.bound.off && x.bound.note === ""
+        && /^Android text-to-speech \(plugin\) · English supported/.test(x.bound.line)
+        && /English 1 on the phone \+ 1 network-only \(e\.g\. en-us-x-tpf-local\)/.test(x.bound.line)
+        && x.lang === "en-US" && x.spoke.length === 2
+        && x.spoke[0].text === "Turn left onto Forest Road 4001" && x.spoke[1].text === "In 300 ft, turn right onto Mio Trail"
+        && x.spoke.every((o) => o.lang === "en-US" && o.queueStrategy === 0 && o.rate === 1 && o.voice === undefined)
+        && x.stops === 1;
+      const judgeB = (x) => x.noEn.drv === "native" && x.noEn.ok === false && x.noEn.en === false && x.bAsks === 5
+        && x.noEn.off && /^Voice is unavailable: this phone has no English text-to-speech voice/.test(x.noEn.note)
+        && /English NOT supported — strip stays silent \(asked 5×\)/.test(x.noEn.line)
+        && /English 0 on the phone \+ 0 network-only/.test(x.noEn.line);
+      const judgeC = (x) => x.none.drv === null && x.none.ok === false && x.none.off
+        && /^Voice is unavailable in this phone’s WebView/.test(x.none.note);
+      const seen = { r0, asking, bound, spoke, stops, lang: A.lang, noEn, bAsks, none };
+      /* the judges, proved on plants first: a "no" taken at the first ask, a
+         stale Web Speech driver, a queued (not flushed) utterance, a repeat
+         spoken twice, a voice index passed, the wrong note, a "no" never
+         asked again, a muted button left live */
+      const ctl = !judgeA({ ...seen, bound: { ...bound, ok: false, en: false, tries: 1 } })
+        && !judgeA({ ...seen, bound: { ...bound, drv: "web" } })
+        && !judgeA({ ...seen, spoke: spoke.map((o) => ({ ...o, queueStrategy: 1 })) })
+        && !judgeA({ ...seen, spoke: [spoke[0], spoke[0], spoke[1]] })
+        && !judgeA({ ...seen, spoke: spoke.map((o) => ({ ...o, voice: 0 })) })
+        && !judgeA({ ...seen, asking: { ...asking, note: "Voice is unavailable in this phone’s WebView." } })
+        && !judgeB({ ...seen, bAsks: 1 }) && !judgeB({ ...seen, noEn: { ...noEn, off: false } })
+        && !judgeC({ ...seen, none: { ...none, ok: true } });
+      ok(judgeA(seen) && judgeB(seen) && judgeC(seen) && ctl,
+         `A218 · the phone's own engine speaks the turns: while it binds the sheet says "${asking.note}"; bound on ask ${bound.tries} `
+         + `it speaks ${spoke.length} lines, each once, flushed, in en-US, the engine's own voice (${JSON.stringify(spoke[0])}), and stops on `
+         + `cancel (${stops}); the self-test says "${bound.line}". With no English it asks ${bAsks}× and says "${noEn.note}" / `
+         + `"${noEn.line}"; with no plugin and no Web Speech, "${none.note}". The judges reject a no taken at once, a Web Speech `
+         + `driver, a queued line, a repeat, a voice index, the wrong note, a no never re-asked, a live muted button and a stale yes (${ctl})`);
+    } catch (e) {
+      ok(false, `A218 · the drill threw: ${e && e.stack ? e.stack.split("\n").slice(0, 3).join(" | ") : e}`);
+    } finally {
+      delete sandbox.Capacitor;
+      Object.assign(V, was); N.chip();
+    }
+  }
+}
+
 /* 10 · nothing ever left the origin */
 ok(remoteAsked.length === 0, `zero remote requests (${remoteAsked.length})`);
 

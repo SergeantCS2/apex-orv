@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 194.* Ranked by blocking-ness, not by interest.
+*Current as of take 195.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -219,12 +219,15 @@ guaranteed offline. ROADMAP 1.2, 1.3, 2.9.
 - **Open:** resumable download and the on-device consumer. Nothing reads a
   manifest yet; that needs the APK.
 
-## A17 — Voice for the turn list · OPEN
+## A17 — Voice for the turn list · CLOSED take 195 (answered by A218)
 
 ROADMAP 5.6. Take 11 generates readable steps; nothing speaks them.
 
 - **Ruled out:** a cloud TTS. PROTOCOL §8 — the field has no network.
-- **Open:** Android on-device TTS through Capacitor, and whether it is wanted at
+- **Closed, take 195:** Android's on-device TTS through the upstream
+  Capacitor plugin is A218's, off by default behind the ride sheet's Voice
+  button; whether it is wanted on a bike stays the rider's switch.
+- **Open (then):** Android on-device TTS through Capacitor, and whether it is wanted at
   all on a bike where a helmet speaker may not be present. Eyes-up matters more
   than ears here, so the visual step list may already be the right answer.
 
@@ -3994,7 +3997,7 @@ the scenes it changed. Not a check: the harness asserts, the probe shows.
 - **Ruled out:** screenshots inside the repo or the gate — they are for
   eyes, not for diffing; a pixel assertion would be landmine 54's shape.
 
-## A207 — CI's bundle job still rebuilds the state every run: the compute steps never skip · FOUND take 186 (run 86) · DESIGNED and APPROVED 2026-11-05 (the maintainer) · to build
+## A207 — CI's bundle job still rebuilds the state every run: the compute steps never skip · FOUND take 186 (run 86) · DESIGNED and APPROVED 2026-11-05 (the maintainer) · BUILT take 195 (CI proves the skip from take 196)
 After A198, run 86 (take 185) restored the v4 cache, recognised the
 workspace from region_stamp.json and skipped the ingest stream (392 s →
 17.5 s, PROVEN in the log) — and the bundle job still took 47 min (55
@@ -4027,6 +4030,22 @@ so a per-step stamp only helps once the key changes.
   step skips only while its inputs equal those of the build that saved the
   cache. That holds for most takes (app-only), not for pipeline takes.
   INFERRED saving: up to ~17 min on an app-only take.
+- **Built, take 195 (HANDOFF), where it differs from the design above:**
+  - the inputs are not listed by hand. tools/stepstamp.py runs each step
+    under an audit hook and records what it actually read, probed, listed,
+    imported and wrote. A step that opens the network, starts a process
+    or loads a C file reader other than osmium writes no stamp;
+  - eight steps, with hazards (take 194) added. Run 116 measured them at
+    1,188 s;
+  - landmine 220 is answered, not just bounded. The cache is restored by
+    prefix and saved under the stamps' hash whenever a stamp changed, so
+    the stamps and the payloads they describe always travel together.
+  Proven here on hazards.py and in the module's selftest; the first skip
+  in CI is take 196's run.
+- **Ruled out:** a stamps-only side cache. A newer build's stamps would sit
+  beside an older build's payloads.
+- **Ruled out:** keying the cache on the tools' hash. Every gate.py edit
+  would re-save 969 MB with nothing changed.
 
 ## A208 — V4 foundation: CSS tokens proven by a computed-style diff, and guards with planted controls · DESIGNED 2026-09-23 (V4 study §5, §11) · BUILT take 187
 Tokens for colour, z-index and motion completely, and for radius, spacing
@@ -4468,7 +4487,7 @@ renamed, A113's five-on-screen rule re-decided with a counter.
   at rest; free ride from the folded drawer is 1 tap (A233). The line above
   stays as the record of take 188's reading.
 
-## A218 — Spoken turn-by-turn is silent on the Fold: its WebView has no Web Speech API · FOUND 2026-09-23 (field, take-186 self-test) · DESIGNED and APPROVED 2026-11-05 (the maintainer) · to build
+## A218 — Spoken turn-by-turn is silent on the Fold: its WebView has no Web Speech API · FOUND 2026-09-23 (field, take-186 self-test) · DESIGNED and APPROVED 2026-11-05 (the maintainer) · BUILT take 195 (the phone proves it)
 The maintainer's self-test on the Fold (take 186; Android 16, WebView
 Chrome 153): "[VOICE] engine — Web Speech API absent in this WebView —
 strip stays silent". Voice guidance (take 173) is feature-detected, so it
@@ -4504,6 +4523,24 @@ phone has offline voice data is UNKNOWN.
   - The harness stubs the plugin and checks which driver is chosen and
     what is spoken.
   Only the phone proves it speaks.
+- **Built, take 195 (HANDOFF).** As designed, plus what reading the
+  plugin's Android source showed (landmine 259):
+  - a "no" is asked again four times over about 14 s, because the engine
+    binds after the app starts;
+  - no voice index is passed, because the plugin's index is a position in
+    a list that changes when a voice pack is installed;
+  - the APK check requires the plugin's classes and its TTS_SERVICE
+    `<queries>` entry in the built artifact;
+  - the plugin's licence travels in www/licenses.txt and on Data sources.
+  Smoke 9l holds the drivers, the notes, what is spoken and the self-test
+  line, with planted controls.
+- **Ruled out:** passing a voice index for an on-device voice, which a
+  newly installed voice pack would shift to another voice. The engine's
+  default English voice, chosen in the phone's settings, speaks.
+- **Ruled out:** trusting the first answer at boot (landmine 259).
+- **Open, on the phone:** the self-test's VOICE line (driver, English or
+  not, voices on the phone versus network-only), and whether a turn is
+  heard.
 
 ## A219 — Marinas and launches ranked by water body · RULED OUT 2026-09-24 (the maintainer)
 The same day, after this item was recorded: "Marinas can stay as they are."
