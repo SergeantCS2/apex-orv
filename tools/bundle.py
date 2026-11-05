@@ -49,6 +49,7 @@ ARTIFACTS = [
     ("gauges_payload.json",  "gauges.json",      "gauges",   False),
     ("nf.json",              "nf.json",          "nf",       False),   # take 174 · A186
     ("hazards_payload.json", "hazards.json",     "hazards",  False),   # take 194 · A189
+    ("slope_payload.json",   "slope.json",       "slope",    False),   # take 196 · A14
 ]
 
 # take 192 · A245 · artifact -> the record its step writes when it omits the
@@ -81,6 +82,7 @@ COUNTERS = {
     "other":   lambda d: len(d.get("r") or []),
     "places":  lambda d: len(d.get("p") or []),
     "hazards": lambda d: len(d.get("h") or []),
+    "slope":   lambda d: len(d.get("p") or []),
     "context": lambda d: len(d.get("counties") or []) + len(d.get("rings") or []),
     # take 139: v2 ships delta-encoded — the count is `n`, the segments are
     # rebuilt in the app
@@ -220,6 +222,26 @@ def build(rid):
         pb = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(pdst) for f in fs)
         man["photos"] = {"count": pn, "bytes": pb}
         print(f"  opt  photos/            {pb/1048576:6.1f} MB  {pn} photos")
+    # take 196 · A14 · the slope bands' PNGs ride beside their index, each
+    # held to the sha256 the index records (the index itself is hashed in
+    # the manifest, so the chain is whole)
+    sdst = os.path.join(dest, "slope")
+    if os.path.isdir(sdst):
+        shutil.rmtree(sdst)      # no bands this build, no folder of last build's
+    if any(e["kind"] == "slope" for e in entries):
+        sp = json.load(open(os.path.join(ROOT, "slope_payload.json")))
+        os.makedirs(sdst)
+        sb = 0
+        for p in sp.get("p") or []:
+            src = os.path.join(ROOT, p["f"])
+            if not os.path.exists(src):
+                sys.exit(f"bundle: slope.json names {p['f']}, which is not on disk")
+            if hashlib.sha256(open(src, "rb").read()).hexdigest() != p.get("h"):
+                sys.exit(f"bundle: {p['f']} is not the image slope.json describes (sha256 differs)")
+            shutil.copyfile(src, os.path.join(dest, p["f"]))
+            sb += os.path.getsize(src)
+        man["slope"] = {"count": len(sp.get("p") or []), "bytes": sb}
+        print(f"  opt  slope/             {sb/1048576:6.1f} MB  {len(sp.get('p') or [])} patch(es)")
     tsrc = os.path.join(ROOT, "imagery_tiles")
     if os.path.isdir(tsrc):
         tdst = os.path.join(dest, "imagery")

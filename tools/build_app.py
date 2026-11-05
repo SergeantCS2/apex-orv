@@ -43,6 +43,7 @@ IN_BUNDLE = {"graph_payload.json": "graph.json",
              "gauges_payload.json": "gauges.json",
              "nf.json": "nf.json",
              "hazards_payload.json": "hazards.json",   # take 194 · A189
+             "slope_payload.json": "slope.json",       # take 196 · A14
              "landcover_payload.json": "landcover.json",
              "areas_payload.json": "areas.json",
              "photos_index.json": "photos.json",
@@ -185,10 +186,12 @@ j('bundle/manifest.json').then(function(man){
     /* take 174 · A186: national forest boundaries — optional, absent-safe */
     have.nf?j('bundle/'+have.nf):Promise.resolve(null),
     /* take 194 · A189: road hazards from OSM — optional, absent-safe */
-    have.hazards?j('bundle/'+have.hazards):Promise.resolve(null)]);
+    have.hazards?j('bundle/'+have.hazards):Promise.resolve(null),
+    /* take 196 · A14: slope bands over the riding areas — optional, absent-safe */
+    have.slope?j('bundle/'+have.slope):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
-  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];NF=r[18];HAZ=r[19];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];NF=r[18];HAZ=r[19];SLOPE=r[20];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -280,6 +283,17 @@ def split():
             shutil.rmtree(pdst)
         shutil.copytree(psrc, pdst)
         print(f"  photos: {sum(len(f) for _, _, f in os.walk(pdst))}")
+    # take 196 · A14 · the slope bands' PNGs ride the same way (the review of
+    # take 196: without this copy slope.json reached www/ and the images it
+    # names did not, take 132's photos gap again). No bands in the bundle,
+    # no folder in www/.
+    ssrc = os.path.join(ROOT, "bundles", R.id, "slope")
+    sdst = os.path.join(WWW, "bundle", "slope")
+    if os.path.isdir(sdst):
+        shutil.rmtree(sdst)
+    if os.path.isdir(ssrc):
+        shutil.copytree(ssrc, sdst)
+        print(f"  slope bands: {sum(len(f) for _, _, f in os.walk(sdst))}")
 
     # The manifest was copied into www/ ONLY as a special case inside
     # pipeline.py's smoke step, so a build_app run without smoke shipped
@@ -386,6 +400,8 @@ def single(out):
             f'PHOTOS = {rd("photos_index.json") or "null"};\n'
             f'PUBS = {rd("publicland_payload.json") or "null"};\n'            f'GAUGES = {rd("gauges_payload.json") or "null"};\n'            f'NF = {rd("nf.json") or "null"};\n'
             f'HAZ = {rd("hazards_payload.json") or "null"};\n'
+            # take 196 · A14 · the single file cannot carry the slope PNGs
+            f'SLOPE = null;\n'
             f'var SHADE = "{uri("hillshade.jpg")}";\n'
             f'var SAT = "{uri("imagery.jpg")}";\n'
             f'var SATB = {json.dumps(json.loads(meta)["b"]) if meta else "[0,0,0,0]"};\n'

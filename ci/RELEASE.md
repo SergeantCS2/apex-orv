@@ -1,17 +1,14 @@
-**Take 195 — Spoken turns through the phone's own text-to-speech; faster builds.**
+**Take 196 — Slope bands over the riding areas.**
 
-Voice guidance now speaks through Android's own text-to-speech engine,
-since this phone's WebView has none of its own. It is off until you turn
-on Voice on the ride sheet. While the app is still asking the phone's
-engine, the sheet says so. If the phone has no English voice, the sheet
-says that instead of staying silent with no reason; each ride asks the
-engine again. If its English voice needs a network, the sheet warns that
-Voice may be silent offline. Tools, Self-test,
-VOICE says what the engine answered and whether its English voice is on
-the phone or needs a network.
+A new layer under Layers, "Slope", off until you turn it on: over the DNR
+riding areas only, ground of 15° and steeper is shaded yellow, 25° orange
+and 35° and steeper red, from the areas' own detailed elevation data
+(about 14 m). Nothing is drawn anywhere else, because the statewide
+elevation data is too coarse to show a hill climb honestly.
 
-Builds skip the slow data steps when nothing they read has changed.
+The self-test no longer fails its map check when it is run right after a
+mode change.
 
-On the phone: run the self-test and read the VOICE line. Then plan a
-route, start a ride, turn Voice on: do you hear "Voice guidance on", and
-the next turn?
+On the phone: Layers, Slope on, then go to Silver Lake or Bull Gap. Do the
+dune faces and the climb show red and orange, and can you still read the
+trails over them?

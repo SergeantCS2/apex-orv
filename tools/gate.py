@@ -1737,6 +1737,90 @@ def check_stepstamp():
                  "each re-run the step for their own reason; a process, a failed run and no stamp never skip")
 
 
+def check_slope_rules():
+    """take 196 (A14): tools/slope.py's bands, held to planted DEMs. A true
+    10, 20, 30 and 40 degree plane at Michigan's latitude, along x and along
+    y (whose rows are spaced by mercator latitude), must read 0, 1, 2 and 3;
+    flat ground and a hole the DEM has no value for read 0; the PNG carries
+    each band as its own palette index with 0 transparent. A slope measured
+    at the equator's pixel size (no cos(latitude)) reads a 20 degree plane as
+    about 14.6 and fails; so does a pixel size off by any factor. And the
+    wiring: terrain.py writes the bands from its own patches, the bundle and
+    the loader carry them."""
+    import importlib.util
+    import math as _m
+    sp = os.path.join(HERE, "slope.py")
+    if not os.path.exists(sp):
+        return fails.append("tools/slope.py missing (A14)")
+    try:
+        import numpy as np
+    except ImportError:
+        return notes.append("slope rules: numpy unavailable here — not checked")
+    spec = importlib.util.spec_from_file_location("slope_gate", sp)
+    S = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(S)
+    bad = []
+    # a patch of 64 rows at z13 starting at 44.6°N: its southern edge is
+    # where 64 rows of 256-a-tile mercator end (slope.degrees refuses rows
+    # that are not the patch's own)
+    z, n_lat, hgt, wid = 13, 44.60, 64, 64
+    y0 = S.merc_y(n_lat)
+    y1 = y0 + hgt / (256 * 2 ** z)
+    s_lat = S.merc_lat(y1)
+    lats = [S.merc_lat(y0 + (y1 - y0) * (i + 0.5) / hgt) for i in range(hgt)]
+    res = [S.EQ / 2 ** z * _m.cos(_m.radians(la)) for la in lats]
+    for th, want in ((10, 0), (20, 1), (30, 2), (40, 3)):
+        t = _m.tan(_m.radians(th))
+        px = np.array([[j * res[i] * t for j in range(wid)] for i in range(hgt)])
+        cum = np.cumsum([0.0] + res[:-1])
+        py = np.array([[cum[i] * t for _ in range(wid)] for i in range(hgt)])
+        for name, raw in (("x", px), ("y", py)):
+            deg = S.degrees(raw, n_lat, s_lat, z)[4:-4, 4:-4]
+            b = S.bands(S.degrees(raw, n_lat, s_lat, z))[4:-4, 4:-4]
+            if abs(float(np.median(deg)) - th) > 0.6 or not (b == want).all():
+                bad.append(f"a {th}° plane along {name} reads {float(np.median(deg)):.1f}° (band {int(np.median(b))}, want {want})")
+    flat = np.full((hgt, wid), 200.0)
+    hole = flat.copy()
+    hole[20:30, 20:30] = np.nan
+    if S.bands(S.degrees(flat, n_lat, s_lat, z)).any():
+        bad.append("flat ground is shaded")
+    try:
+        S.degrees(flat[:40], n_lat, s_lat, z)
+        bad.append("rows that are not the patch's own (40 for a 64-row span) were measured")
+    except ValueError:
+        pass
+    if S.bands(S.degrees(hole, n_lat, s_lat, z))[20:30, 20:30].any():
+        bad.append("a hole with no elevation is shaded, not left transparent")
+    try:
+        from PIL import Image
+        import io as _io
+        b = np.zeros((8, 8), dtype=np.uint8)
+        b[0, 0], b[1, 1], b[2, 2] = 1, 2, 3
+        im = Image.open(_io.BytesIO(S.png(b)))
+        got = np.asarray(im)
+        rgba = np.asarray(im.convert("RGBA"))
+        if not (got == b).all() or im.info.get("transparency") != 0 or rgba[5, 5, 3] != 0 or rgba[0, 0, 3] != 255:
+            bad.append("the PNG does not carry each band as its own palette index with 0 transparent")
+        png_note = "the PNG keeps each band"
+    except ImportError:
+        # (the review of take 196: a pass that never ran is not a pass)
+        png_note = "the PNG half NOT checked here (no Pillow)"
+    links = ((read("tools", "terrain.py") or "", "_slope.write(PATCHES, PATCH_Z)", "terrain.py writes the bands from its patches"),
+             (read("tools", "bundle.py") or "", '("slope_payload.json",   "slope.json",       "slope",    False)', "bundle.py carries slope.json"),
+             (read("tools", "bundle.py") or "", "is not the image slope.json describes", "bundle.py holds each PNG to its hash"),
+             (read("tools", "build_app.py") or "", "have.slope?j('bundle/'+have.slope)", "the loader reads slope.json"),
+             (read("tools", "build_app.py") or "", 'ssrc = os.path.join(ROOT, "bundles", R.id, "slope")', "split carries the PNGs into www/"),
+             (read("src", "app.html") or "", "Nothing is drawn elsewhere.", "the Layers row says it covers the riding areas only"))
+    for src, need, what in links:
+        if need not in src:
+            bad.append(f"not wired: {what} ({need})")
+    if bad:
+        return fails.append("slope bands (A14): " + "; ".join(bad))
+    notes.append("slope bands (A14): planted 10/20/30/40° planes along x and y read their own bands at 44.6°N; "
+                 f"flat ground and a hole stay clear; rows not the patch's own are refused; {png_note}; "
+                 "terrain, bundle, split, loader and the row wired")
+
+
 def check_osm_fallback():
     ing = read("tools", "ingest.py")
     if not ing:
@@ -3358,7 +3442,7 @@ def check_ledger_order():
 for fn in (check_handoff, check_stamps, check_release_notes, check_offline, check_splash, check_scrub,
            check_style, check_palette, check_badges, check_tokens, check_scale, check_icons, check_glyphs,
            check_licences, check_machine_legality,
-           check_ledgers, check_osm_fallback, check_gauges_fallback, check_hazards_rules, check_stepstamp, check_drawn,
+           check_ledgers, check_osm_fallback, check_gauges_fallback, check_hazards_rules, check_stepstamp, check_slope_rules, check_drawn,
            check_region_clean, check_no_duplicate_defs, check_ledger_order,
            check_layer_control,
            check_artifacts_agree, check_agenda, check_syntax, check_stubs,

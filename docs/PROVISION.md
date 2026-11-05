@@ -85,9 +85,9 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### Terrarium elevation tiles
 
 - **Host** `s3.amazonaws.com`
-- **Provides** Encoded DEM: node elevations, per-edge climb, profiles, hillshade
+- **Provides** Encoded DEM: node elevations, per-edge climb, profiles, hillshade, and the slope bands over the riding areas' z13 patches (take 196, A14)
 - **Licence** Public domain / ODbL mix — USGS 3DEP over CONUS
-- **Fetched by** `terrain.py`
+- **Fetched by** `terrain.py, slope.py`
 - **Refresh** rarely — terrain does not move
 
 ### USGS ImageryOnly

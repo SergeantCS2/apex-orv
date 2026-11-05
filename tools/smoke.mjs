@@ -224,6 +224,9 @@ class MapStub {
     return { center: [(w + e) / 2, (s0 + n) / 2], zoom: 12 }; }
   triggerRepaint() { record.repaints = (record.repaints || 0) + 1; }
   getSource(n) { return { setData: (d) => { (record.setData[n] ||= []).push(d); } }; }
+  /* take 196 · A14 · the slope bands are added on first use, as in MapLibre */
+  addSource(id, s) { record.sources[id] = s; }
+  addLayer(l, before) { const L = this._styleLayers, i = before ? L.findIndex((x) => x.id === before) : -1; if (i >= 0) L.splice(i, 0, l); else L.push(l); this._layers.add(l.id); record.layers = L.map((x) => x.id); }
   addControl() {}
   getCanvasContainer() {
     if (!this._cv) {
@@ -4099,7 +4102,9 @@ if (!NO_GPS) {
     if (was) M.apply(was, { silent: true });
     H.set(g, false);
     const offAll = IDS.every((id) => vis(id) === "none");
-    ok(gi >= 0 && new RegExp('data-lg="' + gi + '">').test(html) && /Road hazards/.test(html) && !/not in this bundle/.test(html)
+    /* (take 196: its own row's words only. Read over the whole panel, any
+       other absent row, Slope's in a bundle without slope bands, failed it) */
+    ok(gi >= 0 && new RegExp('data-lg="' + gi + '">').test(html) && /Road hazards/.test(html) && !/Road hazards \u2014 not in this bundle/.test(html)
        && onAll && onRead && kept && offAll,
        `A189 · Layers offers "Road hazards" (row ${gi}); on, all three layers draw and stay on through ${others.length} mode changes; off, all three go`);
     /* the cards: one real pin of each kind the bundle has, and planted rows */
@@ -4259,6 +4264,78 @@ if (!NO_GPS) {
       delete sandbox.Capacitor;
       Object.assign(V, was); N.chip();
     }
+  }
+}
+
+/* 9m · take 196 · A14 · slope bands over the riding areas (the maintainer
+   approved the design 2026-11-05). One image source per z13 patch, on the
+   corners and file the bundle's slope.json names, each PNG the image whose
+   sha256 the index records; the layers sit right above the relief and below
+   the contours, water and trails, start off, and the Layers row (which says
+   "riding areas only") switches all of them and no mode switch undoes it. A
+   bundle without the artifact offers the row as absent. */
+{
+  const SL = sandbox.window.__slope, H = sandbox.window.__haz, M = sandbox.window.__mode;
+  const { createHash } = await import("node:crypto");
+  let file = null;
+  try { file = JSON.parse(readFileSync(join(WWW, "bundle", "slope.json"), "utf8")); } catch (e) { file = null; }
+  const inMan = (manifest.artifacts || []).some((a) => a.kind === "slope");
+  const vis = (id) => { const h = record.layout.filter((l) => l[0] === id && l[1] === "visibility");
+    if (h.length) return h.at(-1)[2];
+    const st = (record.style.layers || []).find((l) => l.id === id); return st && st.layout ? st.layout.visibility : "visible"; };
+  if (!SL || !H) ok(false, "A14 · no __slope hook");
+  else if (!inMan || !file) {
+    grab("c-layers").fire("click"); flushTimeouts();
+    const html = String(grab("lyrpanel")._html || "");
+    ok(!SL.ok && SL.ids.length === 0 && /Slope — not in this bundle/.test(html)
+       && !(record.style.layers || []).some((l) => /^slope-/.test(l.id)),
+       `A14 · a bundle without slope bands: the Layers row reads "Slope — not in this bundle" and the style holds no slope layer`);
+  } else {
+    /* not in the first style (the review of take 196): nothing is loaded
+       until the row is first switched on */
+    const lazy = !SL.added() && !(record.style.layers || []).some((l) => /^slope-/.test(l.id))
+      && !Object.keys(record.sources).some((k) => /^slope\d/.test(k));
+    H.set(SL.group, true); H.set(SL.group, false);
+    const L = record.style.layers || [], ids = L.map((l) => l.id);
+    const iHs = ids.indexOf("hillshade"), iCont = ids.indexOf("cont-line");
+    const seen = file.p.map((p, i) => {
+      const src = record.sources["slope" + i], ly = L.find((l) => l.id === "slope-" + i);
+      let h = null; try { h = createHash("sha256").update(readFileSync(join(WWW, "bundle", p.f))).digest("hex"); } catch (e) {}
+      return { n: p.n, url: src && src.url, type: src && src.type, coords: src && src.coordinates, b: p.b, f: p.f,
+               hash: h, want: p.h, at: ids.indexOf("slope-" + i), lt: ly && ly.type, ls: ly && ly.source,
+               off: vis("slope-" + i) === "none", resample: ly && ly.paint && ly.paint["raster-resampling"],
+               once: ids.filter((x) => x === "slope-" + i).length === 1 };
+    });
+    /* on and off again adds nothing twice */
+    H.set(SL.group, true); H.set(SL.group, false);
+    const twice = (record.style.layers || []).filter((l) => /^slope-/.test(l.id)).length === file.p.length;
+    const judge = (rows) => rows.length === file.p.length && rows.length > 0 && rows.every((r) =>
+      r.type === "image" && r.url === "bundle/" + r.f && r.hash && r.hash === r.want
+      && JSON.stringify(r.coords) === JSON.stringify([[r.b[0], r.b[3]], [r.b[2], r.b[3]], [r.b[2], r.b[1]], [r.b[0], r.b[1]]])
+      && r.lt === "raster" && r.off && r.once && r.resample === "nearest" && r.at > iHs && iHs >= 0 && r.at < iCont);
+    const ctl = !judge(seen.map((r, i) => i ? r : { ...r, coords: [r.coords[1], r.coords[0], r.coords[2], r.coords[3]] }))
+      && !judge(seen.map((r, i) => i ? r : { ...r, at: iHs - 1 })) && !judge(seen.slice(1))
+      && !judge(seen.map((r, i) => i ? r : { ...r, hash: "0".repeat(64) })) && !judge(seen.map((r, i) => i ? r : { ...r, off: false }));
+    ok(lazy && twice && judge(seen) && ctl,
+       `A14 · ${seen.length} slope patches, each its own image source on the corners slope.json names (${seen.map((r) => r.n).join(", ")}), `
+       + `each PNG the one whose sha256 the index records, drawn above the relief (${iHs}) and below the contours (${iCont}), `
+       + `nearest-neighbour; none of it loaded before the row was first on (${lazy}), and added once however often it is switched `
+       + `(${twice}); the judge rejects swapped corners, a layer under the relief, a missing patch, another image and a layer left on (${ctl})`);
+    grab("c-layers").fire("click"); flushTimeouts();
+    const html = String(grab("lyrpanel")._html || "");
+    const g = SL.group, gi = sandbox.window.__areas.groups.indexOf(g);
+    H.set(g, true);
+    const onAll = SL.ids.every((id) => vis(id) === "visible"), onRead = H.on(g);
+    const others = (M && M.MODES || []).map((md) => md.k), was = M && M.get();
+    const kept = others.every((k) => { M.apply(k, { silent: true }); return SL.ids.every((id) => vis(id) === "visible"); });
+    if (was) M.apply(was, { silent: true });
+    H.set(g, false);
+    const offAll = SL.ids.every((id) => vis(id) === "none");
+    ok(gi >= 0 && new RegExp('data-lg="' + gi + '">').test(html) && /Slope/.test(html) && /Riding areas only: .*Nothing is drawn elsewhere\./.test(html)
+       && !/Slope — not in this bundle/.test(html) && onAll && onRead && kept && offAll,
+       `A14 · Layers offers "Slope" (row ${gi}), saying "riding areas only"; on, all ${SL.ids.length} layers draw and stay on `
+       + `through ${others.length} mode changes; off, all go (row ${new RegExp('data-lg="' + gi + '">').test(html)}, `
+       + `words ${/Riding areas only: .*Nothing is drawn elsewhere\./.test(html)}, on ${onAll}/${onRead}, kept ${kept}, off ${offAll})`);
   }
 }
 

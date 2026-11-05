@@ -248,6 +248,10 @@ def sample_at(lon, lat):
     return sample_raw(lon, lat)
 
 _build_patches()
+# take 196 · A14 · slope bands from these z13 patches alone (tools/slope.py);
+# no patches, no slope artifact, and the Layers row says so
+import slope as _slope
+_slope.write(PATCHES, PATCH_Z)
 
 nodes = dec(g["n"])
 node_elev = [round(sample_at(p[0], p[1])) for p in nodes]

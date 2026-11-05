@@ -1204,7 +1204,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 195</span>
+    <span id="title"><b>APEX</b> ORV · Take 196</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -2807,6 +2807,39 @@ function paddleCard(ft){
    says only what OSM records; it plans nothing and routes around nothing.
    HAZ is null in a bundle without the artifact: the Layers row says so. */
 var HAZ_OK=(typeof HAZ!=='undefined')&&!!HAZ&&Array.isArray(HAZ.h)&&HAZ.h.length>0;
+/* take 196 · A14 · slope bands (the maintainer, 2026-11-05, approved "slope
+   shading only where the ground is sharp"). The statewide DEM is z10, about
+   150 m a pixel, which reads every sand climb as gentle; only the z13 patches
+   around the riding areas (about 14 m) are shaded, from tools/slope.py: 15°
+   yellow, 25° orange, 35° red, nothing elsewhere and nothing where the DEM has
+   no value. One image source per patch on its own tile-aligned corners; the
+   layers sit above the relief and the satellite, below water and trails, off
+   by default in every mode. SLOPE is null in a bundle without the artifact,
+   and the Layers row says so. */
+var SLOPE_OK=(typeof SLOPE!=='undefined')&&!!SLOPE&&Array.isArray(SLOPE.p)&&SLOPE.p.length>0;
+var SLOPE_IDS=SLOPE_OK?SLOPE.p.map(function(p,i){return 'slope-'+i}):[];
+function slopeSources(src){
+  if(SLOPE_OK)SLOPE.p.forEach(function(p,i){
+    src['slope'+i]={type:'image',url:'bundle/'+p.f,
+      coordinates:[[p.b[0],p.b[3]],[p.b[2],p.b[3]],[p.b[2],p.b[1]],[p.b[0],p.b[1]]]}});
+  return src}
+/* the review of take 196: not in the first style. MapLibre loads an image
+   source as soon as it is added, visible or not, and eight patches are
+   about 31 MB of textures on a phone whose rider may never turn Slope on.
+   They are added the first time the row is switched on, just below the
+   contours (so above the relief and the satellite); the app never rebuilds
+   its style, so once is enough. */
+var SLOPE_ADDED=false;
+function slopeEnsure(){
+  if(SLOPE_ADDED||!SLOPE_OK)return SLOPE_ADDED;
+  var src=slopeSources({}),before=map.getLayer('cont-line')?'cont-line':undefined;
+  try{
+    Object.keys(src).forEach(function(k){map.addSource(k,src[k])});
+    SLOPE_IDS.forEach(function(id,i){map.addLayer({id:id,type:'raster',source:'slope'+i,layout:{visibility:'none'},
+      paint:{'raster-opacity':0.62,'raster-resampling':'nearest','raster-fade-duration':0}},before)});
+    SLOPE_ADDED=true;logAct('slope: '+SLOPE_IDS.length+' patch layers added')}
+  catch(e){logAct('slope: not added ('+e.message+')')}
+  return SLOPE_ADDED}
 var HAZKIND={a:'Plate reader',h:'Height limit',w:'Weight limit',f:'Ford',
   r:'Rail crossing',t:'Toll booth',c:'Cattle guard',z:'Hazard'};
 /* the label beside a limit's dot, with the unit the card gives it: a bare
@@ -7889,6 +7922,11 @@ var LYRGROUPS=[
      rider's choice in every mode; a bundle without it says so on the row */
   {k:'hazards',h:'Road hazards', s:'plate readers, height and weight limits, fords, rail crossings \u2014 from OpenStreetMap',
    ids:['haz-dot','haz-rail','haz-label'],need:function(){return HAZ_OK}},
+  /* take 196 · A14 · off by default, kept by every mode; the row says what it
+     covers, because outside the riding areas it draws nothing at all */
+  {k:'slope',h:'Slope',s:'riding areas only \u2014 15\u00b0 yellow, 25\u00b0 orange, 35\u00b0+ red, from their ~14 m DEM',
+   sub:'Riding areas only: 15\u00b0 yellow, 25\u00b0 orange, 35\u00b0+ red, from their ~14 m elevation data. Nothing is drawn elsewhere.',
+   ids:SLOPE_IDS,need:function(){return SLOPE_OK}},
   /* take 188 · A226 · TEXT ONLY (the maintainer, 2026-09-25: "Hide text
      only, but make All Labels to be more clear as to what it's turning
      off"). txt:true: this row writes no visibility at all — textSet() below
@@ -7908,6 +7946,7 @@ function lyrOn(g){
 
 function lyrSet(g,on){
   if(g.txt){textSet(on);var l0=el('c-labels');if(l0)l0.className='chip'+(on?' on':'');return}
+  if(on&&g.k==='slope')slopeEnsure();
   var ids=(g.ids||labelLayers()).concat(g.with||[]);
   ids.forEach(function(id){
     try{if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'visible':'none')}catch(e){}});
@@ -7943,7 +7982,9 @@ function buildLyrPanel(){
        '<span class="sw" style="background-color:'+(on?'var(--sel)':'transparent')+
        ';border:1px solid var(--sw-edge)"></span>'+
        '<span>'+g.h+(g.txt?'<span class="rsub">Names and numbers on the map. Pins and the count on a stack stay \u2014 choose pins under Pins in '+
-       modeOf(mode).h+'.</span>':'')+'</span></button>'});
+       modeOf(mode).h+'.</span>':'')+
+       /* take 196 · A14 · a row whose layer covers only part of the map says so */
+       (g.sub?'<span class="rsub">'+g.sub+'</span>':'')+'</span></button>'});
   /* take 186 · A197 P2 · the maintainer: "a pin selector so even under camp,
      I can open a menu and select what pins I want under this mode". One row
      per kind the mode can show, the mode's defaults pre-set, remembered per
@@ -9138,6 +9179,9 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       /* take 194 · A189 · road hazards, read by the harnesses */
       window.__haz={ok:HAZ_OK,data:HAZ_OK?HAZ:null,text:hazardText,card:hazardCard,dir:hazDir,limit:hazLimit,label:hazLabel,kinds:HAZKIND,
         group:LYRGROUPS.filter(function(g){return g.k==='hazards'})[0],set:lyrSet,on:lyrOn};
+      /* take 196 · A14 · slope bands, read by the harnesses */
+      window.__slope={ok:SLOPE_OK,data:SLOPE_OK?SLOPE:null,ids:SLOPE_IDS,added:function(){return SLOPE_ADDED},
+        group:LYRGROUPS.filter(function(g){return g.k==='slope'})[0]};
       window.__search=function(q,all){return all?searchAll(q):search(q)};
       window.__voice=VOICE;window.__say=navSay;window.__voiceProbe=navVoiceProbe;
       window.__voiceLine=stVoiceNative;window.__ttsRetry=TTS_RETRY;   /* take 195 · A218 */
@@ -9322,11 +9366,17 @@ function stRender(cb){
      microtasks, so a .then here structurally cannot complete under it
      (the batch's second red). Poll up to 5 s, report the settle time, and
      only then read the RENDER section against a settled style. */
+  /* take 196 · A275 · 15 s, not 5. Measured in render (Chrome 138, PROVEN):
+     after a ride's drills and a mode change, twelve GeoJSON sources (the
+     network, places, areas, the route lines) were still re-tiling, and the
+     style read loaded only between 3.1 and 7.5 s later, so a self-test
+     run then failed a style that was loading fine. A style that never
+     loads still reads false at 15 s; the time it took is reported. */
   var t0=Date.now();
   (function _settle(){
     var okd=map.isStyleLoaded();
-    if(!okd&&Date.now()-t0<5000)return setTimeout(_settle,250);
-    stAdd('RENDER','style-loaded',okd,okd?('true after '+(Date.now()-t0)+' ms'):'false after 5 s');
+    if(!okd&&Date.now()-t0<15000)return setTimeout(_settle,250);
+    stAdd('RENDER','style-loaded',okd,okd?('true after '+(Date.now()-t0)+' ms'):'false after 15 s');
     _stRenderBody();cb&&cb()})();
   return;
   function _stRenderBody(){
