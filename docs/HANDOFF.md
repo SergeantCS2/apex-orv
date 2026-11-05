@@ -1,4 +1,89 @@
-# HANDOFF — through Take 192 · V3
+# HANDOFF — through Take 193 · V3
+
+## Take 193 — 2026-11-05 — a self-test during a ride keeps the ride's own battery reading (A273); a dropout is counted through a clock set back and through sleep (A274); the strip and the dispatch card treat a fix stamped ahead of the clock as of unknown age
+
+RECORDED FIRST. The maintainer, 2026-11-05: "Continue" (it delegates). No
+field report and no open pull request were waiting, so this take is the
+standing rule's: every ready fix goes into the next take. Take 192's
+review found both, pre-existing, and recorded them OPEN until each had a
+drill. Built on main 0486fee (take 192, release take-110, tagged t192 by
+CI itself).
+
+A273 — rideStart asks the battery for the ride's starting level, and the
+answer is a promise. The self-test's safety drill starts a ride of its own
+and puts the rider's ride back synchronously, so the drill's answer landed
+after it, in the rider's ride: its starting level and charging flag. Both
+battery reads (the start's and the pulse's) now write only into the ride
+they were asked for. Smoke 9j stubs navigator.getBattery: the rider's ride
+reads 80% and charging, the drill's 50% and not. After the drill
+(window.__stSafety, a hook for it alone) the ride keeps 0.8 and charging.
+Its controls: the drill's level, its charging flag, a drill that read
+nothing, a ride left swapped.
+
+A274 — a dropout is a fix that has not come for 15 s, and the pulse
+measured it as Date.now() minus the last fix. With the wall clock set back
+(a network time correction) that age was negative, so no dropout counted
+until the clock caught up, and rideFix stored negative gaps. Both now read
+rideSince(): the wall clock's delta when it is zero or more, else the
+page's monotonic clock, which rideMark() keeps beside it. The take's
+first form used the monotonic clock alone; its review pointed out that on
+Android it most likely stops while the phone sleeps (INFERRED: Chromium's
+clock there is CLOCK_MONOTONIC), so a gap across a sleep would have read
+as nothing. Smoke 9j, each case run by the ride's own pulse alone:
+- the wall clock set back an hour, then 40 s with no fix: one dropout,
+  worst 40 s, gaps never negative;
+- 10 minutes asleep (the wall clock 600 s on, the page's clock still): one
+  dropout, worst 600 s.
+Its controls: a missed dropout, a negative gap, an hour's worst gap, and a
+sleep counted as nothing. Left as it is: the
+ride's duration (t0) stays on the wall clock, because a resumed trip reads
+it back after a restart. A clock change mid-ride still moves the duration
+by the change (INFERRED; A274).
+
+The cold audit (the code-review skill, extra-high, 4 findings), all fixed:
+- the monotonic clock alone missed sleep (above);
+- the same negative-age flaw sat in two more readers. fixStale (the strip:
+  "live GPS" through a dropout) now takes a negative age as stale. The
+  dispatch card's "(under a minute ago)" for a fix stamped ahead of the
+  clock now reads "its age is unknown: the phone's clock changed since".
+  This is the card read to dispatch;
+- a pulse wrote into whatever ride was current, so each now keeps its
+  own ride's books;
+- smoke's ticks(1) ran every interval in the sandbox, and the drills now
+  run this ride's pulse alone. The harness clock still steps 40 s forward
+  in them, as a paused page's would.
+Smoke 9j checks each: the strip stale and dispatch's wording after a fix
+the clock was set back behind; a ride started over another not written by
+the first ride's pulse.
+
+Found on the way: smoke 7c's "dropout counted" check set long.last itself
+and did the pulse's arithmetic in the harness, so it judged its own sum
+and never ran the app's pulse (landmine 69's shape). It now advances the
+page's clock 40 s and runs the ride's own pulse (ticks).
+
+Measured (cloud, Chrome 138, the bundle from the APK of main's run 110,
+take 192's data), on the take as sealed:
+- Smoke, all five passes PASSED: 291 / 203 / 54 ok, fatal 6, dead 33.
+- Render, each section alone: selftest PASSED (the app's self-test 42
+  passed, 0 real failures, its safety drill run in Chrome); nav PASSED
+  (32).
+- The gate checks that need no pipeline output PASSED.
+
+Each fix was taken out of a copy of the built app, and its drill failed:
+- the battery guard out: A273 FAIL (start 0.5, not charging);
+- rideSince on the monotonic clock alone: A274 FAIL (the sleep case, 0
+  dropouts);
+- rideSince on the wall clock alone, as before take 193: A274 FAIL (the
+  clock set back, 0 dropouts, a gap of −3600 s);
+- the pulse's own-ride guard out: FAIL (1 dropout written into the ride
+  started over it);
+- fixStale's negative age out: FAIL (the strip live);
+- dispatch's unknown age out: FAIL ("under a minute ago").
+
+Found on the way (A275, OPEN): `--only=selftest,nav` fails the self-test's
+style-loaded check (false after 5 s). It fails the same way on take 192's
+committed build, while CI's full render passed it. UNKNOWN until this
+take's CI run: the full render and gate on fresh data.
 
 ## Take 192 — 2026-11-02 — the ride sheet's Elevation is the rider's own (A243); the HD card follows its download (A266); a place card's save never replaces a waypoint (A265); the self-test puts its drill's track back on the map (A242); two harness defects (A244); a recorded gauges omission (A245); Locate and a clock set back (A272)
 

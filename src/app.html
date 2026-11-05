@@ -1204,7 +1204,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 192</span>
+    <span id="title"><b>APEX</b> ORV · Take 193</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -6255,13 +6255,31 @@ function batteryNow(){
     return {lvl:b.level,chg:!!b.charging}}).catch(function(){return null});
   return Promise.resolve(null)}
 
+/* take 193 · A274 · the time since the ride's last fix. Date.now() goes
+   back when the phone's clock is set back (a network time correction), and
+   that negative age passed the dropout test as "no dropout" until the
+   clock caught up (landmine 252). The wall clock's delta is used when it is
+   zero or more: it counts the time the phone spent asleep, which the
+   page's monotonic clock does not (INFERRED: Chromium's performance.now()
+   on Android follows CLOCK_MONOTONIC, which stops in suspend; the review
+   of take 193). The monotonic delta answers only when the wall clock went
+   back. t0 stays the wall clock: it is the ride's start time, saved with a
+   trip. */
+function rideMark(R){R.last=Date.now();R.lastM=performance.now()}
+function rideSince(R){var w=Date.now()-R.last;return (w>=0?w:performance.now()-R.lastM)/1000}
 function rideStart(at){
-  RIDE={t0:Date.now(),fixes:0,gaps:[],acc:[],drops:0,maxGap:0,
-        batt0:null,batt1:null,chg:false,last:Date.now(),mi0:0};
-  batteryNow().then(function(b){if(RIDE&&b){RIDE.batt0=b.lvl;RIDE.chg=b.chg}});
-  RIDE.ticks=0;
-  RIDE.pulse=setInterval(function(){
-    if(!RIDE)return;
+  var R=RIDE={t0:Date.now(),fixes:0,gaps:[],acc:[],drops:0,maxGap:0,
+        batt0:null,batt1:null,chg:false,last:0,lastM:0,mi0:0};
+  rideMark(R);
+  /* take 193 · A273 · a battery read lands in the ride it was asked for,
+     or nowhere. The self-test's safety drill starts a ride and puts the
+     rider's back before this promise resolves, so the drill's read used to
+     overwrite the rider's starting level and charging flag. */
+  batteryNow().then(function(b){if(b&&RIDE===R){R.batt0=b.lvl;R.chg=b.chg}});
+  R.ticks=0;
+  R.pulse=setInterval(function(){
+    /* each pulse keeps its own ride's books (the review of take 193) */
+    if(RIDE!==R)return;
     /* take 188 · A222 · the sheet's Time moves between fixes too — and
        (cold audit) a dropout dashes what only a fix can say, on the sheet
        and on the strip */
@@ -6269,17 +6287,17 @@ function rideStart(at){
     /* battery moves slowly and the read is not free; the dropout watch is the
        thing that needs to be prompt */
     if(++RIDE.ticks%3===1)batteryNow().then(function(b){
-      if(RIDE&&b){RIDE.batt1=b.lvl;RIDE.chg=RIDE.chg||b.chg}});
+      if(b&&RIDE===R){R.batt1=b.lvl;R.chg=R.chg||b.chg}});
     /* a fix that has not arrived in 15s is a dropout, not slowness */
-    var since=(Date.now()-RIDE.last)/1000;
-    if(since>15){RIDE.drops++;RIDE.last=Date.now();
+    var since=rideSince(R);
+    if(since>15){RIDE.drops++;rideMark(R);
       if(since>RIDE.maxGap)RIDE.maxGap=since;
       logAct('gps  DROPOUT '+Math.round(since)+'s')}},20000)}
 
 function rideFix(acc){
   if(!RIDE)return;
-  var now=Date.now(),gap=(now-RIDE.last)/1000;
-  RIDE.last=now;RIDE.fixes++;
+  var gap=rideSince(RIDE);
+  rideMark(RIDE);RIDE.fixes++;
   if(RIDE.fixes>1){RIDE.gaps.push(gap);if(gap>RIDE.maxGap)RIDE.maxGap=gap}
   if(acc!==null&&acc!==undefined)RIDE.acc.push(acc)}
 
@@ -6307,7 +6325,10 @@ var HUD={spd:null,hdg:null,at:null,t:null};
    of seconds would be as old as the last pulse); the next fix puts them
    back. Live GPS only: the simulator feeds hudSet on its own clock. */
 var FIX_T=0,GPS_STALE_MS=15000;
-function fixStale(){return posMode==='gps'&&FIX_T>0&&Date.now()-FIX_T>GPS_STALE_MS}
+/* take 193 · the review · an age below zero is unknown, never small
+   (landmine 252): after the clock is set back, a fix stamped ahead of it
+   is not live, and the strip says since when there has been none */
+function fixStale(){var a=Date.now()-FIX_T;return posMode==='gps'&&FIX_T>0&&(a<0||a>GPS_STALE_MS)}
 function fixClock(){try{return new Date(FIX_T).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
   catch(e){return 'the last one'}}
 /* take 189 · cold audit · the folded drawer's GPS line follows the fix:
@@ -6740,8 +6761,12 @@ el('btn-disp').addEventListener('click',function(){
   if(!FX)return show('<b>No GPS fix yet.</b><br>The start pin is not a position: this card '+
     'reads your <i>actual</i> location to dispatch, so it will not print a coordinate you '+
     'are not standing at.','fail');
-  var old=lf?'':(function(){var m=Math.floor((Date.now()-ME_FIX.t)/60000);
-    return '<b>Last GPS fix '+meClock()+'</b> ('+(m<1?'under a minute':m+' min')+' ago) \u2014 '+
+  var old=lf?'':(function(){var a=Date.now()-ME_FIX.t,m=Math.floor(a/60000);
+    /* take 193 · the review · a fix stamped ahead of the clock (it was set
+       back since) has an unknown age: the card read to dispatch says so,
+       never "under a minute ago" (landmine 252) */
+    return '<b>Last GPS fix '+meClock()+'</b> ('+(a<0?'its age is unknown: the phone\u2019s clock changed since':
+      (m<1?'under a minute':m+' min')+' ago')+') \u2014 '+
       'not a live position: you may have moved since.<br>'})();
   show('Locating you on the network…','');
   setTimeout(function(){
@@ -8871,6 +8896,8 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     /* The results array itself, not the formatted report — a check that greps
        rendered text is testing the formatter as much as the result (take 109). */
     window.__st=function(){return ST};
+    /* take 193 · A273 · the safety drill alone, for smoke's battery drill */
+    window.__stSafety=stSafety;
     window.__geo={addressAt:addressAt,geocode:geocode,
                   get ADDR(){return ADDR}};
     /* A96: the dispatch card runs six full scans on one tap and has never been
@@ -8967,6 +8994,9 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         pos:function(v){if(v!==undefined)posMode=v;return posMode},
         /* take 189 · A237 · the one live-fix reader, read by the harnesses */
         live:function(){return liveFix()},
+        /* take 193 · the strip's dropout rule, and the ride's last-fix clock */
+        stale:function(){return fixStale()},
+        fixT:function(v){if(v!==undefined)FIX_T=v;return FIX_T},
         /* fix round 1 · and the distance line the place cards print */
         dist:function(p){return placeDist(p)},
         /* the harness's stand-in for the app being killed: state gone, storage kept */

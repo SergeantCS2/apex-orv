@@ -3485,28 +3485,34 @@ function batteryNow(){
     return {lvl:b.level,chg:!!b.charging}}).catch(function(){return null});
   return Promise.resolve(null)}
 
+ 
+function rideMark(R){R.last=Date.now();R.lastM=performance.now()}
+function rideSince(R){var w=Date.now()-R.last;return (w>=0?w:performance.now()-R.lastM)/1000}
 function rideStart(at){
-  RIDE={t0:Date.now(),fixes:0,gaps:[],acc:[],drops:0,maxGap:0,
-        batt0:null,batt1:null,chg:false,last:Date.now(),mi0:0};
-  batteryNow().then(function(b){if(RIDE&&b){RIDE.batt0=b.lvl;RIDE.chg=b.chg}});
-  RIDE.ticks=0;
-  RIDE.pulse=setInterval(function(){
-    if(!RIDE)return;
+  var R=RIDE={t0:Date.now(),fixes:0,gaps:[],acc:[],drops:0,maxGap:0,
+        batt0:null,batt1:null,chg:false,last:0,lastM:0,mi0:0};
+  rideMark(R);
+   
+  batteryNow().then(function(b){if(b&&RIDE===R){R.batt0=b.lvl;R.chg=b.chg}});
+  R.ticks=0;
+  R.pulse=setInterval(function(){
+     
+    if(RIDE!==R)return;
      
     try{hudPaint();if(NAV.on)navChip();peekGps();elevCell()}catch(e){}
      
     if(++RIDE.ticks%3===1)batteryNow().then(function(b){
-      if(RIDE&&b){RIDE.batt1=b.lvl;RIDE.chg=RIDE.chg||b.chg}});
+      if(b&&RIDE===R){R.batt1=b.lvl;R.chg=R.chg||b.chg}});
      
-    var since=(Date.now()-RIDE.last)/1000;
-    if(since>15){RIDE.drops++;RIDE.last=Date.now();
+    var since=rideSince(R);
+    if(since>15){RIDE.drops++;rideMark(R);
       if(since>RIDE.maxGap)RIDE.maxGap=since;
       logAct('gps  DROPOUT '+Math.round(since)+'s')}},20000)}
 
 function rideFix(acc){
   if(!RIDE)return;
-  var now=Date.now(),gap=(now-RIDE.last)/1000;
-  RIDE.last=now;RIDE.fixes++;
+  var gap=rideSince(RIDE);
+  rideMark(RIDE);RIDE.fixes++;
   if(RIDE.fixes>1){RIDE.gaps.push(gap);if(gap>RIDE.maxGap)RIDE.maxGap=gap}
   if(acc!==null&&acc!==undefined)RIDE.acc.push(acc)}
 
@@ -3514,7 +3520,8 @@ function rideFix(acc){
 var HUD={spd:null,hdg:null,at:null,t:null};
  
 var FIX_T=0,GPS_STALE_MS=15000;
-function fixStale(){return posMode==='gps'&&FIX_T>0&&Date.now()-FIX_T>GPS_STALE_MS}
+ 
+function fixStale(){var a=Date.now()-FIX_T;return posMode==='gps'&&FIX_T>0&&(a<0||a>GPS_STALE_MS)}
 function fixClock(){try{return new Date(FIX_T).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
   catch(e){return 'the last one'}}
  
@@ -3850,8 +3857,10 @@ el('btn-disp').addEventListener('click',function(){
   if(!FX)return show('<b>No GPS fix yet.</b><br>The start pin is not a position: this card '+
     'reads your <i>actual</i> location to dispatch, so it will not print a coordinate you '+
     'are not standing at.','fail');
-  var old=lf?'':(function(){var m=Math.floor((Date.now()-ME_FIX.t)/60000);
-    return '<b>Last GPS fix '+meClock()+'</b> ('+(m<1?'under a minute':m+' min')+' ago) \u2014 '+
+  var old=lf?'':(function(){var a=Date.now()-ME_FIX.t,m=Math.floor(a/60000);
+     
+    return '<b>Last GPS fix '+meClock()+'</b> ('+(a<0?'its age is unknown: the phone\u2019s clock changed since':
+      (m<1?'under a minute':m+' min')+' ago')+') \u2014 '+
       'not a live position: you may have moved since.<br>'})();
   show('Locating you on the network…','');
   setTimeout(function(){
@@ -5420,6 +5429,8 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
              h:b?Math.round(b.getBoundingClientRect().height):-1}};
      
     window.__st=function(){return ST};
+     
+    window.__stSafety=stSafety;
     window.__geo={addressAt:addressAt,geocode:geocode,
                   get ADDR(){return ADDR}};
      
@@ -5498,6 +5509,9 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         pos:function(v){if(v!==undefined)posMode=v;return posMode},
          
         live:function(){return liveFix()},
+         
+        stale:function(){return fixStale()},
+        fixT:function(v){if(v!==undefined)FIX_T=v;return FIX_T},
          
         dist:function(p){return placeDist(p)},
          

@@ -1,11 +1,10 @@
-**Take 192 — the ride sheet's Elevation is yours; the HD card follows its download; a waypoint never replaces another.**
+**Take 193 — a ride's battery figure and dropout count stay true through a self-test and a clock change.**
 
-The ride sheet's Elevation is where you are, from a live GPS fix, and a
-dash without one. The number under the scale says it is the map centre's.
-While HD imagery downloads, its card counts the tiles as they land. Saving
-a waypoint where one of that name is saved keeps both. The self-test no
-longer leaves its drill's truck pin and track on the map.
+Running the self-test during a ride no longer overwrites the ride's
+starting battery level, so the ride report's battery use is measured from
+the start of the ride. A GPS dropout is counted even when the phone's clock
+is set back mid-ride, or the phone sleeps. After a clock change, the
+dispatch card says a last fix's age is unknown instead of guessing.
 
-On the phone: Ride, then look at Elevation — is it yours, and a dash when
-GPS drops? Start an HD save and watch the card: does the count move? Save
-the same spot twice: are both under Saved?
+On the phone: during a ride, run the self-test (Tools), then Stop — does
+the ride report's battery figure look right for the whole ride?

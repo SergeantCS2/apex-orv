@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 192.* Ranked by blocking-ness, not by interest.
+*Current as of take 193.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -5499,7 +5499,7 @@ is stale there too, so Locate asks for a new fix. Smoke 9i: with the clock
 set back an hour after a fix, Locate says it is waiting and opens a watch.
 - **Ruled out:** clamping a negative age to zero (it would read as fresh).
 
-## A273 — The self-test's safety drill writes its battery reading into the rider's ride · FOUND take 192 (its review, code read) · OPEN
+## A273 — The self-test's safety drill writes its battery reading into the rider's ride · FOUND take 192 (its review, code read) · BUILT take 193
 stSafety's drill calls startRecording, which calls rideStart, and
 rideStart asks batteryNow() for the ride's starting level. The promise
 resolves after stSafety has put RIDE back, so `RIDE.batt0` and `RIDE.chg`
@@ -5511,8 +5511,14 @@ into the ride the read was asked for. It needs a smoke drill with a
 battery stub whose readings differ.
 - **Ruled out:** fixing it inside take 192 without that drill (a guard on a
   promise nobody has watched land is landmine 54's shape).
+- **Built take 193:** rideStart's battery reads (the start's and the
+  pulse's) write only into the ride they were asked for (`RIDE === R`).
+  Smoke 9j stubs the battery so the rider's ride reads 80% and charging
+  and the drill's ride 50% and not: after __stSafety (a hook for the drill
+  alone) the ride keeps 0.8 and charging (PROVEN). With the guard taken
+  out of a copy of the built app it read 0.5.
 
-## A274 — The ride's pulse takes a negative age as no dropout · FOUND take 192 (its review, code read) · OPEN
+## A274 — The ride's pulse takes a negative age as no dropout · FOUND take 192 (its review, code read) · BUILT take 193
 rideStart's pulse counts a dropout when `(Date.now() - RIDE.last) / 1000 >
 15`. After the clock is set back, that age is negative and no dropout is
 counted until the clock catches up. This is landmine 252's rule, which
@@ -5520,4 +5526,45 @@ liveFix and (take 192, A272) flyToYou now follow (INFERRED from the code).
 A gap measured on a monotonic clock (performance.now) cannot go negative.
 - **Ruled out:** treating a negative age as a dropout (it would count one
   per pulse until the clock catches up).
+- **Built take 193:** the pulse's dropout test and rideFix's gaps read
+  rideSince(): the wall clock's delta when it is zero or more, else the
+  page's monotonic clock (performance.now), kept beside it by rideMark().
+  Take 193's first form used the monotonic clock alone. Its review
+  pointed out that on Android it most likely stops while the phone sleeps
+  (INFERRED: Chromium's clock there is CLOCK_MONOTONIC), so a gap that
+  spans a sleep would have read as nothing. Each pulse now keeps only its
+  own ride's books (`RIDE !== R` returns). The review also found the same
+  negative-age flaw in two more readers: fixStale (the strip) and the
+  dispatch card's "N min ago". A negative age is now stale on the strip,
+  and dispatch says "its age is unknown: the phone's clock changed since".
+  Smoke 9j: the wall clock set back an hour, 40 s with no fix, is one
+  dropout, worst 40 s, gaps never negative; 10 minutes asleep (wall +600
+  s, page clock still) is one dropout, worst 600 s; a ride started over
+  another is not written by the first ride's pulse; after a fix the clock
+  was set back behind, the strip reads stale and dispatch names the age
+  unknown. Smoke 7c's dropout check had counted the
+  dropout itself (it set long.last and did the pulse's arithmetic), so it
+  never ran the pulse. It now advances the page's clock and runs the
+  ride's own pulse.
+- **Left as it is:** the ride's duration (t0, the HUD's Time and the
+  report's minutes) stays on the wall clock. It is the ride's start time,
+  saved with a trip and read back after a restart, which the page's
+  monotonic clock does not survive. A clock change mid-ride moves the
+  duration by the change (INFERRED). A start on both clocks would fix the
+  page's own rides, not a resumed one; not built.
+
+## A275 — The self-test's style-loaded check fails when it runs straight after render's nav section · FOUND take 193 (render --only=selftest,nav, PROVEN) · OPEN
+`--only=selftest,nav` fails one check on unchanged code: the self-test's
+RENDER/style-loaded read false after its 5 s wait. It did so on take 193
+(render-t193-1) and on take 192's committed build (render-t192-on-selftest-nav).
+Selftest alone passes (42, 0 real failures), and so does CI's full render,
+where other sections run between nav and selftest (runs 109, 110). So nav
+leaves the map loading for more than 5 s, and the next self-test meets it
+(INFERRED; what nav leaves loading is UNKNOWN). The same may happen on the
+phone when a rider runs the self-test just after a ride (UNKNOWN). The
+first thing to measure: map.loaded() and the sources still loading at the
+end of nav, and how long until 'idle'.
+- **Ruled out:** tolerating style-loaded by name, as GPS and trail-names
+  are (it is how a style that never loads is caught); declaring nav as
+  selftest's setup (it is not a setup, it is what breaks it).
 
