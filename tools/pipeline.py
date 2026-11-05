@@ -37,7 +37,7 @@ STEPS = [
     # areas before terrain (take 120): terrain patches z13 DEM over each area
     ("areas",     ["areas.py"],       "DNR scramble areas — open riding ground as polygons"),
     ("publicland", ["publicland.py"],  "DNR public land — state forest, game areas, parks, dissolved"),
-    ("terrain",    ["terrain.py"],     "DEM, climb, hillshade"),
+    ("terrain",    ["terrain.py"],     "DEM, climb, hillshade, slope bands over the riding areas (A14)"),
     ("contour",    ["contour.py"],     "contour lines from the same DEM"),
     ("corridor",   ["corridor.py"],    "a river beyond the box, ordered downstream"),
     ("landcover", ["landcover.py"], "the ground itself — forest, wetland, park and public-land polygons"),

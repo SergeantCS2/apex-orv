@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 195.* Ranked by blocking-ness, not by interest.
+*Current as of take 196.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -166,7 +166,7 @@ routing that ignores elevation is routing that ignores the thing riders care abo
 - **Ruled out:** nothing. Neither remaining item is blocked on anything but the
   APK for 4.9.
 
-## A14 — 3D terrain and slope shading · slope shading DESIGNED and APPROVED 2026-11-05 (the maintainer) · to build
+## A14 — 3D terrain and slope shading · slope shading DESIGNED and APPROVED 2026-11-05 (the maintainer) · slope bands BUILT take 196
 
 ROADMAP 2.6, 2.7. Take 8 ships the rendered hillshade; 3D and slope need the
 encoded DEM on the client.
@@ -189,6 +189,17 @@ encoded DEM on the client.
   - draw nothing elsewhere, never a guess.
   3D terrain stays out: MapLibre's terrain wants a DEM tile source, which
   the bundle does not ship, and z10 would show it at 150 m.
+- **Built, take 196 (HANDOFF).** tools/slope.py from terrain.py's own z13
+  patches, one transparent PNG per patch (8 patches, 47 KB, 13.4–14.0 m a
+  pixel on 2026-11-05's tiles), a Layers row "Slope" whose second line says
+  "Riding areas only … Nothing is drawn elsewhere." Held by gate
+  check_slope_rules (planted planes read their bands at 44.5°N), smoke 9m
+  and render's slope section (the band's colour where the bundle's own PNG
+  is steep, nothing beyond the patches).
+- **Ruled out:** smoothing the DEM before measuring: a climb narrower than
+  the smoothing would read gentler.
+- **Open, on the phone:** whether the bands are readable on the Fold over
+  Map and over Hybrid, and whether 0.62 is the right opacity.
 
 ## A15 — Offline search · CLOSED, take 11
 
@@ -5698,7 +5709,7 @@ A gap measured on a monotonic clock (performance.now) cannot go negative.
   duration by the change (INFERRED). A start on both clocks would fix the
   page's own rides, not a resumed one; not built.
 
-## A275 — The self-test's style-loaded check fails when it runs straight after render's nav section · FOUND take 193 (render --only=selftest,nav, PROVEN) · OPEN
+## A275 — The self-test's style-loaded check fails when it runs straight after render's nav section · FOUND take 193 (render --only=selftest,nav, PROVEN) · BUILT take 196
 `--only=selftest,nav` fails one check on unchanged code: the self-test's
 RENDER/style-loaded read false after its 5 s wait. It did so on take 193
 (render-t193-1) and on take 192's committed build (render-t192-on-selftest-nav).
@@ -5712,6 +5723,15 @@ end of nav, and how long until 'idle'.
 - **Ruled out:** tolerating style-loaded by name, as GPS and trail-names
   are (it is how a style that never loads is caught); declaring nav as
   selftest's setup (it is not a setup, it is what breaks it).
+- **Measured, take 196 (PROVEN, a probe after nav in render, Chrome 138):**
+  at nav's end twelve GeoJSON sources were still loading (ground, wtr,
+  poistack, areas, areapt, net, approach, alt, route, crumb, back,
+  places); the style read loaded between 3.1 and 7.5 s later. The phone
+  meets the same after a mode change (INFERRED: the same sources re-tile).
+- **Built, take 196:** the settle is 15 s, not 5; the time it took is
+  reported, and a style that never loads still fails.
+- **Ruled out:** waiting for 'idle' instead (a map that keeps drawing
+  never goes idle, and the check must still end).
 
 ## A276 — CI rendered the app twice in every build · FOUND 2026-11-05 (run 110's log, PROVEN) · APPROVED 2026-11-05 (the maintainer: "Yes, reuse it") · BUILT take 194
 ci/bundle.sh ran tools/render.mjs (and verify_palette.mjs), then
@@ -5755,7 +5775,7 @@ native text to speech), A14 (slope shading), A10 (surface type).
   whole CI round when it fails); splitting a verified batch to keep takes
   small.
 
-## A278 — render --only=tools,ui fails two tools checks on unchanged code · FOUND take 194 (PROVEN on take 193's committed build) · OPEN
+## A278 — render --only=tools,ui fails two tools checks on unchanged code · FOUND take 194 (PROVEN on take 193's committed build) · OPEN (half found take 196: the HD drill's race; the app's is A279)
 `--only=tools,ui,hazards` failed two checks: A259's "from the map's HD
 button" (tool null, not folded) and "an OPEN panel is reachable by tap".
 They failed the same way on take 193's committed build
@@ -5766,4 +5786,38 @@ open-panel drill toggles c-layers, so a Layers panel already open reads
 as closed (INFERRED, the likely half).
 - **Ruled out:** declaring a setup before measuring which state it is;
   loosening either check.
+- **Measured, take 196 (PROVEN, render probes on the take-196 build):**
+  `--only=tools` ALONE fails both checks too, and tools starts from the
+  same state with or without ui before it (Map tab, drawer folded, Layers
+  closed, no sheet). So ui is not the cause; something a full run's
+  earlier sections do lets them pass (UNKNOWN which).
+  - A259's map HD button: polled every 100 ms, the sheet's tool was
+    c-hdmanage from 300 ms on, and the check passed; with its fixed 700 ms
+    sleep it read tool null. The HD card is written after a storage read,
+    so the drill now waits for the tool, up to 3 s (take 196).
+  - "an OPEN panel is reachable by tap": the open Layers panel's box was
+    y 176-340 (164 px tall at 915), its first row y 329-377, and the tap
+    at the row's centre (y 353) landed on `#tools.strip`. The row is cut
+    off by the panel's own height. OPEN: why the panel is that short in a
+    section run and not in a full run, and whether the phone can reach
+    that state (UNKNOWN).
+- **Found, take 196 (PROVEN):** on tools alone, both failures were the HD
+  drill's race. With the drill waiting for the HD tool before it taps Back,
+  `--only=tools` passed both checks, the Layers one included: the early
+  Back had left the Tools strip up over the Layers panel's first row. The
+  app's own side of that race is A279. With ui before tools, the HD check
+  passes and the Layers check still fails: ui leaves a second cause of its
+  own (OPEN; measure the Layers panel's box and what covers its first row
+  after ui).
+
+## A279 — Back tapped while the HD card is still loading leaves the Tools strip over the map · FOUND take 196 (render probes, PROVEN in render) · OPEN
+The map's HD button opens HD imagery under Tools; its card is written after
+a storage read (about 300 ms in render). In render, Back tapped at 700 ms
+on a section run, before the card had landed, read the sheet's tool as null,
+and the Tools strip (`#tools.strip`) was left over the map: the Layers
+panel's first row, opened next, was cut off by it and a tap at its centre
+hit the strip. Whether a rider's quick Back on the phone reaches the same
+state is UNKNOWN; the first thing to measure is the sheet's state and the
+strip's visibility after Back at 0, 100, 200 and 300 ms from the HD tap.
+- **Ruled out:** fixing it by guess before that measure (A278's rule).
 

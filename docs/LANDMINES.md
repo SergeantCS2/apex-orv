@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 195.*
+*Current as of take 196.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -171,6 +171,7 @@ Start here. Do not read top to bottom.
 | Spoken guidance is silent on a phone whose text-to-speech works everywhere else, or the sheet says "no English voice" on a phone that has one | 259 |
 | Every planted control of a new check "passes", and the check still lets a real change through | 260 |
 | A step skips after a module it loads was edited, though every file it opened is unchanged | 261 |
+| CI rebuilds everything cold ("Cache not found") right after a change to the cache's path list | 262 |
 
 ---
 
@@ -3484,3 +3485,16 @@ trace of what code ran records each executed code object's `co_filename`
 (the `exec` audit event); a trace of opened files is not a trace of
 imports.
 
+**262. actions/cache's version is a hash of its path list: add one path and
+every cache saved before it is a miss.** Take 195 added `graph_raw.json` and
+`step_stamps` to the region cache's paths. Its first run (PR #12, run 120)
+printed "Cache not found for input keys: region-michigan-v4-stamps,
+region-michigan-v4-, region-michigan-v4" although region-michigan-v4 existed
+(PROVEN, the job log), and rebuilt the state cold: the pipeline took 2,538 s
+against 1,428 s warm (run 116), ingest 599 s and imagery 348 s of it. The
+key is matched only within the same version, and the version is computed
+from the paths (and the compression), so no key, prefix or restore-key can
+reach an older list's cache. A failed job saves nothing, so its re-run is
+cold too. Rule: a change to the cache's path list is a clean run in
+disguise; land it in a take whose CI round can afford one cold build in the
+pull request and one on main, and say so in its HANDOFF entry.

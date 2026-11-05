@@ -1,4 +1,145 @@
-# HANDOFF — through Take 195 · V3
+# HANDOFF — through Take 196 · V3
+
+## Take 196 — 2026-11-05 — Slope bands over the riding areas (A14); the self-test waits out a re-tiling map (A275); render's HD drill waits for its card (A278)
+
+RECORDED FIRST. The maintainer, 2026-11-05, approved A14's design: "slope
+shading only where the ground is sharp". Built while take 195's CI ran, on
+main after take 195's merge.
+
+A14 — slope bands.
+- tools/slope.py computes slope from each z13 patch terrain.py already
+  fetches around a DNR scramble area. It measures at the ground's own
+  spacing: 156543.03392 / 2^13 m a pixel at the equator, times
+  cos(latitude), row by row. The bands are 15–25° yellow, 25–35° orange
+  and 35°+ red. Below 15° and wherever the DEM has no value stays
+  transparent. It writes one transparent PNG per patch on the patch's
+  tile-aligned corners, and slope_payload.json with each PNG's sha256.
+- terrain.py calls it with its own patches: no patches, no artifact.
+- bundle.py carries slope.json and slope/, holding each PNG to the hash
+  the index records. The loader reads it; the single-file build carries
+  none.
+- The app gives each patch an image source and a raster layer. They sit
+  just above the relief and the satellite, below the contours, water and
+  trails, nearest-neighbour, off by default, and kept by every mode.
+- Layers has a "Slope" row whose second line says "Riding areas only:
+  15° yellow, 25° orange, 35°+ red, from their ~14 m elevation data.
+  Nothing is drawn elsewhere." A bundle without the artifact offers it as
+  "Slope — not in this bundle". Layers rows can now carry such a line
+  (`sub`).
+Measured here on real data (PROVEN, AWS Terrain Tiles z13 fetched
+2026-11-05, the 8 riding areas of main's newest bundle): 8 patches, 13.4
+to 14.0 m a pixel, 47 KB of PNGs in all. 35°+ pixels: Silver Lake 85,
+Holly Oaks 81, Black Mountain 35, Bull Gap 23, St. Helen 0. A composite
+over the patch's own relief put the bands on Silver Lake's dune faces and
+the shoreline bluff (looked at, not measured).
+How it is held:
+- gate check_slope_rules: true 10, 20, 30 and 40° planes at 44.5°N,
+  along x and along y, read their own bands; flat ground and a hole
+  stay clear; the PNG keeps each band, with index 0 transparent. Five
+  wiring links. Watched failing on a mutant that measured at the
+  equator's pixel size (a 20° plane read 14.5°).
+- smoke 9m: each patch's source on the corners and file slope.json
+  names; each PNG's sha256 equals the index's; the layers' order,
+  resampling and start; the row, its words, on and off through every
+  mode; the absent branch. Its judge was proved on 5 plants. Three
+  mutants of the built app were each caught by their own check: the
+  layers under the relief, swapped corners, the row's line gone.
+- render "slope" (Chrome 138, PROVEN): the real Layers row on, the
+  steepest solid spot of the patch with the most 35°+ ground (Silver
+  Lake, a 34-pixel spot of the bundle's own PNG). There rgb 220,232,205
+  became 232,164,94, which is the band's colour at 0.62 over that ground
+  (232,164,94). 0.2° beyond every patch nothing changed (242,243,240 both
+  ways). The judge was proved on 4 plants.
+The review of take 196 (the code-review skill, 9 findings, each checked):
+- build_app.py's split copied imagery/ and photos/ into www/ but not
+  slope/. slope.json would have shipped without the images it names
+  (take 132's photos gap again). It copies the folder now, and removes a
+  stale one. PROVEN here: 8 PNGs in, folder gone when the bundle has none.
+  bundle.py likewise removes last build's slope/ when there are no bands.
+- The image sources loaded at startup, visible or not: about 31 MB of
+  textures on the phone for a layer that is off. They are added the first
+  time the row is on, below the contours. smoke's map stub learned
+  addSource and addLayer, one method a line for check_stubs. Render's
+  visibility reads ask getLayer first: asking MapLibre about a layer not
+  added yet raises a map error the self-test counts. The self-test after
+  the slope section in render: 42 passed, 0 real failures.
+- slope.degrees() refuses rows that are not the patch's own (the gate's
+  planted planes are now exact 64-row patches, and a 40-row array is
+  refused). The gate's PNG half says so when Pillow is missing instead
+  of passing. The local CLI skips an area whose tile fails, as
+  terrain.py does. Render's spot search falls back to yellow.
+- **Not changed (finding 3):** slope/ is not cleared on a region switch
+  (tools/region.py). slope.write() clears its own PNGs, bundle.py ships
+  only what a fresh slope_payload.json names at its hashes, and an edit to
+  region.py would re-run every stamped step (A207).
+Mutants of the built app, each caught by 9m alone: the layers added at
+boot, the added-once guard gone (plus the three above).
+- **Ruled out:** 3D terrain (the design's own ruling: MapLibre wants a DEM
+  tile source the bundle does not ship, and z10 is 150 m).
+- **Ruled out:** smoothing the DEM before measuring. A climb narrower than
+  the smoothing would read gentler: the confident wrong answer the design
+  exists to avoid.
+- **Ruled out:** a statewide slope layer from the z10 DEM (the design).
+
+A275 — the self-test's style-loaded check after a ride. A probe after
+render's nav section (Chrome 138, PROVEN) found twelve GeoJSON sources
+still loading when nav ended. They were ground, wtr, poistack, areas,
+areapt, net, approach, alt, route, crumb, back and places, and the style
+read loaded only between 3.1 and 7.5 s later. The self-test gave it 5 s.
+It gives 15 now and reports the time; a style that never loads still
+fails. `render --only=nav,selftest`: the fix 42 passed, 0 real failures;
+the same build with 5 s restored failed style-loaded (41, 1), the failure
+A275 recorded on takes 192 and 193.
+
+A278 — render's tools checks on section runs. A probe found that
+`--only=tools` alone failed both checks, and that tools starts from the
+same state with or without ui. A259's map-HD drill slept a fixed 700 ms
+before tapping Back. Polled, the HD tool was up from 300 ms, but on a
+slower read the Back came first, and it left the Tools strip over the
+Layers panel's first row: the second check's failure on tools alone. The
+drill now waits for the tool (up to 3 s), and `--only=tools` passed both.
+`--only=tools,ui` then passed the HD check and still failed the Layers
+one, so ui leaves a second cause (A278 stays OPEN for it). The app's side
+of the race, a rider's quick Back, is A279 (OPEN, to measure).
+
+Take 195's CI, recorded here (PR #12, run 120, PROVEN from its log):
+- the cache missed (landmine 262), so the build was cold: pipeline
+  2,538 s;
+- every compute step ran under the trace and stamped. Inputs: hazards
+  10, pack 6, poi 22, graph 7 (2 outputs), emit_graph 8, contour 128,
+  corridor 11, landcover 10;
+- smoke passed five times;
+- the gate's render died at its first navigation ("Navigation timeout of
+  60000 ms exceeded"). Run 120's own www/ booted here in Chrome 138 and
+  passed --only=basemap in 48 s, so the build is sound. INFERRED: the
+  runner was busy after the cold build. The job was re-run once
+  (landmine 256): green. The bundle job ran 63.5 min, cold again,
+  because a failed job saves no cache. The key step saved the cache under
+  the stamps' key in the PR's scope. The apk job found 5 plugins, the
+  text-to-speech one among them, and android_check read "kept classes 9/9
+  present; mapping ok; queries ok" on the APK and the universal APK.
+  Merged as d23d13a (squash). Main's first build after it runs cold
+  too, since main cannot read a pull request's cache.
+
+Verified here (Chrome 138; the bundle of main's newest green run, plus this
+container's hazards payload and slope bands):
+- smoke, all five passes PASSED: 298 / 210 / 54 ok, fatal 6, dead 33;
+- render: `--only=slope,selftest` PASSED, the self-test 42 passed and
+  0 real failures; `--only=nav,selftest` PASSED with the 15 s settle and
+  failed with 5 s; `--only=tools` PASSED with the HD wait;
+- the 35 gate checks that need no pipeline output PASSED.
+CI proves the full render and gate, terrain.py writing the bands from its
+own patches, and the bundle carrying them. It should also show A207's
+first skips: this take edits no file a stamped step reads.
+
+Also:
+- smoke 9k (take 194's hazards drill) read the whole Layers panel for "not
+  in this bundle", so any other absent row failed it, as Slope does in a
+  bundle without it. It reads its own row's words now.
+- A10 waits for take 197. It changes graph.py's statewide conflation,
+  the step with an OOM history (landmines 117, 200), and graph's inputs
+  are not reachable here; its transfer of a dropped OSM way's surface
+  needs a memory budget first.
 
 ## Take 195 — 2026-11-05 — Spoken turns through the phone's own text-to-speech (A218); compute steps skip on what they read (A207)
 

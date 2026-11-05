@@ -60,7 +60,7 @@ const SHOT = opt("--shot", null);
    "the same camera stacks different things per mode"): every passing
    stacks run had water before it, so water is its declared setup. */
 const SECTIONS = { trails: [], labels: [], modes: [], imagery: [], back: [], water: [], shell: ["water"],
-  stacks: ["water"], pins: ["stacks"], nav: [], camp: [], paddle: [], ui: [], home: [], tools: [], basemap: [], hazards: [],
+  stacks: ["water"], pins: ["stacks"], nav: [], camp: [], paddle: [], ui: [], home: [], tools: [], basemap: [], hazards: [], slope: [],
   selftest: [], routes: [], devices: ["routes"], faults: [], realdom: ["home", "routes"],
   clear: ["home", "routes"], tail: [], g6: [], "v4-setup": [], "v4-band": ["v4-setup"],
   "v4-select": ["v4-setup"], "v4-toast": ["v4-setup"], "v4-audit": ["v4-setup"],
@@ -4711,7 +4711,12 @@ if (zoomed.trails > 0) {
        (plan190 §4); the control, a real other path: the card drawn by its
        own function outside any sheet */
     let hdMap = null, hdCtl = null;
-    { const b = document.getElementById("c-hd"); if (b && b.getClientRects().length) { b.click(); await sleep(700);
+    /* take 196 · A278 · waited for, not slept on: the card is written after a
+       storage read, and a fixed 700 ms read "tool null" on a section run
+       whose read was slower (PROVEN: polled every 100 ms the tool was there
+       from 300 ms; the same drill with 700 ms failed alone) */
+    { const b = document.getElementById("c-hd"); if (b && b.getClientRects().length) { b.click();
+        for (let k = 0; k < 30 && SX.state().tool !== "c-hdmanage"; k++) await sleep(100); await sleep(150);
         const st = SX.state(); document.getElementById("sh-back").click(); await sleep(400);
         hdMap = { tool: st.tool, tab: st.tab, folded: /\bfolded\b/.test(document.getElementById("rail").className), after: SX.state().kind }; } }
     if (typeof window.__hdCard === "function") { window.__hdCard(); await sleep(700);
@@ -5171,6 +5176,135 @@ if (RUN("hazards")) {
        + (card === pre ? ` (the card did not change from "${pre.replace(/\s+/g, " ").slice(0, 60)}")` : ""));
     ok(off.n === 0 && off.vis.every((v) => v === false),
        `road hazards: the row turns them off again and nothing draws (${off.n} pins)`);
+  }
+}
+
+if (RUN("slope")) {
+  /* take 196 · A14 · slope bands DRAW where the ground is steep, and
+     nowhere else. The bundle's own slope.json and PNGs (landmine 197): the
+     patch with the most 35°+ ground, its steepest solid spot found in its
+     own image; the map shot there with the real Layers row off and on must
+     move toward the band's colour at the layer's opacity, and a point
+     outside every patch must not change. The layer goes back off, the
+     camera, tab and drawer back, before the next section. A bundle without
+     the artifact: the row is disabled and says so. */
+  let sfile = null;
+  try { sfile = JSON.parse(readFileSync(join(WWW, "bundle", "slope.json"), "utf8")); } catch (e) { sfile = null; }
+  const prep = await page.evaluate(async () => {
+    const m = window.map, SL = window.__slope, s = (ms) => new Promise((r) => setTimeout(r, ms));
+    const panel = document.getElementById("lyrpanel");
+    const row = () => [...panel.querySelectorAll("[data-lg]")].find((b) => /^Slope/.test(b.innerText)) || null;
+    const tabEl = document.querySelector("#tabs .tab.on"), tab0 = tabEl ? tabEl.dataset.go : null;
+    const rail0 = (document.getElementById("rail") || {}).className || "";
+    const mapTab = document.querySelector('#tabs .tab[data-go="map"]'); if (mapTab) mapTab.click(); await s(300);
+    try { window.__nav && window.__nav.rail && window.__nav.rail(false); } catch (e) {} await s(350);
+    const was = { tab: tab0, folded: /\bfolded\b/.test(rail0) }, cam = { c: [m.getCenter().lng, m.getCenter().lat], z: m.getZoom() };
+    if (panel.hidden) { document.getElementById("c-layers").click(); await s(350); }
+    const r0 = row(), absent = !!r0 && r0.disabled && /not in this bundle/.test(r0.innerText);
+    const d = panel.querySelector("[data-lyrdone]"); if (d) d.click(); await s(250);
+    if (!SL || !SL.ok) return { missing: true, absent, hasRow: !!r0, was, cam };
+    const P = SL.data.p.slice().sort((a, b) => b.c[2] - a.c[2])[0];
+    const img = new Image();
+    await new Promise((r, j) => { img.onload = r; img.onerror = j; img.src = "bundle/" + P.f; });
+    const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+    const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+    const D = g.getImageData(0, 0, c.width, c.height).data, W = c.width, H = c.height;
+    /* the most solid steep spot: the pixel whose 9x9 neighbourhood holds the
+       most pixels of its own colour (a lone pixel is a screen pixel or two) */
+    let best = null;
+    /* red or orange first; yellow only if a patch has no steeper ground */
+    for (const steep of [true, false]) { if (best) break;
+    for (let y = 4; y < H - 4; y += 2) for (let x = 4; x < W - 4; x += 2) {
+      const i = (y * W + x) * 4; if (D[i + 3] < 200 || D[i] < 200 || (steep ? D[i + 1] > 140 : D[i + 1] <= 140)) continue;
+      let n = 0;
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+        const k = ((y + dy) * W + x + dx) * 4; if (D[k + 3] > 200 && D[k] === D[i] && D[k + 1] === D[i + 1]) n++; }
+      if (!best || n > best.n) best = { x, y, n, rgb: [D[i], D[i + 1], D[i + 2]] }; } }
+    if (!best) return { nospot: true, was, cam, name: P.n };
+    const my = (lat) => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2; };
+    const lat = (y) => Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180 / Math.PI;
+    const ll = [P.b[0] + (best.x + 0.5) / W * (P.b[2] - P.b[0]), lat(my(P.b[3]) + (best.y + 0.5) / H * (my(P.b[1]) - my(P.b[3])))];
+    /* a point 0.2° east of every patch: nothing may be drawn there */
+    const far = [Math.max(...SL.data.p.map((p) => p.b[2])) + 0.2, ll[1]];
+    return { ll, far, spot: best, name: P.n, was, cam, ids: SL.ids };
+  });
+  const setRow = async (on) => page.evaluate(async (on) => {
+    const m = window.map, SL = window.__slope, s = (ms) => new Promise((r) => setTimeout(r, ms)), panel = document.getElementById("lyrpanel");
+    /* a layer not added yet is off; asking MapLibre about it would raise a
+       map error the self-test counts (the slope layers are added on first use) */
+    const vis = () => SL.ids.map((id) => !!m.getLayer(id) && m.getLayoutProperty(id, "visibility") === "visible");
+    if (vis().every((v) => v === on)) return vis();
+    if (panel.hidden) { document.getElementById("c-layers").click(); await s(350); }
+    const r = [...panel.querySelectorAll("[data-lg]")].find((b) => /^Slope/.test(b.innerText)); if (r && !r.disabled) r.click(); await s(350);
+    const d = panel.querySelector("[data-lyrdone]"); if (d) d.click(); await s(250);
+    return vis();
+  }, on);
+  const shotAt = async (ll) => {
+    const at = await page.evaluate(async (ll) => {
+      const m = window.map, s = (ms) => new Promise((r) => setTimeout(r, ms));
+      m.jumpTo({ center: ll, zoom: 16, bearing: 0, pitch: 0 });
+      for (let i = 0; i < 60 && !(m.loaded() && m.areTilesLoaded()); i++) await s(200);
+      await Promise.race([new Promise((r) => { m.once("idle", r); m.triggerRepaint(); }), s(8000)]); await s(300);
+      const p = m.project(ll), r = m.getCanvas().getBoundingClientRect();
+      return { x: r.left + p.x, y: r.top + p.y, canvas: document.elementFromPoint(r.left + p.x, r.top + p.y) === m.getCanvas(),
+               dpr: window.devicePixelRatio || 1 };
+    }, ll);
+    const shot = await page.screenshot({ type: "png" });
+    const rgb = await page.evaluate(async (b64, at) => {
+      const img = new Image();
+      await new Promise((r, j) => { img.onload = r; img.onerror = j; img.src = "data:image/png;base64," + b64; });
+      const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+      const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+      const k = img.width / window.innerWidth, d = g.getImageData(Math.round(at.x * k) - 2, Math.round(at.y * k) - 2, 5, 5).data;
+      const a = [0, 0, 0]; for (let i = 0; i < d.length; i += 4) { a[0] += d[i]; a[1] += d[i + 1]; a[2] += d[i + 2]; }
+      return a.map((v) => Math.round(v / (d.length / 4)));
+    }, shot.toString("base64"), at);
+    return { rgb, canvas: at.canvas };
+  };
+  let R = null;
+  if (prep && !prep.missing && !prep.nospot) {
+    const v0 = await setRow(false);
+    const off = await shotAt(prep.ll);
+    const v1 = await setRow(true);
+    const on = await shotAt(prep.ll), farOn = await shotAt(prep.far);
+    await setRow(false);
+    const farOff = await shotAt(prep.far);
+    R = { v0, v1, off, on, farOn, farOff };
+  }
+  /* always: off, and the camera, tab and drawer as they were */
+  const back = await page.evaluate(async (cam, was) => {
+    const m = window.map, SL = window.__slope, s = (ms) => new Promise((r) => setTimeout(r, ms));
+    const vis = () => (SL ? SL.ids : []).map((id) => !!m.getLayer(id) && m.getLayoutProperty(id, "visibility") === "visible");
+    try { window.__nav && window.__nav.rail && window.__nav.rail(false); } catch (e) {}
+    if (was && was.tab) { const t = document.querySelector(`#tabs .tab[data-go="${was.tab}"]`); if (t && !/\bon\b/.test(t.className)) t.click(); await s(300); }
+    if (was && !was.folded) { try { window.__nav.rail(true); } catch (e) {} await s(350); }
+    if (cam) m.jumpTo({ center: cam.c, zoom: cam.z });
+    for (let i = 0; i < 75 && !(m.loaded() && m.areTilesLoaded()); i++) await s(200);
+    await Promise.race([new Promise((z) => { m.once("idle", z); m.triggerRepaint(); }), s(8000)]); await s(300);
+    return { vis: vis() };
+  }, prep && prep.cam, prep && prep.was);
+  if (!sfile || (prep && prep.missing)) {
+    ok(!!prep && prep.missing && !sfile && prep.absent,
+       `slope: this bundle carries none, and the Layers row says "not in this bundle" and is disabled (${prep && prep.absent})`);
+    ok(back.vis.length === 0, `slope: (no artifact) the style holds no slope layer`);
+  } else if (!R) {
+    ok(false, `slope: no steep spot found in ${prep && prep.name}'s own image (${JSON.stringify(prep).slice(0, 160)})`);
+  } else {
+    const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+    const blend = (base, c) => base.map((v, i) => v * (1 - 0.62) + c[i] * 0.62);
+    /* the judge, proved on plants first */
+    const judge = (x) => x.off.canvas && x.on.canvas && x.v0.every((v) => v === false) && x.v1.every((v) => v === true)
+      && dist(x.on.rgb, x.off.rgb) > 30 && dist(x.on.rgb, blend(x.off.rgb, x.spot)) < dist(x.off.rgb, blend(x.off.rgb, x.spot))
+      && dist(x.farOn.rgb, x.farOff.rgb) < 8;
+    const seen = { ...R, spot: prep.spot.rgb };
+    const ctl = !judge({ ...seen, on: seen.off }) && !judge({ ...seen, farOn: { ...seen.farOn, rgb: seen.farOn.rgb.map((v) => v - 40) } })
+      && !judge({ ...seen, v1: seen.v1.map(() => false) }) && !judge({ ...seen, on: { ...seen.on, canvas: false } });
+    ok(judge(seen) && ctl,
+       `slope: the real Layers row turns ${R.v1.length} patch layers on and steep ground at ${prep.name} draws in its band `
+       + `(rgb ${R.off.rgb} off -> ${R.on.rgb} on, the band ${prep.spot.rgb} at 0.62; a ${prep.spot.n}-pixel spot), and 0.2° beyond every `
+       + `patch nothing changes (${R.farOff.rgb} -> ${R.farOn.rgb}); the judge rejects no change, a change beyond the patches, the row `
+       + `left off, and a spot behind the page (${ctl})`);
+    ok(back.vis.every((v) => v === false), `slope: the row turns them off again (${back.vis.filter(Boolean).length} on)`);
   }
 }
 
@@ -8919,7 +9053,7 @@ if (RUN("v4-setup")) {
   SECTION_AT = "(floor guard)";
   const SECTION_FLOOR = {
   boot: 13, trails: 2, labels: 11, modes: 33, imagery: 32, back: 14, water: 12, shell: 10,
-  stacks: 48, pins: 21, nav: 31, camp: 16, paddle: 25, ui: 37, home: 7, tools: 28, basemap: 2, hazards: 3,
+  stacks: 48, pins: 21, nav: 31, camp: 16, paddle: 25, ui: 37, home: 7, tools: 28, basemap: 2, hazards: 3, slope: 2,
   selftest: 2, routes: 3, devices: 222, faults: 6, realdom: 6, clear: 3, tail: 30, g6: 2,
   "v4-setup": 1, "v4-band": 7, "v4-select": 6, "v4-toast": 1, "v4-audit": 11, "v4-walker": 15,
   "v4-eta": 9 };

@@ -82,10 +82,12 @@ j('bundle/manifest.json').then(function(man){
      
     have.nf?j('bundle/'+have.nf):Promise.resolve(null),
      
-    have.hazards?j('bundle/'+have.hazards):Promise.resolve(null)]);
+    have.hazards?j('bundle/'+have.hazards):Promise.resolve(null),
+     
+    have.slope?j('bundle/'+have.slope):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
-  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];NF=r[18];HAZ=r[19];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];NF=r[18];HAZ=r[19];SLOPE=r[20];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -981,6 +983,26 @@ function paddleCard(ft){
 
  
 var HAZ_OK=(typeof HAZ!=='undefined')&&!!HAZ&&Array.isArray(HAZ.h)&&HAZ.h.length>0;
+ 
+var SLOPE_OK=(typeof SLOPE!=='undefined')&&!!SLOPE&&Array.isArray(SLOPE.p)&&SLOPE.p.length>0;
+var SLOPE_IDS=SLOPE_OK?SLOPE.p.map(function(p,i){return 'slope-'+i}):[];
+function slopeSources(src){
+  if(SLOPE_OK)SLOPE.p.forEach(function(p,i){
+    src['slope'+i]={type:'image',url:'bundle/'+p.f,
+      coordinates:[[p.b[0],p.b[3]],[p.b[2],p.b[3]],[p.b[2],p.b[1]],[p.b[0],p.b[1]]]}});
+  return src}
+ 
+var SLOPE_ADDED=false;
+function slopeEnsure(){
+  if(SLOPE_ADDED||!SLOPE_OK)return SLOPE_ADDED;
+  var src=slopeSources({}),before=map.getLayer('cont-line')?'cont-line':undefined;
+  try{
+    Object.keys(src).forEach(function(k){map.addSource(k,src[k])});
+    SLOPE_IDS.forEach(function(id,i){map.addLayer({id:id,type:'raster',source:'slope'+i,layout:{visibility:'none'},
+      paint:{'raster-opacity':0.62,'raster-resampling':'nearest','raster-fade-duration':0}},before)});
+    SLOPE_ADDED=true;logAct('slope: '+SLOPE_IDS.length+' patch layers added')}
+  catch(e){logAct('slope: not added ('+e.message+')')}
+  return SLOPE_ADDED}
 var HAZKIND={a:'Plate reader',h:'Height limit',w:'Weight limit',f:'Ford',
   r:'Rail crossing',t:'Toll booth',c:'Cattle guard',z:'Hazard'};
  
@@ -4652,6 +4674,10 @@ var LYRGROUPS=[
   {k:'hazards',h:'Road hazards', s:'plate readers, height and weight limits, fords, rail crossings \u2014 from OpenStreetMap',
    ids:['haz-dot','haz-rail','haz-label'],need:function(){return HAZ_OK}},
    
+  {k:'slope',h:'Slope',s:'riding areas only \u2014 15\u00b0 yellow, 25\u00b0 orange, 35\u00b0+ red, from their ~14 m DEM',
+   sub:'Riding areas only: 15\u00b0 yellow, 25\u00b0 orange, 35\u00b0+ red, from their ~14 m elevation data. Nothing is drawn elsewhere.',
+   ids:SLOPE_IDS,need:function(){return SLOPE_OK}},
+   
   {k:'labels', h:'Map text',    s:'names and numbers', ids:null, txt:true}
 ];
 
@@ -4665,6 +4691,7 @@ function lyrOn(g){
 
 function lyrSet(g,on){
   if(g.txt){textSet(on);var l0=el('c-labels');if(l0)l0.className='chip'+(on?' on':'');return}
+  if(on&&g.k==='slope')slopeEnsure();
   var ids=(g.ids||labelLayers()).concat(g.with||[]);
   ids.forEach(function(id){
     try{if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'visible':'none')}catch(e){}});
@@ -4697,7 +4724,9 @@ function buildLyrPanel(){
        '<span class="sw" style="background-color:'+(on?'var(--sel)':'transparent')+
        ';border:1px solid var(--sw-edge)"></span>'+
        '<span>'+g.h+(g.txt?'<span class="rsub">Names and numbers on the map. Pins and the count on a stack stay \u2014 choose pins under Pins in '+
-       modeOf(mode).h+'.</span>':'')+'</span></button>'});
+       modeOf(mode).h+'.</span>':'')+
+        
+       (g.sub?'<span class="rsub">'+g.sub+'</span>':'')+'</span></button>'});
    
   var pm=modeOf(mode);
   h+='<div class="sect">Pins in '+pm.h+'</div>';
@@ -5619,6 +5648,9 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
        
       window.__haz={ok:HAZ_OK,data:HAZ_OK?HAZ:null,text:hazardText,card:hazardCard,dir:hazDir,limit:hazLimit,label:hazLabel,kinds:HAZKIND,
         group:LYRGROUPS.filter(function(g){return g.k==='hazards'})[0],set:lyrSet,on:lyrOn};
+       
+      window.__slope={ok:SLOPE_OK,data:SLOPE_OK?SLOPE:null,ids:SLOPE_IDS,added:function(){return SLOPE_ADDED},
+        group:LYRGROUPS.filter(function(g){return g.k==='slope'})[0]};
       window.__search=function(q,all){return all?searchAll(q):search(q)};
       window.__voice=VOICE;window.__say=navSay;window.__voiceProbe=navVoiceProbe;
       window.__voiceLine=stVoiceNative;window.__ttsRetry=TTS_RETRY;    
@@ -5761,11 +5793,12 @@ function stLoad(){
 
 function stRender(cb){
    
+   
   var t0=Date.now();
   (function _settle(){
     var okd=map.isStyleLoaded();
-    if(!okd&&Date.now()-t0<5000)return setTimeout(_settle,250);
-    stAdd('RENDER','style-loaded',okd,okd?('true after '+(Date.now()-t0)+' ms'):'false after 5 s');
+    if(!okd&&Date.now()-t0<15000)return setTimeout(_settle,250);
+    stAdd('RENDER','style-loaded',okd,okd?('true after '+(Date.now()-t0)+' ms'):'false after 15 s');
     _stRenderBody();cb&&cb()})();
   return;
   function _stRenderBody(){

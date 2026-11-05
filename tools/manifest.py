@@ -192,9 +192,10 @@ SOURCES = [
     {
         "host": "s3.amazonaws.com",
         "name": "Terrarium elevation tiles",
-        "what": "Encoded DEM: node elevations, per-edge climb, profiles, hillshade",
+        "what": "Encoded DEM: node elevations, per-edge climb, profiles, hillshade, "
+                "and the slope bands over the riding areas' z13 patches (take 196, A14)",
         "licence": "Public domain / ODbL mix — USGS 3DEP over CONUS",
-        "tool": "terrain.py",
+        "tool": "terrain.py, slope.py",
         "phase": "provision",
         "refresh": "rarely — terrain does not move",
     },
