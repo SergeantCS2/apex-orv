@@ -1649,6 +1649,56 @@ def _gauges_record_fault(g, b, r):
     return None
 
 
+def check_hazards_rules():
+    """take 194 (A189): what tools/hazards.py keeps, held to planted tags.
+    Its counts are reconciled with the source's in its own output (rule 7);
+    this holds the rules that make those counts true: a road with two
+    limits keeps both, "none" is not a limit, a hazard on something not a
+    road is not a road hazard, two cameras on one spot are two cameras, and
+    a crossing mapped twice is one crossing. Each case is a control: a rule
+    taken out fails it."""
+    import importlib.util
+    hp = os.path.join(HERE, "hazards.py")
+    if not os.path.exists(hp):
+        return fails.append("tools/hazards.py missing (A189)")
+    try:
+        spec = importlib.util.spec_from_file_location("_hz", hp)
+        H = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(H)
+    except (Exception, SystemExit) as e:   # an import's sys.exit must not end the gate
+        return fails.append(f"tools/hazards.py will not load: {e!r}")
+    ks = lambda t, way: sorted(k for k, _ in H.kinds_of(t, way))
+    cases = [
+        ("a road with a height and a weight limit", ks({"highway": "primary", "maxheight": "13'6\"", "maxweight": "10"}, True), ["h", "w"]),
+        ("a height limit of 'none'", ks({"highway": "residential", "maxheight": "none"}, True), []),
+        ("a hazard on something not a road", ks({"natural": "wood", "hazard": "falling_rocks"}, True), []),
+        ("a plate reader", ks({"man_made": "surveillance", "surveillance:type": "ALPR"}, False), ["a"]),
+        ("a plain CCTV camera", ks({"man_made": "surveillance", "surveillance:type": "camera"}, False), []),
+        ("a toll booth mapped as an area", ks({"barrier": "toll_booth"}, True), ["t"]),
+        ("a parking garage's height limit", ks({"amenity": "parking", "parking": "multi-storey", "maxheight": "2.1"}, False), []),
+        ("a cliff's hazard", ks({"natural": "cliff", "hazard": "falling_rocks"}, False), []),
+        ("a curve sign", ks({"traffic_sign": "hazard", "hazard": "curve"}, False), ["z"]),
+    ]
+    bad = [f"{name}: {got} (want {want})" for name, got, want in cases if got != want]
+    K = H.Keeper((-90, 40, -80, 50))
+    K.keep(-84.0, 45.0, "a", ["", "", "0"]); K.keep(-84.0, 45.0, "a", ["", "", "180"])
+    K.keep(-84.0, 45.0, "r", ""); K.keep(-84.00002, 45.00002, "r", ""); K.keep(-70.0, 45.0, "r", "")
+    K.keep(-84.0, 45.0, "h", "13'8\""); K.keep(-84.00002, 45.00002, "h", "13'2\""); K.keep(-84.00002, 45.00002, "h", "13'2\"")
+    if K.kept["h"] != 2 or K.dup["h"] != 1:
+        bad.append(f"two different heights on one spot and a repeat kept {K.kept['h']}, again {K.dup['h']} (want 2, 1)")
+    if K.kept["a"] != 2:
+        bad.append(f"two plate readers on one spot kept {K.kept['a']} (want 2)")
+    if K.kept["r"] != 1 or K.dup["r"] != 1 or K.outside["r"] != 1:
+        bad.append(f"a crossing mapped twice and one outside the box: kept {K.kept['r']}, "
+                   f"again {K.dup['r']}, outside {K.outside['r']} (want 1, 1, 1)")
+    if K.found["r"] != K.kept["r"] + K.dup["r"] + K.outside["r"]:
+        bad.append("the hazard counts do not reconcile (found != kept + again + outside)")
+    if bad:
+        return fails.append("tools/hazards.py keeps the wrong things (A189): " + "; ".join(bad))
+    notes.append(f"road hazards: {len(cases) + 3} planted cases kept as A189 says (two limits on one road, "
+                 "two cameras on one spot, one crossing mapped twice)")
+
+
 def check_osm_fallback():
     ing = read("tools", "ingest.py")
     if not ing:
@@ -2607,13 +2657,24 @@ def check_render():
     # in 15.5 min; here the whole gate, render inside, took 885-928 s), past the
     # old 1800 s, so the gate's own render could not finish there (INFERRED;
     # landmine 235). 60 min still catches a hang; the suite must still PASS.
+    # take 194 · A276 · CI renders ONCE, here: ci/bundle.sh no longer runs
+    # its own render first (the same build rendered twice, ~35 of 95 min,
+    # run 110). In CI the render's whole output goes into the job log, which
+    # is what the first run was still kept for.
     r = subprocess.run(["node", rm], capture_output=True, text=True, timeout=3600)
-    if r.returncode:
-        bad = [l.strip() for l in r.stdout.splitlines() if "FAIL" in l][:2]
-        fails.append("render failed: " + ("; ".join(bad) or r.stderr[-700:]))
+    rc, out, err, how = r.returncode, r.stdout, r.stderr, "real browser drew the map"
+    if os.environ.get("CI"):
+        print("\n── render (tools/render.mjs, run by check_render) " + "─" * 20, flush=True)
+        print(out, flush=True)
+        if err.strip():
+            print(err[-4000:], flush=True)
+        print("── end of render " + "─" * 50 + "\n", flush=True)
+    if rc:
+        bad = [l.strip() for l in out.splitlines() if "FAIL" in l][:2]
+        fails.append("render failed: " + ("; ".join(bad) or err[-700:]))
     else:
-        n = sum(1 for l in r.stdout.splitlines() if l.strip().startswith("ok"))
-        notes.append(f"render: real browser drew the map, {n} checks green")
+        n = sum(1 for l in out.splitlines() if l.strip().startswith("ok"))
+        notes.append(f"render: {how}, {n} checks green")
 
     # The palette verifier runs under the SAME policy, in the same place, for the
     # same reason. It is a pipeline step too — but `ci/bundle.sh` runs the
@@ -3193,7 +3254,7 @@ def check_ledger_order():
 for fn in (check_handoff, check_stamps, check_release_notes, check_offline, check_splash, check_scrub,
            check_style, check_palette, check_badges, check_tokens, check_scale, check_icons, check_glyphs,
            check_licences, check_machine_legality,
-           check_ledgers, check_osm_fallback, check_gauges_fallback, check_drawn,
+           check_ledgers, check_osm_fallback, check_gauges_fallback, check_hazards_rules, check_drawn,
            check_region_clean, check_no_duplicate_defs, check_ledger_order,
            check_layer_control,
            check_artifacts_agree, check_agenda, check_syntax, check_stubs,

@@ -47,11 +47,13 @@ echo "chrome pinned: $PUPPETEER_EXECUTABLE_PATH"
 # run. Each step's exit is kept; the job's exit is the first non-zero one.
 RC=0
 keep() { "$@" || { s=$?; echo "::error::$* exited $s"; [ "$RC" -ne 0 ] || RC=$s; }; }
-keep node tools/render.mjs
-# The pipeline has a palette step, but the pipeline runs ABOVE this line —
-# before npm ci — so it finds no puppeteer and skips. Run it here, where chrome
-# exists. A check that skips is not a check (landmine 53).
-keep node tools/verify_palette.mjs
+# take 194 · A276 · the render runs ONCE, inside the gate. This script used
+# to run tools/render.mjs and then tools/verify_palette.mjs, and gate.py's
+# check_render ran both again on the same build: about 35 of a build's 95
+# minutes (run 110, PROVEN). Since keep() (2026-11-01) a failed render no
+# longer stops the job, so the first run had no job left but its log, and
+# check_render now prints the render's whole output into this job's log.
+# The palette verifier runs there too, after the render, as it did.
 
 # The Play privacy policy is served from Pages, and Pages deploys
 # THIS job's www/ artifact — so it is generated here, not in the

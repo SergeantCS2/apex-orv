@@ -4058,6 +4058,90 @@ if (!NO_GPS) {
   }
 }
 
+/* 9k · take 194 · A189 · Road hazards (the maintainer, 2026-11-05: "Build
+   it"). The layer is the bundle's own hazards.json, off by default in every
+   mode; its row in Layers switches all three of its map layers and no mode
+   switch undoes it; each card says only what OSM records, escaped (anyone
+   may edit OSM); a bundle without the artifact offers the row as absent.
+   Every count is the bundle's own (landmine 197). */
+{
+  const H = sandbox.window.__haz, M = sandbox.window.__mode;
+  let file = null;
+  try { file = JSON.parse(readFileSync(join(WWW, "bundle", "hazards.json"), "utf8")); } catch (e) { file = null; }
+  const inMan = (manifest.artifacts || []).some((a) => a.kind === "hazards");
+  const IDS = ["haz-dot", "haz-rail", "haz-label"];
+  const vis = (id) => { const h = record.layout.filter((l) => l[0] === id && l[1] === "visibility");
+    if (h.length) return h.at(-1)[2];
+    const st = (record.style.layers || []).find((l) => l.id === id); return st && st.layout ? st.layout.visibility : "visible"; };
+  if (!H) ok(false, "A189 · no __haz hook");
+  else if (!inMan || !file) {
+    /* a bundle without the artifact: the row says so and switches nothing */
+    grab("c-layers").fire("click"); flushTimeouts();
+    const html = String(grab("lyrpanel")._html || "");
+    ok(!H.ok && /Road hazards \u2014 not in this bundle/.test(html) && /data-lg="\d+" disabled>/.test(html)
+       && IDS.every((id) => vis(id) === "none"),
+       `A189 · a bundle without road hazards: the Layers row reads "Road hazards — not in this bundle" and is disabled; its layers stay off`);
+  } else {
+    const src = record.sources.haz, feats = (src && src.data && src.data.features) || [];
+    const kinds = {}; file.h.forEach((r) => { kinds[r[2]] = (kinds[r[2]] || 0) + 1; });
+    ok(H.ok && feats.length === file.h.length && feats.length > 0 && Object.keys(kinds).length >= 1
+       && IDS.every((id) => record.layers.includes(id)) && IDS.every((id) => vis(id) === "none"),
+       `A189 · the layer is the bundle's hazards.json: ${feats.length.toLocaleString()} pins in the source = ${file.h.length.toLocaleString()} in the file `
+       + `(${Object.entries(kinds).map(([k, v]) => (H.kinds[k] || k) + " " + v).join(", ")}), OSM of ${file.osm}; its three layers exist and start off`);
+    /* the row, the switch and a mode change */
+    grab("c-layers").fire("click"); flushTimeouts();
+    const html = String(grab("lyrpanel")._html || "");
+    const g = H.group, gi = sandbox.window.__areas.groups.indexOf(g);
+    H.set(g, true);
+    const onAll = IDS.every((id) => vis(id) === "visible"), onRead = H.on(g);
+    const others = (M && M.MODES || []).map((md) => md.k), was = M && M.get();
+    const kept = others.every((k) => { M.apply(k, { silent: true }); return IDS.every((id) => vis(id) === "visible"); });
+    if (was) M.apply(was, { silent: true });
+    H.set(g, false);
+    const offAll = IDS.every((id) => vis(id) === "none");
+    ok(gi >= 0 && new RegExp('data-lg="' + gi + '">').test(html) && /Road hazards/.test(html) && !/not in this bundle/.test(html)
+       && onAll && onRead && kept && offAll,
+       `A189 · Layers offers "Road hazards" (row ${gi}); on, all three layers draw and stay on through ${others.length} mode changes; off, all three go`);
+    /* the cards: one real pin of each kind the bundle has, and planted rows */
+    const pick = (k, f) => file.h.find((r) => r[2] === k && (!f || f(r)));
+    const real = {
+      a0: pick("a", (r) => !r[3][1]), a1: pick("a", (r) => !!r[3][0] && !!r[3][1]), ad: pick("a", (r) => /^\d+$/.test(r[3][2])),
+      h: pick("h"), w: pick("w"), f: pick("f"), r: pick("r"), z: pick("z") };
+    const T = (r) => r ? H.text(r) : null, txt = (x) => x ? x.title + " | " + x.lines.join(" | ") : "(none in this bundle)";
+    const a0 = T(real.a0), a1 = T(real.a1), ad = T(real.ad);
+    const plant = H.text([-84, 44, "a", ['<img src=x onerror=alert(1)>', "", "90;270"]]);
+    const hm = H.text([-84, 44, "h", "3.5"]), hf = H.text([-84, 44, "h", "13'6\""]), wz = H.text([-84, 44, "z", "school_zone"]);
+    const lb = { h: H.label("h", "3.5"), w: H.label("w", "10"), raw: H.label("h", "13'6\"") };
+    /* the judge, over every reading; its controls hand it wrong ones */
+    const judge = (x) => (!x.a0 || (x.a0.title === "Plate reader" && x.a0.lines.includes("operator not recorded")))
+      && (!x.a1 || x.a1.lines.some((l) => l.startsWith("operated by ")))
+      && (!x.ad || /^faces \d+\u00b0 \([NESW]{1,3}\)$/.test(x.ad.lines[x.ad.lines.length - 1]))
+      && x.plant.lines[0] === "&lt;img src=x onerror=alert(1)&gt;" && x.plant.lines[1] === "operator not recorded"
+      && x.plant.lines[2] === "faces 90\u00b0 (E) and 270\u00b0 (W)"
+      && x.hm.lines[0] === "3.5 m (11 ft 6 in)" && x.hf.lines[0] === "13'6&quot;" && x.wz.lines[0] === "school zone"
+      && x.lb.h === "3.5 m" && x.lb.w === "10 t" && x.lb.raw === "13'6\"";
+    const seen = { a0, a1, ad, plant, hm, hf, wz, lb };
+    const cardOk = judge(seen);
+    const ctl = !judge({ ...seen, plant: { ...plant, lines: ["<img src=x onerror=alert(1)>"].concat(plant.lines.slice(1)) } })
+      && !judge({ ...seen, hm: { ...hm, lines: ["3.5"] } }) && !judge({ ...seen, lb: { ...lb, h: "3.5" } })
+      && !judge({ ...seen, plant: { ...plant, lines: [plant.lines[0], "operated by someone", plant.lines[2]] } });
+    ok(cardOk && ctl,
+       `A189 · each card says what OSM records and nothing else: "${txt(a0)}"; "${txt(a1)}"; "${txt(ad)}"; a height "${txt(T(real.h))}"; `
+       + `"${txt(T(real.f))}"; "${txt(T(real.r))}"; a planted maker is escaped ("${plant.lines[0]}"), two directions read "${plant.lines[2]}", `
+       + `3.5 reads "${hm.lines[0]}" and is labelled "${lb.h}" on the map; the judge rejects an unescaped maker, a unitless 3.5 on the card `
+       + `and on the map, and an operator the source did not record (${ctl})`);
+    /* the card itself, through the app's own show() */
+    if (real.a0) {
+      const i = file.h.indexOf(real.a0);
+      H.card({ properties: { i }, geometry: { coordinates: [real.a0[0], real.a0[1]] } }); flushTimeouts();
+      const card = String(grab("panel")._html || "");
+      ok(/Plate reader/.test(card) && /operator not recorded/.test(card) && new RegExp("From OpenStreetMap \\(" + file.osm + "\\)").test(card)
+         && card.includes(real.a0[1].toFixed(5)),
+         `A189 · a plate reader's card names its source and date ("From OpenStreetMap (${file.osm})") and its coordinate`);
+    }
+  }
+}
+
 /* 10 · nothing ever left the origin */
 ok(remoteAsked.length === 0, `zero remote requests (${remoteAsked.length})`);
 

@@ -80,10 +80,12 @@ j('bundle/manifest.json').then(function(man){
      
     have.gauges?j('bundle/'+have.gauges):Promise.resolve(null),
      
-    have.nf?j('bundle/'+have.nf):Promise.resolve(null)]);
+    have.nf?j('bundle/'+have.nf):Promise.resolve(null),
+     
+    have.hazards?j('bundle/'+have.hazards):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
-  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];NF=r[18];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];NF=r[18];HAZ=r[19];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -977,6 +979,22 @@ function paddleCard(ft){
   if(f3)f3.addEventListener('click',function(){runClear();ack('Run cancelled.')});
 }
 
+ 
+var HAZ_OK=(typeof HAZ!=='undefined')&&!!HAZ&&Array.isArray(HAZ.h)&&HAZ.h.length>0;
+var HAZKIND={a:'Plate reader',h:'Height limit',w:'Weight limit',f:'Ford',
+  r:'Rail crossing',t:'Toll booth',c:'Cattle guard',z:'Hazard'};
+ 
+function hazLabel(k,v){var s=String(v||'').trim(),n=+s;
+  if(!s)return '';
+  return (s&&isFinite(n))?(k==='h'?n+' m':n+' t'):s}
+var hazf=HAZ_OK?HAZ.h.map(function(r,i){
+  var k=r[2],v=r[3];
+  return {type:'Feature',
+    properties:{i:i,k:k,lb:(k==='h'||k==='w')?hazLabel(k,v):''},
+    geometry:{type:'Point',coordinates:[r[0],r[1]]}}}):[];
+ 
+var HAZ_PAINT=['match',['get','k'],'a','#6D3AA0','h','#C2410C','w','#C2410C','f','#1E6FA8',
+  'r','#3A352E','t','#5B6472','c','#8A6D3B','#B91C1C'];
 var peakf=((CONT&&CONT.pk)||[]).map(function(p){
   return {type:'Feature',
     properties:{n:p.n,ft:p.ft,lb:p.n+'\n'+p.ft.toLocaleString()+' ft'},
@@ -1266,6 +1284,7 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
     cont:{type:'geojson',data:{type:'FeatureCollection',features:contf}},
     wpts:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
     peaks:{type:'geojson',data:{type:'FeatureCollection',features:peakf}},
+    haz:{type:'geojson',data:{type:'FeatureCollection',features:hazf}},
     paddle:{type:'geojson',data:{type:'FeatureCollection',features:padf}},
     padpin:{type:'geojson',data:{type:'FeatureCollection',features:padpin}},
     areas:{type:'geojson',data:{type:'FeatureCollection',features:areaf}},
@@ -1552,6 +1571,19 @@ var map=new maplibregl.Map({container:'map',style:{version:8,glyphs:GLYPH_URL,
         'text-size':w(8,9.5,11),'text-offset':[0,0.85],'text-anchor':'top',
         'text-max-width':10,'text-padding':4,'text-line-height':1.15},
       paint:{'text-color':'#3A352E','text-halo-color':'#FFFFFF','text-halo-width':1.9}},
+     
+    {id:'haz-dot',type:'circle',source:'haz',minzoom:9.5,filter:['!=',['get','k'],'r'],
+      layout:{visibility:'none'},
+      paint:{'circle-radius':w(3.2,4.6,6.5),'circle-color':HAZ_PAINT,
+        'circle-stroke-color':'#FFFFFF','circle-stroke-width':1.6}},
+    {id:'haz-rail',type:'circle',source:'haz',minzoom:12,filter:['==',['get','k'],'r'],
+      layout:{visibility:'none'},
+      paint:{'circle-radius':w(3,4.2,6),'circle-color':HAZ_PAINT,
+        'circle-stroke-color':'#FFFFFF','circle-stroke-width':1.4}},
+    {id:'haz-label',type:'symbol',source:'haz',minzoom:13,filter:['in',['get','k'],['literal',['h','w']]],
+      layout:{visibility:'none','text-field':['get','lb'],'text-font':['APEX'],
+        'text-size':w(8,9.5,11),'text-offset':[0,0.95],'text-anchor':'top','text-padding':3},
+      paint:{'text-color':'#7A2E0E','text-halo-color':'#FFFFFF','text-halo-width':1.8}},
      
      
     {id:'pad-dot',type:'symbol',source:'padpin',minzoom:9.5,
@@ -4569,6 +4601,9 @@ var LYRGROUPS=[
    ids:['pad-case','pad-line','pad-dot','pad-lbl','pad-dam','pad-damlbl']},
   {k:'relief', h:'Relief',      s:'hillshade', ids:['hillshade']},
    
+  {k:'hazards',h:'Road hazards', s:'plate readers, height and weight limits, fords, rail crossings \u2014 from OpenStreetMap',
+   ids:['haz-dot','haz-rail','haz-label'],need:function(){return HAZ_OK}},
+   
   {k:'labels', h:'Map text',    s:'names and numbers', ids:null, txt:true}
 ];
 
@@ -4604,8 +4639,12 @@ function buildLyrPanel(){
        '<span>'+nm+(dis?' — not in this bundle':'')+'</span></button>'});
   h+='<div class="sect">Layers</div>';
   LYRGROUPS.forEach(function(g,i){
-    var on=lyrOn(g);
+    var on=lyrOn(g),gone=g.need&&!g.need();
      
+     
+    if(gone){h+='<button class="actrow" data-lg="'+i+'" disabled>'+
+       '<span class="sw" style="background-color:transparent;border:1px solid var(--sw-edge)"></span>'+
+       '<span>'+g.h+' \u2014 not in this bundle</span></button>';return}
     h+='<button class="actrow'+(on?' on':'')+'" data-lg="'+i+'">'+
        '<span class="sw" style="background-color:'+(on?'var(--sel)':'transparent')+
        ';border:1px solid var(--sw-edge)"></span>'+
@@ -4642,6 +4681,7 @@ function buildLyrPanel(){
       buildLyrPanel()})});
   Array.prototype.forEach.call(p.querySelectorAll('[data-lg]'),function(b){
     b.addEventListener('click',function(){
+      if(b.disabled)return;
       var g=LYRGROUPS[+b.dataset.lg],on=!lyrOn(g);
       lyrSet(g,on);logAct('act  layer '+g.k+' '+(on?'on':'off'));
       buildLyrPanel()})});
@@ -5396,6 +5436,45 @@ function placeCard(at,kind,title){
         'Find it again under <b>Saved</b> on the Plan tab.</span>','pass')})});
 }
 
+ 
+function hazEsc(x){return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+var HAZ_POINTS=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+function hazDir(d){
+  var a=String(d).split(';').map(function(x){return x.trim()}).filter(Boolean);
+  return a.map(function(x){var n=+x;
+    return (isFinite(n)&&x!=='')?Math.round(((n%360)+360)%360)+'\u00b0 ('+HAZ_POINTS[Math.round((((n%360)+360)%360)/22.5)%16]+')'
+      :hazEsc(x)}).join(' and ')}
+function hazLimit(v,unit){
+   
+  var s=String(v||'').trim(),n=+s;
+  if(s&&isFinite(n)){
+    if(unit==='m'){var inch=Math.round(n*39.3701);
+      return n+' m ('+Math.floor(inch/12)+' ft '+(inch%12)+' in)'}
+    return n+' t'}
+  return s?hazEsc(s):'value not recorded'}
+function hazardText(r){
+  var k=r[2],v=r[3],lines=[];
+  if(k==='a'){var m=(v&&v[0])||'',o=(v&&v[1])||'',d=(v&&v[2])||'';
+    lines.push(m?hazEsc(m):'maker not recorded');
+    lines.push(o?'operated by '+hazEsc(o):'operator not recorded');
+    if(d)lines.push('faces '+hazDir(d))}
+  else if(k==='h')lines.push(hazLimit(v,'m'));
+  else if(k==='w')lines.push(hazLimit(v,'t'));
+  else if(k==='f')lines.push('the road crosses water here'+(v?' \u00b7 '+hazEsc(v):''));
+  else if(k==='t'&&v)lines.push(hazEsc(v));
+  else if(k==='z')lines.push(hazEsc(String(v||'').replace(/_/g,' '))||'type not recorded');
+  return {title:HAZKIND[k]||'Hazard',lines:lines}}
+function hazardCard(f){
+  var r=HAZ_OK?HAZ.h[+f.properties.i]:null;if(!r)return;
+  var x=hazardText(r);
+  logAct('tap  hazard '+r[2]);
+  RAIL_AT=[r[0],r[1]];
+  show('<span class="tn">'+x.title+'</span>'+
+    (x.lines.length?'<br>'+x.lines.join('<br>'):'')+
+    '<div class="sub">From OpenStreetMap ('+hazEsc(HAZ.osm)+'), as mapped \u2014 not checked on the ground.</div>'+
+    '<span class="tn">'+r[1].toFixed(5)+'  '+r[0].toFixed(5)+'</span>','')}
+
 function wpDraw(){
   var a=wpLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region});
   try{map.getSource('wpts').setData({type:'FeatureCollection',
@@ -5488,6 +5567,9 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         craft:function(){return machine},card:paddleCard};
       window.__gauge=GAUGE;
       window.__gauges=(typeof GAUGES!=='undefined')?GAUGES:null;
+       
+      window.__haz={ok:HAZ_OK,data:HAZ_OK?HAZ:null,text:hazardText,card:hazardCard,dir:hazDir,limit:hazLimit,label:hazLabel,kinds:HAZKIND,
+        group:LYRGROUPS.filter(function(g){return g.k==='hazards'})[0],set:lyrSet,on:lyrOn};
       window.__search=function(q,all){return all?searchAll(q):search(q)};
       window.__voice=VOICE;window.__say=navSay;window.__voiceProbe=navVoiceProbe;
       window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,
@@ -6706,6 +6788,10 @@ map.on('click',function(e){
     }
     return;
   }
+   
+  var hz=map.queryRenderedFeatures([[e.point.x-11,e.point.y-11],[e.point.x+11,e.point.y+11]],
+    {layers:['haz-dot','haz-rail']});
+  if(hz.length&&hz[0].properties&&hz[0].geometry)return hazardCard(hz[0]);
   var f=map.queryRenderedFeatures([[e.point.x-9,e.point.y-9],[e.point.x+9,e.point.y+9]],
     {layers:HIT.concat(HIT_SHOW)});
   if(!f.length){

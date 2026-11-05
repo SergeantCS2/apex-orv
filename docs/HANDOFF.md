@@ -1,4 +1,147 @@
-# HANDOFF — through Take 193 · V3
+# HANDOFF — through Take 194 · V3
+
+## Take 194 — 2026-11-05 — Road hazards, from OpenStreetMap (A189); CI renders once (A276); the maintainer's packing rule (A277)
+
+RECORDED FIRST. The maintainer, 2026-11-05:
+- "for future takes i'd like to pack as many features/changes in as SAFELY
+  possible, given how long it takes to build within github" (A277;
+  CLAUDE.md "Pack each take");
+- asked about CI's second render: "Yes, reuse it" (A276);
+- asked about A189 before A183's device check: "Build it in the next take";
+- queued A207, A218, A14 and A10, each design first.
+Built on main cc05a9f (take 193, release take-113, tagged t193 by CI).
+
+A276 — run 110's bundle job, from its own timestamps: pipeline 21 min,
+render 34.5 min, gate 38.7 min, the gate's time mostly a second, identical
+render (PROVEN). First built as you approved it: tools/render_stamp.py
+stamped the standalone render's log, and check_render judged that log when
+the hashes matched. Proven here:
+- a real stamp of a stand-in log was accepted;
+- an edited log, another Chrome, a partial run and no stamp were each
+  refused;
+- check_render judged a stamped log of this build in 1 min 27 s.
+The cold audit found its input list incomplete (render.mjs also reads
+gate.py's NEVER_HIDE, www/vendor and the other www/ files). It also found
+the simpler change. Since keep() (2026-11-01) a failed render no longer
+stops the job, so the standalone run had nothing left to do but write its
+log. So bundle.sh now renders nothing itself; the gate's check_render
+renders once, as it always did, and in CI prints the whole render into the
+job log. The stamp module is gone: one render, nothing to trust. The
+saving is about 35 min a build: INFERRED until this take's CI run measures
+it.
+
+A189 — Road hazards. The extract is reachable here from
+download.openstreetmap.fr (PROVEN 2026-11-05; Geofabrik is not), so the
+new step ran on real data, and the counts were taken first. Source totals
+for every element in the state: ALPR 3,682; rail crossings 7,464; fords
+698; toll booths 164; cattle guards 18; hazard=* 51; weight-limited roads
+250; height limits 1,776 roads with a value plus 30 points (187 roads say
+none or default); speed cameras 0.
+
+tools/hazards.py makes one pass over the extract the ingest reads (105 s
+here), keeps those kinds and prints, for each, found = kept + outside the
+box + the same spot again. Two of my rules were wrong, and the
+reconciliation showed both:
+- merging within 15 m folded 114 plate readers into a neighbour, so
+  cameras are now never merged;
+- a first-match rule dropped the weight limit of 4 roads that also carry
+  a height limit, so a road keeps every kind it records.
+On the extract every kind now reconciles: 13,369 pins, 525 KB. The gate's
+check_hazards_rules holds those rules to nine planted cases. Each of four
+mutants was caught (a fifth I wrote wrong passed, and was redone).
+
+The app:
+- **Layers:** a "Road hazards" row, off by default, and no mode lists it,
+  so it keeps the rider's choice in every mode. A bundle without the
+  artifact offers it as "Road hazards — not in this bundle", disabled.
+- **The map:** dots coloured by kind, rail crossings from z12 and the rest
+  from z9.5, the recorded height or weight printed from z13.
+- **A tap:** opens a card that says only what OSM records. For example
+  "Plate reader · Flock Safety · operator not recorded · faces 160° (SSE)",
+  or a bare 3.5 as "3.5 m (11 ft 6 in)". The source line reads "From
+  OpenStreetMap (2026-11-05), as mapped — not checked on the ground".
+  Every value is escaped, since anyone may edit OSM.
+Not built, recorded in A189:
+- the truck turn-list warning, since the app has no truck and no drive-to
+  routing;
+- stacking with the place pins;
+- clipping to the state line: pins are kept by the region's box, as the
+  other OSM layers are.
+
+The cold audit (the code-review skill, extra-high, 15 findings) changed
+the take. Fixed:
+- A276 became the simpler form (above);
+- hazards.py took its region from osm_local.region(), which reads only
+  the default, so `--region sthelen` would have shipped the state's pins
+  in St. Helen's bundle. It uses region.R now, and gauges.py (whose line
+  it had copied) is fixed too: APEX_REGION=sthelen builds St. Helen, and
+  its four stubbed NWIS paths still behave (PROVEN);
+- two different limits on one spot are kept as two;
+- a node that is a place gives no limit or hazard pin. A pass over the
+  extract's 51 such nodes showed 26 of the 30 height-limit nodes are
+  parking garages, and the 20 hazard nodes 19 road signs and a bare point;
+- the step skips without osmium, as corridor and landcover do;
+- the gate check survives a sys.exit in an import;
+- the tap comes after the places (A110), in their 22 px box;
+- a bare 3.5 is labelled "3.5 m" on the map, as on its card;
+- render's section always turns the layer back off and folds the card,
+  takes any kind where a bundle has no plate reader, and clears the app's
+  own 18 px stack radius;
+- smoke's card judge got a real control (it had compared a literal);
+- PROVISION's refresh line was still wrong for box regions.
+Kept as is: the extra pass over the extract (105 s here; A207 is
+pipeline time's item).
+
+Measured (cloud, Chrome 138, run 113's bundle with this take's
+hazards.json added locally, take 193's data otherwise):
+- Smoke, all five passes PASSED: 295 / 207 / 54 ok, fatal 6, dead 33.
+- Render --only=hazards PASSED (3).
+- The gate checks that need no pipeline output PASSED.
+Controls, each failing exactly its check (PROVEN):
+- smoke on the bundle without hazards: the row disabled, "not in this
+  bundle", its layers off;
+- smoke mutants: no escaping, no label units, the absent-row rule out;
+- render on the bundle without hazards: disabled row, nothing draws;
+- render with the tap check out: the same tap opened "County Road 24";
+- hazards.py rules: the gate's cases against five mutants.
+render --only=tools,ui fails two tools checks, and failed them the same way
+on take 193's committed build: A278, OPEN. UNKNOWN until this take's CI
+run: the full render and gate on fresh data, hazards.py on Geofabrik's
+extract, and the minutes A276 saves.
+
+CI's run 115 (this pull request, cb27d57) measured A276 and found two
+failures (PROVEN, its log):
+- **Time:** the bundle job took 49 min where run 110's took 95. Pipeline
+  1,009 s, with hazards.py 85 s on Geofabrik's extract of 2026-10-31
+  (13,336 pins, every kind reconciling: plate readers 3,676 = 3,676). The
+  render ran once, in the gate, about 30 min, its whole output in the log.
+- **The hazards tap** read "RIDE Ride from here…": the Ride tab's card,
+  left up by the sections before. The page-mouse click had changed
+  nothing.
+- **The self-test right after** read no roads (RENDER/roads), because the
+  cleanup jumped the camera back and returned while the map was still
+  loading.
+Fixed in the section:
+- it starts from a state it makes (the Map tab, the drawer folded, what it
+  found put back after);
+- the target must be the canvas at that point;
+- it taps as a finger does, touchstart, touchend and click on the canvas
+  (realdom's sequence). A touchstart also clears a long press an earlier
+  drill left armed (lp.fired swallows the next click);
+- the cleanup waits for the map to go idle.
+Proven here:
+- the full render on the state-and-idle fix PASSED everything but that
+  tap: 680 ok, the self-test 42/0;
+- with the state CI met rebuilt (a long press left armed, then the Ride
+  tab's card), the committed section failed with CI's own text and the
+  fixed one opened the plate reader's card.
+
+PROVISION: the Geofabrik entry said "only when every Overpass mirror
+fails". That was the box region's rule. The statewide build reads the
+extract every time (ingest's bulk path, corridor, landcover, now hazards),
+and the entry says so now. A200's heading read BUILDING since take 186,
+which built it; fixed. A10 got its first measurement: 57,627 tracks carry
+no surface tag, and 511 say sand.
 
 ## Take 193 — 2026-11-05 — a self-test during a ride keeps the ride's own battery reading (A273); a dropout is counted through a clock set back and through sleep (A274); the strip and the dispatch card treat a fix stamped ahead of the clock as of unknown age
 

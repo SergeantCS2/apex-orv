@@ -48,6 +48,7 @@ ARTIFACTS = [
     ("publicland_payload.json","publicland.json",  "publicland",False),
     ("gauges_payload.json",  "gauges.json",      "gauges",   False),
     ("nf.json",              "nf.json",          "nf",       False),   # take 174 · A186
+    ("hazards_payload.json", "hazards.json",     "hazards",  False),   # take 194 · A189
 ]
 
 # take 192 · A245 · artifact -> the record its step writes when it omits the
@@ -79,6 +80,7 @@ COUNTERS = {
     "publicland": lambda d: len(d.get("a") or []),
     "other":   lambda d: len(d.get("r") or []),
     "places":  lambda d: len(d.get("p") or []),
+    "hazards": lambda d: len(d.get("h") or []),
     "context": lambda d: len(d.get("counties") or []) + len(d.get("rings") or []),
     # take 139: v2 ships delta-encoded — the count is `n`, the segments are
     # rebuilt in the app

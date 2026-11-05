@@ -26,6 +26,9 @@ STEPS = [
     ("bas",        ["bas.py"],         "DNR boating access sites (A169)"),
     ("gauges",     ["gauges.py"],      "USGS gauge inventory (live values are the app's, on a tap)"),
     ("nf",         ["nf.py"],          "national forest boundaries (Camp mode, A186)"),
+    # take 194 · A189 · its own pass over the extract the ingest reads; it
+    # widens nothing in aoi.json (the ingest's cache key)
+    ("hazards",    ["hazards.py"],     "road hazards from OSM: plate readers, limits, crossings (A189)"),
     ("pack",       ["pack.py"],        "water layer"),
     ("poi",        ["poi.py"],         "places you can ride to"),
     ("graph",      ["graph.py"],       "conflate and node the network"),

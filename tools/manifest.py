@@ -100,13 +100,22 @@ SOURCES = [
     {
         "host": "download.geofabrik.de",
         "name": "Geofabrik OpenStreetMap extract",
-        "what": "Michigan .osm.pbf — the same OSM ways ingest.py asks Overpass "
-                "for, from the sanctioned bulk download path",
+        # take 194 · the statewide region reads this every build (ingest.py's
+        # bulk path, corridor, landcover, and A189's road hazards); "only
+        # when every Overpass mirror fails" was the box region's rule and
+        # had gone stale here (the document is the bug)
+        "what": "Michigan .osm.pbf — read directly for the statewide region: the "
+                "ways ingest.py would ask Overpass for, river corridors, land "
+                "cover, and road hazards (plate readers, height and weight "
+                "limits, fords, rail crossings; A189, take 194)",
         "licence": "ODbL (OpenStreetMap contributors)",
-        "tool": "osm_local.py",
+        "tool": "osm_local.py, corridor.py, landcover.py, hazards.py",
         "phase": "provision",
-        "refresh": "only when every Overpass mirror fails — tier 2 of the OSM "
-                   "fallback chain, ahead of Census TIGER (A108, take 85)",
+        "refresh": "every build (cached in CI's osm_cache): corridor, landcover and "
+                   "hazards read it for any region, and the statewide ingest reads it "
+                   "directly; a box region's ingest uses it only when every Overpass "
+                   "mirror fails — tier 2 of the OSM fallback chain, ahead of Census "
+                   "TIGER (A108, take 85)",
     },
     {
         "host": "gisagodnr.state.mi.us",
