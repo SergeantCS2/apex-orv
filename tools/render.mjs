@@ -5080,8 +5080,17 @@ if (RUN("hazards")) {
     const openLyr = async () => { if (panel.hidden) { document.getElementById("c-layers").click(); await s(350); } };
     const closeLyr = async () => { const d = panel.querySelector("[data-lyrdone]"); if (d) d.click(); await s(250); };
     const cam = { c: m.getCenter(), z: m.getZoom() };
+    /* the section starts from a state it makes (CI's run of PR #11: the
+       sections before it left the Ride tab's card up, and the tap meant for
+       a plate reader opened "Ride from here"): the Map tab, the drawer
+       folded. What it found is put back at the end. */
+    const tabEl = document.querySelector("#tabs .tab.on"), tab0 = tabEl ? tabEl.dataset.go : null;
+    const rail0 = (document.getElementById("rail") || {}).className || "";
+    const mapTab = document.querySelector('#tabs .tab[data-go="map"]'); if (mapTab) mapTab.click(); await s(300);
+    try { window.__nav && window.__nav.rail && window.__nav.rail(false); } catch (e) {} await s(350);
+    const was = { tab: tab0, folded: /\bfolded\b/.test(rail0) };
     await openLyr(); const r0 = row(); const absent = !!r0 && r0.disabled && /not in this bundle/.test(r0.innerText);
-    if (!H || !H.ok) { await closeLyr(); return { missing: true, absent, hasRow: !!r0, cam: { c: [cam.c.lng, cam.c.lat], z: cam.z } }; }
+    if (!H || !H.ok) { await closeLyr(); return { missing: true, absent, hasRow: !!r0, was, cam: { c: [cam.c.lng, cam.c.lat], z: cam.z } }; }
     const off0 = IDS.map(vis);
     if (r0) r0.click(); await s(350);
     const on = { vis: IDS.map(vis), rowOn: /\bon\b/.test((row() || {}).className || "") };
@@ -5098,16 +5107,39 @@ if (RUN("hazards")) {
         .filter((f) => f.properties.k === c.k).length;
       const over = near(pt, 18, ["poi-stack-bg", "poi-stack"]) + near(pt, 11, ["poi-dot", "poi-dot-major"]) + near(pt, 13, ["pad-dam", "pad-dot"]);
       drawn = q(["haz-dot", "haz-rail"]);
-      if (here && !over) { const r = m.getCanvas().getBoundingClientRect(); tgt = { p: c.p, k: c.k, x: r.left + pt.x, y: r.top + pt.y }; break; } }
-    return { off0, on, tgt, drawn, tries, absent, title: tgt ? H.kinds[tgt.k] : null, cam: { c: [cam.c.lng, cam.c.lat], z: cam.z } };
+      /* and nothing over it on the page: the tap must reach the map's own canvas */
+      const r = m.getCanvas().getBoundingClientRect(), x = r.left + pt.x, y = r.top + pt.y;
+      const onCanvas = document.elementFromPoint(x, y) === m.getCanvas();
+      if (here && !over && onCanvas) { tgt = { p: c.p, k: c.k, x, y }; break; } }
+    return { off0, on, tgt, drawn, tries, absent, was, title: tgt ? H.kinds[tgt.k] : null, cam: { c: [cam.c.lng, cam.c.lat], z: cam.z } };
   }, cands);
-  let card = "", off = null;
+  let card = "", pre = "", off = null;
   if (hz && !hz.missing && hz.tgt) {
-    await page.mouse.click(hz.tgt.x, hz.tgt.y); await new Promise((r) => setTimeout(r, 500));
-    card = await page.evaluate(() => (document.getElementById("panel") || {}).innerText || "");
+    /* a finger's tap on the canvas at the pin: touchstart, touchend, click
+       (realdom's sequence). CI's run of PR #11 clicked with the page's
+       mouse and read "Ride from here", the card the sections before had
+       left up: that click changed nothing. A touchstart is also what
+       clears a long press an earlier drill may have left armed (lp.fired
+       swallows the next click). The card before the tap is kept, so a tap
+       that changes nothing says so. */
+    const got = await page.evaluate(async (t, title) => {
+      const m = window.map, cv = m.getCanvas(), s = (ms) => new Promise((r) => setTimeout(r, ms));
+      const pre = (document.getElementById("panel") || {}).innerText || "";
+      const tt = new Touch({ identifier: 17, target: cv, clientX: t.x, clientY: t.y });
+      cv.dispatchEvent(new TouchEvent("touchstart", { touches: [tt], bubbles: true, cancelable: true }));
+      await s(60);
+      cv.dispatchEvent(new TouchEvent("touchend", { touches: [], changedTouches: [tt], bubbles: true }));
+      cv.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX: t.x, clientY: t.y }));
+      let card = "";
+      for (let i = 0; i < 20; i++) { await s(150); card = (document.getElementById("panel") || {}).innerText || ""; if (card.startsWith(title)) break; }
+      return { pre, card };
+    }, hz.tgt, hz.title || "");
+    card = got.card; pre = got.pre;
   }
-  /* always: the layer back off (through its row), the card folded, the camera back */
-  off = await page.evaluate(async (cam) => {
+  /* always: the layer back off (through its row), the camera back and drawn
+     (CI's run of PR #11: the self-test ran on a map still loading the camera
+     this put back, and read no roads), the tab and drawer as they were */
+  off = await page.evaluate(async (cam, was) => {
     const m = window.map, s = (ms) => new Promise((r) => setTimeout(r, ms)), panel = document.getElementById("lyrpanel");
     const IDS = ["haz-dot", "haz-rail", "haz-label"];
     const vis = (id) => { try { return m.getLayoutProperty(id, "visibility") !== "none"; } catch (e) { return null; } };
@@ -5118,9 +5150,13 @@ if (RUN("hazards")) {
     await Promise.race([new Promise((z) => { m.once("idle", z); m.triggerRepaint(); }), s(6000)]); await s(250);
     const n = m.queryRenderedFeatures({ layers: ["haz-dot", "haz-rail"] }).length, v = IDS.map(vis);
     try { window.__nav && window.__nav.rail && window.__nav.rail(false); } catch (e) {}
+    if (was && was.tab) { const t = document.querySelector(`#tabs .tab[data-go="${was.tab}"]`); if (t && !/\bon\b/.test(t.className)) t.click(); await s(300); }
+    if (was && !was.folded) { try { window.__nav.rail(true); } catch (e) {} await s(350); }
     if (cam) m.jumpTo({ center: cam.c, zoom: cam.z });
+    for (let i = 0; i < 75 && !(m.loaded() && m.areTilesLoaded()); i++) await s(200);
+    await Promise.race([new Promise((z) => { m.once("idle", z); m.triggerRepaint(); }), s(8000)]); await s(300);
     return { n, vis: v };
-  }, hz && hz.cam);
+  }, hz && hz.cam, hz && hz.was);
   if (!hfile || (hz && hz.missing)) {
     ok(!!hz && hz.missing && !hfile && hz.absent,
        `road hazards: this bundle carries none, and the Layers row says "not in this bundle" and is disabled (${hz && hz.absent})`);
@@ -5131,7 +5167,8 @@ if (RUN("hazards")) {
        `road hazards: off by default; the real Layers row turns all three layers on and the row reads on; a ${hz.title || "pin"} from the bundle draws `
        + `(${hz.drawn} hazard pins in view, found in ${hz.tries} tr${hz.tries === 1 ? "y" : "ies"})`);
     ok(!!hz.title && card.startsWith(hz.title) && new RegExp("From OpenStreetMap \\(" + hfile.osm + "\\)").test(card) && /not checked on the ground/.test(card),
-       `road hazards: a real tap on it opens its own card — "${card.replace(/\s+/g, " ").slice(0, 110)}"`);
+       `road hazards: a tap on it opens its own card — "${card.replace(/\s+/g, " ").slice(0, 110)}"`
+       + (card === pre ? ` (the card did not change from "${pre.replace(/\s+/g, " ").slice(0, 60)}")` : ""));
     ok(off.n === 0 && off.vis.every((v) => v === false),
        `road hazards: the row turns them off again and nothing draws (${off.n} pins)`);
   }

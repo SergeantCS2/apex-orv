@@ -104,7 +104,7 @@ without this, half the riding area is missing (landmine 13).
   populated. Richer than the DNR for 7.4.
 - **Ruled out:** needing to infer vehicle legality from width. The MVUM states it.
 
-## A10 — Surface type: sand vs hardpack · OPEN · QUEUED 2026-11-05 (the maintainer: design first)
+## A10 — Surface type: sand vs hardpack · DESIGNED and APPROVED 2026-11-05 (the maintainer) · to build
 
 ROADMAP 6.5. In this terrain it's the difference between a fun loop and a bad day.
 
@@ -122,6 +122,15 @@ ROADMAP 6.5. In this terrain it's the difference between a fun loop and a bad da
   So a sand-vs-hardpack layer can only speak where a mapper recorded it:
   about 1 track in 6 says anything, and "sand" is 511 statewide. A design
   has to show "not recorded" as itself, never as hardpack.
+
+- **Design (2026-11-05, APPROVED by the maintainer the same day): on the trail's
+  card, not the map.** Since about 5 tracks in 6 record nothing, a map
+  coloured by surface would be mostly "not recorded". So:
+  - the trail card says "Surface: sand (OpenStreetMap)" where a mapper
+    recorded it, and "Surface not recorded" where none did;
+  - the graph carries OSM's surface for the edges conflated with an OSM
+    way (graph.py and emit_graph.py, a pipeline change proven by CI);
+  - DNR's own fields stay ruled out (above).
 
 ## A11 — Retrace · DONE, take 7
 
@@ -157,7 +166,7 @@ routing that ignores elevation is routing that ignores the thing riders care abo
 - **Ruled out:** nothing. Neither remaining item is blocked on anything but the
   APK for 4.9.
 
-## A14 — 3D terrain and slope shading · OPEN · QUEUED 2026-11-05 (the maintainer)
+## A14 — 3D terrain and slope shading · slope shading DESIGNED and APPROVED 2026-11-05 (the maintainer) · to build
 
 ROADMAP 2.6, 2.7. Take 8 ships the rendered hillshade; 3D and slope need the
 encoded DEM on the client.
@@ -168,6 +177,18 @@ encoded DEM on the client.
   actually worth on a 6.5" cover screen while riding.
 - **Note:** slope shading needs the same encoded DEM, and is arguably worth more
   than 3D here — it would show the sand hills directly.
+
+- **Design (2026-11-05, APPROVED by the maintainer the same day): slope shading only
+  where the ground is sharp.** The statewide DEM is z10, about 150 m a pixel
+  (terrain.py); the riding areas carry z13 patches, about 19 m. A sand
+  hill climb is narrower than 150 m, so a statewide slope layer would read
+  every climb as gentle: a confident wrong answer. So:
+  - shade slope bands (15°, 25°, 35°) from the z13 patches alone, as a
+    Layers row;
+  - say on the row that it covers the riding areas only;
+  - draw nothing elsewhere, never a guess.
+  3D terrain stays out: MapLibre's terrain wants a DEM tile source, which
+  the bundle does not ship, and z10 would show it at 150 m.
 
 ## A15 — Offline search · CLOSED, take 11
 
@@ -3973,7 +3994,7 @@ the scenes it changed. Not a check: the harness asserts, the probe shows.
 - **Ruled out:** screenshots inside the repo or the gate — they are for
   eyes, not for diffing; a pixel assertion would be landmine 54's shape.
 
-## A207 — CI's bundle job still rebuilds the state every run: the compute steps never skip · FOUND take 186 (run 86) · OPEN, design first · QUEUED 2026-11-05 (the maintainer)
+## A207 — CI's bundle job still rebuilds the state every run: the compute steps never skip · FOUND take 186 (run 86) · DESIGNED and APPROVED 2026-11-05 (the maintainer) · to build
 After A198, run 86 (take 185) restored the v4 cache, recognised the
 workspace from region_stamp.json and skipped the ingest stream (392 s →
 17.5 s, PROVEN in the log) — and the bundle job still took 47 min (55
@@ -3989,6 +4010,23 @@ so a per-step stamp only helps once the key changes.
 - **Ruled out:** skipping on "payload exists" — the clean-run rule exists
   because artifacts on disk hid four broken steps at take 13.
 - **Ruled out:** doing it inside take 186 — three items are already in it.
+
+- **Design (2026-11-05, APPROVED by the maintainer the same day).** Measured in run
+  110 (PROVEN, its log): pipeline 1,274 s. Seven compute steps never skip:
+  graph 431 s, corridor 260 s, landcover 88 s, poi 81 s, pack 78 s,
+  contour 64 s, emit_graph 36 s, about 17 min together. The proposal:
+  - each of those steps writes a stamp beside its payload: the hash of its
+    own source and the local modules it imports, the content hashes of the
+    inputs it reads (aoi.json, authoritative.json, the extract, the DEM
+    cache, regions.json) and its own knobs;
+  - the next build skips the step only when every hash matches, never
+    because the payload exists (landmine 32);
+  - a change to any input re-runs it, and bumping DATA_V is still the clean
+    run (PROTOCOL §6b).
+  Landmine 220 bounds the gain: the cache is saved only on a miss, so a
+  step skips only while its inputs equal those of the build that saved the
+  cache. That holds for most takes (app-only), not for pipeline takes.
+  INFERRED saving: up to ~17 min on an app-only take.
 
 ## A208 — V4 foundation: CSS tokens proven by a computed-style diff, and guards with planted controls · DESIGNED 2026-09-23 (V4 study §5, §11) · BUILT take 187
 Tokens for colour, z-index and motion completely, and for radius, spacing
@@ -4430,7 +4468,7 @@ renamed, A113's five-on-screen rule re-decided with a counter.
   at rest; free ride from the folded drawer is 1 tap (A233). The line above
   stays as the record of take 188's reading.
 
-## A218 — Spoken turn-by-turn is silent on the Fold: its WebView has no Web Speech API · FOUND 2026-09-23 (field, take-186 self-test) · OPEN, design first · QUEUED 2026-11-05 (the maintainer)
+## A218 — Spoken turn-by-turn is silent on the Fold: its WebView has no Web Speech API · FOUND 2026-09-23 (field, take-186 self-test) · DESIGNED and APPROVED 2026-11-05 (the maintainer) · to build
 The maintainer's self-test on the Fold (take 186; Android 16, WebView
 Chrome 153): "[VOICE] engine — Web Speech API absent in this WebView —
 strip stays silent". Voice guidance (take 173) is feature-detected, so it
@@ -4452,6 +4490,20 @@ phone has offline voice data is UNKNOWN.
   without one, and rejects both wrong states (the cold audit's F14 found the
   older check could not fail). Spoken turns on the Fold remain absent; this
   item is unchanged.
+
+- **Design (2026-11-05, APPROVED by the maintainer the same day).** Upstream first
+  (PROTOCOL §3): `@capacitor-community/text-to-speech` 8.0.2, peer
+  `@capacitor/core >=8.0.0` (the app is on 8), updated 2026-10-23 (PROVEN,
+  npm). It speaks through Android's own TextToSpeech, offline when the
+  phone has a voice installed (UNKNOWN for the Fold until its self-test
+  says).
+  - VOICE gains a second driver: the plugin where it exists, Web Speech
+    where it exists, else the honest mute that take 188 built.
+  - The self-test's VOICE line names the driver and whether a voice is
+    installed.
+  - The harness stubs the plugin and checks which driver is chosen and
+    what is spoken.
+  Only the phone proves it speaks.
 
 ## A219 — Marinas and launches ranked by water body · RULED OUT 2026-09-24 (the maintainer)
 The same day, after this item was recorded: "Marinas can stay as they are."
@@ -5639,8 +5691,8 @@ Built take 194, the simpler form:
 - check_render renders once, as it always did, and in CI prints the
   render's whole output into the job log.
 One render, every check run once on the exact build, nothing to trust and
-no stamp to keep current. Expected: about 35 min off every pull-request and
-main build (INFERRED until this take's CI run measures it). It also removes
+no stamp to keep current. Measured on CI's run 115 (PROVEN, its log): the
+bundle job took 49 min to its end, against run 110's 95. It also removes
 A271's exposure, since its failure was in the second render.
 - **Ruled out:** the stamped reuse (built, then replaced in the same take:
   an input list that must grow with render.mjs is a check that can go

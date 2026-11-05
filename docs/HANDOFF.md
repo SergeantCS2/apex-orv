@@ -109,6 +109,33 @@ on take 193's committed build: A278, OPEN. UNKNOWN until this take's CI
 run: the full render and gate on fresh data, hazards.py on Geofabrik's
 extract, and the minutes A276 saves.
 
+CI's run 115 (this pull request, cb27d57) measured A276 and found two
+failures (PROVEN, its log):
+- **Time:** the bundle job took 49 min where run 110's took 95. Pipeline
+  1,009 s, with hazards.py 85 s on Geofabrik's extract of 2026-10-31
+  (13,336 pins, every kind reconciling: plate readers 3,676 = 3,676). The
+  render ran once, in the gate, about 30 min, its whole output in the log.
+- **The hazards tap** read "RIDE Ride from here…": the Ride tab's card,
+  left up by the sections before. The page-mouse click had changed
+  nothing.
+- **The self-test right after** read no roads (RENDER/roads), because the
+  cleanup jumped the camera back and returned while the map was still
+  loading.
+Fixed in the section:
+- it starts from a state it makes (the Map tab, the drawer folded, what it
+  found put back after);
+- the target must be the canvas at that point;
+- it taps as a finger does, touchstart, touchend and click on the canvas
+  (realdom's sequence). A touchstart also clears a long press an earlier
+  drill left armed (lp.fired swallows the next click);
+- the cleanup waits for the map to go idle.
+Proven here:
+- the full render on the state-and-idle fix PASSED everything but that
+  tap: 680 ok, the self-test 42/0;
+- with the state CI met rebuilt (a long press left armed, then the Ride
+  tab's card), the committed section failed with CI's own text and the
+  fixed one opened the plate reader's card.
+
 PROVISION: the Geofabrik entry said "only when every Overpass mirror
 fails". That was the box region's rule. The statewide build reads the
 extract every time (ingest's bulk path, corridor, landcover, now hazards),
