@@ -2020,14 +2020,22 @@ if (!NO_GPS) {
     const long = RD.R;
     long.t0 = Date.now() - 95 * 60 * 1000;
     long.batt0 = 0.8; long.batt1 = 0.52;
-    long.last = Date.now() - 40000;
-    const since = (Date.now() - long.last) / 1000;
-    if (since > 15) { long.drops++; long.maxGap = since; }
+    /* take 193 · A274 · the dropout is the APP's: 40 s with no fix, on
+       both clocks, then this ride's own 20 s pulse (only it: every other
+       interval stays put). Until take 193 this block set long.last and
+       counted the dropout itself, so it judged its own arithmetic and never
+       ran the pulse (landmine 69's shape). */
+    const drops0 = long.drops, RDa = sandbox.Date;
+    sandbox.Date = class extends RDa { constructor(...a) { if (a.length) super(...a); else super(RDa.now() + 40000); }
+      static now() { return RDa.now() + 40000; } };
+    now += 40000;
+    try { intervals.get(long.pulse)(); } finally { sandbox.Date = RDa; }
+    const pulsed = long.drops - drops0;
     const done = RD.stop();
     ok(done.perHr !== null && done.perHr > 0.15 && done.perHr < 0.20,
        `a real ride quotes ${(done.perHr * 100).toFixed(1)}%/hour`);
-    ok(done.drops === 1 && done.maxGap > 30,
-       `dropout counted (${done.drops}, worst ${Math.round(done.maxGap)}s)`);
+    ok(pulsed === 1 && done.drops === 1 && done.maxGap > 30,
+       `dropout counted by the ride's own pulse (${done.drops}, worst ${Math.round(done.maxGap)}s)`);
     ok(done.medAcc === 9, `median accuracy tracked (±${done.medAcc} m)`);
   }
 }
@@ -3941,6 +3949,112 @@ if (!NO_GPS) {
        `A243 · the ride sheet's Elevation: "${s0 && s0.cell}" before a fix (the centre reads "${s0 && s0.ro}"); "${s1 && s1.cell}" at a live fix `
        + `${p ? p.map((x) => x.toFixed(3)).join(",") : "(no point with its own elevation found)"} while the centre still reads "${s1 && s1.ro}"; "${s2 && s2.cell}" once that fix is 60 s old, the map still; `
        + `the judge rejects the centre's number in the cell, a cell filled before a fix, a stale fix's number kept, and the old unlabelled readout (${ctl})`);
+  }
+}
+
+/* 9j · take 193. A273: the self-test's safety drill starts a ride of its
+   own and puts the rider's back before its battery read resolves; that
+   read used to land in the rider's ride (its starting level and charging
+   flag). A274: a dropout is counted on the page's monotonic clock, so a
+   wall clock set back mid-ride cannot hide one, and no gap is negative.
+   Each judge is shown forged readings it must reject. */
+{
+  const RD = sandbox.window.__ride, nav = sandbox.navigator, R1 = sandbox.Date;
+  /* A273 · the rider's ride reads 80% and charging; the drill's ride reads
+     50% and not charging */
+  if (RD && RD.start && sandbox.window.__stSafety) {
+    const had = nav.getBattery, reads = [{ level: 0.80, charging: true }, { level: 0.50, charging: false }];
+    let asked = 0;
+    nav.getBattery = () => Promise.resolve(reads[Math.min(asked++, reads.length - 1)]);
+    let seen = null;
+    try {
+      RD.start([-84.09, 44.57]);
+      const R = RD.R;
+      sandbox.window.__stSafety();
+      for (let i = 0; i < 4; i++) await new Promise((r) => setImmediate(r));
+      seen = { same: RD.R === R, b0: R.batt0, chg: R.chg, asked };
+    } finally { try { RD.stop(); } catch (e) {} nav.getBattery = had; }
+    const judge = (x) => !!x && x.same && x.b0 === 0.80 && x.chg === true && x.asked >= 2;
+    const ctl = !judge({ ...seen, b0: 0.50 }) && !judge({ ...seen, chg: false }) && !judge({ ...seen, asked: 1 })
+      && !judge({ ...seen, same: false });
+    ok(judge(seen) && ctl,
+       `A273 · a self-test during a ride leaves the ride's own battery reading: start ${seen && seen.b0}, charging ${seen && seen.chg} `
+       + `(the drill's ride read ${seen && seen.asked >= 2 ? "50%, not charging" : "NOTHING"}); the judge rejects the drill's level, its charging flag, `
+       + `a drill that read no battery, and a ride left swapped (${ctl})`);
+  } else ok(false, "A273 · no __ride / __stSafety hook");
+  /* A274 · a fix, then (a) the wall clock set back an hour and 40 s with
+     no fix on the page's clock, and (b) 10 minutes asleep: the wall clock
+     moves 600 s and the page's clock does not. The ride's own pulse counts
+     a dropout each time, with its true length; no gap is negative. */
+  if (RD && RD.start) {
+    const at = (ms) => { sandbox.Date = class extends R1 { constructor(...a) { if (a.length) super(...a); else super(R1.now() + ms); }
+      static now() { return R1.now() + ms; } }; };
+    let back = null, slept = null;
+    try {
+      RD.start([-84.09, 44.57]); RD.fix(5);
+      let R = RD.R, d0 = R.drops;
+      at(-3600000); now += 40000; intervals.get(R.pulse)();
+      RD.fix(5); now += 3000; RD.fix(5);
+      back = { drops: R.drops - d0, maxGap: R.maxGap, gaps: R.gaps.slice() };
+      sandbox.Date = R1; RD.stop();
+      RD.start([-84.09, 44.57]); RD.fix(5);
+      R = RD.R; d0 = R.drops;
+      at(600000); intervals.get(R.pulse)();
+      slept = { drops: R.drops - d0, maxGap: R.maxGap, gaps: R.gaps.slice() };
+    } finally { sandbox.Date = R1; try { RD.stop(); } catch (e) {} }
+    const judge = (x, lo, hi) => !!x && x.drops === 1 && x.maxGap >= lo && x.maxGap < hi && x.gaps.every((g) => g >= 0);
+    const ctl = !judge({ ...back, drops: 0 }, 39, 60) && !judge({ ...back, gaps: back.gaps.concat([-3597]) }, 39, 60)
+      && !judge({ ...back, maxGap: 3640 }, 39, 60) && !judge({ ...slept, drops: 0, maxGap: 0 }, 599, 700);
+    ok(judge(back, 39, 60) && back.gaps.length >= 1 && judge(slept, 599, 700) && ctl,
+       `A274 · the ride's pulse counts a dropout with its true length: the wall clock set back an hour mid-ride, 40 s with no fix `
+       + `(${back && back.drops} dropout, worst ${back && Math.round(back.maxGap)} s; gaps ${back ? back.gaps.map((g) => g.toFixed(0)).join(", ") : "?"} s); `
+       + `10 minutes asleep, the page's clock still (${slept && slept.drops} dropout, worst ${slept && Math.round(slept.maxGap)} s); `
+       + `the judge rejects a missed dropout, a negative gap, an hour's worst gap and a sleep counted as nothing (${ctl})`);
+  }
+  /* each pulse keeps its own ride's books: a ride started over another
+     (the safety drill's shape) is not written by the first ride's pulse */
+  if (RD && RD.start) {
+    let seen = null;
+    try {
+      RD.start([-84.09, 44.57]); RD.fix(5);
+      const A = RD.R;
+      RD.start([-84.09, 44.57]); RD.fix(5);
+      const B = RD.R, b0 = B.drops;
+      now += 40000; const RDb = sandbox.Date;
+      sandbox.Date = class extends RDb { constructor(...a) { if (a.length) super(...a); else super(RDb.now() + 40000); }
+        static now() { return RDb.now() + 40000; } };
+      try { intervals.get(A.pulse)(); } finally { sandbox.Date = RDb; }
+      seen = { other: B !== A, bDrops: B.drops - b0, aDrops: A.drops };
+      intervals.delete(A.pulse);
+    } finally { try { RD.stop(); } catch (e) {} }
+    const judge = (x) => !!x && x.other && x.bDrops === 0 && x.aDrops === 0;
+    ok(judge(seen) && !judge({ ...seen, bDrops: 1 }),
+       `a ride's pulse writes only its own ride: the first ride's pulse, 40 s on, added ${seen && seen.bDrops} dropouts to the ride started over it; the judge rejects one`);
+  }
+  /* the strip's rule and the dispatch card, after a fix the clock was then
+     set back behind: the fix is not live, and its age is said to be
+     unknown, never "under a minute" */
+  if (!NO_GPS) {
+    const N = sandbox.window.__nav;
+    let st = null, card = "";
+    const pos0 = N.pos(), ft0 = N.fixT();
+    try {
+      N.pos("gps"); N.fixT(R1.now());
+      const live0 = N.stale();
+      grab("c-locate").fire("click");
+      geo.cb && geo.cb({ coords: { longitude: anchors[0][1], latitude: anchors[0][2], accuracy: 5 } }); flushTimeouts(); frames(1);
+      sandbox.Date = class extends R1 { constructor(...a) { if (a.length) super(...a); else super(R1.now() - 3600000); }
+        static now() { return R1.now() - 3600000; } };
+      st = { live0, stale: N.stale(), live: N.live() !== null };
+      grab("btn-disp").fire("click"); flushTimeouts();
+      card = String(grab("panel")._html || "");
+    } finally { sandbox.Date = R1; N.fixT(ft0); N.pos(pos0); }
+    const judge = (x, c) => !!x && x.live0 === false && x.stale === true && x.live === false
+      && /Last GPS fix .*its age is unknown/.test(c) && !/under a minute ago/.test(c);
+    const ctl = !judge({ ...st, stale: false }, card) && !judge(st, card.replace("its age is unknown: the phone\u2019s clock changed since", "under a minute ago"));
+    ok(judge(st, card) && ctl,
+       `landmine 252 · a fix the clock was set back behind: the strip calls it stale (${st && st.stale}; live just after it: ${st && !st.live0}), `
+       + `and dispatch says "${((card.match(/Last GPS fix[^<]*<\/b>\s*\(([^)]*)\)/) || [, "?"])[1])}"; the judge rejects a live strip and "under a minute ago" (${ctl})`);
   }
 }
 
