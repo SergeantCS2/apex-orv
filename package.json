@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Offline ORV trail navigation for Michigan riding areas",
   "dependencies": {
+    "@capacitor-community/text-to-speech": "^8.0.2",
     "@capacitor/android": "^8.0.0",
     "@capacitor/core": "^8.0.0",
     "@capacitor/device": "^8.0.0",

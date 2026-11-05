@@ -3711,8 +3711,16 @@ function hudBtns(ro){
      
     if(NAV_VOICE_IC!==!!(V.ok&&V.on)){NAV_VOICE_IC=!!(V.ok&&V.on);
       vb.innerHTML=ic(NAV_VOICE_IC?'voice':'voiceoff')+'<span>Voice</span>'}}
-  if(vn){vn.hidden=!!V.ok;
-    var vt=V.ok?'':'Voice is unavailable in this phone\u2019s WebView'+
+   
+  var vnet=!!(V.ok&&V.drv==='native'&&V.nat&&V.nat.offline===false);
+  if(vn){vn.hidden=!!V.ok&&!vnet;
+     
+    var vt=vnet?'Voice may be silent offline: this phone\u2019s English voice needs a network'+
+        voiceTail(ro===undefined?hudRouted():ro):
+      V.ok?'':(V.drv==='native'
+      ?(V.nat&&V.nat.en===null?'Voice: asking the phone\u2019s text-to-speech'
+        :'Voice is unavailable: this phone has no English text-to-speech voice')
+      :'Voice is unavailable in this phone\u2019s WebView')+
       voiceTail(ro===undefined?hudRouted():ro);
     if(vn.textContent!==vt)vn.textContent=vt}
   var nb=el('nav-north');if(nb)nb.className=NAV.northUp?'on':'';
@@ -4063,6 +4071,8 @@ function navGStale(){
  
 function navWake(on){try{if(on)WAKE.hold('nav');else WAKE.drop('nav')}catch(e){}}
 function navStart(){NAV.on=true;NAV.follow=true;NAV.lastAt=null;FIX_T=0;navWake(true);
+   
+  if(VOICE.drv==='native'&&VOICE.nat&&VOICE.nat.en===false){VOICE.nat=null;navVoiceProbe()}
   RIDE_G_ROOM=52;    
   navChip()}
 function navStop(){NAV.on=false;navWake(false);navChip();navGuideClear();navSay('',true);rideCameraFlat()}
@@ -4072,20 +4082,58 @@ function rideCameraFlat(){try{
     map.easeTo({pitch:0,bearing:0,duration:600,essential:true});logAct('ride end: the map flat, north up')}}catch(e){}}
 
  
-var VOICE={ok:false,on:false,last:'',near:''};
+var VOICE={ok:false,on:false,last:'',near:'',drv:null,nat:null};
+ 
+var TTS_RETRY=[1000,3000,5000,5000];
+function ttsPlug(){try{var T=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.TextToSpeech;
+  return (T&&typeof T.speak==='function')?T:null}catch(e){return null}}
+function navVoiceNative(T){
+  VOICE.drv='native';
+  if(VOICE.nat)return VOICE.ok;
+  VOICE.nat={en:null,voices:null,tries:0};
+  ttsAsk(T);
+  return VOICE.ok}
+function ttsAsk(T){
+  var N=VOICE.nat;N.tries++;
+  function ask(f,a,no){try{var p=f?f.call(T,a):null;
+    return (p&&p.then)?p.then(null,function(){return no}):Promise.resolve(no)}catch(e){return Promise.resolve(no)}}
+  Promise.all([ask(T.isLanguageSupported,{lang:'en-US'},{supported:false}),ask(T.getSupportedVoices,undefined,null)])
+    .then(function(r){
+      if(VOICE.nat!==N)return;
+      var yes=!!(r[0]&&r[0].supported);
+      if(r[1]&&r[1].voices)N.voices=r[1].voices;
+      var en=(N.voices||[]).filter(function(x){return /^en/i.test((x&&x.lang)||'')});
+      VOICE.voice=en.filter(function(x){return x.localService})[0]||en[0]||null;
+      VOICE.local=!!(VOICE.voice&&VOICE.voice.localService);
+      if(!yes&&N.tries<=TTS_RETRY.length){
+        setTimeout(function(){if(VOICE.nat===N)ttsAsk(T)},TTS_RETRY[N.tries-1]);return}
+      N.en=yes;VOICE.ok=yes;
+       
+      N.offline=N.voices?en.some(function(x){return x.localService}):null;
+      logAct('voice: the phone\u2019s text-to-speech '+(yes?'speaks English':'has no English voice')+
+        ' (asked '+N.tries+'\u00d7)');
+      try{navChip()}catch(e){}});
+  }
 function navVoiceProbe(){
   try{
-    if(typeof speechSynthesis==='undefined'||typeof SpeechSynthesisUtterance==='undefined')return false;
+    var T=ttsPlug();if(T)return navVoiceNative(T);
+     
+    VOICE.nat=null;
+    if(typeof speechSynthesis==='undefined'||typeof SpeechSynthesisUtterance==='undefined'){VOICE.drv=null;VOICE.ok=false;return false}
     var v=speechSynthesis.getVoices()||[];
-    VOICE.ok=v.length>0;
+    VOICE.ok=v.length>0;VOICE.drv=VOICE.ok?'web':null;
     VOICE.voice=v.filter(function(x){return /^en/i.test(x.lang)&&x.localService})[0]
       ||v.filter(function(x){return /^en/i.test(x.lang)})[0]||v[0]||null;
     VOICE.local=!!(VOICE.voice&&VOICE.voice.localService);
     return VOICE.ok}catch(e){VOICE.ok=false;return false}}
 function navSay(text,cancel){
-  if(cancel){try{if(VOICE.ok)speechSynthesis.cancel()}catch(e){}VOICE.last='';VOICE.near='';return}
+  var T=VOICE.drv==='native'?ttsPlug():null;
+  if(cancel){try{if(VOICE.ok){if(T)T.stop();else speechSynthesis.cancel()}}catch(e){}VOICE.last='';VOICE.near='';return}
   if(!VOICE.ok||!VOICE.on||!text||text===VOICE.last)return;
   VOICE.last=text;
+   
+  if(T){try{var pr=T.speak({text:text,lang:'en-US',rate:1.0,queueStrategy:0});
+      if(pr&&pr.catch)pr.catch(function(){});logAct('say  '+text)}catch(e){}return}
   try{var u=new SpeechSynthesisUtterance(text);if(VOICE.voice)u.voice=VOICE.voice;
     u.rate=1.0;speechSynthesis.cancel();speechSynthesis.speak(u);
     logAct('say  '+text)}catch(e){}}
@@ -4093,8 +4141,8 @@ function navVoiceToggle(){VOICE.on=!VOICE.on;
   try{localStorage.setItem('apex.voice',VOICE.on?'1':'0')}catch(e){}
   navChip();if(VOICE.on)navSay('Voice guidance on')}
 try{VOICE.on=localStorage.getItem('apex.voice')==='1'}catch(e){}
-if(typeof speechSynthesis!=='undefined'){
-  navVoiceProbe();
+navVoiceProbe();
+if(typeof speechSynthesis!=='undefined'&&VOICE.drv!=='native'){
   try{speechSynthesis.onvoiceschanged=function(){navVoiceProbe();navChip()}}catch(e){}}
 
  
@@ -4841,7 +4889,8 @@ function sourcesCard(){
     '(<span class="nobr">BSD 3-Clause</span>, \u00a9 2020 Mapbox), glfx.js (MIT, \u00a9 2011 Evan Wallace) and d3-color '+
     '(<span class="nobr">BSD 3-Clause</span>, \u00a9 2010-2016 Mike Bostock).<br><b>App runtime</b> \u2014 Capacitor 8 with its '+
     'Device, Geolocation, Haptics and Share plugins, MIT licence, \u00a9 2017-present Drifty Co.; '+
-    'the plugins \u00a9 2020-present Ionic (Geolocation \u00a9 2025 Ionic).'+
+    'the plugins \u00a9 2020-present Ionic (Geolocation \u00a9 2025 Ionic); the community Text-to-speech plugin, '+
+    'MIT licence, \u00a9 2021 Robin Genz.'+
     '<br>The full licence texts are included in the app package.</div>'+
     (PRIVACY_URL?'<div class="k">PRIVACY</div><div class="sub"><a href="'+PRIVACY_URL+'" target="_blank" rel="noopener" style="color:var(--link)">Privacy policy</a> — '+
       'nothing you do in this app is sent anywhere; the policy says so in full.</div>':'')+
@@ -5572,6 +5621,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         group:LYRGROUPS.filter(function(g){return g.k==='hazards'})[0],set:lyrSet,on:lyrOn};
       window.__search=function(q,all){return all?searchAll(q):search(q)};
       window.__voice=VOICE;window.__say=navSay;window.__voiceProbe=navVoiceProbe;
+      window.__voiceLine=stVoiceNative;window.__ttsRetry=TTS_RETRY;    
       window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,
          
          
@@ -6150,6 +6200,18 @@ function stCompass(){
     worst.toFixed(0)+'° · steadiness '+(Math.hypot(sx,sy)/n).toFixed(3)+' · '+MAGLOG[n-1].ev+
     (MAGLOG[n-1].abs?' (absolute)':' (relative)')+' · painted raw, no smoothing')}
 
+ 
+function stVoiceNative(){
+  var N=VOICE.nat||{},vs=N.voices,head='Android text-to-speech (plugin) \u00b7 ';
+  if(N.en===null||N.en===undefined)return head+'asking the engine (no answer yet, try '+(N.tries||0)+')';
+  var tail=' (asked '+N.tries+'\u00d7)';
+  if(!vs)tail+=' \u00b7 the engine listed no voices';
+  else{var en=vs.filter(function(x){return /^en/i.test((x&&x.lang)||'')}),
+      loc=en.filter(function(x){return x.localService});
+    tail+=' \u00b7 '+vs.length+' voice(s), English '+loc.length+' on the phone + '+(en.length-loc.length)+' network-only'+
+      (loc.length?' (e.g. '+(loc[0].voiceURI||loc[0].name||'?')+')':en.length?' \u2014 offline speech UNKNOWN':'')}
+  return head+(N.en?'English supported \u00b7 the phone\u2019s default English voice speaks':
+    'English NOT supported \u2014 strip stays silent')+tail}
 function stHaptics(){
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Haptics;
   stAdd('HAPTICS','available',!!(C||navigator.vibrate),
@@ -6158,6 +6220,8 @@ function stHaptics(){
   catch(e){stAdd('HAPTICS','fired',false,'threw: '+e.message)}
    
   var ok=navVoiceProbe(),vs=[];
+   
+  if(VOICE.drv==='native'){stAdd('VOICE','engine',null,stVoiceNative());return}
   try{vs=speechSynthesis.getVoices()||[]}catch(e){}
   stAdd('VOICE','engine',null,ok
     ?vs.length+' voice(s) · using "'+((VOICE.voice||{}).name||'?')+'" ('+((VOICE.voice||{}).lang||'?')+

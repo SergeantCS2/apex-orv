@@ -43,3 +43,6 @@ play-assets-*.zip
 *.aab
 www/privacy.html
 www/testing.html
+
+# take 195 · A207 · per-step stamps, cached by CI beside the payloads
+step_stamps/

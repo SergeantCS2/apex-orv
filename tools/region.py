@@ -109,7 +109,10 @@ DERIVED_EXTRA = ["aoi.json", "authoritative.json", "graph_raw.json",
                  "hillshade.jpg", "imagery.jpg",
     "region_stamp.json",  # take 118: a switch must clear the old stamp
 ]
-DERIVED_DIRS = ["imagery_tiles"]
+DERIVED_DIRS = ["imagery_tiles",
+                # take 195 · A207 · the step stamps describe this region's
+                # payloads; another region's never skip a step here
+                "step_stamps"]
 
 
 def derived_files():

@@ -62,7 +62,8 @@ def npm_configs():
     "@capacitor/geolocation": "^8.0.0",
     "@capacitor/haptics": "^8.0.0",
     "@capacitor/share": "^8.0.0",
-    "@capacitor/device": "^8.0.0"
+    "@capacitor/device": "^8.0.0",
+    "@capacitor-community/text-to-speech": "^8.0.2"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
@@ -317,7 +318,7 @@ PROGUARD_RULES = """# APEX-R8 v1 — app-side keep rules (take 183, A183). Writt
 # keep every @CapacitorPlugin class and everything extending
 # com.getcapacitor.Plugin. These are belt and braces on top of them, and they
 # are what lets tools/android_check.py assert on the BUILT dex that the
-# bridge and the four plugins survived R8 by NAME: PluginManager loads each
+# bridge and the five plugins survived R8 by NAME: PluginManager loads each
 # plugin with Class.forName() from capacitor.plugins.json, so a renamed or
 # stripped plugin fails on the phone and nowhere else.
 -keep class com.getcapacitor.** { *; }

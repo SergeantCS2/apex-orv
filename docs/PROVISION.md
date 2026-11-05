@@ -152,9 +152,9 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 
 ### Capacitor (the Android app runtime and its plugins)
 
-- **File** `node_modules/@capacitor/{android,core,device,geolocation,haptics,share}` — npm packages at the versions package-lock.json pins
-- **Provides** the native shell that hosts the web app on Android, its bridge, and the Device, Geolocation, Haptics and Share plugins
-- **Licence** MIT (2017-present Drifty Co.; the plugins 2020-present Ionic, Geolocation 2025 Ionic). Full texts in www/licenses.txt; the notice is in Tools -> Data sources
+- **File** `node_modules/@capacitor/{android,core,device,geolocation,haptics,share}, node_modules/@capacitor-community/text-to-speech` — npm packages at the versions package-lock.json pins
+- **Provides** the native shell that hosts the web app on Android, its bridge, and the Device, Geolocation, Haptics and Share plugins, and the community Text-to-speech plugin (take 195, A218: spoken turns through the phone's own engine)
+- **Licence** MIT (2017-present Drifty Co.; the plugins 2020-present Ionic, Geolocation 2025 Ionic; Text-to-speech 2021 Robin Genz). Full texts in www/licenses.txt; the notice is in Tools -> Data sources
 - **Fetched by** `npm ci` in ci/bundle.sh, from npm's registry like every package in package-lock.json; `npx cap sync android` in ci/apk.sh compiles it into the APK
 - **Refresh** on a package-lock bump: tools/gate.py check_licences compares each package's LICENSE and version with www/licenses.txt
 

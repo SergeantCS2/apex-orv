@@ -1,4 +1,187 @@
-# HANDOFF — through Take 194 · V3
+# HANDOFF — through Take 195 · V3
+
+## Take 195 — 2026-11-05 — Spoken turns through the phone's own text-to-speech (A218); compute steps skip on what they read (A207)
+
+RECORDED FIRST. The maintainer, 2026-11-05, approved four designs: "A207
+faster pipeline, A218 spoken turns, A14 slope shading, A10 surface on the
+card", and asked for takes packed "as SAFELY possible" (A277). This take
+carries the two that are built and verifiable now. A14 and A10 each change
+the pipeline (terrain; graph and emit_graph) and are built for take 196
+while this take's CI runs, so A207's first CI run shows its own effect.
+Built on main be9a03d (take 194, merged as PR #11).
+
+A218 — spoken turns. Upstream first (PROTOCOL §3):
+`@capacitor-community/text-to-speech` 8.0.2, peer `@capacitor/core
+>=8.0.0`, MIT (2021 Robin Genz). The lockfile's sha512 equals the tarball's
+(PROVEN). Its Android source, read before writing the driver (PROVEN, by
+reading TextToSpeech.java and TextToSpeechPlugin.java of 8.0.2):
+- the engine is bound asynchronously when the plugin loads;
+- asked before that, isLanguageSupported answers false (Android's own
+  answer when not bound), getSupportedVoices rejects, and speak answers
+  "unavailable" (landmine 259);
+- speak flushes the queue unless queueStrategy is 1;
+- its voice index is a position in a name-sorted list that changes when a
+  voice pack is installed;
+- its manifest carries the `<queries>` entry for TTS_SERVICE that Android
+  11+ needs to bind the engine.
+What the app does:
+- VOICE has a driver: the plugin where it exists, Web Speech where it
+  exists, else take 188's honest mute. A "no" from the engine is asked
+  again at 1, 3, 5 and 5 s (about 14 s) before the sheet says there is no
+  English voice. Until then it says "Voice: asking the phone's
+  text-to-speech".
+- The turns are spoken in en-US through the engine's default English
+  voice, one at a time, each new one replacing the one still speaking. No
+  voice index is passed.
+- The self-test's VOICE line names the driver, English or not, how many
+  times it asked, and how many English voices are on the phone versus
+  network-only. The voice's engine name (voiceURI) is the one given; the
+  plugin's "name" is only "English United States".
+- Data sources names the plugin and its licence; www/licenses.txt carries
+  its LICENSE verbatim.
+How it is held:
+- smoke 9l stubs the plugin as the source behaves. In one case the engine
+  binds on the third ask; in another it is bound with no English; in the
+  third there is no plugin and no Web Speech. Its judges were proved on 9
+  plants first: a no taken at once, a Web Speech driver, a queued line, a
+  repeat, a voice index, the wrong note, a no never re-asked, a live muted
+  button, a stale yes.
+- tools/android_check.py requires the plugin's two classes in the dex
+  and the TTS_SERVICE query in the merged manifest, with controls. aapt2
+  8.7.3 fetched here read take 193's real APK: no `<queries>`, so the
+  audit refuses it. With the plugin's block spliced in, it passes (PROVEN).
+  The merged manifest's own layout is CI's apk job to prove.
+- The gate's check_play holds the five links (the app, android.py's
+  template, package.json, the lockfile, the artifact check), one control
+  per link. check_licences now covers `@capacitor-community/*`.
+- `npm ci` from the new lockfile installs here (PROVEN).
+UNKNOWN until the phone: whether the Fold has an English voice installed,
+and whether it speaks.
+
+A207 — compute steps skip on what they read. Run 116's own log (PROVEN):
+- the pipeline took 1,428 s;
+- the eight compute steps that read only files took 1,188 s (19.8 min):
+  graph 433, corridor 276, hazards 127, landcover 94, poi 81, pack 79,
+  contour 64 and emit_graph 35;
+- the cache is 969 MB and restored in 11 s.
+New: tools/stepstamp.py runs such a step in-process under a PEP 578 audit
+hook. It records:
+- every file under the repo the step opens;
+- every path it stats, and every directory it lists;
+- every file handed to osmium (wrapped when the step imports it);
+- every module it imports or tries to import;
+- what it writes.
+The stamp holds content hashes of all of these, the package versions,
+argv and Python. pipeline.py skips the step only when all of it holds,
+outputs included. Hand lists drift (landmines 37, 170); a trace is what
+the step did. A step that opens the network, starts a process or loads a
+C file reader other than osmium writes no stamp and runs every build. So
+does a failed run, which also deletes the old stamp first.
+APEX_NO_SKIP=1 runs every step (PROTOCOL §6b).
+Proven here:
+- the selftest's 9 planted changes each re-run the step for their own
+  reason. The reason is asserted, because the first version's controls
+  all "passed" on an env var the test itself set (landmine 260). A child
+  process, a failed run and a missing stamp never skip.
+- Two mutants of the module were caught by the gate's check_stepstamp:
+  no output check, and no listing record.
+- On real data: hazards.py under the trace took 87 s (85 s direct) and
+  wrote a byte-identical payload, with 10 inputs (332 MB). The next
+  pipeline run skipped it in 0.4 s, and an edit to hazards.py re-ran it.
+CI: the region cache is now actions/cache/restore plus actions/cache/save.
+- The save key is `region-ID-DATA_V-<hash of the stamps>`, saved only
+  after a green build and only when a stamp changed.
+- The restore takes the newest key by prefix, with the old exact key
+  last.
+- The key step failed here under GitHub's `-eo pipefail` with no stamps
+  (exit 1, an unmatched glob in a pipeline; landmine 258). Fixed, it ran
+  in all three cases: no stamps, stamps restored from the old key, and the
+  same key.
+- The gate holds the restore and save path lists equal, with 4 controls.
+INFERRED, for CI to prove:
+- this PR's run runs every step (no stamps yet) and saves in the PR's
+  scope;
+- main's run after the merge does the same in main's scope;
+- take 196's run skips what did not change: up to about 20 min on an
+  app-only take, less on one that edits a step.
+- **Ruled out:** a per-step input list by hand, which drifts.
+- **Ruled out:** skipping because a payload exists (landmine 32).
+- **Ruled out:** a stamps-only side cache. It could pair a newer build's
+  stamps with an older build's payloads.
+- **Ruled out:** a cache key from the tools' hash. Every gate.py edit would
+  re-save the 969 MB cache with nothing changed.
+
+The review of take 195 (the code-review skill on the diff, 10 findings,
+each checked against the code and all of them right):
+- graph_raw.json was not in the region cache. graph writes it and
+  emit_graph reads it, so graph, the slowest step and A207's main target,
+  could never skip. It is cached now. The key step also names any stamped
+  output no cache path carries, as a CI warning.
+- The save key hashed only the stamps, so new tiles, DEM tiles or a
+  re-fetched extract from steps that always run were never saved. It now
+  hashes the stamps (time fields aside) and the name and size of every
+  cached file (`stepstamp.py key`). A build that changed nothing saves
+  nothing; its record (step_stamps/_cache.json) says what changed since
+  the restored cache.
+- The trace now also records renames (a payload written as .part and
+  renamed), removals (a payload the step deletes must be absent before it
+  may skip), lstat and access probes, and no longer records code compiled
+  from a string as "<string>".
+- Hashes are memoised within the pipeline process (the extract is read by
+  three steps).
+- The selftest no longer fails, or unsets APEX_NO_SKIP, during the clean
+  run that sets it. The gate's check counts only its own failures.
+- A218: a "no English" was final for the session. Each ride now asks
+  again. An engine that speaks English only through network voices keeps
+  Voice on offer, and the sheet says "Voice may be silent offline: this
+  phone's English voice needs a network". Smoke 9l holds both, with
+  controls.
+- **Ruled out (finding 8, cache pressure):** pruning older stamp-keyed
+  caches. A save happens only when something cached changed. GitHub
+  evicts the least recently used entries past 10 GB, the oldest first.
+  Each entry is about 1 GB (run 116: 969 MB). Each save costs upload time
+  on CI: UNKNOWN until this take's run.
+New selftest controls, each watched failing on a mutant: a renamed output
+(no rename trace), a new cached file (a key without files).
+
+Also: A17 (voice for the turn list, OPEN since take 11) is answered by
+A218 and closed by it.
+
+What I got wrong:
+- the stamp module's selftest ran its scratch tool with the module's
+  default root, the repo, and wrote a stamp into the repo. Caught at once
+  and removed; the selftest now passes its own root;
+- that root, passed as an APEX_ variable, entered the stamp's environment,
+  so every planted change "re-ran" for that reason alone (landmine 260);
+- the first trace recorded the files a step opened and the modules in
+  sys.modules. emit_graph loads pack.py by spec, and from a valid .pyc the
+  source is never opened, so an edit to pack.py would have left
+  emit_graph skipping (landmine 261). Found by reading emit_graph; the
+  trace now records every executed code object's source, with a control
+  watched failing without it;
+- the gate's first needle for the app's driver
+  ("Plugins.TextToSpeech") did not match the code as written. It failed,
+  and the code now reads the plugin the way every other plugin call does.
+
+Verified here (Chrome 138, the bundle of main's run 113 plus this
+container's hazards payload):
+- smoke, all five passes PASSED: 296 / 208 / 54 ok, fatal 6, dead 33;
+- render `--only=nav,back,selftest,devices` (with routes) PASSED, 288 ok,
+  on the build before the review's two app fixes. Both fixes act only
+  under the plugin's driver, which render's Chrome never has (INFERRED
+  inert there); the full render is CI's;
+- five mutants of the built app, each caught by smoke 9l alone (FAILED
+  (1)): no retry, a queued utterance, the plugin ignored, no re-ask on a
+  ride, no network-only note;
+- the stamp selftest's 11 planted changes, and four mutants of the module
+  caught: no output check, no listing record, no rename trace, a key
+  without the cached files;
+- with the final module, hazards through the pipeline twice: the first
+  ran (its stamp predated the module's edit, 82 s), the second skipped
+  in 0.4 s; an edit to hazards.py re-ran it, and reverting it skipped
+  again; the payload byte-identical to the direct run's;
+- the 34 gate checks that need no pipeline output PASSED.
+
 
 ## Take 194 — 2026-11-05 — Road hazards, from OpenStreetMap (A189); CI renders once (A276); the maintainer's packing rule (A277)
 

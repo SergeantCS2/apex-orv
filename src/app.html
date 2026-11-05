@@ -1204,7 +1204,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 194</span>
+    <span id="title"><b>APEX</b> ORV · Take 195</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -6593,8 +6593,17 @@ function hudBtns(ro){
        state is a class; the label stays */
     if(NAV_VOICE_IC!==!!(V.ok&&V.on)){NAV_VOICE_IC=!!(V.ok&&V.on);
       vb.innerHTML=ic(NAV_VOICE_IC?'voice':'voiceoff')+'<span>Voice</span>'}}
-  if(vn){vn.hidden=!!V.ok;
-    var vt=V.ok?'':'Voice is unavailable in this phone\u2019s WebView'+
+  /* take 195 · the review: an English voice that needs a network is said */
+  var vnet=!!(V.ok&&V.drv==='native'&&V.nat&&V.nat.offline===false);
+  if(vn){vn.hidden=!!V.ok&&!vnet;
+    /* take 195 · A218 · which one is missing: the WebView's speech, or (with
+       the phone's engine reachable) an English voice on the phone */
+    var vt=vnet?'Voice may be silent offline: this phone\u2019s English voice needs a network'+
+        voiceTail(ro===undefined?hudRouted():ro):
+      V.ok?'':(V.drv==='native'
+      ?(V.nat&&V.nat.en===null?'Voice: asking the phone\u2019s text-to-speech'
+        :'Voice is unavailable: this phone has no English text-to-speech voice')
+      :'Voice is unavailable in this phone\u2019s WebView')+
       voiceTail(ro===undefined?hudRouted():ro);
     if(vn.textContent!==vt)vn.textContent=vt}
   var nb=el('nav-north');if(nb)nb.className=NAV.northUp?'on':'';
@@ -7043,6 +7052,12 @@ function navGStale(){
    navigation holds and drops its token. */
 function navWake(on){try{if(on)WAKE.hold('nav');else WAKE.drop('nav')}catch(e){}}
 function navStart(){NAV.on=true;NAV.follow=true;NAV.lastAt=null;FIX_T=0;navWake(true);
+  /* take 195 · A218 · the review: a "no English" from the phone's engine
+     was final for the session (an engine slower than the 14 s of asks, or
+     an English pack installed since). Each ride asks it again; the sheet
+     says it is asking meanwhile. Only the plugin's answer: a WebView's
+     speech is probed as before. */
+  if(VOICE.drv==='native'&&VOICE.nat&&VOICE.nat.en===false){VOICE.nat=null;navVoiceProbe()}
   RIDE_G_ROOM=52;   /* take 188 · A215 · a new ride starts from the default banner room */
   navChip()}
 function navStop(){NAV.on=false;navWake(false);navChip();navGuideClear();navSay('',true);rideCameraFlat()}
@@ -7057,26 +7072,87 @@ function rideCameraFlat(){try{
 
 /* take 173 · A187 N5 · VOICE, feature-detected and never assumed. The Web
    Speech API rides the phone's own text-to-speech engine — Samsung's, with
-   its offline English pack, on Jacob's Fold — but the Android WebView has
+   its offline English pack, on the maintainer's Fold — but the Android WebView has
    been patchier than Chrome about exposing it, so the toggle appears only
    when a voice is actually present, and the self-test reports what THIS
    phone has. It speaks when the instruction CHANGES, not on every fix: a
    turn is announced once when it becomes the next one, again inside 300 ft,
    and arrival once. Off by default; the toggle remembers. */
-var VOICE={ok:false,on:false,last:'',near:''};
+var VOICE={ok:false,on:false,last:'',near:'',drv:null,nat:null};
+/* take 195 · A218 · the maintainer, 2026-11-05 (the design approved): the
+   phone's own text-to-speech, through the upstream plugin
+   @capacitor-community/text-to-speech (8.x, Capacitor 8). The Fold's
+   WebView has no Web Speech API (its take-186 self-test: "absent"), so the
+   plugin is asked first; Web Speech where it exists; else the honest mute
+   take 188 built. The plugin speaks only once the engine says English is
+   supported (isLanguageSupported, a promise: the answer lands after boot
+   and repaints the chip).
+   The plugin (8.0.2, its TextToSpeech.java, read 2026-11-05) binds the
+   engine asynchronously when the app starts: asked before that,
+   isLanguageSupported answers false (Android's own answer when not bound)
+   and getSupportedVoices rejects. So a "no" is asked again, four times
+   over about 14 s, before the chip says there is no English voice; until
+   then it says it is asking. The engine's own default English voice
+   speaks (the one chosen in the phone's settings): no voice index is
+   passed, because the plugin's index is a position in a list that changes
+   when a voice pack is installed. */
+var TTS_RETRY=[1000,3000,5000,5000];
+function ttsPlug(){try{var T=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.TextToSpeech;
+  return (T&&typeof T.speak==='function')?T:null}catch(e){return null}}
+function navVoiceNative(T){
+  VOICE.drv='native';
+  if(VOICE.nat)return VOICE.ok;
+  VOICE.nat={en:null,voices:null,tries:0};
+  ttsAsk(T);
+  return VOICE.ok}
+function ttsAsk(T){
+  var N=VOICE.nat;N.tries++;
+  function ask(f,a,no){try{var p=f?f.call(T,a):null;
+    return (p&&p.then)?p.then(null,function(){return no}):Promise.resolve(no)}catch(e){return Promise.resolve(no)}}
+  Promise.all([ask(T.isLanguageSupported,{lang:'en-US'},{supported:false}),ask(T.getSupportedVoices,undefined,null)])
+    .then(function(r){
+      if(VOICE.nat!==N)return;
+      var yes=!!(r[0]&&r[0].supported);
+      if(r[1]&&r[1].voices)N.voices=r[1].voices;
+      var en=(N.voices||[]).filter(function(x){return /^en/i.test((x&&x.lang)||'')});
+      VOICE.voice=en.filter(function(x){return x.localService})[0]||en[0]||null;
+      VOICE.local=!!(VOICE.voice&&VOICE.voice.localService);
+      if(!yes&&N.tries<=TTS_RETRY.length){
+        setTimeout(function(){if(VOICE.nat===N)ttsAsk(T)},TTS_RETRY[N.tries-1]);return}
+      N.en=yes;VOICE.ok=yes;
+      /* take 195 · the review: the engine can say English while every
+         English voice it lists needs a network the field does not have.
+         Voice stays on offer (it speaks on a signal, and an engine may
+         fall back to a voice it does not list), and the sheet says so.
+         A list the engine did not give says nothing either way. */
+      N.offline=N.voices?en.some(function(x){return x.localService}):null;
+      logAct('voice: the phone\u2019s text-to-speech '+(yes?'speaks English':'has no English voice')+
+        ' (asked '+N.tries+'\u00d7)');
+      try{navChip()}catch(e){}});
+  }
 function navVoiceProbe(){
   try{
-    if(typeof speechSynthesis==='undefined'||typeof SpeechSynthesisUtterance==='undefined')return false;
+    var T=ttsPlug();if(T)return navVoiceNative(T);
+    /* no plugin (any more): a later plugin is asked afresh, and a probe that
+       finds no speech keeps no earlier yes */
+    VOICE.nat=null;
+    if(typeof speechSynthesis==='undefined'||typeof SpeechSynthesisUtterance==='undefined'){VOICE.drv=null;VOICE.ok=false;return false}
     var v=speechSynthesis.getVoices()||[];
-    VOICE.ok=v.length>0;
+    VOICE.ok=v.length>0;VOICE.drv=VOICE.ok?'web':null;
     VOICE.voice=v.filter(function(x){return /^en/i.test(x.lang)&&x.localService})[0]
       ||v.filter(function(x){return /^en/i.test(x.lang)})[0]||v[0]||null;
     VOICE.local=!!(VOICE.voice&&VOICE.voice.localService);
     return VOICE.ok}catch(e){VOICE.ok=false;return false}}
 function navSay(text,cancel){
-  if(cancel){try{if(VOICE.ok)speechSynthesis.cancel()}catch(e){}VOICE.last='';VOICE.near='';return}
+  var T=VOICE.drv==='native'?ttsPlug():null;
+  if(cancel){try{if(VOICE.ok){if(T)T.stop();else speechSynthesis.cancel()}}catch(e){}VOICE.last='';VOICE.near='';return}
   if(!VOICE.ok||!VOICE.on||!text||text===VOICE.last)return;
   VOICE.last=text;
+  /* the phone's engine: one utterance at a time, the newest replacing the
+     one still speaking (QueueStrategy.Flush, 0), as speechSynthesis.cancel()
+     then speak() does below */
+  if(T){try{var pr=T.speak({text:text,lang:'en-US',rate:1.0,queueStrategy:0});
+      if(pr&&pr.catch)pr.catch(function(){});logAct('say  '+text)}catch(e){}return}
   try{var u=new SpeechSynthesisUtterance(text);if(VOICE.voice)u.voice=VOICE.voice;
     u.rate=1.0;speechSynthesis.cancel();speechSynthesis.speak(u);
     logAct('say  '+text)}catch(e){}}
@@ -7084,8 +7160,8 @@ function navVoiceToggle(){VOICE.on=!VOICE.on;
   try{localStorage.setItem('apex.voice',VOICE.on?'1':'0')}catch(e){}
   navChip();if(VOICE.on)navSay('Voice guidance on')}
 try{VOICE.on=localStorage.getItem('apex.voice')==='1'}catch(e){}
-if(typeof speechSynthesis!=='undefined'){
-  navVoiceProbe();
+navVoiceProbe();
+if(typeof speechSynthesis!=='undefined'&&VOICE.drv!=='native'){
   try{speechSynthesis.onvoiceschanged=function(){navVoiceProbe();navChip()}}catch(e){}}
 
 /* take 171 · A187 N2 · GUIDANCE. Google Maps for offroad, on the route the
@@ -8112,7 +8188,8 @@ function sourcesCard(){
     '(<span class="nobr">BSD 3-Clause</span>, \u00a9 2020 Mapbox), glfx.js (MIT, \u00a9 2011 Evan Wallace) and d3-color '+
     '(<span class="nobr">BSD 3-Clause</span>, \u00a9 2010-2016 Mike Bostock).<br><b>App runtime</b> \u2014 Capacitor 8 with its '+
     'Device, Geolocation, Haptics and Share plugins, MIT licence, \u00a9 2017-present Drifty Co.; '+
-    'the plugins \u00a9 2020-present Ionic (Geolocation \u00a9 2025 Ionic).'+
+    'the plugins \u00a9 2020-present Ionic (Geolocation \u00a9 2025 Ionic); the community Text-to-speech plugin, '+
+    'MIT licence, \u00a9 2021 Robin Genz.'+
     '<br>The full licence texts are included in the app package.</div>'+
     (PRIVACY_URL?'<div class="k">PRIVACY</div><div class="sub"><a href="'+PRIVACY_URL+'" target="_blank" rel="noopener" style="color:var(--link)">Privacy policy</a> — '+
       'nothing you do in this app is sent anywhere; the policy says so in full.</div>':'')+
@@ -9063,6 +9140,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
         group:LYRGROUPS.filter(function(g){return g.k==='hazards'})[0],set:lyrSet,on:lyrOn};
       window.__search=function(q,all){return all?searchAll(q):search(q)};
       window.__voice=VOICE;window.__say=navSay;window.__voiceProbe=navVoiceProbe;
+      window.__voiceLine=stVoiceNative;window.__ttsRetry=TTS_RETRY;   /* take 195 · A218 */
       window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,
         /* take 188 · A217 · the simulator, driven directly (landmine 111): a
            headless browser gets no fix, so the simulator-only Wrong turn
@@ -9799,6 +9877,21 @@ function stCompass(){
     worst.toFixed(0)+'° · steadiness '+(Math.hypot(sx,sy)/n).toFixed(3)+' · '+MAGLOG[n-1].ev+
     (MAGLOG[n-1].abs?' (absolute)':' (relative)')+' · painted raw, no smoothing')}
 
+/* take 195 · A218 · what the phone's engine said: the driver, English or
+   not, and whether an English voice is on the phone (offline) or needs a
+   network the field does not have. The voice's engine name (voiceURI) is
+   the distinctive one; the plugin's "name" is only "English United States". */
+function stVoiceNative(){
+  var N=VOICE.nat||{},vs=N.voices,head='Android text-to-speech (plugin) \u00b7 ';
+  if(N.en===null||N.en===undefined)return head+'asking the engine (no answer yet, try '+(N.tries||0)+')';
+  var tail=' (asked '+N.tries+'\u00d7)';
+  if(!vs)tail+=' \u00b7 the engine listed no voices';
+  else{var en=vs.filter(function(x){return /^en/i.test((x&&x.lang)||'')}),
+      loc=en.filter(function(x){return x.localService});
+    tail+=' \u00b7 '+vs.length+' voice(s), English '+loc.length+' on the phone + '+(en.length-loc.length)+' network-only'+
+      (loc.length?' (e.g. '+(loc[0].voiceURI||loc[0].name||'?')+')':en.length?' \u2014 offline speech UNKNOWN':'')}
+  return head+(N.en?'English supported \u00b7 the phone\u2019s default English voice speaks':
+    'English NOT supported \u2014 strip stays silent')+tail}
 function stHaptics(){
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Haptics;
   stAdd('HAPTICS','available',!!(C||navigator.vibrate),
@@ -9810,6 +9903,8 @@ function stHaptics(){
      line must say exactly what this phone has, because that is the one
      fact the harness cannot know. */
   var ok=navVoiceProbe(),vs=[];
+  /* take 195 · A218 · the phone's own engine, through the plugin */
+  if(VOICE.drv==='native'){stAdd('VOICE','engine',null,stVoiceNative());return}
   try{vs=speechSynthesis.getVoices()||[]}catch(e){}
   stAdd('VOICE','engine',null,ok
     ?vs.length+' voice(s) · using "'+((VOICE.voice||{}).name||'?')+'" ('+((VOICE.voice||{}).lang||'?')+

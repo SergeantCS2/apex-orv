@@ -83,13 +83,31 @@ def selftest():
     same.write("com.getcapacitor.Bridge -> com.getcapacitor.Bridge:\n    int x -> x\n"); same.close()
     ren = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
     ren.write("androidx.core.app.Foo -> a.b.c:\n"); ren.close()
+    # A218 controls: the query found inside <queries>, and refused when the
+    # element is gone or the action sits outside it
+    q = """E: manifest
+      E: queries (line=5)
+        E: intent (line=6)
+          E: action (line=7)
+            A: android:name(0x01010003)="android.intent.action.TTS_SERVICE" (Raw: "x")
+      E: application (line=9)"""
+    assert queries_missing(q) == [], queries_missing(q)
+    outside = q.replace("E: queries (line=5)", "E: permission (line=5)")
+    assert queries_missing(outside) == list(QUERIES), queries_missing(outside)
+    after = """E: manifest
+      E: queries (line=5)
+        E: package (line=6)
+      E: service (line=9)
+        A: android:name(0x01010003)="android.intent.action.TTS_SERVICE" (Raw: "x")"""
+    assert queries_missing(after) == list(QUERIES), queries_missing(after)
     try:
         assert mapping_problem(None) and mapping_problem("/nonexistent/mapping.txt")
         assert mapping_problem(same.name) and mapping_problem(ren.name) is None
     finally:
         os.unlink(same.name); os.unlink(ren.name)
     print("android_check selftest ok: exported audit refuses a bare component; "
-          "dex audit refuses a stripped plugin; mapping audit refuses an unrenamed map")
+          "dex audit refuses a stripped plugin; mapping audit refuses an unrenamed map; "
+          "queries audit refuses a missing TTS_SERVICE query")
 
 
 def signer_dn(artifact):
@@ -130,7 +148,34 @@ KEEP_CLASSES = (
     "Lcom/capacitorjs/plugins/haptics/HapticsPlugin;",
     "Lcom/capacitorjs/plugins/share/SharePlugin;",
     "Lcom/capacitorjs/plugins/device/DevicePlugin;",
+    # take 195 · A218: the phone's text-to-speech (@capacitor-community/
+    # text-to-speech), its plugin and the class that drives the engine
+    "Lcom/getcapacitor/community/tts/TextToSpeechPlugin;",
+    "Lcom/getcapacitor/community/tts/TextToSpeech;",
 )
+# take 195 · A218 · Android 11+ hides other apps' services unless the
+# manifest declares it looks for them: without this <queries> entry (the
+# plugin's own manifest carries it, and merging must keep it) the engine
+# never binds and every turn is silent on the phone, which nothing else
+# here can see.
+QUERIES = ("android.intent.action.TTS_SERVICE",)
+
+
+def queries_missing(tree, wanted=QUERIES):
+    """Actions absent from every <queries> element of an xmltree dump. An
+    element's children are the lines indented deeper than it."""
+    lines = tree.splitlines()
+    found = set()
+    for i, ln in enumerate(lines):
+        if ln.strip().startswith("E: queries"):
+            d = len(ln) - len(ln.lstrip())
+            for sub in lines[i + 1:]:
+                if sub.strip() and len(sub) - len(sub.lstrip()) <= d:
+                    break
+                for w in wanted:
+                    if f'"{w}"' in sub:
+                        found.add(w)
+    return [w for w in wanted if w not in found]
 MAPPING_DEFAULT = os.path.join(ROOT, "android", "app", "build", "outputs",
                                "mapping", "release", "mapping.txt")
 
@@ -242,6 +287,10 @@ def check(apk, play=False, mapping=None):
     mp = mapping_problem(mapping or MAPPING_DEFAULT)
     if mp:
         fails.append(mp)
+    qm = queries_missing(tree)
+    if qm:
+        fails.append("the merged manifest lost its <queries> for " + ", ".join(qm) +
+                     " — the phone's text-to-speech engine cannot bind (A218)")
     if "application-icon" not in badging or "application-label:'APEX ORV'" not in badging:
         fails.append("badging lost the launcher icon or label — shrinkResources "
                      "removed a resource the shell needs (A183)")
@@ -251,7 +300,8 @@ def check(apk, play=False, mapping=None):
           f"minSdk {msdk}  targetSdk {tsdk}")
     print(f"  dex {len(dexes)} file(s) {sum(map(len, dexes)) / 1e6:.1f} MB; "
           f"kept classes {len(KEEP_CLASSES) - len(stripped)}/{len(KEEP_CLASSES)} present; "
-          f"mapping {'ok' if not mp else 'MISSING'}")
+          f"mapping {'ok' if not mp else 'MISSING'}; "
+          f"queries {'ok' if not qm else 'MISSING'}")
     print(f"  components {ncomp} (all exported-declared: {not missing})  "
           f"permissions {len(perms)}: {', '.join(p.rsplit('.',1)[1] for p in perms)}")
     for f in fails:

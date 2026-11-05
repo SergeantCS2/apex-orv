@@ -292,13 +292,16 @@ SOURCES = [
     },
     {
         # take 188 · the app runtime: installed by npm, compiled into the APK
-        "file": "node_modules/@capacitor/{android,core,device,geolocation,haptics,share}",
+        "file": "node_modules/@capacitor/{android,core,device,geolocation,haptics,share}, "
+                "node_modules/@capacitor-community/text-to-speech",
         "filenote": "npm packages at the versions package-lock.json pins",
         "name": "Capacitor (the Android app runtime and its plugins)",
         "what": "the native shell that hosts the web app on Android, its bridge, "
-                "and the Device, Geolocation, Haptics and Share plugins",
+                "and the Device, Geolocation, Haptics and Share plugins, and the "
+                "community Text-to-speech plugin (take 195, A218: spoken turns "
+                "through the phone's own engine)",
         "licence": "MIT (2017-present Drifty Co.; the plugins 2020-present Ionic, "
-                   "Geolocation 2025 Ionic). Full texts in www/licenses.txt; the "
+                   "Geolocation 2025 Ionic; Text-to-speech 2021 Robin Genz). Full texts in www/licenses.txt; the "
                    "notice is in Tools -> Data sources",
         "tool": "`npm ci` in ci/bundle.sh, from npm's registry like every package "
                 "in package-lock.json; `npx cap sync android` in ci/apk.sh compiles it into the APK",

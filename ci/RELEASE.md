@@ -1,10 +1,17 @@
-**Take 194 — Road hazards: plate readers, height and weight limits, fords and rail crossings, from OpenStreetMap.**
+**Take 195 — Spoken turns through the phone's own text-to-speech; faster builds.**
 
-A new layer under Layers, "Road hazards", off until you turn it on, in
-every mode: 3,682 plate-reader cameras, height and weight limits, fords,
-rail crossings, toll booths and cattle guards across Michigan. Tap a dot
-for what OpenStreetMap records about it, such as who makes or runs a
-camera and which way it faces, and nothing it does not.
+Voice guidance now speaks through Android's own text-to-speech engine,
+since this phone's WebView has none of its own. It is off until you turn
+on Voice on the ride sheet. While the app is still asking the phone's
+engine, the sheet says so. If the phone has no English voice, the sheet
+says that instead of staying silent with no reason; each ride asks the
+engine again. If its English voice needs a network, the sheet warns that
+Voice may be silent offline. Tools, Self-test,
+VOICE says what the engine answered and whether its English voice is on
+the phone or needs a network.
 
-On the phone: Layers, Road hazards on, then zoom to a town. Do dots
-show, and does a tap say what the camera or the limit is?
+Builds skip the slow data steps when nothing they read has changed.
+
+On the phone: run the self-test and read the VOICE line. Then plan a
+route, start a ride, turn Voice on: do you hear "Voice guidance on", and
+the next turn?

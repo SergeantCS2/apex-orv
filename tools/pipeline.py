@@ -13,6 +13,7 @@ anywhere, and so CI and a laptop cannot diverge.
 import subprocess, sys, time, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from region import R, ALL, ensure_workspace
+import stepstamp
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -68,8 +69,20 @@ def run(name, args, why):
         import shutil
         shutil.copyfile(os.path.join(ROOT, "bundles", R.id, "manifest.json"),
                         os.path.join(ROOT, "www", "bundle", "manifest.json"))
-    r = subprocess.run(runner + [os.path.join(HERE, args[0])] + argv + extra,
-                       cwd=ROOT)
+    cmd = runner + [os.path.join(HERE, args[0])] + argv + extra
+    # take 195 · A207 · a compute step that read only files skips when every
+    # file it read, probed or listed, every module and package it imported
+    # and every file it wrote equal its stamp (tools/stepstamp.py); else it
+    # runs under the trace that writes the stamp. APEX_NO_SKIP=1 runs it.
+    if name in stepstamp.SKIPPABLE:
+        tool = os.path.join("tools", args[0])
+        ok, why = stepstamp.fresh(name, tool, argv + extra)
+        if ok:
+            print(f"   skipped \u2014 {why}")
+            return
+        print(f"   runs \u2014 {why}")
+        cmd = [sys.executable, os.path.join(HERE, "stepstamp.py"), "run", name, tool] + argv + extra
+    r = subprocess.run(cmd, cwd=ROOT)
     if r.returncode:
         sys.exit(f"\n{name} failed ({r.returncode}) — pipeline stopped")
     print(f"   {time.time()-t0:.1f}s")
