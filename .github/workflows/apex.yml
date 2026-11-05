@@ -204,6 +204,7 @@ jobs:
             dem_meta.json
             aoi.json
             authoritative.json
+            graph_raw.json
             dem_cache
             img_cache
             osm_cache
@@ -224,23 +225,30 @@ jobs:
         # updates. The workflow file is pasted by hand and cannot be (landmine 84).
         run: bash ci/bundle.sh
 
-      # take 195 · A207 · saved only after a green build, and only when a
-      # step ran (its stamp changed): the key is the stamps' hash, so a build
-      # whose every step skipped finds its key equal to the one it restored
-      # and saves nothing. The path list is the restore's, line for line
-      # (tools/gate.py holds the two equal).
+      # take 195 · A207 · saved only after a green build, and only when
+      # something it holds changed: the key hashes every step stamp (its time
+      # fields aside) and the name and size of every cached file
+      # (tools/stepstamp.py key), so a build whose steps all skipped and that
+      # fetched nothing new keys equal to the cache it restored and saves
+      # nothing, while new tiles or a re-run step save. graph_raw.json is
+      # cached now: graph writes it and emit_graph reads it, and graph (the
+      # slowest step) could never skip without it. The path list is the
+      # restore's, line for line (tools/gate.py holds the two equal).
       - name: Key the region cache by its step stamps
         id: stampkey
         if: success()
         run: |
-          # (the default shell runs with -e and pipefail: a build with no
-          # stamp at all must still key, not fail on an unmatched glob)
-          H=$( (cat step_stamps/*.json 2>/dev/null || true) | sha256sum | cut -c1-16)
+          # (the default shell runs with -e and pipefail: a key that cannot
+          # be made must not turn a green build red; it saves nothing)
+          H=$(python3 tools/stepstamp.py key || echo none)
           K="region-${{ steps.region.outputs.id }}-${{ env.DATA_V }}-$H"
           WAS="${{ steps.tilecache.outputs.cache-matched-key }}"
           echo "key=$K" >> "$GITHUB_OUTPUT"
           echo "step stamps: $( (ls step_stamps 2>/dev/null || true) | tr '\n' ' ')"
-          if [ "$K" = "$WAS" ]; then
+          if [ "$H" = "none" ]; then
+            echo "save=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::the region cache key could not be made (tools/stepstamp.py key): nothing saved"
+          elif [ "$K" = "$WAS" ]; then
             echo "save=false" >> "$GITHUB_OUTPUT"
             echo "the stamps equal the restored cache's ($K): nothing to save"
           else
@@ -263,6 +271,7 @@ jobs:
             dem_meta.json
             aoi.json
             authoritative.json
+            graph_raw.json
             dem_cache
             img_cache
             osm_cache

@@ -79,7 +79,7 @@ C file reader other than osmium writes no stamp and runs every build. So
 does a failed run, which also deletes the old stamp first.
 APEX_NO_SKIP=1 runs every step (PROTOCOL §6b).
 Proven here:
-- the selftest's 8 planted changes each re-run the step for their own
+- the selftest's 9 planted changes each re-run the step for their own
   reason. The reason is asserted, because the first version's controls
   all "passed" on an env var the test itself set (landmine 260). A child
   process, a failed run and a missing stamp never skip.
@@ -111,6 +111,39 @@ INFERRED, for CI to prove:
 - **Ruled out:** a cache key from the tools' hash. Every gate.py edit would
   re-save the 969 MB cache with nothing changed.
 
+The review of take 195 (the code-review skill on the diff, 10 findings,
+each checked against the code and all of them right):
+- graph_raw.json was not in the region cache. graph writes it and
+  emit_graph reads it, so graph, the slowest step and A207's main target,
+  could never skip. It is cached now. The key step also names any stamped
+  output no cache path carries, as a CI warning.
+- The save key hashed only the stamps, so new tiles, DEM tiles or a
+  re-fetched extract from steps that always run were never saved. It now
+  hashes the stamps (time fields aside) and the name and size of every
+  cached file (`stepstamp.py key`). A build that changed nothing saves
+  nothing; its record (step_stamps/_cache.json) says what changed since
+  the restored cache.
+- The trace now also records renames (a payload written as .part and
+  renamed), removals (a payload the step deletes must be absent before it
+  may skip), lstat and access probes, and no longer records code compiled
+  from a string as "<string>".
+- Hashes are memoised within the pipeline process (the extract is read by
+  three steps).
+- The selftest no longer fails, or unsets APEX_NO_SKIP, during the clean
+  run that sets it. The gate's check counts only its own failures.
+- A218: a "no English" was final for the session. Each ride now asks
+  again. An engine that speaks English only through network voices keeps
+  Voice on offer, and the sheet says "Voice may be silent offline: this
+  phone's English voice needs a network". Smoke 9l holds both, with
+  controls.
+- **Ruled out (finding 8, cache pressure):** pruning older stamp-keyed
+  caches. A save happens only when something cached changed. GitHub
+  evicts the least recently used entries past 10 GB, the oldest first.
+  Each entry is about 1 GB (run 116: 969 MB). Each save costs upload time
+  on CI: UNKNOWN until this take's run.
+New selftest controls, each watched failing on a mutant: a renamed output
+(no rename trace), a new cached file (a key without files).
+
 Also: A17 (voice for the turn list, OPEN since take 11) is answered by
 A218 and closed by it.
 
@@ -120,12 +153,34 @@ What I got wrong:
   and removed; the selftest now passes its own root;
 - that root, passed as an APEX_ variable, entered the stamp's environment,
   so every planted change "re-ran" for that reason alone (landmine 260);
+- the first trace recorded the files a step opened and the modules in
+  sys.modules. emit_graph loads pack.py by spec, and from a valid .pyc the
+  source is never opened, so an edit to pack.py would have left
+  emit_graph skipping (landmine 261). Found by reading emit_graph; the
+  trace now records every executed code object's source, with a control
+  watched failing without it;
 - the gate's first needle for the app's driver
   ("Plugins.TextToSpeech") did not match the code as written. It failed,
   and the code now reads the plugin the way every other plugin call does.
 
 Verified here (Chrome 138, the bundle of main's run 113 plus this
-container's hazards payload): see the seal's numbers below.
+container's hazards payload):
+- smoke, all five passes PASSED: 296 / 208 / 54 ok, fatal 6, dead 33;
+- render `--only=nav,back,selftest,devices` (with routes) PASSED, 288 ok,
+  on the build before the review's two app fixes. Both fixes act only
+  under the plugin's driver, which render's Chrome never has (INFERRED
+  inert there); the full render is CI's;
+- five mutants of the built app, each caught by smoke 9l alone (FAILED
+  (1)): no retry, a queued utterance, the plugin ignored, no re-ask on a
+  ride, no network-only note;
+- the stamp selftest's 11 planted changes, and four mutants of the module
+  caught: no output check, no listing record, no rename trace, a key
+  without the cached files;
+- with the final module, hazards through the pipeline twice: the first
+  ran (its stamp predated the module's edit, 82 s), the second skipped
+  in 0.4 s; an edit to hazards.py re-ran it, and reverting it skipped
+  again; the payload byte-identical to the direct run's;
+- the 34 gate checks that need no pipeline output PASSED.
 
 
 ## Take 194 — 2026-11-05 — Road hazards, from OpenStreetMap (A189); CI renders once (A276); the maintainer's packing rule (A277)

@@ -4199,6 +4199,14 @@ if (!NO_GPS) {
       const B = plug(1, false, EN.slice(2)); fresh(B);
       probe(); await settle(); N.chip();
       const noEn = read(), bAsks = B.asks;
+      /* the review of take 195: a ride asks a "no" again */
+      N.start(); await tick();
+      const reask = { asks: B.asks, en: V.nat ? V.nat.en : undefined };
+      N.stop(); await settle();
+      /* D · English supported, but every English voice needs a network */
+      const D = plug(1, true, [EN[1], EN[2]]); fresh(D);
+      probe(); await settle(); N.chip();
+      const net = read();
       /* C · no plugin and no Web Speech (the smoke sandbox has none) */
       fresh(null); probe(); N.chip();
       const none = read();
@@ -4219,7 +4227,10 @@ if (!NO_GPS) {
         && /English 0 on the phone \+ 0 network-only/.test(x.noEn.line);
       const judgeC = (x) => x.none.drv === null && x.none.ok === false && x.none.off
         && /^Voice is unavailable in this phone’s WebView/.test(x.none.note);
-      const seen = { r0, asking, bound, spoke, stops, lang: A.lang, noEn, bAsks, none };
+      const judgeD = (x) => x.reask.asks === x.bAsks + 1 && x.reask.en === null
+        && x.net.ok === true && !x.net.off && /^Voice may be silent offline: this phone’s English voice needs a network/.test(x.net.note)
+        && x.bound.note === "";
+      const seen = { r0, asking, bound, spoke, stops, lang: A.lang, noEn, bAsks, none, reask, net };
       /* the judges, proved on plants first: a "no" taken at the first ask, a
          stale Web Speech driver, a queued (not flushed) utterance, a repeat
          spoken twice, a voice index passed, the wrong note, a "no" never
@@ -4231,13 +4242,17 @@ if (!NO_GPS) {
         && !judgeA({ ...seen, spoke: spoke.map((o) => ({ ...o, voice: 0 })) })
         && !judgeA({ ...seen, asking: { ...asking, note: "Voice is unavailable in this phone’s WebView." } })
         && !judgeB({ ...seen, bAsks: 1 }) && !judgeB({ ...seen, noEn: { ...noEn, off: false } })
-        && !judgeC({ ...seen, none: { ...none, ok: true } });
-      ok(judgeA(seen) && judgeB(seen) && judgeC(seen) && ctl,
+        && !judgeC({ ...seen, none: { ...none, ok: true } })
+        && !judgeD({ ...seen, reask: { ...reask, asks: bAsks } }) && !judgeD({ ...seen, net: { ...net, note: "" } })
+        && !judgeD({ ...seen, net: { ...net, off: true } });
+      ok(judgeA(seen) && judgeB(seen) && judgeC(seen) && judgeD(seen) && ctl,
          `A218 · the phone's own engine speaks the turns: while it binds the sheet says "${asking.note}"; bound on ask ${bound.tries} `
          + `it speaks ${spoke.length} lines, each once, flushed, in en-US, the engine's own voice (${JSON.stringify(spoke[0])}), and stops on `
          + `cancel (${stops}); the self-test says "${bound.line}". With no English it asks ${bAsks}× and says "${noEn.note}" / `
-         + `"${noEn.line}"; with no plugin and no Web Speech, "${none.note}". The judges reject a no taken at once, a Web Speech `
-         + `driver, a queued line, a repeat, a voice index, the wrong note, a no never re-asked, a live muted button and a stale yes (${ctl})`);
+         + `"${noEn.line}"; a ride asks it again (ask ${reask.asks}); with only network English voices Voice stays on offer and says `
+         + `"${net.note}"; with no plugin and no Web Speech, "${none.note}". The judges reject a no taken at once, a Web Speech `
+         + `driver, a queued line, a repeat, a voice index, the wrong note, a no never re-asked, a live muted button, a stale yes, `
+         + `a ride that does not re-ask, and a network-only voice said nothing of or muted (${ctl})`);
     } catch (e) {
       ok(false, `A218 · the drill threw: ${e && e.stack ? e.stack.split("\n").slice(0, 3).join(" | ") : e}`);
     } finally {

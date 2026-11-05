@@ -4038,8 +4038,11 @@ so a per-step stamp only helps once the key changes.
   - eight steps, with hazards (take 194) added. Run 116 measured them at
     1,188 s;
   - landmine 220 is answered, not just bounded. The cache is restored by
-    prefix and saved under the stamps' hash whenever a stamp changed, so
-    the stamps and the payloads they describe always travel together.
+    prefix and saved whenever a stamp or a cached file changed (the key
+    hashes the stamps and every cached file's name and size), so the
+    stamps and the payloads they describe always travel together, and new
+    tiles are kept;
+  - graph_raw.json joins the cache: graph could never skip without it.
   Proven here on hazards.py and in the module's selftest; the first skip
   in CI is take 196's run.
 - **Ruled out:** a stamps-only side cache. A newer build's stamps would sit
@@ -4538,6 +4541,9 @@ phone has offline voice data is UNKNOWN.
   newly installed voice pack would shift to another voice. The engine's
   default English voice, chosen in the phone's settings, speaks.
 - **Ruled out:** trusting the first answer at boot (landmine 259).
+- **Built, the review of take 195:** each ride asks a "no" again, and an
+  English voice that needs a network is said on the sheet while Voice stays
+  on offer.
 - **Open, on the phone:** the self-test's VOICE line (driver, English or
   not, voices on the phone versus network-only), and whether a turn is
   heard.

@@ -3711,9 +3711,13 @@ function hudBtns(ro){
      
     if(NAV_VOICE_IC!==!!(V.ok&&V.on)){NAV_VOICE_IC=!!(V.ok&&V.on);
       vb.innerHTML=ic(NAV_VOICE_IC?'voice':'voiceoff')+'<span>Voice</span>'}}
-  if(vn){vn.hidden=!!V.ok;
+   
+  var vnet=!!(V.ok&&V.drv==='native'&&V.nat&&V.nat.offline===false);
+  if(vn){vn.hidden=!!V.ok&&!vnet;
      
-    var vt=V.ok?'':(V.drv==='native'
+    var vt=vnet?'Voice may be silent offline: this phone\u2019s English voice needs a network'+
+        voiceTail(ro===undefined?hudRouted():ro):
+      V.ok?'':(V.drv==='native'
       ?(V.nat&&V.nat.en===null?'Voice: asking the phone\u2019s text-to-speech'
         :'Voice is unavailable: this phone has no English text-to-speech voice')
       :'Voice is unavailable in this phone\u2019s WebView')+
@@ -4067,6 +4071,8 @@ function navGStale(){
  
 function navWake(on){try{if(on)WAKE.hold('nav');else WAKE.drop('nav')}catch(e){}}
 function navStart(){NAV.on=true;NAV.follow=true;NAV.lastAt=null;FIX_T=0;navWake(true);
+   
+  if(VOICE.drv==='native'&&VOICE.nat&&VOICE.nat.en===false){VOICE.nat=null;navVoiceProbe()}
   RIDE_G_ROOM=52;    
   navChip()}
 function navStop(){NAV.on=false;navWake(false);navChip();navGuideClear();navSay('',true);rideCameraFlat()}
@@ -4102,6 +4108,8 @@ function ttsAsk(T){
       if(!yes&&N.tries<=TTS_RETRY.length){
         setTimeout(function(){if(VOICE.nat===N)ttsAsk(T)},TTS_RETRY[N.tries-1]);return}
       N.en=yes;VOICE.ok=yes;
+       
+      N.offline=N.voices?en.some(function(x){return x.localService}):null;
       logAct('voice: the phone\u2019s text-to-speech '+(yes?'speaks English':'has no English voice')+
         ' (asked '+N.tries+'\u00d7)');
       try{navChip()}catch(e){}});

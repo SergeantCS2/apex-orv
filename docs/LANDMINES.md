@@ -170,6 +170,7 @@ Start here. Do not read top to bottom.
 | A workflow step fails at a variable assignment with no error printed, only on a run with nothing to match | 258 |
 | Spoken guidance is silent on a phone whose text-to-speech works everywhere else, or the sheet says "no English voice" on a phone that has one | 259 |
 | Every planted control of a new check "passes", and the check still lets a real change through | 260 |
+| A step skips after a module it loads was edited, though every file it opened is unchanged | 261 |
 
 ---
 
@@ -3470,4 +3471,16 @@ environment, so the "unchanged" run re-ran too: the one failure that
 showed it. With that fixed, each plant must name its own cause (the file,
 the directory, the argv) in the reason the check gives. Landmine 54's
 family: a red that is the wrong red is as blind as a green.
+
+**261. A module loaded from its .pyc is never opened: a trace of opened
+files does not see it.** Take 195's stamp traced every file a step opens.
+emit_graph loads pack.py with `spec_from_file_location` (so it never enters
+sys.modules), and when pack.py's .pyc is valid the import system reads the
+.pyc and only stats the source, through its own `posix.stat`, not
+`os.stat` (PROVEN 2026-11-05 in the stamp's selftest: with a compiled
+side.py, the trace held only the tool; side.py edited, the step skipped).
+Found by reading emit_graph before CI ran it, not by a failure. Rule: a
+trace of what code ran records each executed code object's `co_filename`
+(the `exec` audit event); a trace of opened files is not a trace of
+imports.
 

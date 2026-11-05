@@ -54,11 +54,26 @@ PROC_EVENTS = ("subprocess.Popen", "os.system", "os.exec", "os.posix_spawn", "os
 SKIP_DIRS = ("__pycache__", ".git", "node_modules", DIR)
 
 
+_MEMO = {}
+
+
 def sha(path, buf=1 << 20):
+    """A file's sha256, remembered within one process by (size, mtime): the
+    pipeline checks eight stamps, three of them over the same 348 MB
+    extract (the review of take 195)."""
+    try:
+        st = os.stat(path)
+        k = (os.path.abspath(path), st.st_size, st.st_mtime_ns)
+    except OSError:
+        k = None
+    if k and k in _MEMO:
+        return _MEMO[k]
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for b in iter(lambda: f.read(buf), b""):
             h.update(b)
+    if k:
+        _MEMO[k] = h.hexdigest()
     return h.hexdigest()
 
 
@@ -157,7 +172,7 @@ def run(name, tool, args, root=ROOT):
     sp = stamp_path(name, root)
     if os.path.exists(sp):
         os.remove(sp)                 # a failed run must never leave an old yes behind
-    reads, writes, probes, listed, tried = set(), set(), set(), set(), set()
+    reads, writes, probes, listed, tried, gone = set(), set(), set(), set(), set(), set()
     blind = []
     tracing = [True]    # audit hooks cannot be removed: the stamp's own reads after the run are not the step's
 
@@ -178,6 +193,19 @@ def run(name, tool, args, root=ROOT):
         try:
             if ev == "open":
                 note_open(a[0], a[1] if len(a) > 1 else None, a[2] if len(a) > 2 else None)
+            elif ev == "os.rename":
+                # os.replace and shutil.move raise it too: the file a step
+                # writes as x.part and renames is x
+                d = _rel(a[1], root) if len(a) > 1 else None
+                if d is not None:
+                    writes.add(d)
+                sr = _rel(a[0], root)
+                if sr is not None:
+                    gone.add(sr)
+            elif ev == "os.remove":
+                r = _rel(a[0], root)
+                if r is not None:
+                    gone.add(r)
             elif ev in ("os.listdir", "os.scandir"):
                 r = _rel(a[0] if a and a[0] is not None else ".", root)
                 if r is not None:
@@ -186,6 +214,18 @@ def run(name, tool, args, root=ROOT):
                 tp = _third_party(a[0], root)
                 if tp:
                     tried.add(tp)
+            elif ev == "exec":
+                # every module body runs through exec, and its code object
+                # names its source even when it was loaded from a .pyc
+                # (whose source is only stat'ed by the import system, never
+                # through os.stat) or by spec_from_file_location without
+                # ever entering sys.modules (emit_graph loads pack.py so)
+                fn = getattr(a[0], "co_filename", None) if a else None
+                # code compiled from a string names itself "<string>" and the
+                # like: not a file, not an input (the review of take 195)
+                r = _rel(fn, root) if fn and not str(fn).startswith("<") else None
+                if r is not None:
+                    reads.add(r)
             elif ev in NET_EVENTS:
                 blind.append(f"the network ({ev})")
             elif ev in PROC_EVENTS or ev.startswith("os.exec") or ev.startswith("os.spawn"):
@@ -195,16 +235,19 @@ def run(name, tool, args, root=ROOT):
         except Exception:
             blind.append(f"an event the trace could not read ({ev})")
 
-    _stat = os.stat
+    _stat, _lstat, _access = os.stat, os.lstat, os.access
 
-    def stat(p, *a, **k):
-        try:
-            r = _rel(p, root) if not isinstance(p, int) else None
-            if r is not None:
-                probes.add(r)
-        except Exception:
-            pass
-        return _stat(p, *a, **k)
+    def probe(f):
+        def w(p, *a, **k):
+            try:
+                r = _rel(p, root) if not isinstance(p, int) else None
+                if r is not None:
+                    probes.add(r)
+            except Exception:
+                pass
+            return f(p, *a, **k)
+        return w
+    stat = probe(_stat)
 
     # osmium reads its file in C++, which no audit event sees: when the step
     # imports it, its entry points are wrapped to record the path they are
@@ -265,7 +308,7 @@ def run(name, tool, args, root=ROOT):
         wrap_osmium(sys.modules["osmium"])
     before = set(sys.modules)
     sys.addaudithook(hook)
-    os.stat = stat
+    os.stat, os.lstat, os.access = stat, probe(_lstat), probe(_access)
     sys.argv = [tool_abs] + list(args)
     sys.path[0] = os.path.dirname(tool_abs)
     code = 0
@@ -277,7 +320,7 @@ def run(name, tool, args, root=ROOT):
             print(e.code, file=sys.stderr)
     finally:
         tracing[0] = False
-        os.stat = _stat
+        os.stat, os.lstat, os.access = _stat, _lstat, _access
         sys.stdout.flush()
     if code:
         return code
@@ -297,9 +340,13 @@ def run(name, tool, args, root=ROOT):
     if blind:
         print(f"   {name}: no stamp — it used {blind[0]}, which the trace cannot see; it runs every build")
         return 0
-    outputs = {r: sha(os.path.join(root, r)) for r in sorted(writes) if os.path.isfile(os.path.join(root, r))}
+    # what the step wrote, renamed into place, or removed: a payload it
+    # deleted must be absent before it may skip, or a cache could restore
+    # one the step no longer makes (the review of take 195)
+    outputs = {r: state_of(root, r) for r in sorted(writes | gone)
+               if not os.path.isdir(os.path.join(root, r)) and (r in writes or not os.path.exists(os.path.join(root, r)))}
     ins = {}
-    for r in sorted((reads | probes) - set(writes)):
+    for r in sorted((reads | probes) - set(outputs)):
         ins[r] = state_of(root, r)
     st = dict(env_of(args), step=name, tool=_rel(tool_abs, root) or tool,
               t=time.strftime("%Y-%m-%dT%H:%MZ", time.gmtime()), secs=round(time.time() - t0, 1),
@@ -355,6 +402,85 @@ def fresh(name, tool, args, root=ROOT):
                   f"{st.get('t')} ({st.get('secs')} s saved; checked in {time.time() - t0:.1f} s)")
 
 
+VOLATILE = ("t", "secs")
+
+
+def cache_paths(root=ROOT):
+    """The region cache's path list, read from the workflow (the gate holds
+    restore and save equal)."""
+    import yaml
+    d = yaml.safe_load(open(os.path.join(root, "ci", "build.yml")))
+    rs = [x for x in d["jobs"]["bundle"]["steps"] if str(x.get("uses", "")).startswith("actions/cache/restore@")]
+    return [l.strip() for l in str(rs[0]["with"]["path"]).splitlines() if l.strip()]
+
+
+def cached_files(root, pats):
+    """{path: size} of every file the cache paths cover, the stamps' own
+    directory left out (they are keyed by content below)."""
+    import glob
+    out = {}
+    for p in pats:
+        p = p[2:] if p.startswith("./") else p
+        for m in glob.glob(os.path.join(root, p)):
+            if os.path.isdir(m):
+                for dp, _dn, fn in os.walk(m):
+                    for f in fn:
+                        fp = os.path.join(dp, f)
+                        out[os.path.relpath(fp, root).replace(os.sep, "/")] = os.path.getsize(fp)
+            elif os.path.isfile(m):
+                out[os.path.relpath(m, root).replace(os.sep, "/")] = os.path.getsize(m)
+    return {k: v for k, v in out.items() if not k.startswith(DIR + "/")}
+
+
+def cache_key(root=ROOT, pats=None):
+    """take 195 · A207 · the hash the region cache is saved under: every
+    stamp without its time fields, and the name and size of every file the
+    cache holds. A build whose steps all skipped and that fetched nothing
+    new keys equal to the cache it restored, and saves nothing. New tiles,
+    a DEM tile, a re-fetched extract or a re-run step change it, and the
+    cache is saved with them (the review of take 195: keyed on the stamps
+    alone, tiles a build fetched were thrown away). Prints why to stderr,
+    against the record the restored cache carries."""
+    import glob
+    pats = pats if pats is not None else cache_paths(root)
+    stamps = {}
+    for fn in sorted(glob.glob(os.path.join(root, DIR, "*.json"))):
+        n = os.path.basename(fn)[:-5]
+        if n.startswith("_"):
+            continue
+        st = json.load(open(fn))
+        stamps[n] = {k: v for k, v in st.items() if k not in VOLATILE}
+    files = cached_files(root, pats)
+    rec = {"stamps": stamps, "files": files}
+    h = hashlib.sha256(json.dumps(rec, sort_keys=True).encode()).hexdigest()[:16]
+    # what the step stamps say a step wrote, but no cache path carries: that
+    # step can never skip (the review of take 195 found graph_raw.json so)
+    unc = sorted({o for st in stamps.values() for o, v in st.get("outputs", {}).items()
+                  if v != "absent" and o not in files})
+    for o in unc:
+        print(f"::warning::{o} is a stamped step's output that the region cache does not carry: "
+              "that step re-runs every build (A207)", file=sys.stderr)
+    rp = os.path.join(root, DIR, "_cache.json")
+    try:
+        was = json.load(open(rp))
+    except Exception:
+        was = None
+    if was is None:
+        print("cache key: no record from the restored cache (a first build with stamps)", file=sys.stderr)
+    else:
+        ch = sorted(n for n in set(stamps) | set(was.get("stamps", {})) if stamps.get(n) != was.get("stamps", {}).get(n))
+        wf = was.get("files", {})
+        new = [k for k in files if k not in wf]
+        lost = [k for k in wf if k not in files]
+        size = [k for k in files if k in wf and files[k] != wf[k]]
+        print(f"cache key: stamps changed {ch or 'none'}; files new {len(new)}, gone {len(lost)}, "
+              f"resized {len(size)}" + (f" (e.g. {', '.join((new + lost + size)[:4])})" if new or lost or size else ""),
+              file=sys.stderr)
+    os.makedirs(os.path.join(root, DIR), exist_ok=True)
+    json.dump(rec, open(rp, "w"), sort_keys=True)
+    return h
+
+
 def selftest():
     """The planted controls, in a scratch repo: a stamp is honoured only while
     everything holds, and each change below must re-run the step."""
@@ -362,6 +488,9 @@ def selftest():
     import subprocess
     import tempfile
     tmp = tempfile.mkdtemp(prefix="apex-stepstamp-")
+    # the clean run sets APEX_NO_SKIP and then runs the gate: the scratch
+    # checks must not read it, nor take it away (the review of take 195)
+    outer = os.environ.pop("APEX_NO_SKIP", None)
     try:
         root = os.path.realpath(tmp)
         os.makedirs(os.path.join(root, "tools"))
@@ -378,6 +507,11 @@ def selftest():
           "json.dump({'a': a['a'] * K, 'opt': opt, 'n': n, 'argv': sys.argv[1:]}, open('fake_payload.json', 'w'))\n")
         W("tools/proc.py", "import subprocess\nsubprocess.run(['true'])\nopen('proc_payload.json', 'w').write('{}')\n")
         W("tools/bad.py", "open('in.json').read()\nraise SystemExit('bad step')\n")
+        W("tools/side.py", "V = 1\n")
+        W("tools/spec.py", "import importlib.util, os\n"
+          "sp = importlib.util.spec_from_file_location('side', os.path.join(os.path.dirname(__file__), 'side.py'))\n"
+          "m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m)\n"
+          "open('spec_payload.json', 'w').write(str(m.V))\n")
         me = os.path.abspath(__file__)
 
         def go(tool, *a):
@@ -448,6 +582,76 @@ def selftest():
         os.remove(stamp_path("fake", root))
         if chk("tools/fake.py", "--region", "x")[0]:
             fails.append("control: no stamp still skipped")
+        # a module loaded by spec from a valid .pyc is an input too
+        import py_compile
+        py_compile.compile(os.path.join(root, "tools", "side.py"), doraise=True)
+        go("tools/spec.py")
+        st2 = json.load(open(stamp_path("spec", root)))
+        if "tools/side.py" not in st2["inputs"]:
+            fails.append(f"the trace missed a module loaded by spec from its .pyc: {sorted(st2['inputs'])}")
+        W("tools/side.py", "V = 2\n")
+        ok, why = chk("tools/spec.py")
+        if ok or "tools/side.py" not in why:
+            fails.append(f"control: a module loaded by spec changed and the step did not re-run for it ({why})")
+        else:
+            whys.append(why)
+        # a payload written as .part and renamed into place is the output;
+        # one the step deletes must be absent before it skips; code compiled
+        # from a string is not an input
+        W("tools/mv.py", "import os, collections\nP = collections.namedtuple('P', 'a b')\n"
+                         "open('mv_payload.json.part', 'w').write('{}')\nos.replace('mv_payload.json.part', 'mv_payload.json')\n"
+                         "os.path.exists('old_payload.json') and os.remove('old_payload.json')\n")
+        W("old_payload.json", "{}")
+        go("tools/mv.py")
+        st3 = json.load(open(stamp_path("mv", root)))
+        if "mv_payload.json" not in st3["outputs"] or st3["outputs"].get("old_payload.json") != "absent":
+            fails.append(f"the trace missed a renamed output or a removed one: {st3['outputs']}")
+        if any(k.startswith("<") for k in st3["inputs"]):
+            fails.append(f"code compiled from a string was recorded as an input: {sorted(st3['inputs'])}")
+        W("old_payload.json", "{}")
+        ok, why = chk("tools/mv.py")
+        os.remove(os.path.join(root, "old_payload.json"))
+        if ok or "old_payload.json" not in why:
+            fails.append(f"control: a payload the step deletes came back and it still skipped ({why})")
+        else:
+            whys.append(why)
+        W("mv_payload.json", "[]")
+        ok, why = chk("tools/mv.py")
+        if ok or "mv_payload.json" not in why:
+            fails.append(f"control: a renamed-into-place output changed and the step still skipped ({why})")
+        else:
+            whys.append(why)
+        # the cache key: equal when nothing changed, new when a cached file
+        # or a stamp did, and it names an output no cache path carries
+        import io
+        import contextlib
+        go("tools/fake.py", "--region", "x")
+        pats = ["./*_payload.json", "data", DIR]
+        def key(root, pats, _e=None):
+            with contextlib.redirect_stderr(_e or io.StringIO()):
+                return cache_key(root, pats)
+        k1 = key(root, pats)
+        if key(root, pats) != k1:
+            fails.append("the cache key differs with nothing changed")
+        W("data/z.txt", "z")
+        if key(root, pats) == k1:
+            fails.append("control: a new file in a cached directory left the cache key unchanged")
+        os.remove(os.path.join(root, "data", "z.txt"))
+        if key(root, pats) != k1:
+            fails.append("the cache key did not return when the file went")
+        st = json.load(open(stamp_path("fake", root)))
+        st["t"] = "2000-01-01T00:00Z"
+        json.dump(st, open(stamp_path("fake", root), "w"))
+        if key(root, pats) != k1:
+            fails.append("a stamp's time alone changed the cache key")
+        st["inputs"]["in.json"] = "0" * 64
+        json.dump(st, open(stamp_path("fake", root), "w"))
+        if key(root, pats) == k1:
+            fails.append("control: a stamp whose record changed left the cache key unchanged")
+        err = io.StringIO()
+        key(root, ["data", DIR], err)
+        if "fake_payload.json is a stamped step's output that the region cache does not carry" not in err.getvalue():
+            fails.append("control: an output no cache path carries was not named")
         r = go("tools/proc.py")
         if r.returncode or os.path.exists(stamp_path("proc", root)) or "no stamp" not in r.stdout:
             fails.append(f"control: a step that starts a process was stamped ({r.stdout[-200:]})")
@@ -477,12 +681,19 @@ def selftest():
         return fails, whys
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+        os.environ.pop("APEX_NO_SKIP", None)
+        if outer is not None:
+            os.environ["APEX_NO_SKIP"] = outer
 
 
 if __name__ == "__main__":
     if len(sys.argv) >= 4 and sys.argv[1] == "run":
         # APEX_STAMP_ROOT: the selftest's scratch repo, never set by the pipeline
         sys.exit(run(sys.argv[2], sys.argv[3], sys.argv[4:], root=os.environ.get("APEX_STAMP_ROOT") or ROOT))
+    if sys.argv[1:] == ["key"]:
+        # the workflow's save key: one line on stdout, the reasons on stderr
+        print(cache_key())
+        sys.exit(0)
     if sys.argv[1:] == ["--selftest"]:
         bad, whys = selftest()
         for x in whys:

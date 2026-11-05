@@ -6593,10 +6593,14 @@ function hudBtns(ro){
        state is a class; the label stays */
     if(NAV_VOICE_IC!==!!(V.ok&&V.on)){NAV_VOICE_IC=!!(V.ok&&V.on);
       vb.innerHTML=ic(NAV_VOICE_IC?'voice':'voiceoff')+'<span>Voice</span>'}}
-  if(vn){vn.hidden=!!V.ok;
+  /* take 195 · the review: an English voice that needs a network is said */
+  var vnet=!!(V.ok&&V.drv==='native'&&V.nat&&V.nat.offline===false);
+  if(vn){vn.hidden=!!V.ok&&!vnet;
     /* take 195 · A218 · which one is missing: the WebView's speech, or (with
        the phone's engine reachable) an English voice on the phone */
-    var vt=V.ok?'':(V.drv==='native'
+    var vt=vnet?'Voice may be silent offline: this phone\u2019s English voice needs a network'+
+        voiceTail(ro===undefined?hudRouted():ro):
+      V.ok?'':(V.drv==='native'
       ?(V.nat&&V.nat.en===null?'Voice: asking the phone\u2019s text-to-speech'
         :'Voice is unavailable: this phone has no English text-to-speech voice')
       :'Voice is unavailable in this phone\u2019s WebView')+
@@ -7048,6 +7052,12 @@ function navGStale(){
    navigation holds and drops its token. */
 function navWake(on){try{if(on)WAKE.hold('nav');else WAKE.drop('nav')}catch(e){}}
 function navStart(){NAV.on=true;NAV.follow=true;NAV.lastAt=null;FIX_T=0;navWake(true);
+  /* take 195 · A218 · the review: a "no English" from the phone's engine
+     was final for the session (an engine slower than the 14 s of asks, or
+     an English pack installed since). Each ride asks it again; the sheet
+     says it is asking meanwhile. Only the plugin's answer: a WebView's
+     speech is probed as before. */
+  if(VOICE.drv==='native'&&VOICE.nat&&VOICE.nat.en===false){VOICE.nat=null;navVoiceProbe()}
   RIDE_G_ROOM=52;   /* take 188 · A215 · a new ride starts from the default banner room */
   navChip()}
 function navStop(){NAV.on=false;navWake(false);navChip();navGuideClear();navSay('',true);rideCameraFlat()}
@@ -7110,6 +7120,12 @@ function ttsAsk(T){
       if(!yes&&N.tries<=TTS_RETRY.length){
         setTimeout(function(){if(VOICE.nat===N)ttsAsk(T)},TTS_RETRY[N.tries-1]);return}
       N.en=yes;VOICE.ok=yes;
+      /* take 195 · the review: the engine can say English while every
+         English voice it lists needs a network the field does not have.
+         Voice stays on offer (it speaks on a signal, and an engine may
+         fall back to a voice it does not list), and the sheet says so.
+         A list the engine did not give says nothing either way. */
+      N.offline=N.voices?en.some(function(x){return x.localService}):null;
       logAct('voice: the phone\u2019s text-to-speech '+(yes?'speaks English':'has no English voice')+
         ' (asked '+N.tries+'\u00d7)');
       try{navChip()}catch(e){}});

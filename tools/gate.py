@@ -1710,6 +1710,7 @@ def check_stepstamp():
     clean-run switch) and holds the pipeline's wiring: every skippable step
     is a step, and the runner asks the stamp before it runs one."""
     import importlib.util
+    n0 = len(fails)
     sp = os.path.join(HERE, "stepstamp.py")
     if not os.path.exists(sp):
         return fails.append("tools/stepstamp.py missing (A207)")
@@ -1730,7 +1731,7 @@ def check_stepstamp():
     for need in ("stepstamp.fresh(", '"stepstamp.py"), "run"', "name in stepstamp.SKIPPABLE"):
         if need not in pl:
             fails.append(f"tools/pipeline.py does not ask the stamp before a skippable step: {need} (A207)")
-    if fails and any("A207" in f for f in fails):
+    if len(fails) > n0:
         return
     notes.append(f"step stamps (A207): {len(m.SKIPPABLE)} skippable steps wired; {len(whys)} planted changes "
                  "each re-run the step for their own reason; a process, a failed run and no stamp never skip")
