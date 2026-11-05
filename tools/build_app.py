@@ -42,6 +42,7 @@ IN_BUNDLE = {"graph_payload.json": "graph.json",
              # new artifact by hand (bundle.py's manifest was the first).
              "gauges_payload.json": "gauges.json",
              "nf.json": "nf.json",
+             "hazards_payload.json": "hazards.json",   # take 194 · A189
              "landcover_payload.json": "landcover.json",
              "areas_payload.json": "areas.json",
              "photos_index.json": "photos.json",
@@ -182,10 +183,12 @@ j('bundle/manifest.json').then(function(man){
     /* take 150 · A164: gauge inventory — optional, absent-safe */
     have.gauges?j('bundle/'+have.gauges):Promise.resolve(null),
     /* take 174 · A186: national forest boundaries — optional, absent-safe */
-    have.nf?j('bundle/'+have.nf):Promise.resolve(null)]);
+    have.nf?j('bundle/'+have.nf):Promise.resolve(null),
+    /* take 194 · A189: road hazards from OSM — optional, absent-safe */
+    have.hazards?j('bundle/'+have.hazards):Promise.resolve(null)]);
 }).then(function(r){
   GR=r[0];TR=r[1];GLYPHS=r[2];WATER=r[3];SHADE=r[4];SAT=r[5];SATB=r[6].b;CTX=r[7];ADDR=r[8];SHOW=r[9];
-  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];NF=r[18];
+  POIS=r[10];CONT=r[11];PADDLE=r[12];LAND=r[13];AREAS=r[14];PHOTOS=r[15];PUBS=r[16];GAUGES=r[17];NF=r[18];HAZ=r[19];
   start();
 }).catch(function(e){
   if(String(e.message).indexOf('required artifact')<0)
@@ -382,6 +385,7 @@ def single(out):
             f'AREAS = {rd("areas_payload.json") or "null"};\n'
             f'PHOTOS = {rd("photos_index.json") or "null"};\n'
             f'PUBS = {rd("publicland_payload.json") or "null"};\n'            f'GAUGES = {rd("gauges_payload.json") or "null"};\n'            f'NF = {rd("nf.json") or "null"};\n'
+            f'HAZ = {rd("hazards_payload.json") or "null"};\n'
             f'var SHADE = "{uri("hillshade.jpg")}";\n'
             f'var SAT = "{uri("imagery.jpg")}";\n'
             f'var SATB = {json.dumps(json.loads(meta)["b"]) if meta else "[0,0,0,0]"};\n'

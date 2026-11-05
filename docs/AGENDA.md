@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 193.* Ranked by blocking-ness, not by interest.
+*Current as of take 194.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -104,7 +104,7 @@ without this, half the riding area is missing (landmine 13).
   populated. Richer than the DNR for 7.4.
 - **Ruled out:** needing to infer vehicle legality from width. The MVUM states it.
 
-## A10 — Surface type: sand vs hardpack · OPEN
+## A10 — Surface type: sand vs hardpack · OPEN · QUEUED 2026-11-05 (the maintainer: design first)
 
 ROADMAP 6.5. In this terrain it's the difference between a fun loop and a bad day.
 
@@ -112,6 +112,16 @@ ROADMAP 6.5. In this terrain it's the difference between a fun loop and a bad da
 - **Ruled out:** DNR `TrailTreadType`. PROVEN — null on 159/159.
 - **Open:** OSM `surface` tag coverage in the AOI, and whether it's worth anything
   this far from a city.
+- **Measured take 194** (the openstreetmap.fr Michigan extract of 2026-11-05,
+  every highway=track / path / unclassified / bridleway way in the state,
+  PROVEN by a count pass):
+  - tracks carry no `surface` on 57,627 ways. The most-used values are
+    unpaved 9,865, ground 1,205, dirt 866, sand 511 and gravel 428;
+  - paths carry none on 40,881, dirt 3,640;
+  - unclassified roads carry none on 4,861, asphalt 5,261, unpaved 5,110.
+  So a sand-vs-hardpack layer can only speak where a mapper recorded it:
+  about 1 track in 6 says anything, and "sand" is 511 statewide. A design
+  has to show "not recorded" as itself, never as hardpack.
 
 ## A11 — Retrace · DONE, take 7
 
@@ -147,7 +157,7 @@ routing that ignores elevation is routing that ignores the thing riders care abo
 - **Ruled out:** nothing. Neither remaining item is blocked on anything but the
   APK for 4.9.
 
-## A14 — 3D terrain and slope shading · OPEN
+## A14 — 3D terrain and slope shading · OPEN · QUEUED 2026-11-05 (the maintainer)
 
 ROADMAP 2.6, 2.7. Take 8 ships the rendered hillshade; 3D and slope need the
 encoded DEM on the client.
@@ -3246,7 +3256,7 @@ dropped, 383 shadows dropped, 440 named for their lake; the remaining
 - **Ruled out:** dropping unnamed pins that shadow NOTHING. A launch on
   an unnamed pond is still a launch; it just waits for z13.5.
 
-## A189 — "Road hazards" layer: plate readers, low bridges, crossings · DESIGNED take 180 (build after A183, on the maintainer's approval)
+## A189 — "Road hazards" layer: plate readers, low bridges, crossings · DESIGNED take 180 · APPROVED 2026-11-05 (the maintainer: "Build it in the next take") · BUILT take 194 (the layer); the truck turn-list warning OPEN (no truck profile)
 A mode that marks Flock Safety automatic licence-plate readers and other
 potential hazards on the road. The data exists and is already in the
 app's main source: the DeFlock project maps Flock cameras into
@@ -3309,6 +3319,46 @@ the bundle's OSM date, on the card like every other pin's source line.
 - **Ruled out:** any category the source is empty on (speed cameras).
 - **Ruled out:** building before the maintainer approves this design and
   before A183, by his order.
+- **Approved 2026-11-05:** the maintainer, asked whether to build it before
+  A183's device check: "Build it in the next take".
+- **Built take 194 (the layer):** tools/hazards.py, one pass over the
+  extract the ingest reads (aoi.json is not widened: its tag set is the
+  ingest's cache key). Source totals, the openstreetmap.fr extract of
+  2026-11-05 (PROVEN, a count pass): ALPR 3,682 · height-limited roads
+  1,776 with a value (187 more say none/default) + 30 points · weight 250
+  · fords 698 · rail crossings 7,464 · toll booths 164 · cattle guards 18 ·
+  hazard=* 51 · speed cameras 0. The step prints found = kept + outside
+  the box + the same spot again for each kind, and on that extract every
+  kind reconciles. Plate readers are never merged (each is a camera);
+  crossings, booths and limits are merged within ~15 m (one per track or
+  lane). That leaves 13,369 pins in 525 KB, 105 s here. The app: a Layers
+  row, "Road hazards", off by default, kept through mode changes (no mode
+  lists it), and "not in this bundle" when the artifact is absent. Dots
+  are coloured by kind (rail crossings from z12, the rest from z9.5); the
+  recorded height or weight is printed from z13. A tap opens a card that
+  says only what OSM records, escaped, with "From OpenStreetMap (date), as
+  mapped — not checked on the ground". The gate holds hazards.py's rules
+  to planted cases (check_hazards_rules; four mutants each caught).
+- **The cold audit (take 194), fixed:**
+  - the region now comes from region.R: osm_local.region() reads only the
+    default, so --region would have shipped the state's hazards in a box
+    bundle; gauges.py had the same line and is fixed too;
+  - two different limits on one spot are kept as two, not merged;
+  - a node that is a place gives no limit or hazard pin: 26 of the 30
+    height-limit nodes are parking garages, so height limits are now 1,780
+    (1,776 roads + 4 points);
+  - the step skips when osmium is absent, as corridor and landcover do;
+  - a hazard's tap comes after the places (A110), in their 22 px box;
+  - a limit's label carries its unit ("3.5 m", "10 t"), as its card does.
+- **Not built, recorded:** the turn list's warning ("Low bridge, 11 ft 6
+  in, in 0.4 mi"). The design hung it on "when the machine is a truck",
+  and the app has no truck: its machines are bike, quad, side-by-side, on
+  foot and the boats, and no route is a drive-to. A truck profile (and
+  drive-to routing on the road network) is a design of its own, the
+  maintainer's call. Not stacked with the place pins (169) either: hazard
+  dots draw as their own layer, so a stack badge can sit over one. Pins
+  are kept by the region's box, as the other OSM layers are, so the
+  border's slivers show (a plate reader in Sylvania, Ohio).
 
 ## A190 — HD download tiers: this view, this county, whole state at z13 · BUILDING (H1 take 178 · H2 take 179 · field verdict pending)
 The maintainer asked whether "download all of Michigan" is possible. Measured:
@@ -3734,7 +3784,7 @@ to do.
 - **Ruled out:** leaving it until the UI overhaul (A203) — a wrong place
   name on first open is exactly the kind of answer this app must not give.
 
-## A200 — Setting home is hard to find and slow · DESIGNED 2026-09-23 · BUILDING take 186
+## A200 — Setting home is hard to find and slow · DESIGNED 2026-09-23 · BUILT take 186 (HANDOFF take 186; this heading read BUILDING until take 194)
 The maintainer, 2026-09-23: "I wanted to plan a ride, I had to long press
 my location, set it as a home, then press a location, and click return
 home. It was awful … make it a button — such as set current location to
@@ -3923,7 +3973,7 @@ the scenes it changed. Not a check: the harness asserts, the probe shows.
 - **Ruled out:** screenshots inside the repo or the gate — they are for
   eyes, not for diffing; a pixel assertion would be landmine 54's shape.
 
-## A207 — CI's bundle job still rebuilds the state every run: the compute steps never skip · FOUND take 186 (run 86) · OPEN, design first
+## A207 — CI's bundle job still rebuilds the state every run: the compute steps never skip · FOUND take 186 (run 86) · OPEN, design first · QUEUED 2026-11-05 (the maintainer)
 After A198, run 86 (take 185) restored the v4 cache, recognised the
 workspace from region_stamp.json and skipped the ingest stream (392 s →
 17.5 s, PROVEN in the log) — and the bundle job still took 47 min (55
@@ -4380,7 +4430,7 @@ renamed, A113's five-on-screen rule re-decided with a counter.
   at rest; free ride from the folded drawer is 1 tap (A233). The line above
   stays as the record of take 188's reading.
 
-## A218 — Spoken turn-by-turn is silent on the Fold: its WebView has no Web Speech API · FOUND 2026-09-23 (field, take-186 self-test) · OPEN, design first
+## A218 — Spoken turn-by-turn is silent on the Fold: its WebView has no Web Speech API · FOUND 2026-09-23 (field, take-186 self-test) · OPEN, design first · QUEUED 2026-11-05 (the maintainer)
 The maintainer's self-test on the Fold (take 186; Android 16, WebView
 Chrome 153): "[VOICE] engine — Web Speech API absent in this WebView —
 strip stays silent". Voice guidance (take 173) is feature-detected, so it
@@ -5567,4 +5617,58 @@ end of nav, and how long until 'idle'.
 - **Ruled out:** tolerating style-loaded by name, as GPS and trail-names
   are (it is how a style that never loads is caught); declaring nav as
   selftest's setup (it is not a setup, it is what breaks it).
+
+## A276 — CI rendered the app twice in every build · FOUND 2026-11-05 (run 110's log, PROVEN) · APPROVED 2026-11-05 (the maintainer: "Yes, reuse it") · BUILT take 194
+ci/bundle.sh ran tools/render.mjs (and verify_palette.mjs), then
+tools/gate.py ran both again inside check_render: the same arguments, the
+same www/, the same Chrome. In run 110 the bundle job took 95 min: pipeline
+21 min, standalone render 34.5 min, gate 38.7 min, most of it that second
+render (PROVEN, the job log's timestamps, lines 1313–2117).
+
+The maintainer approved the gate judging the first render's log, tied by
+hashes to the build. Take 194 built that first: tools/render_stamp.py and
+eight planted controls, proven here. Its cold audit found the stamp's input
+list incomplete. render.mjs also reads tools/gate.py (NEVER_HIDE),
+www/vendor and the other www/ files, and every input it gains is one more
+the stamp must name. It also pointed out the simpler change: since keep()
+(2026-11-01) a failed render no longer stops the job, so the standalone
+run had nothing left to do but write its log.
+
+Built take 194, the simpler form:
+- ci/bundle.sh no longer renders or runs the palette verifier;
+- check_render renders once, as it always did, and in CI prints the
+  render's whole output into the job log.
+One render, every check run once on the exact build, nothing to trust and
+no stamp to keep current. Expected: about 35 min off every pull-request and
+main build (INFERRED until this take's CI run measures it). It also removes
+A271's exposure, since its failure was in the second render.
+- **Ruled out:** the stamped reuse (built, then replaced in the same take:
+  an input list that must grow with render.mjs is a check that can go
+  stale silently); dropping the gate's render (it is the contract's).
+
+## A277 — The maintainer's packing rule for takes · DECIDED 2026-11-05
+The maintainer: "for future takes i'd like to pack as many features/changes
+in as SAFELY possible, given how long it takes to build within github" (the
+message read "menu"; taken as "many"). Each take carries every ready,
+verifiable change, not one or two. A CI build is about 95 minutes, and
+about 60 once A276 lands. Safety still decides what is ready: every change
+has its agenda item, drill and controls, and a change that cannot be
+verified here or by CI waits. The queue he set the same day, each design
+first: A207 (pipeline steps skip by input hash), A218 (spoken turns,
+native text to speech), A14 (slope shading), A10 (surface type).
+- **Ruled out:** packing an unverified change to fill a take (it costs a
+  whole CI round when it fails); splitting a verified batch to keep takes
+  small.
+
+## A278 — render --only=tools,ui fails two tools checks on unchanged code · FOUND take 194 (PROVEN on take 193's committed build) · OPEN
+`--only=tools,ui,hazards` failed two checks: A259's "from the map's HD
+button" (tool null, not folded) and "an OPEN panel is reachable by tap".
+They failed the same way on take 193's committed build
+(render-t193-on-tools-ui), and CI's full render passes both (runs 110, 113).
+So ui leaves a state the tools section's drills do not start from when
+home does not run between them (INFERRED; A244 and A275's shape). The
+open-panel drill toggles c-layers, so a Layers panel already open reads
+as closed (INFERRED, the likely half).
+- **Ruled out:** declaring a setup before measuring which state it is;
+  loosening either check.
 

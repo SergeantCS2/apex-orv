@@ -250,6 +250,8 @@ The screens are outside the repo: the "before" screens in
   numbers: take 193; agenda A275; landmine 258.
 - At take 193's seal (2026-11-05): agenda A275, landmine 257. Next
   numbers: take 194; agenda A276; landmine 258.
+- At take 194's seal (2026-11-05): agenda A278, landmine 257. Next
+  numbers: take 195; agenda A279; landmine 258.
 
 ## Order (as of 2026-11-01)
 
@@ -290,4 +292,5 @@ explicit ruled-outs; every ready fix goes into the next take, each with
 its own agenda item and HANDOFF paragraph (HANDOFF, take 185); audit
 before sealing; card text literally honest; "Continue" delegates, "get
 this right" means do not seal until every item is hit; the document is
-the bug when it disagrees with the code.
+the bug when it disagrees with the code. Since 2026-11-05: pack each take with every
+ready, verifiable change (A277, CLAUDE.md "Pack each take").

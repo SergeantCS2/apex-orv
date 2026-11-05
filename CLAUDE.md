@@ -30,6 +30,21 @@ newest green CI run on main. Export the `PUPPETEER_EXECUTABLE_PATH` it
 prints. The pipeline cannot run here: Geofabrik and overpass-api.de close
 this cloud's connections (PROVEN 2026-11-01). A take that changes the
 pipeline or the data is proven by CI's run, which builds everything.
+download.openstreetmap.fr does serve the Michigan extract here
+(`extracts/north-america/us-midwest/michigan-latest.osm.pbf`, 348 MB, PROVEN
+2026-11-05). Saved as `osm_cache/michigan-latest.osm.pbf`, it lets an OSM
+step that reads only the extract (take 194's hazards.py) or a count pass
+run and be measured here. CI still reads Geofabrik's copy, whose border
+may differ (UNKNOWN).
+
+## Pack each take
+The maintainer, 2026-11-05: "pack as many features/changes in as SAFELY
+possible, given how long it takes to build within github" (A277). A take
+carries every change that is ready and verifiable, not one or two. Ready
+means its agenda item, its drill with controls, and a check that has been
+watched failing. Anything that cannot be verified here or by CI waits,
+because a failed CI round costs about an hour. Design-first items are
+designed (and asked about) while a CI build runs.
 
 ## How a take works here
 1. Record first: HANDOFF entry, AGENDA item with a `Ruled out:` line, a
@@ -52,7 +67,9 @@ pipeline or the data is proven by CI's run, which builds everything.
 6. Mark the pull request ready for review: CI builds it (pipeline, render,
    gate, signed APK as a run artifact; no release). The maintainer merges;
    CI's run on main publishes the release, and is the last word. The
-   commit hash is the seal.
+   commit hash is the seal. Since take 194 CI renders once, inside the
+   gate (check_render), which prints the render's whole output into the
+   job log; ci/bundle.sh no longer renders first (A276).
 Take, agenda and landmine numbers are assigned only in this repo. Any other
 surface starts from the repo head.
 

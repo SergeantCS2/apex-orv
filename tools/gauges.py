@@ -10,14 +10,18 @@ sites with instantaneous values, statewide.
 import json, os, sys, time, urllib.error, urllib.request
 
 sys.path.insert(0, os.path.dirname(__file__))
-from osm_local import region
+# take 194 · the region from region.R, as every other step: osm_local's
+# region() reads only regions.json's default, so --region and $APEX_REGION
+# built the default region's inventory (found by take 194's review of
+# hazards.py, which had copied this line)
+from region import R as REG
 
-RID, R = region()
-W, S, E, N = R["bbox"]
+RID = REG.id
+W, S, E, N = REG.bbox
 # NWIS wants the two-letter postal code; the region record carries the
 # prose name. Explicit map, not string surgery — a wrong guess here is a
 # silent empty inventory.
-STATE = {"michigan": "MI"}.get(RID, R.get("postal", "MI"))
+STATE = {"michigan": "MI"}.get(RID, getattr(REG, "postal", None) or "MI")
 
 URL = ("https://waterservices.usgs.gov/nwis/site/?format=rdb"
        f"&stateCd={STATE}&siteType=ST&siteStatus=active&hasDataTypeCd=iv")

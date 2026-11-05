@@ -20,10 +20,10 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### Geofabrik OpenStreetMap extract
 
 - **Host** `download.geofabrik.de`
-- **Provides** Michigan .osm.pbf — the same OSM ways ingest.py asks Overpass for, from the sanctioned bulk download path
+- **Provides** Michigan .osm.pbf — read directly for the statewide region: the ways ingest.py would ask Overpass for, river corridors, land cover, and road hazards (plate readers, height and weight limits, fords, rail crossings; A189, take 194)
 - **Licence** ODbL (OpenStreetMap contributors)
-- **Fetched by** `osm_local.py`
-- **Refresh** only when every Overpass mirror fails — tier 2 of the OSM fallback chain, ahead of Census TIGER (A108, take 85)
+- **Fetched by** `osm_local.py, corridor.py, landcover.py, hazards.py`
+- **Refresh** every build (cached in CI's osm_cache): corridor, landcover and hazards read it for any region, and the statewide ingest reads it directly; a box region's ingest uses it only when every Overpass mirror fails — tier 2 of the OSM fallback chain, ahead of Census TIGER (A108, take 85)
 
 ### Michigan DNR trails
 

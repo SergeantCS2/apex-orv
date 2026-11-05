@@ -60,7 +60,7 @@ const SHOT = opt("--shot", null);
    "the same camera stacks different things per mode"): every passing
    stacks run had water before it, so water is its declared setup. */
 const SECTIONS = { trails: [], labels: [], modes: [], imagery: [], back: [], water: [], shell: ["water"],
-  stacks: ["water"], pins: ["stacks"], nav: [], camp: [], paddle: [], ui: [], home: [], tools: [], basemap: [],
+  stacks: ["water"], pins: ["stacks"], nav: [], camp: [], paddle: [], ui: [], home: [], tools: [], basemap: [], hazards: [],
   selftest: [], routes: [], devices: ["routes"], faults: [], realdom: ["home", "routes"],
   clear: ["home", "routes"], tail: [], g6: [], "v4-setup": [], "v4-band": ["v4-setup"],
   "v4-select": ["v4-setup"], "v4-toast": ["v4-setup"], "v4-audit": ["v4-setup"],
@@ -5055,6 +5055,88 @@ else {
 
 }
 
+if (RUN("hazards")) {
+  /* take 194 · A189 · Road hazards in a real browser. Off by default it
+     draws nothing; the real Layers row turns it on and a pin from the
+     bundle's own hazards.json draws (landmine 197) — a plate reader where
+     the bundle has one, else any kind that draws at z13.6; a real tap on it
+     opens its card, which names OSM and its date; the row turns it off and
+     nothing draws. Whatever happens, the layer goes back off and the card
+     folds before the next section. A bundle without the artifact: the row
+     is disabled and says so. */
+  let hfile = null;
+  try { hfile = JSON.parse(readFileSync(join(WWW, "bundle", "hazards.json"), "utf8")); } catch (e) { hfile = null; }
+  const pool = hfile ? hfile.h.filter((r) => r[2] === "a").concat(hfile.h.filter((r) => r[2] !== "a" && r[2] !== "r")) : [];
+  const cands = pool.filter((_, i) => i % 23 === 0).slice(0, 24).map((r) => ({ p: [r[0], r[1]], k: r[2] }));
+  const hz = await page.evaluate(async (cands) => {
+    const m = window.map, H = window.__haz, s = (ms) => new Promise((r) => setTimeout(r, ms));
+    const IDS = ["haz-dot", "haz-rail", "haz-label"];
+    const vis = (id) => { try { return m.getLayoutProperty(id, "visibility") !== "none"; } catch (e) { return null; } };
+    const idle = async () => { for (let i = 0; i < 60 && !m.areTilesLoaded(); i++) await s(200);
+      await Promise.race([new Promise((r) => { m.once("idle", r); m.triggerRepaint(); }), s(8000)]); await s(250); };
+    const q = (ids) => { try { return m.queryRenderedFeatures({ layers: ids }).length; } catch (e) { return -1; } };
+    const panel = document.getElementById("lyrpanel");
+    const row = () => [...panel.querySelectorAll("[data-lg]")].find((b) => /Road hazards/.test(b.innerText)) || null;
+    const openLyr = async () => { if (panel.hidden) { document.getElementById("c-layers").click(); await s(350); } };
+    const closeLyr = async () => { const d = panel.querySelector("[data-lyrdone]"); if (d) d.click(); await s(250); };
+    const cam = { c: m.getCenter(), z: m.getZoom() };
+    await openLyr(); const r0 = row(); const absent = !!r0 && r0.disabled && /not in this bundle/.test(r0.innerText);
+    if (!H || !H.ok) { await closeLyr(); return { missing: true, absent, hasRow: !!r0, cam: { c: [cam.c.lng, cam.c.lat], z: cam.z } }; }
+    const off0 = IDS.map(vis);
+    if (r0) r0.click(); await s(350);
+    const on = { vis: IDS.map(vis), rowOn: /\bon\b/.test((row() || {}).className || "") };
+    await closeLyr();
+    /* a pin nothing else claims a tap from: no stack within the app's 18 px,
+       no place or paddle pin within its 11 and 13 px (they are checked first) */
+    const near = (pt, r, layers) => { try { return m.queryRenderedFeatures([[pt.x - r, pt.y - r], [pt.x + r, pt.y + r]],
+      { layers: layers.filter((id) => m.getLayer(id)) }).length; } catch (e) { return 0; } };
+    let tgt = null, drawn = 0, tries = 0;
+    for (const c of cands) { tries++;
+      m.jumpTo({ center: c.p, zoom: 13.6 }); await idle();
+      const pt = m.project(c.p);
+      const here = m.queryRenderedFeatures([[pt.x - 6, pt.y - 6], [pt.x + 6, pt.y + 6]], { layers: ["haz-dot"] })
+        .filter((f) => f.properties.k === c.k).length;
+      const over = near(pt, 18, ["poi-stack-bg", "poi-stack"]) + near(pt, 11, ["poi-dot", "poi-dot-major"]) + near(pt, 13, ["pad-dam", "pad-dot"]);
+      drawn = q(["haz-dot", "haz-rail"]);
+      if (here && !over) { const r = m.getCanvas().getBoundingClientRect(); tgt = { p: c.p, k: c.k, x: r.left + pt.x, y: r.top + pt.y }; break; } }
+    return { off0, on, tgt, drawn, tries, absent, title: tgt ? H.kinds[tgt.k] : null, cam: { c: [cam.c.lng, cam.c.lat], z: cam.z } };
+  }, cands);
+  let card = "", off = null;
+  if (hz && !hz.missing && hz.tgt) {
+    await page.mouse.click(hz.tgt.x, hz.tgt.y); await new Promise((r) => setTimeout(r, 500));
+    card = await page.evaluate(() => (document.getElementById("panel") || {}).innerText || "");
+  }
+  /* always: the layer back off (through its row), the card folded, the camera back */
+  off = await page.evaluate(async (cam) => {
+    const m = window.map, s = (ms) => new Promise((r) => setTimeout(r, ms)), panel = document.getElementById("lyrpanel");
+    const IDS = ["haz-dot", "haz-rail", "haz-label"];
+    const vis = (id) => { try { return m.getLayoutProperty(id, "visibility") !== "none"; } catch (e) { return null; } };
+    if (IDS.some(vis)) {
+      if (panel.hidden) { document.getElementById("c-layers").click(); await s(350); }
+      const r = [...panel.querySelectorAll("[data-lg]")].find((b) => /Road hazards/.test(b.innerText)); if (r && !r.disabled) r.click(); await s(350);
+      const d = panel.querySelector("[data-lyrdone]"); if (d) d.click(); await s(250); }
+    await Promise.race([new Promise((z) => { m.once("idle", z); m.triggerRepaint(); }), s(6000)]); await s(250);
+    const n = m.queryRenderedFeatures({ layers: ["haz-dot", "haz-rail"] }).length, v = IDS.map(vis);
+    try { window.__nav && window.__nav.rail && window.__nav.rail(false); } catch (e) {}
+    if (cam) m.jumpTo({ center: cam.c, zoom: cam.z });
+    return { n, vis: v };
+  }, hz && hz.cam);
+  if (!hfile || (hz && hz.missing)) {
+    ok(!!hz && hz.missing && !hfile && hz.absent,
+       `road hazards: this bundle carries none, and the Layers row says "not in this bundle" and is disabled (${hz && hz.absent})`);
+    ok(off.vis.every((v) => v === false), `road hazards: (no artifact) its layers stay off`);
+    ok(off.n === 0, `road hazards: (no artifact) nothing draws`);
+  } else {
+    ok(hz.off0.every((v) => v === false) && hz.on.vis.every((v) => v === true) && hz.on.rowOn && !!hz.tgt && hz.drawn > 0,
+       `road hazards: off by default; the real Layers row turns all three layers on and the row reads on; a ${hz.title || "pin"} from the bundle draws `
+       + `(${hz.drawn} hazard pins in view, found in ${hz.tries} tr${hz.tries === 1 ? "y" : "ies"})`);
+    ok(!!hz.title && card.startsWith(hz.title) && new RegExp("From OpenStreetMap \\(" + hfile.osm + "\\)").test(card) && /not checked on the ground/.test(card),
+       `road hazards: a real tap on it opens its own card — "${card.replace(/\s+/g, " ").slice(0, 110)}"`);
+    ok(off.n === 0 && off.vis.every((v) => v === false),
+       `road hazards: the row turns them off again and nothing draws (${off.n} pins)`);
+  }
+}
+
 if (RUN("selftest")) {
 /* Run the app's OWN self-test here, headless. Same battery Jacob runs by tapping
    one button on the Fold — so anything that differs between the two reports is
@@ -8800,7 +8882,7 @@ if (RUN("v4-setup")) {
   SECTION_AT = "(floor guard)";
   const SECTION_FLOOR = {
   boot: 13, trails: 2, labels: 11, modes: 33, imagery: 32, back: 14, water: 12, shell: 10,
-  stacks: 48, pins: 21, nav: 31, camp: 16, paddle: 25, ui: 37, home: 7, tools: 28, basemap: 2,
+  stacks: 48, pins: 21, nav: 31, camp: 16, paddle: 25, ui: 37, home: 7, tools: 28, basemap: 2, hazards: 3,
   selftest: 2, routes: 3, devices: 222, faults: 6, realdom: 6, clear: 3, tail: 30, g6: 2,
   "v4-setup": 1, "v4-band": 7, "v4-select": 6, "v4-toast": 1, "v4-audit": 11, "v4-walker": 15,
   "v4-eta": 9 };

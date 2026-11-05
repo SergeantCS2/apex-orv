@@ -1,10 +1,10 @@
-**Take 193 — a ride's battery figure and dropout count stay true through a self-test and a clock change.**
+**Take 194 — Road hazards: plate readers, height and weight limits, fords and rail crossings, from OpenStreetMap.**
 
-Running the self-test during a ride no longer overwrites the ride's
-starting battery level, so the ride report's battery use is measured from
-the start of the ride. A GPS dropout is counted even when the phone's clock
-is set back mid-ride, or the phone sleeps. After a clock change, the
-dispatch card says a last fix's age is unknown instead of guessing.
+A new layer under Layers, "Road hazards", off until you turn it on, in
+every mode: 3,682 plate-reader cameras, height and weight limits, fords,
+rail crossings, toll booths and cattle guards across Michigan. Tap a dot
+for what OpenStreetMap records about it, such as who makes or runs a
+camera and which way it faces, and nothing it does not.
 
-On the phone: during a ride, run the self-test (Tools), then Stop — does
-the ride report's battery figure look right for the whole ride?
+On the phone: Layers, Road hazards on, then zoom to a town. Do dots
+show, and does a tap say what the camera or the limit is?
