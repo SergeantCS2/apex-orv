@@ -3443,11 +3443,15 @@ if (zoomed.trails > 0) {
     const listsOk = (o) => o.kicks.indexOf("OFFICIAL SOURCES") >= 0 && o.kicks.indexOf("OTHER DATA") > o.kicks.indexOf("OFFICIAL SOURCES")
       && o.official.some((h) => /census\.gov/.test(h)) && o.official.some((h) => /michigan\.gov\/dnr/.test(h))
       && !o.official.some((h) => /openstreetmap|amazonaws|opendata\.aws/.test(h))
-      && o.other.some((h) => /openstreetmap\.org/.test(h)) && o.other.some((h) => /registry\.opendata\.aws/.test(h));
+      && o.other.some((h) => /openstreetmap\.org/.test(h)) && o.other.some((h) => /registry\.opendata\.aws/.test(h))
+      /* take 197 · Google Play's review: the photos' source is named too */
+      && o.other.some((h) => /commons\.wikimedia\.org/.test(h)) && o.other.some((h) => /en\.wikipedia\.org/.test(h))
+      && !o.official.some((h) => /wikimedia|wikipedia/.test(h));
     const forged = { ...src, official: src.official.concat(src.other.filter((h) => /openstreetmap/.test(h))) };
     ok(listsOk(src) && !listsOk(forged),
        `A257 · Data sources lists ${src.official.length} agencies (the Census Bureau among them) under OFFICIAL SOURCES and `
-       + `${src.other.length} under OTHER DATA (OpenStreetMap, AWS Terrain Tiles); its control, OpenStreetMap among the agencies, is rejected`);
+       + `${src.other.length} under OTHER DATA (OpenStreetMap, AWS Terrain Tiles, Wikipedia, Wikimedia Commons); its control, `
+       + `OpenStreetMap among the agencies, is rejected`);
   }
   /* take 189 · A232 · at 360 px wide every "BSD 3-Clause" on Data sources
      stays on one line: take 188's 13b3 shots read "BSD 3-" / "Clause". Read
@@ -4764,9 +4768,19 @@ if (zoomed.trails > 0) {
   const mot = await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const p = document.getElementById("lyrpanel");
+    /* take 197 · A278 · a state the drill makes, not one it inherits. Probed
+       (PROVEN): with the drawer left open by the sections before, the Layers
+       panel had 164 px above it and its first row sat below the panel's own
+       box, so the tap hit the Tools strip; folded, the panel was 568 px and
+       the row reachable. A section run left it either way. Folded first,
+       Layers closed, and the row scrolled into the panel's view as a
+       rider's thumb would. */
+    if (!p.hidden) { const dn = p.querySelector("[data-lyrdone]"); if (dn) dn.click(); await sleep(300); }
+    try { window.railSet(false); } catch (e) {} await sleep(350);
     document.getElementById("c-layers").click();
     await sleep(320);
     const openRow = p.querySelector("[data-lg]");
+    try { openRow.scrollIntoView({ block: "nearest" }); } catch (e) {} await sleep(120);
     const openHit = document.elementFromPoint(
       ...(() => { const r = openRow.getBoundingClientRect();
                   return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)]; })());

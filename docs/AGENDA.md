@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 196.* Ranked by blocking-ness, not by interest.
+*Current as of take 197.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -104,7 +104,7 @@ without this, half the riding area is missing (landmine 13).
   populated. Richer than the DNR for 7.4.
 - **Ruled out:** needing to infer vehicle legality from width. The MVUM states it.
 
-## A10 — Surface type: sand vs hardpack · DESIGNED and APPROVED 2026-11-05 (the maintainer) · to build
+## A10 — Surface type: sand vs hardpack · DESIGNED and APPROVED 2026-11-05 (the maintainer) · BUILT take 197 (CI's run proves the counts)
 
 ROADMAP 6.5. In this terrain it's the difference between a fun loop and a bad day.
 
@@ -131,6 +131,18 @@ ROADMAP 6.5. In this terrain it's the difference between a fun loop and a bad da
   - the graph carries OSM's surface for the edges conflated with an OSM
     way (graph.py and emit_graph.py, a pipeline change proven by CI);
   - DNR's own fields stay ruled out (above).
+- **Built, take 197 (HANDOFF):**
+  - tools/surface.py: an OSM line keeps its own tag, and an agency line
+    takes the tag of the OSM duplicate graph.py drops on it (at least half
+    its vertices on that duplicate's cells), a split said as both;
+  - graph.py and emit_graph.py carry it (bk "sf");
+  - the card says "Surface **sand** (OpenStreetMap)" or "Surface not
+    recorded".
+  Measured first: run 120 dropped only 2,184 OSM duplicates statewide, so
+  the cell table is a few MB. Held by gate check_surface_rules and smoke 9n.
+- **Ruled out:** reading a surface off an OSM way that only runs beside or
+  crosses a trail (graph.py keeps those as separate lines; only a dropped
+  duplicate is the same road).
 
 ## A11 — Retrace · DONE, take 7
 
@@ -4060,6 +4072,13 @@ so a per-step stamp only helps once the key changes.
   beside an older build's payloads.
 - **Ruled out:** keying the cache on the tools' hash. Every gate.py edit
   would re-save 969 MB with nothing changed.
+- **First skips, take 196's CI (PROVEN, run 123):** pipeline 244 s (1,428 s
+  before); six steps skipped (1,036 s); poi and contour re-ran because a new
+  file in tools/ changed the import system's scan of it.
+- **Refined, take 197:** a listing of a sys.path directory is the import
+  system's and is not recorded; every local module a step tries to import
+  is recorded as present or absent instead. The hook records none of its
+  own work (landmine 263).
 
 ## A208 — V4 foundation: CSS tokens proven by a computed-style diff, and guards with planted controls · DESIGNED 2026-09-23 (V4 study §5, §11) · BUILT take 187
 Tokens for colour, z-index and motion completely, and for radius, spacing
@@ -5775,7 +5794,7 @@ native text to speech), A14 (slope shading), A10 (surface type).
   whole CI round when it fails); splitting a verified batch to keep takes
   small.
 
-## A278 — render --only=tools,ui fails two tools checks on unchanged code · FOUND take 194 (PROVEN on take 193's committed build) · OPEN (half found take 196: the HD drill's race; the app's is A279)
+## A278 — render --only=tools,ui fails two tools checks on unchanged code · FOUND take 194 (PROVEN on take 193's committed build) · BUILT take 197
 `--only=tools,ui,hazards` failed two checks: A259's "from the map's HD
 button" (tool null, not folded) and "an OPEN panel is reachable by tap".
 They failed the same way on take 193's committed build
@@ -5809,6 +5828,16 @@ as closed (INFERRED, the likely half).
   passes and the Layers check still fails: ui leaves a second cause of its
   own (OPEN; measure the Layers panel's box and what covers its first row
   after ui).
+- **Measured, take 197 (PROVEN, render probes):** the deciding state is the
+  drawer, not ui. With the drawer open (rail not folded) the Layers panel
+  had 164 px above it, y 176-340, and its first row (y 329-377) sat below
+  the panel's own box, so the tap at its centre hit the Tools strip. With
+  it folded, the panel was 568 px tall and the row reachable. A section
+  run left the drawer either way, so tools alone and tools after ui each
+  failed in one run and passed in another.
+- **Built, take 197:** the drill closes Layers, folds the drawer itself,
+  and scrolls the first row into the panel's view before the tap (a
+  rider's thumb would). `--only=tools` and `--only=tools,ui` both passed.
 
 ## A279 — Back tapped while the HD card is still loading leaves the Tools strip over the map · FOUND take 196 (render probes, PROVEN in render) · OPEN
 The map's HD button opens HD imagery under Tools; its card is written after
@@ -5820,4 +5849,40 @@ hit the strip. Whether a rider's quick Back on the phone reaches the same
 state is UNKNOWN; the first thing to measure is the sheet's state and the
 strip's visibility after Back at 0, 100, 200 and 300 ms from the HD tap.
 - **Ruled out:** fixing it by guess before that measure (A278's rule).
+- **Measured, take 197 (PROVEN, a render probe on the take-197 build): not a
+  race.** From the Map tab with the drawer folded, HD, then Back after 0,
+  100, 200, 300 and 700 ms: at every delay the sheet showed the Tools index
+  (tool null; the HD tool never registered in this sequence), and Back
+  left the sheet closed, the Map tab on, the drawer OPEN (not folded) and
+  the Tools strip up at y 348, over the Layers panel's first row. A259's
+  own drill, which waits for the tool, reads the drawer folded. OPEN: why
+  the map's HD button does not land on the HD tool from this state, and
+  whether the phone does the same (UNKNOWN); intended (plan190 §4) is "the
+  map's HD button opens the same tool under Tools, and back folds".
+
+## A280 — Google Play refused the listing: "Insufficient Sources Provided" · FOUND 2026-11-06 (Play's review, the maintainer's note 2026-11-07) · BUILT take 197 (the console is the maintainer's)
+Play, under the Misleading Claims policy: "Your app's description statement
+makes it seem like there are more than one source of information used
+without listing all of them" (evidence: the full description, en-US). What
+was wrong, PROVEN by reading:
+- the description named six sources and said the same list was in the
+  app, but the app named eight (the Census Bureau and AWS Terrain Tiles
+  too);
+- neither named Wikipedia or Wikimedia Commons, where the pin photos come
+  from (each photo already credits its author and licence);
+- the feature lines named data with no source.
+- **Built, take 197:** one table. The app's SOURCES / SOURCES_OTHER, with a
+  Wikipedia row and a Wikimedia Commons row, is read by tools/play_assets.py
+  for the listing's sources. The feature lines name their sources. Every
+  fetched host and citation in tools/manifest.py names its row
+  (`credit`). The gate's check_sources_credited holds the three together,
+  with 4 controls, and fails on take 196's tree.
+- **The maintainer's, after take 197 is released:** paste the new full
+  description (listing.md in play-assets-197.zip) into the console and
+  resubmit. Not before: it says the same list is inside the app, and only
+  take 197's app lists the photos' source.
+- **Ruled out:** naming the photos' source on each photo only (Play reads
+  the listing; the photo credit stays, and the source is listed too).
+- **Ruled out:** a second hand-written copy of the list in play_assets.py
+  (it is what drifted; landmine 107).
 

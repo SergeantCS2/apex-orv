@@ -1,14 +1,12 @@
-**Take 196 — Slope bands over the riding areas.**
+**Take 197 — Every data source named; the trail card says its surface.**
 
-A new layer under Layers, "Slope", off until you turn it on: over the DNR
-riding areas only, ground of 15° and steeper is shaded yellow, 25° orange
-and 35° and steeper red, from the areas' own detailed elevation data
-(about 14 m). Nothing is drawn anywhere else, because the statewide
-elevation data is too coarse to show a hill climb honestly.
+Tools, Data sources now lists every source of data in the app, the photos'
+too (Wikipedia, Wikimedia Commons), and the store listing lists the
+same sources with the same links.
 
-The self-test no longer fails its map check when it is run right after a
-mode change.
+A trail's card now says its surface where OpenStreetMap records one, for
+example "Surface sand (OpenStreetMap)", and "Surface not recorded" where
+no mapper did. Most trails record none.
 
-On the phone: Layers, Slope on, then go to Silver Lake or Bull Gap. Do the
-dune faces and the climb show red and orange, and can you still read the
-trails over them?
+On the phone: tap a trail and read the Surface line. Then Tools, Data
+sources: is the photos' source there?

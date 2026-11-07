@@ -176,6 +176,13 @@ def run(name, tool, args, root=ROOT):
     blind = []
     tracing = [True]    # audit hooks cannot be removed: the stamp's own reads after the run are not the step's
 
+    # (the review of take 197: computed once, not per event; and never the
+    # repo root, whose listing by a step is a real input)
+    _sp = {os.path.abspath(x or ".") for x in sys.path} - {root}
+
+    def syspath():
+        return _sp
+
     def note_open(path, mode, flags):
         r = _rel(path, root)
         if r is None:
@@ -187,9 +194,12 @@ def run(name, tool, args, root=ROOT):
             w = bool(flags & (os.O_WRONLY | os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_TRUNC))
         (writes if w else reads).add(r)
 
+    inhook = [False]    # the hook's own stats (e.g. _third_party's exists) are not the step's
+
     def hook(ev, a):
-        if not tracing[0]:
+        if not tracing[0] or inhook[0]:
             return
+        inhook[0] = True
         try:
             if ev == "open":
                 note_open(a[0], a[1] if len(a) > 1 else None, a[2] if len(a) > 2 else None)
@@ -207,13 +217,31 @@ def run(name, tool, args, root=ROOT):
                 if r is not None:
                     gone.add(r)
             elif ev in ("os.listdir", "os.scandir"):
-                r = _rel(a[0] if a and a[0] is not None else ".", root)
+                p = a[0] if a and a[0] is not None else "."
+                # take 197 · the import system scans every sys.path directory
+                # it searches (and again when its mtime moves): that listing
+                # is not the step's input. PR #13's run re-ran poi and contour
+                # on "the files in tools/ changed" when take 196 added
+                # tools/slope.py, which neither reads. The modules a step
+                # does load are recorded by the exec event, and the local
+                # names it tries to import by the import event below.
+                if os.path.abspath(os.fspath(p)) in syspath():
+                    return
+                r = _rel(p, root)
                 if r is not None:
                     listed.add(r)
             elif ev == "import":
                 tp = _third_party(a[0], root)
                 if tp:
                     tried.add(tp)
+                # a local module the step asks for, there or not: if it is
+                # absent now and appears later, the step must run again
+                top = str(a[0]).split(".")[0]
+                for d in syspath():
+                    for cand in (os.path.join(d, top + ".py"), os.path.join(d, top, "__init__.py")):
+                        r = _rel(cand, root)
+                        if r is not None:
+                            probes.add(r)
             elif ev == "exec":
                 # every module body runs through exec, and its code object
                 # names its source even when it was loaded from a .pyc
@@ -234,13 +262,15 @@ def run(name, tool, args, root=ROOT):
                 blind.append("a sqlite database")
         except Exception:
             blind.append(f"an event the trace could not read ({ev})")
+        finally:
+            inhook[0] = False
 
     _stat, _lstat, _access = os.stat, os.lstat, os.access
 
     def probe(f):
         def w(p, *a, **k):
             try:
-                r = _rel(p, root) if not isinstance(p, int) else None
+                r = _rel(p, root) if not isinstance(p, int) and not inhook[0] else None
                 if r is not None:
                     probes.add(r)
             except Exception:
@@ -311,6 +341,8 @@ def run(name, tool, args, root=ROOT):
     os.stat, os.lstat, os.access = stat, probe(_lstat), probe(_access)
     sys.argv = [tool_abs] + list(args)
     sys.path[0] = os.path.dirname(tool_abs)
+    _sp.clear()
+    _sp.update({os.path.abspath(x or ".") for x in sys.path} - {root})
     code = 0
     try:
         runpy.run_path(tool_abs, run_name="__main__")
@@ -501,6 +533,7 @@ def selftest():
         W("data/x.txt", "x\n")
         W("tools/fake.py",
           "import json, os, sys\nfrom helper import K\n"
+          "try:\n    import optmod\nexcept ImportError:\n    optmod = None\n"
           "a = json.load(open('in.json'))\n"
           "opt = os.path.exists('opt.json')\n"
           "n = len(os.listdir('data'))\n"
@@ -538,8 +571,14 @@ def selftest():
             fails.append("an absent probed path is not recorded as absent")
         if "data" not in st["listed"] or "fake_payload.json" not in st["outputs"]:
             fails.append("the trace missed the listing or the output")
-        if st["packages"]:
+        if set(st["packages"]) - {"optmod"}:
+            # (an absent name it tried is also a package it asked for: a
+            # package of that name installed later re-runs it, rightly)
             fails.append(f"packages the step never imported are recorded: {st['packages']}")
+        if "tools" in st["listed"]:
+            fails.append("the import system's scan of tools/ was recorded as the step's listing")
+        if st["inputs"].get("tools/optmod.py") != "absent":
+            fails.append("an optional local module the step tried to import is not recorded as absent")
         ok, why = chk("tools/fake.py", "--region", "x")
         if not ok:
             fails.append(f"an unchanged step did not skip: {why}")
@@ -565,10 +604,19 @@ def selftest():
             plant("the tool itself changed", "tools/fake.py",
                   lambda: W("tools/fake.py", open(os.path.join(root, "tools/fake.py")).read() + "#\n"),
                   lambda: W("tools/fake.py", open(os.path.join(root, "tools/fake.py")).read()[:-2])),
+            plant("an optional local module appeared", "tools/optmod.py", lambda: W("tools/optmod.py", "X = 1\n"),
+                  lambda: os.remove(os.path.join(root, "tools", "optmod.py"))),
             plant("the output is not the one stamped", "fake_payload.json", lambda: W("fake_payload.json", "{}"),
                   lambda: W("fake_payload.json", json.dumps({}))),
             plant("another argv", "argv", lambda: None, lambda: None, "--region", "y"),
         ]
+        # take 197 · a new file in tools/ that the step never reads must not
+        # re-run it (PR #13's poi and contour re-ran on tools/slope.py)
+        W("tools/unrelated.py", "Y = 2\n")
+        ok_u, why_u = chk("tools/fake.py", "--region", "x")
+        os.remove(os.path.join(root, "tools", "unrelated.py"))
+        if not ok_u and "fake_payload.json" not in why_u:
+            fails.append(f"an unrelated new file in tools/ re-ran the step ({why_u})")
         # the output plant rewrote the payload: a fresh run restores the yes
         go("tools/fake.py", "--region", "x")
         if not chk("tools/fake.py", "--region", "x")[0]:

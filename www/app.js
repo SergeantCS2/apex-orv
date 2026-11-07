@@ -192,6 +192,10 @@ var EDGES=GR.e.map(function(e,i){return {a:e[0],b:e[1],L:e[2],c:CLS[e[3]],
   d:e.length<8||e[7]!==0,
    
   rf:(e.length>8&&e[8]>=0)?NM[e[8]]:null}});
+ 
+function surfaceBit(a){
+  if(!a||!a.sf)return 'Surface not recorded';
+  return 'Surface <b>'+hazEsc(String(a.sf).replace(/[_:]/g,' '))+'</b> (OpenStreetMap)'}
 function attrs(e){var o={};if(e.bi<0)return o;
   var v=B[e.bi];for(var k=0;k<BK.length;k++)if(v[k])o[BK[k]]=v[k];return o}
 
@@ -4886,8 +4890,13 @@ var SOURCES=[
 var SOURCES_OTHER=[
   ['OpenStreetMap contributors','Roads, places and context, under ODbL',
    'https://www.openstreetmap.org/copyright'],
-  ['AWS Terrain Tiles','Elevation for climbs, profiles and hillshade (USGS 3DEP over the U.S.)',
-   'https://registry.opendata.aws/terrain-tiles/']];
+  ['AWS Terrain Tiles','Elevation for climbs, profiles, hillshade and slope (USGS 3DEP over the U.S.)',
+   'https://registry.opendata.aws/terrain-tiles/'],
+   
+  ['Wikipedia','Lead photos for major pins; each photo names its author and licence',
+   'https://en.wikipedia.org'],
+  ['Wikimedia Commons','Geotagged photos for pins with no article; each names its author and licence',
+   'https://commons.wikimedia.org']];
 function srcRows(list){return '<div class="sbox">'+list.map(function(r){
   return srowHTML({tag:'a',attrs:' href="'+r[2]+'" target="_blank" rel="noopener"',icon:'sources',label:r[0],sub:r[1],trail:'external'})}).join('')+'</div>'}
  
@@ -4904,8 +4913,9 @@ function sourcesCard(){
     'convenience. Check the official source, and the signs on the ground, '+
     'before you ride.</div>'+srcRows(SOURCES)+
     '<div class="k">OTHER DATA</div>'+
-    '<div class="sub">Not agencies: OpenStreetMap is mapped by its contributors, and '+
-    'AWS Terrain Tiles host elevation drawn from public surveys.</div>'+srcRows(SOURCES_OTHER)+
+    '<div class="sub">Not agencies: OpenStreetMap is mapped by its contributors, '+
+    'AWS Terrain Tiles host elevation drawn from public surveys, and the photos '+
+    'come from Wikipedia and Wikimedia Commons.</div>'+srcRows(SOURCES_OTHER)+
      
     '<div class="k">SOFTWARE AND TYPE</div><div class="sub"><b>Icons</b> \u2014 Lucide '+LUCIDE_V+
     ', ISC licence, \u00a9 Lucide Icons and Contributors; icons derived from Feather under '+
@@ -5649,6 +5659,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       window.__haz={ok:HAZ_OK,data:HAZ_OK?HAZ:null,text:hazardText,card:hazardCard,dir:hazDir,limit:hazLimit,label:hazLabel,kinds:HAZKIND,
         group:LYRGROUPS.filter(function(g){return g.k==='hazards'})[0],set:lyrSet,on:lyrOn};
        
+      window.__surface=surfaceBit;window.__gr=GR;    
       window.__slope={ok:SLOPE_OK,data:SLOPE_OK?SLOPE:null,ids:SLOPE_IDS,added:function(){return SLOPE_ADDED},
         group:LYRGROUPS.filter(function(g){return g.k==='slope'})[0]};
       window.__search=function(q,all){return all?searchAll(q):search(q)};
@@ -6935,6 +6946,7 @@ map.on('click',function(e){
   if(a.moto)bits.push('Moto <b>'+a.moto+'</b>');
   if(a.atv)bits.push('ATV <b>'+a.atv+'</b>');
   if(a.lic)bits.push(a.lic);
+  bits.push(surfaceBit(a));
   bits.push((ed.L/1609.34).toFixed(2)+' mi segment');
    
   var _rs=restrictOf(ed);

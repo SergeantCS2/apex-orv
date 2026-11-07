@@ -12,6 +12,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### USFS forest boundaries (Camp mode, take 174 · A186)
 
 - **Host** `apps.fs.usda.gov`
+- **Credited** in the app and the store listing as *U.S. Forest Service*
 - **Provides** administrative boundaries of Michigan's three national forests (Ottawa, Hiawatha, Huron-Manistee) from the Enterprise Data Warehouse layer `EDW_ForestSystemBoundaries_01/MapServer/0`, generalised to ~60 m — 23 KB; build time, cached as nf_cache.json
 - **Licence** US federal government work, public domain
 - **Fetched by** `nf.py`
@@ -20,6 +21,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### Geofabrik OpenStreetMap extract
 
 - **Host** `download.geofabrik.de`
+- **Credited** in the app and the store listing as *OpenStreetMap contributors*
 - **Provides** Michigan .osm.pbf — read directly for the statewide region: the ways ingest.py would ask Overpass for, river corridors, land cover, and road hazards (plate readers, height and weight limits, fords, rail crossings; A189, take 194)
 - **Licence** ODbL (OpenStreetMap contributors)
 - **Fetched by** `osm_local.py, corridor.py, landcover.py, hazards.py`
@@ -28,6 +30,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### Michigan DNR trails
 
 - **Host** `gisagodnr.state.mi.us`
+- **Credited** in the app and the store listing as *Michigan DNR*
 - **Provides** ORV routes, trails, motorcycle trails, MCCCT, closures, reroutes
 - **Licence** Public domain (State of Michigan open data)
 - **Fetched by** `ingest.py`
@@ -36,6 +39,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### Wikipedia (geosearch + lead image)
 
 - **Host** `en.wikipedia.org`
+- **Credited** in the app and the store listing as *Wikipedia*
 - **Provides** Photos for MAJOR pins — camps, trail systems, riding areas, named beaches — matched by name near the pin (take 131)
 - **Licence** CC BY-SA / public domain per image; author and licence shipped and shown on the card
 - **Fetched by** `photos.py`
@@ -44,6 +48,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### Wikimedia Commons (geosearch)
 
 - **Host** `commons.wikimedia.org`
+- **Credited** in the app and the store listing as *Wikimedia Commons*
 - **Provides** A geotagged photo taken AT a pin that has no article — beaches, launches, campgrounds (take 131)
 - **Licence** per image; author and licence shipped and shown
 - **Fetched by** `photos.py`
@@ -52,6 +57,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### Wikimedia Commons (thumbnails)
 
 - **Host** `upload.wikimedia.org`
+- **Credited** in the app and the store listing as *Wikimedia Commons*
 - **Provides** The 320 px lead image itself
 - **Licence** per image (see en.wikipedia.org entry)
 - **Fetched by** `photos.py`
@@ -61,6 +67,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 
 - **Host** `services3.arcgis.com`
 - **Also provides (take 151, A169)** `DNR_State_Sponsored_Developed_Boating_Access_Sites_Public_View` — 1,325 in-state boat ramps, fetched by `bas.py`, merged into launches and corridor accesses. State-sponsored only; county/township ramps are in neither this layer nor OSM.
+- **Credited** in the app and the store listing as *Michigan DNR*
 - **Provides** Designated open-riding area polygons (Silver Lake, St. Helen, Holly Oaks, The Mounds, Bull Gap Hill Climb…) — the DNR publishes these on ArcGIS Online, not in its trails MapServer
 - **Licence** Public domain (State of Michigan open data)
 - **Fetched by** `areas.py`
@@ -69,6 +76,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### USDA Forest Service MVUM
 
 - **Host** `apps.fs.usda.gov`
+- **Credited** in the app and the store listing as *U.S. Forest Service*
 - **Provides** Motor Vehicle Use Map roads and trails, per-vehicle legality
 - **Licence** Public domain (US Government work)
 - **Fetched by** `ingest.py`
@@ -77,6 +85,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### OpenStreetMap via Overpass
 
 - **Host** `overpass-api.de`
+- **Credited** in the app and the store listing as *OpenStreetMap contributors*
 - **Provides** Context roads, tracks, water. Advisory only, never authoritative
 - **Licence** ODbL — attribution required, shipped in the map credits
 - **Fetched by** `ingest.py / pack.py`
@@ -85,6 +94,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### Terrarium elevation tiles
 
 - **Host** `s3.amazonaws.com`
+- **Credited** in the app and the store listing as *AWS Terrain Tiles*
 - **Provides** Encoded DEM: node elevations, per-edge climb, profiles, hillshade, and the slope bands over the riding areas' z13 patches (take 196, A14)
 - **Licence** Public domain / ODbL mix — USGS 3DEP over CONUS
 - **Fetched by** `terrain.py, slope.py`
@@ -93,6 +103,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### USGS ImageryOnly
 
 - **Host** `basemap.nationalmap.gov`
+- **Credited** in the app and the store listing as *U.S. Geological Survey*
 - **Provides** Satellite basemap. NAIP-derived
 - **Licence** Public domain (US Government work)
 - **Fetched by** `imagery.py` (pipeline) and **in-app** by the HD save flow (take 145, A160) — user tap only, never at boot or idle
@@ -102,6 +113,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### USGS Water Services (NWIS)
 
 - **Host** `waterservices.usgs.gov`
+- **Credited** in the app and the store listing as *USGS Water Services*
 - **Provides** Gauge site inventory at build (241 MI surface-water sites, 22 KB) and LIVE instantaneous values (flow 00060, stage 00065, water temp 00010) fetched **in-app** on a user tap (take 150, A164)
 - **Licence** Public domain (US Government work)
 - **Fetched by** `gauges.py` (inventory) and the river card's conditions button — §8 in-app rules: tap only, never at boot or idle, never load-bearing; stale values are never shipped (ruled out in AGENDA)
@@ -110,6 +122,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### US Census cartographic boundary files
 
 - **Host** `www2.census.gov`
+- **Credited** in the app and the store listing as *U.S. Census Bureau*
 - **Provides** cb_2023_us_state_20m — state outlines clipped to the SHORELINE. The TIGERweb legal boundary was tried first and runs far out into the Great Lakes, which draws a shape nobody recognises.
 - **Licence** US Government work, public domain
 - **Fetched by** `context.py`
@@ -118,6 +131,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### US Census TIGER address ranges (ADDRFEAT)
 
 - **Host** `www2.census.gov`
+- **Credited** in the app and the store listing as *U.S. Census Bureau*
 - **Provides** per-county house-number ranges per road segment, for the offline geocoder. Counties are chosen by overlap with the region box, then clipped to it. TIGER 2024 since take 184; each county's file is cached under auth_cache/addrfeat/ and a county that cannot be fetched refuses the build (A196).
 - **Licence** US Government work, public domain
 - **Fetched by** `address.py`
@@ -126,6 +140,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### Overpass mirror (Kumi Systems)
 
 - **Host** `overpass.kumi.systems`
+- **Credited** in the app and the store listing as *OpenStreetMap contributors*
 - **Provides** same OSM database as the primary; used only when it is down
 - **Licence** ODbL (OpenStreetMap contributors)
 - **Fetched by** `ingest.py`
@@ -134,6 +149,7 @@ bench and dies at Mack Lake — the gate refuses any host not listed here.
 ### USFS National Forest System trails (EDW_TrailNFSPublish_01)
 
 - **Host** `apps.fs.usda.gov`
+- **Credited** in the app and the store listing as *U.S. Forest Service*
 - **Provides** every NFS trail, motorised and not, with per-mode permissions. MVUM lists only what vehicles may use; this is what EXISTS.
 - **Licence** US Government work, public domain
 - **Fetched by** `ingest.py`

@@ -12,9 +12,17 @@ import os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
+# take 197 · Google Play's review of 2026-11-06 refused the listing under
+# Misleading Claims, "Insufficient Sources Provided": the description named
+# some sources and not all. Every source the build fetches (and every
+# citation) now names, in "credit", the row of the app's Data sources table
+# (SOURCES / SOURCES_OTHER in src/app.html) that credits it. That table is
+# also the store listing's (tools/play_assets.py reads it), and
+# tools/gate.py check_sources_credited holds the three together.
 SOURCES = [
     {
         "host": "apps.fs.usda.gov",
+        "credit": "U.S. Forest Service",
         "name": "USFS forest boundaries (Camp mode, take 174 · A186)",
         "what": "administrative boundaries of Michigan's three national forests "
                 "(Ottawa, Hiawatha, Huron-Manistee) from the Enterprise Data "
@@ -35,6 +43,7 @@ SOURCES = [
     # claim that should be written down rather than assumed.
     {
         "host": "www.michigan.gov",
+        "credit": "Michigan DNR",
         "name": "Michigan DNR (citation)",
         "what": "official agency page for the trail, closure, state-land and boating-access data",
         "licence": "n/a — cited, not fetched",
@@ -44,6 +53,7 @@ SOURCES = [
     },
     {
         "host": "gis-midnr.opendata.arcgis.com",
+        "credit": "Michigan DNR open data",
         "name": "Michigan DNR open data (citation)",
         "what": "public portal for the GIS layers the pipeline ingests",
         "licence": "n/a — cited, not fetched",
@@ -53,6 +63,7 @@ SOURCES = [
     },
     {
         "host": "data.fs.usda.gov",
+        "credit": "U.S. Forest Service",
         "name": "USDA Forest Service geodata (citation)",
         "what": "official source for national forest roads and trails",
         "licence": "n/a — cited, not fetched",
@@ -62,6 +73,7 @@ SOURCES = [
     },
     {
         "host": "apps.nationalmap.gov",
+        "credit": "U.S. Geological Survey",
         "name": "USGS The National Map (citation)",
         "what": "official source for satellite imagery and elevation",
         "licence": "n/a — cited, not fetched",
@@ -71,6 +83,7 @@ SOURCES = [
     },
     {
         "host": "waterdata.usgs.gov",
+        "credit": "USGS Water Services",
         "name": "USGS water data (citation)",
         "what": "official source for the live river gauge readings",
         "licence": "n/a — cited, not fetched",
@@ -79,7 +92,30 @@ SOURCES = [
         "refresh": "re-check the link still resolves before each submission",
     },
     {
+        # take 197 · the two links the app's Data sources showed and the
+        # manifest never declared (found by reading the table, below)
+        "host": "www.census.gov",
+        "credit": "U.S. Census Bureau",
+        "name": "US Census TIGER/Line (citation)",
+        "what": "official page for the boundary and address-range files the state outline, county lines and offline addresses come from",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
+        "host": "registry.opendata.aws",
+        "credit": "AWS Terrain Tiles",
+        "name": "AWS Terrain Tiles registry page (citation)",
+        "what": "the dataset page for the elevation tiles (USGS 3DEP over the U.S.) behind climbs, profiles, hillshade and slope",
+        "licence": "n/a — cited, not fetched",
+        "tool": "play_assets.py listing and the app's Data sources panel",
+        "phase": "citation",
+        "refresh": "re-check the link still resolves before each submission",
+    },
+    {
         "host": "www.openstreetmap.org",
+        "credit": "OpenStreetMap contributors",
         "name": "OpenStreetMap copyright page (citation)",
         "what": "licence and attribution for OSM-derived roads, places and context",
         "licence": "n/a — cited, not fetched",
@@ -99,6 +135,7 @@ SOURCES = [
     },
     {
         "host": "download.geofabrik.de",
+        "credit": "OpenStreetMap contributors",
         "name": "Geofabrik OpenStreetMap extract",
         # take 194 · the statewide region reads this every build (ingest.py's
         # bulk path, corridor, landcover, and A189's road hazards); "only
@@ -119,6 +156,7 @@ SOURCES = [
     },
     {
         "host": "gisagodnr.state.mi.us",
+        "credit": "Michigan DNR",
         "name": "Michigan DNR trails",
         "what": "ORV routes, trails, motorcycle trails, MCCCT, closures, reroutes",
         "licence": "Public domain (State of Michigan open data)",
@@ -128,6 +166,7 @@ SOURCES = [
     },
     {
         "host": "en.wikipedia.org",
+        "credit": "Wikipedia",
         "name": "Wikipedia (geosearch + lead image)",
         "what": "Photos for MAJOR pins — camps, trail systems, riding areas, "
                 "named beaches — matched by name near the pin (take 131)",
@@ -139,6 +178,7 @@ SOURCES = [
     },
     {
         "host": "commons.wikimedia.org",
+        "credit": "Wikimedia Commons",
         "name": "Wikimedia Commons (geosearch)",
         "what": "A geotagged photo taken AT a pin that has no article — beaches, "
                 "launches, campgrounds (take 131)",
@@ -149,6 +189,7 @@ SOURCES = [
     },
     {
         "host": "upload.wikimedia.org",
+        "credit": "Wikimedia Commons",
         "name": "Wikimedia Commons (thumbnails)",
         "what": "The 320 px lead image itself",
         "licence": "per image (see en.wikipedia.org entry)",
@@ -158,6 +199,7 @@ SOURCES = [
     },
     {
         "host": "services3.arcgis.com",
+        "credit": "Michigan DNR",
         "name": "Michigan DNR ORV Scramble Areas",
         "also": "**Also provides (take 151, A169)** `DNR_State_Sponsored_Developed_"
                 "Boating_Access_Sites_Public_View` — 1,325 in-state boat ramps, fetched "
@@ -173,6 +215,7 @@ SOURCES = [
     },
     {
         "host": "apps.fs.usda.gov",
+        "credit": "U.S. Forest Service",
         "name": "USDA Forest Service MVUM",
         "what": "Motor Vehicle Use Map roads and trails, per-vehicle legality",
         "licence": "Public domain (US Government work)",
@@ -182,6 +225,7 @@ SOURCES = [
     },
     {
         "host": "overpass-api.de",
+        "credit": "OpenStreetMap contributors",
         "name": "OpenStreetMap via Overpass",
         "what": "Context roads, tracks, water. Advisory only, never authoritative",
         "licence": "ODbL — attribution required, shipped in the map credits",
@@ -191,6 +235,7 @@ SOURCES = [
     },
     {
         "host": "s3.amazonaws.com",
+        "credit": "AWS Terrain Tiles",
         "name": "Terrarium elevation tiles",
         "what": "Encoded DEM: node elevations, per-edge climb, profiles, hillshade, "
                 "and the slope bands over the riding areas' z13 patches (take 196, A14)",
@@ -201,6 +246,7 @@ SOURCES = [
     },
     {
         "host": "basemap.nationalmap.gov",
+        "credit": "U.S. Geological Survey",
         "name": "USGS ImageryOnly",
         "what": "Satellite basemap. NAIP-derived",
         "licence": "Public domain (US Government work)",
@@ -219,6 +265,7 @@ SOURCES = [
         # The count is the record's (241 sites, HANDOFF takes 150/179), not
         # the 1,332 this entry carried with no source (A204, take 186).
         "host": "waterservices.usgs.gov",
+        "credit": "USGS Water Services",
         "name": "USGS Water Services (NWIS)",
         "what": "Gauge site inventory at build (241 MI surface-water sites, "
                 "22 KB) and LIVE instantaneous values (flow 00060, stage 00065, "
@@ -233,6 +280,7 @@ SOURCES = [
     },
     {
         "host": "www2.census.gov",
+        "credit": "U.S. Census Bureau",
         "name": "US Census cartographic boundary files",
         "what": "cb_2023_us_state_20m — state outlines clipped to the SHORELINE. "
                 "The TIGERweb legal boundary was tried first and runs far out "
@@ -244,6 +292,7 @@ SOURCES = [
     },
     {
         "host": "www2.census.gov",
+        "credit": "U.S. Census Bureau",
         "name": "US Census TIGER address ranges (ADDRFEAT)",
         "what": "per-county house-number ranges per road segment, for the "
                 "offline geocoder. Counties are chosen by overlap with the "
@@ -257,6 +306,7 @@ SOURCES = [
     },
     {
         "host": "overpass.kumi.systems",
+        "credit": "OpenStreetMap contributors",
         "name": "Overpass mirror (Kumi Systems)",
         "what": "same OSM database as the primary; used only when it is down",
         "licence": "ODbL (OpenStreetMap contributors)",
@@ -266,6 +316,7 @@ SOURCES = [
     },
     {
         "host": "apps.fs.usda.gov",
+        "credit": "U.S. Forest Service",
         "name": "USFS National Forest System trails (EDW_TrailNFSPublish_01)",
         "what": "every NFS trail, motorised and not, with per-mode permissions. "
                 "MVUM lists only what vehicles may use; this is what EXISTS.",
@@ -426,6 +477,17 @@ def scan_hosts():
     for d in (os.path.join(ROOT, ".github", "workflows"), os.path.join(ROOT, "ci")):
         if os.path.isdir(d):
             targets.append((d, os.listdir(d)))
+    # take 197 · the links the app's Data sources table shows (and the store
+    # listing, which reads it) are reached too: they moved there out of
+    # play_assets.py, and a citation nobody shows is a dead declaration
+    try:
+        app = open(os.path.join(ROOT, "src", "app.html"), encoding="utf-8").read()
+        for var in ("SOURCES", "SOURCES_OTHER"):
+            mm = re.search(r"^var " + var + r"=\[(.*?)\]\];", app, re.S | re.M)
+            for u in re.findall(r"https?://([A-Za-z0-9.\-]+)", mm.group(1) if mm else ""):
+                found.setdefault(u, set()).add("app.html (Data sources)")
+    except OSError:
+        pass
     for d, files in targets:
         for fn in files:
             if not fn.endswith((".py", ".yml", ".yaml", ".sh")):
@@ -458,6 +520,8 @@ def render():
             rows.append(f"- **Host** `{e['host']}`")
         if e.get("also"):
             rows.append(f"- {e['also']}")
+        if e.get("credit"):
+            rows.append(f"- **Credited** in the app and the store listing as *{e['credit']}*")
         rows += [f"- **Provides** {e['what']}",
                  f"- **Licence** {e['licence']}",
                  (f"- **Fetched by** {e['tool']}" if e.get("file")
