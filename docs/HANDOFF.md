@@ -1,4 +1,165 @@
-# HANDOFF — through Take 196 · V3
+# HANDOFF — through Take 197 · V3
+
+## Take 197 — 2026-11-07 — Every data source named, in the app and the store listing (A280); the trail card's surface (A10); the step stamps ignore the import system's scans (A207)
+
+RECORDED FIRST. The maintainer, 2026-11-07: "go, build take 197 with all
+four" (A10, A207's tools/ listing, A278's second half, A279's measure), and a
+note from Google Play: the listing was refused under the Misleading Claims
+policy, "Insufficient Sources Provided: Your app's description statement
+makes it seem like there are more than one source of information used
+without listing all of them" (evidence: the full description, en-US).
+Built on main 00a0d49 (take 196, release take-124, tagged t196 by CI).
+
+Take 196's CI, recorded here (PR #13, run 123, PROVEN from its log):
+- the cache was restored from main's run-121 key (1,026 MB);
+- the pipeline took 244 s (1,428 s warm in run 116; 2,538 s cold in run
+  120), and the bundle job 31 min (61);
+- graph, corridor, hazards, landcover, pack and emit_graph skipped (433.7,
+  273.2, 124.7, 94.2, 81.0, 29.0 s: 1,036 s saved), each checked in
+  0.1-0.4 s;
+- poi and contour re-ran: "the files in tools/ changed". Each had
+  recorded a listing of tools/, and take 196 added tools/slope.py. That is
+  the import system's own scan of a sys.path directory (INFERRED; neither
+  step lists tools/ itself, PROVEN by reading them). It is fixed below.
+Main's run 124 (take 196) took about 36 min against take 194's 66.
+
+A280 — every source named (Google Play's review).
+- PROVEN, by reading the manifest and the app:
+  - the store listing named six sources and said "The same list, with
+    the same links, is inside the app";
+  - the app's Data sources card named eight: the Census Bureau and AWS
+    Terrain Tiles too;
+  - neither named Wikipedia or Wikimedia Commons, which the pin photos
+    come from (each photo already shows its author and licence);
+  - the listing's feature lines named data with no source: terrain and
+    elevation, satellite imagery, photos.
+- Now there is one table. The app's SOURCES / SOURCES_OTHER gains a
+  Wikipedia row and a Wikimedia Commons row, each with its own link, and
+  tools/play_assets.py reads that table (refusing one it cannot read
+  whole) and writes the listing's source list from it.
+- The listing's feature lines name their sources: USGS 3DEP elevation
+  served as AWS Terrain Tiles, USGS imagery, Michigan DNR and OSM pins,
+  Wikipedia and Wikimedia Commons photos, and Census address ranges
+  (with the address search, the county lines and the state outline).
+  Road hazards and slope shading are named as features.
+  The description is 3,933 of 4,000 characters.
+- tools/manifest.py: every source the build fetches, and every citation,
+  names in `credit` the row of that table that credits it. The two links
+  the app showed and the manifest never declared (www.census.gov,
+  registry.opendata.aws) are citations now, and the host scan reads the
+  app's Data sources table, so a cited link nobody shows is caught.
+- The gate's check_sources_credited holds the three together, with 4
+  controls: an uncredited host, the photo row renamed away, a listing one
+  source short, a row nobody fetches. It fails on take 196's tree (the
+  photo hosts credited no row), PROVEN here.
+- Render's Data sources check requires the photo row under OTHER DATA,
+  not among the agencies.
+- **Not done here (the maintainer's):** Play Console. The new listing is
+  listing.md in this release's play-assets-197.zip; its full
+  description goes into the console and the app is resubmitted.
+
+A207 — the stamps' listings.
+- A listing of a sys.path directory is the import system's and is no
+  longer recorded; the modules a step does load are recorded by the exec
+  event.
+- Every local module name a step tries to import is recorded as a probe
+  of tools/<name>.py (and tools/<name>/__init__.py), there or absent. So
+  an optional module that appears later still re-runs the step.
+- The hook no longer records its own work. Its helper's os.path.exists
+  had recorded the probe it was meant to make, which hid a mutant
+  (landmine 263).
+- Selftest: 12 planted changes. A new file in tools/ the step never reads
+  must not re-run it; an optional module that appears must. Watched
+  failing: the import system's scan recorded again, the tried-import probe
+  removed.
+- On real data: hazards through the pipeline ran (its stamp predated the
+  edit) and stamped 113 inputs (the extra ones are the absent
+  tools/<module>.py of what it imported). Then it skipped in 0.5 s.
+
+A10 — the trail card's surface.
+- Measured first (PROVEN, a pass over the local extract, 11 s): 558,062
+  of 1,974,728 ways of the classes graph.py keeps carry a surface, holding
+  5.47 M nodes; tracks 13,424 of 71,051. Values: asphalt 194,662, concrete
+  178,076, unpaved 88,535, paved 53,626, gravel 14,161, dirt 8,303, ground
+  5,087, sand 1,112.
+- Run 120's log (PROVEN): graph.py's OSM loop added 247,853 ways and
+  dropped only 2,184 as duplicates of agency lines. So the cell table is
+  at most those ways' points, a few MB: no memory budget to spend.
+- tools/surface.py:
+  - an OSM line carries its own tag;
+  - a dropped duplicate's cells remember theirs, and an agency line takes
+    the value at least half its vertices sit on;
+  - a split is both said ("sand; dirt");
+  - a value is trimmed, an overlong one is none.
+- graph.py carries `sf` through noding, emit_graph.py bundles it (bk gains
+  "sf"; the app reads bundles by name), and the card says "Surface **sand**
+  (OpenStreetMap)" or "Surface not recorded". OSM text is escaped.
+- Held by gate check_surface_rules: 7 planted lines and 5 tag values, the
+  wiring from graph.py to the card. Watched failing on two mutants: no
+  half-coverage rule (a half-covered line took a surface) and no split
+  rule.
+- Held by smoke 9n: the line on planted values with a judge and 3
+  controls; a real edge's card through the map's own tap, with no surface
+  and with one planted into its bundle; and a bundle built with A10 must
+  carry a surface somewhere.
+- UNKNOWN until CI: the counts on real data (graph.py prints them) and the
+  card on the phone.
+
+A278 and A279, measured in render (PROVEN, probes on this build):
+- **A278:** the deciding state is the drawer, not ui. With the drawer
+  open, the Layers panel had 164 px above it (y 176-340) and its first
+  row (y 329-377) sat below its own box, so the tap at the row's centre
+  hit the Tools strip. Folded, the panel was 568 px and the row
+  reachable. Section runs left the drawer either way: tools alone and
+  tools after ui each failed one run and passed another. The drill now
+  closes Layers, folds the drawer itself and scrolls the row into the
+  panel's view first. `--only=tools` and `--only=tools,ui` then both
+  passed (the HD check too). A278 is BUILT.
+- **A279 is not the timing race take 196 recorded.** From the Map tab
+  with the drawer folded, HD then Back after 0, 100, 200, 300 and
+  700 ms: at every delay the sheet showed the Tools index (the HD tool
+  never registered in this sequence). Back left the sheet closed, the
+  Map tab on, the drawer OPEN and the Tools strip up at y 348. A259's
+  drill, which waits for the tool, reads the drawer folded. OPEN: why
+  the map's HD button does not land on the HD tool from this state, and
+  whether the phone does the same.
+
+What I got wrong:
+- the stamp's hook recorded its own helper's file probes as the step's
+  (landmine 263); a mutant of the explicit probe passed the selftest until
+  the hook ignored its own work;
+- the new selftest control ran after the output control had left the
+  payload rewritten, and so re-ran for that reason, not its own (landmine
+  260 again); it runs before it now;
+- the first planted control of check_sources_credited, "the photo row
+  dropped", did not match the app's text and planted nothing. It renames
+  the row instead.
+
+The review of take 197 (the code-review skill, 7 findings; 6 fixed, 1
+left):
+- the stamp's sys.path skip never covers the repo root, whose listing by a
+  step is a real input, and sys.path is read once per run;
+- the surface cell table holds tuples (a tag's own " | " was a
+  separator), and a cell shared by two values is one vote split;
+- play_assets refuses a sources table it cannot read whole;
+- Wikipedia and Wikimedia Commons are two rows with their own links;
+- left as is: the card escapes with hazEsc, a helper named for the
+  hazards. It is shared, and correct.
+
+Verified here (Chrome 138; the bundle of main's newest green run, plus this
+container's hazards payload and slope bands):
+- smoke, all five passes PASSED, at 300 / 212 / 54 ok, fatal 6, dead 33,
+  before the review's fixes; after them, the default and simulator passes
+  again: 300 and 212 ok, PASSED;
+- mutants of the built app, each caught by 9n alone: no escaping, the
+  card not calling the surface line;
+- render: `--only=tools` and `--only=tools,ui` PASSED (A278); `--only=camp`
+  PASSED with the photo rows under OTHER DATA (6 agencies, 4 others);
+- the stamp selftest's 12 planted changes, and its mutants caught: the
+  import system's scan recorded again, the tried-import probe removed;
+- gate check_surface_rules watched failing on two mutants;
+  check_sources_credited on take 196's tree;
+- the 37 gate checks that need no pipeline output PASSED.
 
 ## Take 196 — 2026-11-05 — Slope bands over the riding areas (A14); the self-test waits out a re-tiling map (A275); render's HD drill waits for its card (A278)
 

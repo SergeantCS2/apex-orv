@@ -121,7 +121,12 @@ ALLOW = re.compile(r"openstreetmap\.org|maplibre\.org|github\.com/maplibre"
                    # the app's own Pages site. Displayed, never fetched; Play's
                    # User Data policy wants the policy reachable from inside
                    # the app, not just the listing.
-                   r"|sergeantcs2\.github\.io")
+                   r"|sergeantcs2\.github\.io"
+                   # take 197 · A280 (Google Play's review): the photos' source
+                   # on the same card. Anchored at the bare link: a fetch from
+                   # Commons (an API path) still refuses; the photos ship in
+                   # the bundle and nothing in the app downloads one.
+                   r"|commons\.wikimedia\.org/?$|en\.wikipedia\.org/?$")
 # take 187 · A211 — the scan now reaches www/'s subfolders. The vendored
 # MapLibre files there carry two kinds of URL that are TEXT, never fetched:
 # the SVG/XML namespace inside inline SVG (an identifier, not a location) and
@@ -1821,6 +1826,134 @@ def check_slope_rules():
                  "terrain, bundle, split, loader and the row wired")
 
 
+def _sources_faults(app_src, sources, listing_txt, app_sources):
+    """take 197: the store listing, the app's Data sources table and the
+    provisioning manifest name the same sources (Google Play, 2026-11-06,
+    Misleading Claims: "Insufficient Sources Provided")."""
+    out = []
+    try:
+        tab = app_sources(app_src)
+    except SystemExit as e:
+        return [f"the app's Data sources table is unreadable: {e}"]
+    rows = tab["SOURCES"] + tab["SOURCES_OTHER"]
+    names = {r[0] for r in rows}
+    credited = set()
+    for e in sources:
+        if e.get("phase") not in ("provision", "citation") or e.get("host") == "sergeantcs2.github.io":
+            continue
+        c = e.get("credit")
+        if not c:
+            out.append(f"{e.get('host')} ({e.get('name')}) is fetched or cited but credits no row of the app's Data sources")
+        elif c not in names:
+            out.append(f"{e.get('host')} credits \"{c}\", which the app's Data sources table does not list")
+        else:
+            credited.add(c)
+    for n in sorted(names - credited):
+        out.append(f"the app lists \"{n}\" as a source, but no fetched or cited host is credited to it")
+    for n, w, u in rows:
+        if f"• {n} — {w}: {u}" not in listing_txt:
+            out.append(f"the store listing does not list \"{n}\" with its link")
+    return out
+
+
+def check_sources_credited():
+    """take 197 (Google Play's review of build 196): every source of data
+    the build fetches is credited, by name and link, in the app's Data
+    sources and in the store listing, which says it holds the same list.
+    One table: the app's SOURCES / SOURCES_OTHER, read by play_assets.py;
+    every manifest entry names its row in `credit`."""
+    import importlib.util
+    def load(name):
+        spec = importlib.util.spec_from_file_location(name + "_gate", os.path.join(HERE, name + ".py"))
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        return m
+    try:
+        mf, pa = load("manifest"), load("play_assets")
+        app = read("src", "app.html") or ""
+        lst = pa.listing(take())
+    except Exception as e:
+        return fails.append(f"check_sources_credited could not load its inputs: {e}")
+    base = _sources_faults(app, mf.SOURCES, lst, pa.app_sources)
+    if base:
+        return fails.append("sources (Play, Misleading Claims): " + "; ".join(base))
+    # controls: an uncredited host, a row the app dropped, a listing short of
+    # a row, and a row nobody fetches
+    plants = (
+        ("a fetched host with no credit", app, [dict(e, credit=None) if e.get("host") == "www2.census.gov" else e for e in mf.SOURCES], lst),
+        ("the app's photo row renamed away", app.replace("['Wikimedia Commons',", "['Photos',", 1), mf.SOURCES, lst),
+        ("a listing one source short", app, mf.SOURCES, "\n".join(l for l in lst.splitlines() if not l.startswith("• AWS Terrain Tiles"))),
+        ("a row nobody fetches", app.replace("var SOURCES=[", "var SOURCES=[\n  ['Phantom Agency','Nothing','https://www.michigan.gov/dnr'],", 1),
+         mf.SOURCES, lst))
+    missed = [lab for lab, a, srcs, l in plants if not _sources_faults(a, srcs, l, pa.app_sources)]
+    if missed:
+        return fails.append("check_sources_credited missed its controls: " + ", ".join(missed))
+    tab = pa.app_sources(app)
+    notes.append(f"sources: the app's Data sources ({len(tab['SOURCES'])} official + {len(tab['SOURCES_OTHER'])} other) "
+                 f"and the store listing name the same sources with their links, and every fetched host credits one "
+                 f"of them; {len(plants)} planted controls caught")
+
+
+def check_surface_rules():
+    """take 197 (A10): tools/surface.py says only what OSM records. Held to
+    planted records: an agency line lying on a dropped duplicate's cells
+    takes its surface; one covered on less than half its vertices takes
+    none; two surfaces that split it are both said; a clear majority is one;
+    an OSM line and a line already carrying a value are left alone; a value
+    is trimmed, several are spaced, an empty or overlong one is none. And
+    the wiring, graph.py to the card."""
+    import importlib.util
+    sp = os.path.join(HERE, "surface.py")
+    if not os.path.exists(sp):
+        return fails.append("tools/surface.py missing (A10)")
+    spec = importlib.util.spec_from_file_location("surface_gate", sp)
+    S = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(S)
+    bad = []
+    c = S.CELL
+    line = lambda x0, n: [[(x0 + k) * c + c / 2, 44.5] for k in range(n)]
+    def rec(src, coords, sf=None):
+        r = {"src": src, "geometry": {"type": "LineString", "coordinates": coords}}
+        if sf:
+            r["sf"] = sf
+        return r
+    T = {}
+    S.collect(T, line(0, 10), "sand")              # a dropped duplicate along cells 0-9
+    S.collect(T, line(100, 10), "sand")            # two duplicates splitting cells 100-109
+    S.collect(T, line(100, 10), "dirt")
+    S.collect(T, line(200, 8), "gravel")           # a clear majority at 200-207, dirt on two
+    S.collect(T, line(206, 2), "dirt")
+    S.collect(T, line(300, 10), "  ")              # an empty tag adds nothing
+    full, half, split, major = rec("dnr", line(0, 10)), rec("dnr", line(5, 12)), rec("usfs", line(100, 10)), rec("dnr", line(200, 8))
+    osm, kept, blank = rec("osm", line(0, 10)), rec("dnr", line(0, 10), "asphalt"), rec("dnr", line(300, 10))
+    got = S.assign([full, half, split, major, osm, kept, blank], T)
+    want = {"full": "sand", "half": None, "split": "sand; dirt", "major": "gravel", "osm": None, "kept": "asphalt", "blank": None}
+    seen = {"full": full.get("sf"), "half": half.get("sf"), "split": split.get("sf"), "major": major.get("sf"),
+            "osm": osm.get("sf"), "kept": kept.get("sf"), "blank": blank.get("sf")}
+    for k, v in want.items():
+        if seen[k] != v:
+            bad.append(f"{k}: {seen[k]!r} (want {v!r})")
+    if got != 3:
+        bad.append(f"assign() reported {got} lines given a surface (want 3)")
+    for v, w in ((None, None), ("", None), ("  sand  ", "sand"), ("sand;dirt", "sand; dirt"), ("x" * 41, None)):
+        if S.clean(v) != w:
+            bad.append(f"clean({v!r}) = {S.clean(v)!r} (want {w!r})")
+    g, eg, app = read("tools", "graph.py") or "", read("tools", "emit_graph.py") or "", read("src", "app.html") or ""
+    for src, need, what in ((g, "_sf_cells += _surface.collect(_SF, _coords, t.get(\"surface\"))", "graph.py keeps a dropped duplicate's surface"),
+                            (g, "_surface.assign(net, _SF)", "graph.py gives agency lines their duplicate's surface"),
+                            (g, '"sf": f.get("sf"),', "graph.py's edges carry the surface"),
+                            (g, '"sf": _surface.clean(t.get("surface")),', "graph.py's OSM lines carry their own"),
+                            (eg, 'e.get("sf"))', "emit_graph.py bundles the surface"),
+                            (eg, '"rst","sf"]', "emit_graph.py names it in bk"),
+                            (app, "bits.push(surfaceBit(a));", "the trail card says it")):
+        if need not in src:
+            bad.append(f"not wired: {what}")
+    if bad:
+        return fails.append("surface (A10): " + "; ".join(bad))
+    notes.append(f"surface (A10): {len(want)} planted lines and 5 tag values read as A10 says (a duplicate's surface "
+                 "taken, half-covered none, a split both said, OSM and kept values left alone); graph to card wired")
+
+
 def check_osm_fallback():
     ing = read("tools", "ingest.py")
     if not ing:
@@ -3442,7 +3575,7 @@ def check_ledger_order():
 for fn in (check_handoff, check_stamps, check_release_notes, check_offline, check_splash, check_scrub,
            check_style, check_palette, check_badges, check_tokens, check_scale, check_icons, check_glyphs,
            check_licences, check_machine_legality,
-           check_ledgers, check_osm_fallback, check_gauges_fallback, check_hazards_rules, check_stepstamp, check_slope_rules, check_drawn,
+           check_ledgers, check_osm_fallback, check_gauges_fallback, check_hazards_rules, check_stepstamp, check_slope_rules, check_sources_credited, check_surface_rules, check_drawn,
            check_region_clean, check_no_duplicate_defs, check_ledger_order,
            check_layer_control,
            check_artifacts_agree, check_agenda, check_syntax, check_stubs,

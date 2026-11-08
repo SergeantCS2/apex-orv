@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 196.*
+*Current as of take 197.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -172,6 +172,7 @@ Start here. Do not read top to bottom.
 | Every planted control of a new check "passes", and the check still lets a real change through | 260 |
 | A step skips after a module it loads was edited, though every file it opened is unchanged | 261 |
 | CI rebuilds everything cold ("Cache not found") right after a change to the cache's path list | 262 |
+| A mutant that removes a trace's record still passes: something else records it by accident | 263 |
 
 ---
 
@@ -3498,3 +3499,15 @@ reach an older list's cache. A failed job saves nothing, so its re-run is
 cold too. Rule: a change to the cache's path list is a clean run in
 disguise; land it in a take whose CI round can afford one cold build in the
 pull request and one on main, and say so in its HANDOFF entry.
+
+**263. A trace's own helpers run inside the trace.** Take 197 added an
+explicit probe to the step stamp's audit hook: every local module a step
+tries to import is recorded, present or absent. The mutant that removed the
+probe still passed the selftest (PROVEN 2026-11-07). The hook's helper
+`_third_party()` calls `os.path.exists()` on `tools/<name>.py`, the stamp
+patches `os.stat`, and so the hook recorded its own lookup as the step's
+probe. The explicit probe was redundant by accident, and its absence
+invisible. Rule: a tracer ignores everything it does itself (a re-entry
+guard in the hook and in every patched call), and each record it makes is
+proved by the mutant that removes it.
+

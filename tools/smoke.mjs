@@ -4339,6 +4339,58 @@ if (!NO_GPS) {
   }
 }
 
+/* 9n · take 197 · A10 · the trail card says the surface OSM records, or
+   that none is recorded (the maintainer approved the design 2026-11-05).
+   The line on planted values, then a real edge's card through the map's own
+   tap: as the bundle has it, and with a surface planted into its bundle. A
+   bundle built with A10 (its graph's `bk` names `sf`) must carry a surface
+   on some edges, or the producer broke quietly. */
+{
+  const SB = sandbox.window.__surface, GRg = sandbox.window.__gr;
+  if (!SB || !GRg) ok(false, `A10 · no __surface or __gr hook (${typeof SB}, ${typeof GRg})`);
+  else {
+    const plants = { none: SB({}), sand: SB({ sf: "sand" }), fg: SB({ sf: "fine_gravel" }), two: SB({ sf: "sand; dirt" }),
+                     cp: SB({ sf: "concrete:plates" }), bad: SB({ sf: '<img src=x onerror="alert(1)">' }) };
+    const lineOk = (x) => x.none === "Surface not recorded" && x.sand === "Surface <b>sand</b> (OpenStreetMap)"
+      && x.fg === "Surface <b>fine gravel</b> (OpenStreetMap)" && x.two === "Surface <b>sand; dirt</b> (OpenStreetMap)"
+      && x.cp === "Surface <b>concrete plates</b> (OpenStreetMap)" && !/<img/.test(x.bad) && /&lt;img/.test(x.bad);
+    const lctl = !lineOk({ ...plants, none: "Surface hardpack (assumed)" }) && !lineOk({ ...plants, bad: '<img src=x>' })
+      && !lineOk({ ...plants, sand: "Surface <b>sand</b>" });
+    ok(lineOk(plants) && lctl,
+       `A10 · the surface line: none reads "${plants.none}", sand "${plants.sand}", fine_gravel "${plants.fg}", `
+       + `a split "${plants.two}", markup escaped; the judge rejects a guessed hardpack, unescaped markup and an unattributed value (${lctl})`);
+    const net = record.sources.net.data.features;
+    const feat = net.find((f) => f.properties && f.properties.i !== undefined && GRg.e[f.properties.i] && GRg.e[f.properties.i][6] >= 0);
+    if (!feat) ok(false, "A10 · no per-edge feature with a bundle to tap");
+    else {
+      const i = feat.properties.i, bi = GRg.e[i][6], at = feat.geometry.coordinates[0];
+      const tap = () => { theMap._hit = [{ properties: { i, c: feat.properties.c }, layer: { id: feat.properties.c } }];
+        grab("panel")._html = ""; theMap.fire("click", { lngLat: { lng: at[0], lat: at[1] }, point: { x: 300, y: 500 } });
+        flushTimeouts(); theMap._hit = []; return String(grab("panel")._html || ""); };
+      theMap._hit = []; theMap.fire("click", { lngLat: { lng: at[0], lat: at[1] }, point: { x: 300, y: 500 } }); flushTimeouts();
+      const had = GRg.bk.indexOf("sf"), row = GRg.b[bi], was = had >= 0 ? row[had] : undefined;
+      if (had >= 0) row[had] = null;
+      const plain = tap();
+      const k = had >= 0 ? had : GRg.bk.length;
+      if (had < 0) GRg.bk.push("sf");
+      row[k] = "sand";
+      const sanded = tap();
+      if (had < 0) { GRg.bk.pop(); row.length = k; } else row[had] = was;
+      ok(/Surface not recorded/.test(plain) && /mi segment/.test(plain) && /Surface <b>sand<\/b> \(OpenStreetMap\)/.test(sanded)
+         && !/Surface not recorded/.test(sanded),
+         `A10 · a real ${feat.properties.c} edge's card through the map's tap says "Surface not recorded" with no surface `
+         + `in its bundle, and "Surface sand (OpenStreetMap)" with one planted`);
+    }
+    if (GRg.bk.indexOf("sf") >= 0) {
+      const si = GRg.bk.indexOf("sf"), srcI = GRg.bk.indexOf("src");
+      let osm = 0, ag = 0;
+      GRg.e.forEach((e) => { const b = e[6] >= 0 ? GRg.b[e[6]] : null; if (b && b[si]) { if (b[srcI] === "osm" || !b[srcI]) osm++; else ag++; } });
+      ok(osm + ag > 0, `A10 · this bundle carries a surface on ${(osm + ag).toLocaleString()} of ${GRg.e.length.toLocaleString()} edges `
+         + `(${osm.toLocaleString()} OSM, ${ag.toLocaleString()} DNR/USFS from the OSM duplicate on them)`);
+    } else console.log(`  ..   A10 · this bundle predates A10 (its graph names no surface): every card reads "Surface not recorded"`);
+  }
+}
+
 /* 10 · nothing ever left the origin */
 ok(remoteAsked.length === 0, `zero remote requests (${remoteAsked.length})`);
 

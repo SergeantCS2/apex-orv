@@ -166,9 +166,36 @@ None, none, none. The app is free and has no in-app purchases.
 """
 
 
+def app_sources(src=None):
+    """take 197 · the app's Data sources table (SOURCES and SOURCES_OTHER in
+    src/app.html), read, not copied: Google Play refused build 196's listing
+    (2026-11-06, Misleading Claims, "Insufficient Sources Provided") because
+    it named some sources and not all, while saying the same list was in the
+    app. One table now, read by both (landmine 107)."""
+    import json as _json
+    import re as _re
+    if src is None:
+        src = open(os.path.join(ROOT, "src", "app.html"), encoding="utf-8").read()
+    out = {}
+    for var in ("SOURCES", "SOURCES_OTHER"):
+        m = _re.search(r"^var " + var + r"=\[(.*?)\]\];", src, _re.S | _re.M)
+        if not m:
+            raise SystemExit(f"play_assets: var {var} not found in src/app.html")
+        body = _re.sub(r"/\*.*?\*/", "", m.group(1) + "]", flags=_re.S)
+        rows = _re.findall(r"\[\s*'((?:[^'\\]|\\.)*)'\s*,\s*'((?:[^'\\]|\\.)*)'\s*,\s*'((?:[^'\\]|\\.)*)'\s*\]", body)
+        # every row the table holds, or none: a row this parser cannot read
+        # would be missing from the listing and from the gate alike
+        opened = len(_re.findall(r"\[\s*['\"]", body))
+        if not rows or len(rows) != opened:
+            raise SystemExit(f"play_assets: var {var} holds {opened} rows, {len(rows)} readable")
+        out[var] = [tuple(_json.loads('"' + x.replace('"', '\\"') + '"') for x in r) for r in rows]
+    return out
+
+
 def listing(t):
     """Store listing copy. 30/80/4000 character limits are Play's."""
     short = "Offline ORV, trail and water navigation for all of Michigan."
+    SRC = app_sources()
     # Play rejected build 166 under the Misleading Claims policy: an app that
     # presents government information must name the official source of that
     # information with a working link, and must say plainly that it is not the
@@ -190,12 +217,14 @@ def listing(t):
      "",
      "WHAT IS IN IT",
      "",
-     "• Michigan's ORV trail system: routes, connectors and forest roads, drawn from state DNR and U.S. Forest Service data alongside OpenStreetMap.",
+     "• Michigan's ORV trail system: routes, connectors and forest roads, drawn from Michigan DNR and U.S. Forest Service data alongside OpenStreetMap.",
      "• Four modes that each plan something. Off-road plans by machine on the trail network. Outdoors and Hunt plan on foot. Water plans river runs by boat.",
      "• Turn-by-turn routing and Return Home, computed on the phone.",
-     "• Terrain and elevation, with a live elevation readout.",
-     "• Satellite imagery for the whole state, offline, with optional high-detail imagery you can save for a specific area when you have wifi.",
-     "• Trailheads, campgrounds, launches, liveries, fuel and food as searchable pins, with photos where they exist.",
+     "• Terrain and elevation (USGS 3DEP elevation, served as AWS Terrain Tiles), with a live elevation readout, and slope shading over the riding areas.",
+     "• Satellite imagery for the whole state from the U.S. Geological Survey, offline, with optional high-detail imagery you can save for a specific area when you have wifi.",
+     "• Trailheads, campgrounds, launches, liveries, fuel and food as searchable pins (Michigan DNR and OpenStreetMap), with photos from Wikipedia and Wikimedia Commons where they exist, each credited to its author.",
+     "• Street-address search offline, from the U.S. Census Bureau's address ranges, and county lines and the state outline from the same Census data.",
+     "• Road hazards from OpenStreetMap, off until you turn them on: plate readers, height and weight limits, fords and rail crossings.",
      "• Ride recording, waypoints, and a self-test that tells you the app is actually working before you are three miles in.",
      "• Live river conditions from USGS gauges when you have signal and tap for them.",
      "",
@@ -209,14 +238,13 @@ def listing(t):
      "",
      "WHERE THE DATA COMES FROM",
      "",
-     "This app republishes public data from the agencies below. They are the authority; the app is a convenience. Always check the official source, and the signs on the ground, before you ride.",
+     "This is every source of data in the app. The government agencies are the authority; the app is a convenience. Always check the official source, and the signs on the ground, before you ride.",
      "",
-     "• Michigan DNR — trail designations, closures, state land, boating access: https://www.michigan.gov/dnr",
-     "• Michigan DNR open data portal: https://gis-midnr.opendata.arcgis.com",
-     "• U.S. Forest Service — national forest roads and trails: https://data.fs.usda.gov/geodata/",
-     "• U.S. Geological Survey — satellite imagery and elevation: https://apps.nationalmap.gov/downloader/",
-     "• USGS river gauge readings: https://waterdata.usgs.gov",
-     "• OpenStreetMap contributors — roads, places and context, under ODbL: https://www.openstreetmap.org/copyright",
+     "Official sources:",
+    ] + [f"• {n} — {w}: {u}" for n, w, u in SRC["SOURCES"]] + [
+     "",
+     "Other data (not government agencies):",
+    ] + [f"• {n} — {w}: {u}" for n, w, u in SRC["SOURCES_OTHER"]] + [
      "",
      "The same list, with the same links, is inside the app under Tools > Data sources.",
      "",

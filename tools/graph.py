@@ -214,6 +214,10 @@ def _covered(coords):
 
 osm_dupe = 0
 osm_n = 0
+# take 197 · A10 · the surface OSM records (tools/surface.py): a dropped
+# duplicate's cells remember it for the agency line it duplicates
+import surface as _surface
+_SF, _sf_cells = {}, 0
 _osm_ok = os.path.exists("aoi.json")
 if _osm_ok:
     try:
@@ -317,6 +321,7 @@ for e in aoi_stream.elements():
     # one that runs along it for most of its length is the same road twice.
     if c not in SHOW_ONLY and _covered(_coords) >= 0.85:
         osm_dupe += 1
+        _sf_cells += _surface.collect(_SF, _coords, t.get("surface"))
         continue
     # A75. OSM carries the posted route number in `ref` — "M 33", "F-28",
     # "H45", "614" — and we dropped it. That number is how a rider says where
@@ -336,6 +341,7 @@ for e in aoi_stream.elements():
         c = "path"
     (show if _show_only else net).append({"c": c, "src": "osm", "auth": "advisory",
                 "n": t.get("name"), "ref": (t.get("ref") or "").strip() or None,
+                "sf": _surface.clean(t.get("surface")),    # A10, take 197
                 "geometry": {"type": "LineString",
                              "coordinates": [[p["lon"], p["lat"]] for p in g]}})
     osm_n += 1
@@ -343,6 +349,13 @@ del rows
 import gc as _gc
 _gc.collect()
 print(f"osm context: {osm_n} added, {osm_dupe} dropped as duplicates of agency geometry ({len(net)} total)")
+_sf_ag = sum(1 for r in net if r.get("src") != "osm")
+_sf_got = _surface.assign(net, _SF)
+_sf_osm = sum(1 for r in net if r.get("src") == "osm" and r.get("sf"))
+print(f"surface (A10): {_sf_got:,} of {_sf_ag:,} agency lines take the surface of the OSM duplicate on them "
+      f"({len(_SF):,} cells from {_sf_cells:,} points of dropped duplicates with a surface); "
+      f"{_sf_osm:,} OSM lines carry their own; the rest record none")
+_SF = None
 
 # ── 3. node the network ────────────────────────────────────────────────────
 polys = []
@@ -421,6 +434,7 @@ for f, pts in polys:
                                   "lic": f.get("lic"), "sym": f.get("sym"),
                                   "ref": f.get("ref"),      # A75, take 88
                                   "rst": f.get("rst"),      # A101, take 95
+                                  "sf": f.get("sf"),        # A10, take 197
                                   "pts": run[:]})
             cur, run = n2, [p]
 print(f"noded: {len(nodes)} nodes, {len(edges)} edges")

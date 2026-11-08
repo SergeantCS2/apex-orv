@@ -45,7 +45,8 @@ bundles, bidx = [], {}
 def bundle_id(e):
     b = (e.get("src"), e.get("auth"), e.get("st"), e.get("w"),
          e.get("moto"), e.get("atv"), e.get("lic"), e.get("sym"),
-         e.get("rst"))          # A101, take 95 — must match bk below
+         e.get("rst"),          # A101, take 95 — must match bk below
+         e.get("sf"))           # A10, take 197 — OSM's surface
     if all(x is None for x in b):
         return -1
     if b not in bidx:
@@ -187,7 +188,7 @@ for n, es in inc.items():
         JX[n] = labels[:3]
 print(f"junctions named: {len(JX)}")
 
-out = {"jx": JX, "cls": CLS, "nm": names, "bk": ["src","auth","st","w","moto","atv","lic","sym","rst"],
+out = {"jx": JX, "cls": CLS, "nm": names, "bk": ["src","auth","st","w","moto","atv","lic","sym","rst","sf"],
        "b": bundles, "n": N, "e": E, "g": G}
 blob = json.dumps(out, separators=(",", ":"))
 pathlib.Path("graph_payload.json").write_text(blob)

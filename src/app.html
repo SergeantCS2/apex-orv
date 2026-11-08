@@ -1204,7 +1204,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 196</span>
+    <span id="title"><b>APEX</b> ORV · Take 197</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -1647,6 +1647,15 @@ var EDGES=GR.e.map(function(e,i){return {a:e[0],b:e[1],L:e[2],c:CLS[e[3]],
   d:e.length<8||e[7]!==0,
   /* A75: the posted route number. Older payloads have no ninth field. */
   rf:(e.length>8&&e[8]>=0)?NM[e[8]]:null}});
+/* take 197 · A10 · the maintainer, 2026-11-05 (approved): "on the trail's
+   card, not the map". OSM's surface where a mapper recorded it, carried in
+   the edge's bundle as `sf` (tools/surface.py: an OSM line's own tag, or the
+   tag of the OSM duplicate graph.py dropped on an agency line); "Surface not
+   recorded" where none did, never a guess and never "hardpack". OSM text is
+   anyone's: escaped. Older bundles have no `sf` key and read not recorded. */
+function surfaceBit(a){
+  if(!a||!a.sf)return 'Surface not recorded';
+  return 'Surface <b>'+hazEsc(String(a.sf).replace(/[_:]/g,' '))+'</b> (OpenStreetMap)'}
 function attrs(e){var o={};if(e.bi<0)return o;
   var v=B[e.bi];for(var k=0;k<BK.length;k++)if(v[k])o[BK[k]]=v[k];return o}
 
@@ -8190,8 +8199,18 @@ var SOURCES=[
 var SOURCES_OTHER=[
   ['OpenStreetMap contributors','Roads, places and context, under ODbL',
    'https://www.openstreetmap.org/copyright'],
-  ['AWS Terrain Tiles','Elevation for climbs, profiles and hillshade (USGS 3DEP over the U.S.)',
-   'https://registry.opendata.aws/terrain-tiles/']];
+  ['AWS Terrain Tiles','Elevation for climbs, profiles, hillshade and slope (USGS 3DEP over the U.S.)',
+   'https://registry.opendata.aws/terrain-tiles/'],
+  /* take 197 · Google Play's review, 2026-11-06 ("Insufficient Sources
+     Provided": the description named some sources and not all). The pin
+     photos come from Wikipedia and Wikimedia Commons; each photo already
+     credits its author and licence. This table is also the store
+     listing's: tools/play_assets.py reads it, and tools/gate.py holds every
+     source the build fetches to a row here. */
+  ['Wikipedia','Lead photos for major pins; each photo names its author and licence',
+   'https://en.wikipedia.org'],
+  ['Wikimedia Commons','Geotagged photos for pins with no article; each names its author and licence',
+   'https://commons.wikimedia.org']];
 function srcRows(list){return '<div class="sbox">'+list.map(function(r){
   return srowHTML({tag:'a',attrs:' href="'+r[2]+'" target="_blank" rel="noopener"',icon:'sources',label:r[0],sub:r[1],trail:'external'})}).join('')+'</div>'}
 /* take 181 · A195 · the policy Play requires inside the app as well as on the
@@ -8213,8 +8232,9 @@ function sourcesCard(){
     'convenience. Check the official source, and the signs on the ground, '+
     'before you ride.</div>'+srcRows(SOURCES)+
     '<div class="k">OTHER DATA</div>'+
-    '<div class="sub">Not agencies: OpenStreetMap is mapped by its contributors, and '+
-    'AWS Terrain Tiles host elevation drawn from public surveys.</div>'+srcRows(SOURCES_OTHER)+
+    '<div class="sub">Not agencies: OpenStreetMap is mapped by its contributors, '+
+    'AWS Terrain Tiles host elevation drawn from public surveys, and the photos '+
+    'come from Wikipedia and Wikimedia Commons.</div>'+srcRows(SOURCES_OTHER)+
     /* take 188 · A216 · the notices the licences ask for (Lucide, Barlow,
        MapLibre GL JS, Capacitor); the full texts ship in www/licenses.txt.
        No URL here (tools/gate.py check_licences) */
@@ -9180,6 +9200,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       window.__haz={ok:HAZ_OK,data:HAZ_OK?HAZ:null,text:hazardText,card:hazardCard,dir:hazDir,limit:hazLimit,label:hazLabel,kinds:HAZKIND,
         group:LYRGROUPS.filter(function(g){return g.k==='hazards'})[0],set:lyrSet,on:lyrOn};
       /* take 196 · A14 · slope bands, read by the harnesses */
+      window.__surface=surfaceBit;window.__gr=GR;   /* take 197 · A10 */
       window.__slope={ok:SLOPE_OK,data:SLOPE_OK?SLOPE:null,ids:SLOPE_IDS,added:function(){return SLOPE_ADDED},
         group:LYRGROUPS.filter(function(g){return g.k==='slope'})[0]};
       window.__search=function(q,all){return all?searchAll(q):search(q)};
@@ -10829,6 +10850,7 @@ map.on('click',function(e){
   if(a.moto)bits.push('Moto <b>'+a.moto+'</b>');
   if(a.atv)bits.push('ATV <b>'+a.atv+'</b>');
   if(a.lic)bits.push(a.lic);
+  bits.push(surfaceBit(a));
   bits.push((ed.L/1609.34).toFixed(2)+' mi segment');
   /* A101 · a published restriction goes LAST and on its own line, because it is
      the thing that decides whether you may be here at all. If we recognise it we
