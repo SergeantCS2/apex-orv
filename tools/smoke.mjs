@@ -4583,12 +4583,6 @@ if (!NO_GPS) {
   const ten = at(58.35), pond = at(60.83), above = at(61.52), below = at(61.58), m33 = at(61.82);
   if (!c || !ten || !pond || !above || !below || !m33) console.log("  ..   A292 · this bundle's Au Sable lacks the Mio Dam stops the drill names");
   else {
-    /* A294 · a land route planned first, as a rider who rode in and now
-       paddles: Navigate this run must still start */
-    sandbox.window.__route.setMachine("bike");
-    theMap._hit = []; theMap.fire("contextmenu", { lngLat: { lng: R0.ME[0] + 0.02, lat: R0.ME[1] + 0.01 } });
-    grab("pc-route") && grab("pc-route").fire("click"); flushTimeouts();
-    const land = documentStub.querySelectorAll(".rc").length;
     const m0 = MO.get(); MO.apply("water", { silent: true }); flushTimeouts();
     P.run(ten, below, c.n); flushTimeouts(); const passes = text("panel");
     P.run(ten, pond, c.n); flushTimeouts(); const clear = text("panel");
@@ -4597,7 +4591,6 @@ if (!NO_GPS) {
     grab("pd-nav")._listeners = {};
     P.run(above, m33, c.n); flushTimeouts();
     grab("pd-nav").fire("click"); flushTimeouts(); frames(1);
-    const started = flagged();
     const Lr = N.riverLine(c.n);
     const atMile = (mi) => { const mm = mi * 1609.34; let i = 0; while (i < Lr.cum.length - 2 && Lr.cum[i + 1] < mm) i++;
       const t = (mm - Lr.cum[i]) / Math.max(1, Lr.cum[i + 1] - Lr.cum[i]);
@@ -4607,9 +4600,6 @@ if (!NO_GPS) {
     stop(); MO.apply(m0, { silent: true }); flushTimeouts();
     const st = { passes: /Mio Dam/.test(passes) && !/No dams between them/.test(passes), clear: /No dams between them/.test(clear) && !/Mio Dam/.test(clear),
                  nav: /Dam just ahead/.test(strip) && /Mio Dam/.test(strip) };
-    const navOk = (l, s) => l >= 1 && s;
-    ok(navOk(land, started) && !navOk(land, false) && !navOk(0, true),
-       `A294 · with a land route planned (${land} cards), Navigate this run starts the run (${started}); the judge rejects take 199's refusal ("not legal for a Kayak") and a drill with no land route`);
     const damOk = (x) => x.passes && x.clear && x.nav;
     ok(damOk(st) && !damOk({ ...st, passes: false }) && !damOk({ ...st, nav: false }),
        `A292 · Camp Ten Bridge to the access below Mio Dam names the dam (${st.passes}); Camp Ten to Mio Pond still says no dams (${st.clear}); `
@@ -4749,6 +4739,35 @@ if (!NO_GPS) {
   ok(loopOk(st) && !loopOk({ ...st, off: null }),
      `A297 · a loop from the middle of Houghton Lake says its approach, +${st.off} mi off-network (in the lake: ${st.inLake}); `
      + `the judge rejects take 199's card, which said none`);
+}
+
+/* 9u · take 200 · A294 · a saved route for another machine clears the route
+   planned now, as the machine chip and a mode change do. A route planned
+   with the bike, then a saved route for the boat opened (legal on no land
+   class, so the reopen fails): no route is left planned under the boat, and
+   Ride is not refused as "not legal for a Kayak". Until take 199 the old
+   route stayed under the new machine (svOpen changed the machine and kept
+   it), and Ride said so and started nothing. */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav, SVO = sandbox.window.__svOpen, R = sandbox.window.__route, SX = sandbox.window.__sheet;
+  const text = (id) => String(grab(id)._html || "").replace(/<[^>]*>/g, " ");
+  const flagged = () => "ride" in grab("shell").dataset;
+  const stop = () => { for (let i = 0; i < 3 && flagged(); i++) { grab("c-ride").fire("click"); flushTimeouts(); frames(1); } };
+  const m0 = R.machine, ME0 = R.ME.slice();
+  R.setMachine("bike");
+  theMap._hit = []; theMap.fire("contextmenu", { lngLat: { lng: ME0[0] + 0.02, lat: ME0[1] + 0.01 } });
+  grab("pc-route") && grab("pc-route").fire("click"); flushTimeouts();
+  const planned = !!N.plan();
+  SVO({ n: "Old paddle", f: ME0.slice(), t: [ME0[0] + 0.05, ME0[1] + 0.03], lbl: "Old paddle", m: "kayak", p: "fast" }); flushTimeouts();
+  const left = !!N.plan(), mach = R.machine;
+  SX.tab("ride"); flushTimeouts(); grab("c-ride").fire("click"); flushTimeouts();
+  const refused = /not legal for a/.test(text("panel"));
+  stop(); R.setMachine(m0); SX.tab("map"); flushTimeouts();
+  const st = { planned, mach, left, refused };
+  const svmOk = (x) => x.planned && x.mach === "kayak" && !x.left && !x.refused;
+  ok(svmOk(st) && !svmOk({ ...st, left: true, refused: true }),
+     `A294 · a saved route for the boat opened over a bike route leaves no route planned under the boat (${JSON.stringify(st)}); `
+     + `the judge rejects take 199's (the bike route kept under the kayak, and Ride refused)`);
 }
 
 /* 10 · nothing ever left the origin */

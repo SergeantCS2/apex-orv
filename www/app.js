@@ -861,8 +861,6 @@ function runCard(a,b,riv){
    
   var nb=el('pd-nav');
   if(nb)nb.addEventListener('click',function(){
-     
-    if(last)clearRoute();
     runSet(riv,putIn,takeOut);
     if(mode!=='water')applyMode('water',{silent:true});
     if(!rideMode)el('c-ride').click();
@@ -2475,6 +2473,8 @@ function svOpen(rec){
    
   var stale=(rec.b&&BUNDLE.hash&&rec.b!==BUNDLE.hash);
    
+   
+  if(rec.m&&MACHINE[rec.m]&&rec.m!==machine&&last){logAct('route cleared: saved route for '+rec.m);clearRoute()}
   if(rec.m&&MACHINE[rec.m]){
     machine=rec.m;
     var _mi=ORDER.indexOf(rec.m);if(_mi>=0)machIdx=_mi;

@@ -2692,11 +2692,6 @@ function runCard(a,b,riv){
      river's own line steers the camera, the take-out is the destination */
   var nb=el('pd-nav');
   if(nb)nb.addEventListener('click',function(){
-    /* take 200 · A294 · the run replaces a land route still planned. Ride
-       checked that route against the boat and refused the run: "This route
-       is not legal for a Kayak … Nothing started" (found by take 200's dam
-       drill, PROVEN in smoke) */
-    if(last)clearRoute();
     runSet(riv,putIn,takeOut);
     if(mode!=='water')applyMode('water',{silent:true});
     if(!rideMode)el('c-ride').click();
@@ -4863,6 +4858,12 @@ function svOpen(rec){
      handler sets machIdx, machine and the label inline, so do the same three
      things here rather than inventing a helper (landmine 102: check the code,
      not your memory of it). */
+  /* take 200 · A294 · a saved route for another machine clears the route
+     planned now, as the machine chip and a mode change do (take 188): svOpen
+     changed the machine and kept it, and when the reopen failed (A288) the
+     old route stayed planned under the new machine, and Ride refused it as
+     "not legal for a Kayak … plan it again" (PROVEN in smoke) */
+  if(rec.m&&MACHINE[rec.m]&&rec.m!==machine&&last){logAct('route cleared: saved route for '+rec.m);clearRoute()}
   if(rec.m&&MACHINE[rec.m]){
     machine=rec.m;
     var _mi=ORDER.indexOf(rec.m);if(_mi>=0)machIdx=_mi;
