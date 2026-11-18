@@ -3142,6 +3142,9 @@ el('c-search').addEventListener('click',function(){
 el('q').addEventListener('input',function(){if(SRCH.on)searchPaint()});
 
  
+ 
+function stepName(st){var n=st.name||'track';
+  return (/^(two-track|forest road|road|paved|trail)$/i.test(n)&&!st.id)?'the unnamed '+n:n}
 function turnWord(d){
   var a=((d+540)%360)-180,x=Math.abs(a);
   if(x<22)return ['Continue','straight'];
@@ -3155,15 +3158,17 @@ function directions(path,startNode){
   var cur=startNode,legs=[];
   for(var i=0;i<path.length;i++){var e=path[i],g=decode(GR.g[e.i]);
     var fwd=(e.a===cur);if(!fwd)g=g.slice().reverse();
-    legs.push({e:e,g:g,name:e.n||label(e.c),id:e.id,
+    legs.push({e:e,g:g,name:e.n||label(e.c),id:e.id,node:cur,
       inB:bearing(g[0],g[Math.min(1,g.length-1)]),
       outB:bearing(g[Math.max(0,g.length-2)],g[g.length-1])});
     cur=fwd?e.b:e.a}
   var steps=[],acc=null;
   for(var i=0;i<legs.length;i++){var L=legs[i];
     var key=L.name+'|'+(L.id||'');
-    if(acc&&acc.key===key){acc.mi+=L.e.L/1609.34;acc.up+=UP[L.e.i];acc.out=L.outB;
-      continue}
+     
+    var unn=!L.e.n&&!L.id,dd=acc?((L.inB-acc.out+540)%360)-180:0;
+    if(acc&&acc.key===key&&!(unn&&Math.abs(dd)>=45&&(ADJ[L.node]||[]).length>=3)){
+      acc.mi+=L.e.L/1609.34;acc.up+=UP[L.e.i];acc.out=L.outB;continue}
     if(acc)steps.push(acc);
     acc={key:key,name:L.name,id:L.id,cls:L.e.c,mi:L.e.L/1609.34,up:UP[L.e.i],
       inB:L.inB,out:L.outB,at:i}}
@@ -4588,11 +4593,11 @@ function navGuide(at,acc,mps){
     ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(togo)+' to '+(G.lbl||'destination')+'</b>'+
       (offE&&remain<200?'<span class="sub warn">the last '+navFmt(offE)+' is off the mapped network (dashed)</span>':'')
     :'<b><span class="arw">'+ic(G.steps[ni].turn[1])+'</span>In '+navFmt(G.marks[ni]-pr.prog)+
-      ' \u00b7 '+G.steps[ni].turn[0]+' onto '+G.steps[ni].name+'</b>';
+      ' \u00b7 '+G.steps[ni].turn[0]+' onto '+stepName(G.steps[ni])+'</b>';
    
   if(ni>=0){var d=G.marks[ni]-pr.prog,key=ni+'|'+(d<90?'near':'far');
     if(key!==VOICE.near){VOICE.near=key;
-      navSay((d<90?'':'In '+navFmt(d)+', ')+G.steps[ni].turn[0].toLowerCase()+' onto '+G.steps[ni].name)}}
+      navSay((d<90?'':'In '+navFmt(d)+', ')+G.steps[ni].turn[0].toLowerCase()+' onto '+stepName(G.steps[ni]))}}
   g.hidden=false;
   g.innerHTML=line1+'<span class="eta">'+navFmt(togo)+' remaining'+
     (etaMin!==null?' \u00b7 ~'+etaTxt(etaMin):'')+(pr.off>40?' \u00b7 '+navFmt(pr.off)+' off the line':'')+'</span>';
@@ -5853,7 +5858,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
                    nearestPavement:nearestPavement,countyAt:countyAt,
                    addressAt:addressAt,get ME(){return ME}};
     window.__route={buildLoops:buildLoops,nearestNode:nearestNode,isFreeway:isFreeway,fwN:function(){return FW_N},
-                    route:route,PROFILES:PROFILES,NODES:NODES,go:routeToPoint,setME:function(p){ME=p.slice()},DETOUR:DETOUR,
+                    route:route,PROFILES:PROFILES,NODES:NODES,go:routeToPoint,setME:function(p){ME=p.slice()},DETOUR:DETOUR,directions:directions,
                     machineLegal:machineLegal,EDGES:EDGES,ADJ:ADJ,attrs:attrs,
                     setMachine:function(m){if(MACHINE[m])machine=m},
                     get machine(){return machine},spd:spd,MACHINE:MACHINE,
@@ -5905,7 +5910,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       window.__search=function(q,all){return all?searchAll(q):search(q)};
       window.__voice=VOICE;window.__say=navSay;window.__voiceProbe=navVoiceProbe;
       window.__voiceLine=stVoiceNative;window.__ttsRetry=TTS_RETRY;    
-      window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,peekText:function(){return railPeekText()},arriveNear:arriveNear,
+      window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,peekText:function(){return railPeekText()},arriveNear:arriveNear,stepName:stepName,
         truck:function(){return TRUCK?TRUCK.slice():null},
          
          

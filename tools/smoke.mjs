@@ -5110,6 +5110,32 @@ if (!NO_GPS) {
      + `a home in Milwaukee is refused ("${(far.match(/Home is .*? on this map\./) || ["routed"])[0]}"); the judge rejects take 201's arrival at the snapped node and the route across the lake`);
 }
 
+/* 9za · take 202 · A318 · a turn from one unnamed track onto another, at a
+   junction, is its own step, said as "the unnamed two-track". Unnamed
+   lines shared one key, so the turn merged away: no strip line, no voice,
+   Turns one step (57% of track miles unnamed: the take-201 audit). */
+{
+  const R = sandbox.window.__route;
+  if (!R || !R.directions) ok(false, "A318 · directions hook missing");
+  else {
+    const NODES = R.NODES, ADJ = R.ADJ, brg = (a, b) => (Math.atan2((b[0] - a[0]) * Math.cos(a[1] * Math.PI / 180), b[1] - a[1]) * 180 / Math.PI + 360) % 360;
+    let found = null, seen = 0;
+    for (let j = 0; j < NODES.length && !found; j += 7) { const ad = ADJ[j] || []; if (ad.length < 3) continue;
+      const un = ad.filter((e) => !e.n && !e.id && e.c === "track"); if (un.length < 2) continue; seen++;
+      for (let x = 0; x < un.length && !found; x++) for (let y = 0; y < un.length && !found; y++) { if (x === y) continue;
+        const eA = un[x], eB = un[y], start = eA.a === j ? eA.b : eA.a, endB = eB.a === j ? eB.b : eB.a;
+        const turn = ((brg(NODES[j], NODES[endB]) - brg(NODES[start], NODES[j]) + 540) % 360) - 180;
+        if (Math.abs(turn) < 50 || Math.abs(turn) > 150) continue;
+        const st = R.directions([eA, eB], start);
+        if (st.length === 2) found = { j, st: st.map((q) => q.turn[0] + " " + q.name), turn: Math.round(turn) }; } }
+    const N9 = sandbox.window.__nav, nm = (found && N9 && N9.stepName) ? N9.stepName({ name: "two-track" }) : null;
+    const ok318 = (x) => !!x && x.st.length === 2 && /^(Bear|Turn|Sharp) (left|right) two-track$/.test(x.st[1]);
+    ok(ok318(found) && !ok318(found && { ...found, st: [found.st[0]] }) && nm === "the unnamed two-track",
+       `A318 · at a junction of ${found ? (ADJ[found.j] || []).length : "?"} lines an unnamed two-track turning ${found ? found.turn : "?"}° onto another is its own step (${found ? found.st.join(" → ") : "none found in " + seen + " junctions"}); `
+       + `strip and voice name it "${nm}"; the judge rejects take 201's one merged step`);
+  }
+}
+
 /* 10 · nothing ever left the origin */
 ok(remoteAsked.length === 0, `zero remote requests (${remoteAsked.length})`);
 
