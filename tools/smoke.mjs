@@ -1790,8 +1790,11 @@ grab("btn-retrace").fire("click");
 const back = (record.setData.back || []).at(-1);
 ok(back && back.features.length === 1, "retrace drew the return line");
 if (back && back.features.length) {
-  const coords = back.features[0].geometry.coordinates;
-  const crumbLine = (record.setData.crumb || []).at(-1).features[0].geometry.coordinates;
+  /* take 200 · A295 · both lines are MultiLineStrings (a gap is a break): their
+     points are read across the parts */
+  const flatG = (g) => (g.type === "MultiLineString" ? g.coordinates.flat() : g.coordinates);
+  const coords = flatG(back.features[0].geometry);
+  const crumbLine = flatG((record.setData.crumb || []).at(-1).features[0].geometry);
   const same = (a, b) => Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9;
   ok(same(coords[0], crumbLine.at(-1)) && same(coords.at(-1), crumbLine[0]),
      "retrace is exactly the recorded track, reversed");
@@ -2253,7 +2256,8 @@ if (!NO_GPS && sandbox.window.__selfTest) {
      drill's pin and line drawn. */
   if (pre) {
     const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-    const lineOf = (fc) => (fc && fc.features && fc.features[0] && fc.features[0].geometry) ? fc.features[0].geometry.coordinates : null;
+    const lineOf = (fc) => { const g = (fc && fc.features && fc.features[0] && fc.features[0].geometry) || null;
+      return !g ? null : g.type === "MultiLineString" ? g.coordinates.flat() : g.coordinates; };
     const judge = (o) => o.drew && (o.T ? o.trucks.length === 1 && same(o.trucks[0], o.T) : o.trucks.length === 0)
       && (o.c.length > 1 ? same(lineOf(o.crumb), o.c) : !!o.crumb && o.crumb.features.length === 0)
       && same(o.back, o.backWas);
@@ -3160,10 +3164,10 @@ if (!NO_GPS) {
       const kept = (p) => /^Waiting for a GPS fix — /.test(p) && p.includes(want) && !/nothing recorded/.test(p);
       /* take 189 · cold audit · the line as Resume WROTE it is judged too
          (it read "Trip resumed · recording" until a refold) */
-      ok(offered && mi0 > 0.5 && waiting && kept(p0) && kept(p1) && kept(p2) && n1 > n0 && mi1 > mi0 + 0.5 && !kept("Waiting for a GPS fix — nothing recorded yet")
+      ok(offered && mi0 > 0.5 && waiting && kept(p0) && kept(p1) && kept(p2) && n1 >= n0 + 2 && mi1 > mi0 + 0.5 && !kept("Waiting for a GPS fix — nothing recorded yet")
          && !kept("Trip resumed · recording"),
          `A230 · a resumed trip (${mi0.toFixed(2)} mi, ${n0} points) waiting for its first fix: the peek line reads "${p1}" after a refold `
-         + `and "${p2}" once its route is planned (as Resume wrote it: "${p0}"); the next fixes carry the same track on (${n0} → ${n1} points, ${mi1.toFixed(2)} mi); `
+         + `and "${p2}" once its route is planned (as Resume wrote it: "${p0}"); the next two fixes carry the same track on, both on it (take 200 · A295: the first was dropped) (${n0} → ${n1} points, ${mi1.toFixed(2)} mi); `
          + `the judge rejects "Waiting for a GPS fix — nothing recorded yet" and "Trip resumed · recording" for it`);
     }
 
@@ -4529,6 +4533,263 @@ if (!NO_GPS) {
       R.setMachine(m0);
     }
   }
+}
+
+/* 9p · take 200 · A291 · no machine, and no one on foot, is routed on a
+   freeway. On this bundle every edge posted as an interstate is refused for
+   the bike, the quad, the side-by-side and on foot; pavement that is not a
+   freeway stays legal; and a start 95 m east of I-75 (the take-198 safety
+   audit's point, 44.95824 -84.67234) snaps to a node that has a legal edge
+   which is not a freeway. Until take 199 every interstate edge was legal
+   pavement and that start snapped onto I-75. */
+{
+  const R = sandbox.window.__route;
+  if (!R || typeof R.isFreeway !== "function") ok(false, "A291 · no __route.isFreeway hook");
+  else {
+    const iv = /^I[ -]?\d+$/, m0 = R.machine;
+    const inter = R.EDGES.filter((e) => e.rf && String(e.rf).split(";").some((x) => iv.test(x.trim())));
+    const legalOn = {};
+    for (const m of ["bike", "quad", "sxs", "walk"]) { R.setMachine(m); legalOn[m] = inter.filter((e) => R.machineLegal(e)).length; }
+    R.setMachine("bike");
+    const pavedKept = R.EDGES.filter((e) => e.c === "paved" && !e.fw).slice(0, 2000).filter((e) => R.machineLegal(e)).length;
+    /* the snapped node's legal edges that are not interstates, read from the
+       posted ref here, not from the app's own mark (the take-198 review: on a
+       build without the mark every edge read "not a freeway") */
+    const isI = (e) => !!e.rf && String(e.rf).split(";").some((x) => iv.test(x.trim()));
+    const snapOk = (ll) => { const n = R.nearestNode(ll); if (n < 0) return { n, legal: 0, fw: 0 };
+      const ad = R.ADJ[n] || []; return { n, legal: ad.filter((e) => R.machineLegal(e) && !isI(e)).length, fw: ad.filter(isI).length }; };
+    const at = snapOk([-84.67234, 44.95824]);
+    R.setMachine(m0);
+    const st = { interstate: inter.length, marked: R.fwN(), legalOn, pavedKept, at };
+    const fwOk = (x) => x.interstate > 0 && x.marked >= x.interstate && Object.values(x.legalOn).every((n) => n === 0)
+      && x.pavedKept > 0 && x.at.n >= 0 && x.at.legal > 0;
+    ok(fwOk(st) && !fwOk({ ...st, legalOn: { ...legalOn, bike: inter.length } }) && !fwOk({ ...st, at: { n: 1, legal: 0, fw: 2 } }),
+       `A291 · ${st.interstate.toLocaleString()} interstate edges (${st.marked.toLocaleString()} marked freeways) are refused for every machine `
+       + `(${JSON.stringify(legalOn)}); ${pavedKept} other paved edges stay legal; a start 95 m east of I-75 snaps to a node with `
+       + `${at.legal} legal non-freeway edges; the judge rejects take 199's (every interstate edge legal) and a snap onto I-75`);
+  }
+}
+
+/* 9q · take 200 · A292 · a dam at either end of a paddle run is said, on the
+   card and while navigating. Camp Ten Bridge (58.35) to the access below
+   Mio Dam (61.58) passes the dam at 61.54; until take 199 the card read "No
+   dams between them" (a dam within 0.05 river-mi of an end was left out),
+   and navigating from the access 0.02 mi above it never warned. A run with
+   no dam near it still says there is none. */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav, P = sandbox.window.__paddle, MO = sandbox.window.__mode, R0 = sandbox.window.__route;
+  const text = (id) => String(grab(id)._html || "").replace(/<[^>]*>/g, "");
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1], accuracy: 5 }, extra || {}) });
+  const stop = () => { if (flagged()) grab("hud-stop").fire("click"); if (flagged()) grab("c-ride").fire("click"); flushTimeouts(); frames(1); };
+  const c = ((P && P.data && P.data.c) || []).find((x) => x.n === "Au Sable River");
+  const at = (mi) => c && c.f.find((f) => Math.abs(f.mi - mi) < 0.006 && (f.k === "access" || f.k === "launch"));
+  const ten = at(58.35), pond = at(60.83), above = at(61.52), below = at(61.58), m33 = at(61.82);
+  if (!c || !ten || !pond || !above || !below || !m33) console.log("  ..   A292 · this bundle's Au Sable lacks the Mio Dam stops the drill names");
+  else {
+    const m0 = MO.get(); MO.apply("water", { silent: true }); flushTimeouts();
+    P.run(ten, below, c.n); flushTimeouts(); const passes = text("panel");
+    P.run(ten, pond, c.n); flushTimeouts(); const clear = text("panel");
+    /* a card's buttons keep the listeners every earlier card bound to the
+       same id in this stub; the run navigated is this one */
+    grab("pd-nav")._listeners = {};
+    P.run(above, m33, c.n); flushTimeouts();
+    grab("pd-nav").fire("click"); flushTimeouts(); frames(1);
+    const Lr = N.riverLine(c.n);
+    const atMile = (mi) => { const mm = mi * 1609.34; let i = 0; while (i < Lr.cum.length - 2 && Lr.cum[i + 1] < mm) i++;
+      const t = (mm - Lr.cum[i]) / Math.max(1, Lr.cum[i + 1] - Lr.cum[i]);
+      return [Lr.pts[i][0] + (Lr.pts[i + 1][0] - Lr.pts[i][0]) * t, Lr.pts[i][1] + (Lr.pts[i + 1][1] - Lr.pts[i][1]) * t]; };
+    fix(atMile(above.mi), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1);
+    const strip = text("nav-g");
+    stop(); MO.apply(m0, { silent: true }); flushTimeouts();
+    const st = { passes: /Mio Dam/.test(passes) && !/No dams between them/.test(passes), clear: /No dams between them/.test(clear) && !/Mio Dam/.test(clear),
+                 nav: /Dam just ahead/.test(strip) && /Mio Dam/.test(strip) };
+    const damOk = (x) => x.passes && x.clear && x.nav;
+    ok(damOk(st) && !damOk({ ...st, passes: false }) && !damOk({ ...st, nav: false }),
+       `A292 · Camp Ten Bridge to the access below Mio Dam names the dam (${st.passes}); Camp Ten to Mio Pond still says no dams (${st.clear}); `
+       + `navigating from the access 0.02 mi above it warns "${strip.slice(0, 50)}"; the judge rejects take 199's card and silence`);
+  }
+}
+
+/* 9r · take 200 · A293 · distance to a line is to its segments. At the
+   middle of a long straight paved span the dispatch's nearest road and
+   nearest pavement are that road, a few feet away; riding the middle of a
+   long designated span of a planned route raises no "Off route". Until take
+   199 both measured to vertices only: mid-span read another road, or
+   pavement a third of a mile off, and the phone buzzed on the planned line
+   (the take-198 safety audit, PROVEN on the shipped graph). */
+if (!NO_GPS) {
+  const D = sandbox.window.__disp, R = sandbox.window.__route, SX = sandbox.window.__sheet;
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1], accuracy: 5 }, extra || {}) });
+  const stop = () => { for (let i = 0; i < 3 && flagged(); i++) { grab("c-ride").fire("click"); flushTimeouts(); frames(1); } };
+  const feats = (record.sources.net && record.sources.net.data.features) || [];
+  const len = (a, b) => Math.hypot((b[0] - a[0]) * 0.714 * 69, (b[1] - a[1]) * 69);
+  const span = (c, min) => { for (const f of feats) { if (!f.properties || f.properties.c !== c || f.properties.i === undefined) continue;
+      const g = f.geometry.coordinates; if (R.EDGES[f.properties.i] && R.EDGES[f.properties.i].fw) continue;
+      for (let k = 0; k + 1 < g.length; k++) { const d = len(g[k], g[k + 1]);
+        if (d > min) return { i: f.properties.i, g, m: [(g[k][0] + g[k + 1][0]) / 2, (g[k][1] + g[k + 1][1]) / 2], d }; } } return null; };
+  const pv = span("paved", 0.6), tr = span("route72", 0.6);
+  if (!pv || !tr) ok(false, `A293 · no long span to test (paved ${!!pv}, route72 ${!!tr})`);
+  else {
+    const ne = D.nearestEdge(pv.m), np = D.nearestPavement(pv.m);
+    /* the five longest straight road spans in this bundle: their vertices sit
+       cells away from their middle, where only an edge filed in every cell it
+       crosses is found (without that, 60 of the 400 longest spans' middles
+       read another road, measured on take 197's graph) */
+    const longest = [];
+    for (const f of feats) { const c = f.properties && f.properties.c; if ((c !== "paved" && c !== "minor") || f.properties.i === undefined) continue;
+      if (R.EDGES[f.properties.i] && R.EDGES[f.properties.i].fw) continue;
+      const g = f.geometry.coordinates; for (let k = 0; k + 1 < g.length; k++) { const d = len(g[k], g[k + 1]);
+        if (d > 2) longest.push({ d, m: [(g[k][0] + g[k + 1][0]) / 2, (g[k][1] + g[k + 1][1]) / 2] }); } }
+    longest.sort((x, y) => y.d - x.d);
+    const far = longest.slice(0, 5).map((x) => ({ span: +x.d.toFixed(1), d: +D.nearestEdge(x.m).d.toFixed(3) }));
+    /* points just inside a grid cell's edge (0.02°), against every line by
+       brute force: the search must not stop a ring early (the take-198
+       review: 68 of 400 such points read a farther line) */
+    const segMi = (p, a, b) => { const kx = Math.cos(p[1] * Math.PI / 180) * 69.172, ky = 69.172;
+      const ax = (a[0] - p[0]) * kx, ay = (a[1] - p[1]) * ky, dx = (b[0] - a[0]) * kx, dy = (b[1] - a[1]) * ky, L = dx * dx + dy * dy;
+      const t = L > 0 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L)) : 0; return Math.hypot(ax + t * dx, ay + t * dy); };
+    const brute = (p) => { let b = 1e9; for (const f of feats) { const g = f.geometry && f.geometry.coordinates; if (!g || f.properties.i === undefined) continue;
+      for (let k = 0; k + 1 < g.length; k++) { const d = segMi(p, g[k], g[k + 1]); if (d < b) b = d; } } return b; };
+    let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const edgeProbes = [];
+    for (let n = 0; n < 2000 && edgeProbes.length < 24; n++) {
+      const f = feats[Math.floor(rnd() * feats.length)]; if (!f || !f.geometry || f.properties.i === undefined) continue;
+      const v = f.geometry.coordinates[0], cx = Math.floor((v[0] + 180) / 0.02), cy = Math.floor((v[1] + 90) / 0.02);
+      const west = rnd() < 0.5, e = 0.0003;
+      edgeProbes.push(west ? [cx * 0.02 - 180 + e, v[1]] : [v[0], cy * 0.02 - 90 + e]); }
+    const edgeMiss = edgeProbes.filter((p) => D.nearestEdge(p).d > brute(p) + 1e-6).length;
+    /* the ride: a route from the trail edge's one end to its other, then a fix
+       at each end of the long span and its middle */
+    R.setMachine("bike");
+    const A = tr.g[0], B = tr.g[tr.g.length - 1];
+    /* GPS drives the start in this pass (Start here is refused then): the ride
+       starts, its fix stands at A, and the route is planned from there */
+    SX.tab("ride"); flushTimeouts(); grab("c-ride").fire("click"); flushTimeouts();
+    fix(A, { speed: 6, heading: 0 }); flushTimeouts(); frames(1);
+    theMap._hit = []; theMap.fire("contextmenu", { lngLat: { lng: B[0], lat: B[1] } }); grab("pc-route") && grab("pc-route").fire("click"); flushTimeouts();
+    const routed = documentStub.querySelectorAll(".rc").length;
+    fix(A, { speed: 6, heading: 0 }); flushTimeouts(); frames(1);
+    fix(tr.m, { speed: 6, heading: 0 }); flushTimeouts(); frames(1);
+    const alertOn = /\bon\b/.test(String(grab("alert").className || "")), riding = flagged();
+    stop(); SX.tab("map"); flushTimeouts();
+    const st = { road: { d: +ne.d.toFixed(3), same: !!ne.e && ne.e.i === pv.i, span: +pv.d.toFixed(2) }, pave: +np.d.toFixed(3), far,
+                 edge: { probes: edgeProbes.length, miss: edgeMiss },
+                 ride: { routed, riding, alertOn, span: +tr.d.toFixed(2) } };
+    const segOk = (x) => x.road.d < 0.01 && x.pave < 0.01 && x.far.length === 5 && x.far.every((f) => f.d < 0.01)
+      && x.edge.probes >= 20 && x.edge.miss === 0
+      && x.ride.routed >= 1 && x.ride.riding && !x.ride.alertOn;
+    ok(segOk(st) && !segOk({ ...st, road: { ...st.road, d: 0.31 } }) && !segOk({ ...st, ride: { ...st.ride, alertOn: true } })
+       && !segOk({ ...st, far: far.map((f, i) => (i ? f : { ...f, d: 0.49 })) }) && !segOk({ ...st, edge: { ...st.edge, miss: 1 } }),
+       `A293 · mid-span on a ${st.road.span} mi straight paved span the nearest road is ${st.road.d} mi off (${st.road.same ? "that road" : "another on the spot"}) `
+       + `and pavement ${st.pave} mi; ${st.edge.probes} points at a grid cell's edge read the nearest line brute force finds (misses ${st.edge.miss}); the middles of the five longest spans (${far.map((f) => f.span).join(", ")} mi) read their own road (${far.map((f) => f.d).join(", ")} mi); `
+       + `riding the middle of a ${st.ride.span} mi span of the planned line raises no Off route (${JSON.stringify(st.ride)}); `
+       + `the judge rejects take 199's vertex distance, a far middle reading another road, and the false alert`);
+  }
+}
+
+/* 9s · take 200 · A295 · a gap in the recorded track is a break, not a line.
+   A ride whose fixes jump 6 mi (the screen locked, the app closed and the
+   trip resumed): Retrace draws no segment longer than a quarter mile, counts
+   only the ground it saw, and its card says where the GPS saw nothing
+   instead of "every foot of this is ground you have already covered". Until
+   take 199 the jump was drawn straight (across swamp or water) inside that
+   claim, and counted in its "mi back along the track you actually rode". */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav, SX = sandbox.window.__sheet, R = sandbox.window.__route;
+  const text = (id) => String(grab(id)._html || "").replace(/<[^>]*>/g, "");
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1], accuracy: 5 }, extra || {}) });
+  const stop = () => { for (let i = 0; i < 3 && flagged(); i++) { grab("c-ride").fire("click"); flushTimeouts(); frames(1); } };
+  const len = (a, b) => Math.hypot((b[0] - a[0]) * 0.714 * 69, (b[1] - a[1]) * 69);
+  const P0 = R.ME.slice(), far = [P0[0] - 0.12, P0[1] + 0.03];
+  SX.tab("ride"); flushTimeouts(); grab("c-ride").fire("click"); flushTimeouts();
+  const pts = [];
+  for (let i = 0; i < 4; i++) pts.push([P0[0] + i * 6e-4, P0[1]]);
+  for (let i = 0; i < 4; i++) pts.push([far[0] + i * 6e-4, far[1]]);
+  for (const p of pts) { fix(p, { speed: 8, heading: 90 }); flushTimeouts(); frames(1); }
+  const riding = flagged();
+  grab("btn-retrace").fire("click"); flushTimeouts();
+  const back = (record.setData.back || []).at(-1), g = back && back.features[0] && back.features[0].geometry;
+  const parts = !g ? [] : g.type === "MultiLineString" ? g.coordinates : [g.coordinates];
+  let maxSeg = 0; for (const q of parts) for (let k = 1; k < q.length; k++) maxSeg = Math.max(maxSeg, len(q[k - 1], q[k]));
+  const card = text("panel"), back_mi = parseFloat((card.match(/([\d.]+) mi back along the track/) || [0, "NaN"])[1]);
+  stop(); SX.tab("map"); flushTimeouts();
+  const st = { riding, jump: +len(pts[3], pts[4]).toFixed(1), miles: back_mi, parts: parts.length, maxSeg: +maxSeg.toFixed(2),
+               said: /break/.test(card) && !/Every foot of this is ground/.test(card) };
+  const gapOk = (x) => x.riding && x.jump > 5 && x.miles < 1 && x.parts === 2 && x.maxSeg < 0.25 && x.said;
+  ok(gapOk(st) && !gapOk({ ...st, maxSeg: st.jump, parts: 1 }) && !gapOk({ ...st, miles: st.miles + st.jump }) && !gapOk({ ...st, said: false }),
+     `A295 · a ${st.jump} mi jump between fixes: Retrace counts ${st.miles} mi of seen ground, draws ${st.parts} parts with no segment over `
+     + `${st.maxSeg} mi, and its card names the break; the judge rejects take 199's straight line, its miles, and its "every foot" claim`);
+}
+
+/* 9t · take 200 · A296, A297. The dispatch card says the fix's accuracy
+   beside the coordinate, and calls a coarse one coarse (five decimals
+   implied metres whatever the fix). A loop from a start off the network
+   says its off-network approach, and its fuel line counts it (a loop's
+   approach was 0 and never said). */
+if (!NO_GPS) {
+  const SX = sandbox.window.__sheet, R = sandbox.window.__route;
+  const text = (id) => String(grab(id)._html || "").replace(/<[^>]*>/g, " ");
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1] }, extra || {}) });
+  const stop = () => { for (let i = 0; i < 3 && flagged(); i++) { grab("c-ride").fire("click"); flushTimeouts(); frames(1); } };
+  const P0 = R.ME.slice();
+  R.setMachine("bike");
+  SX.tab("ride"); flushTimeouts(); grab("c-ride").fire("click"); flushTimeouts();
+  fix(P0, { accuracy: 900, speed: 0 }); flushTimeouts(); frames(1);
+  grab("btn-disp").fire("click"); flushTimeouts(); const coarse = text("panel");
+  fix([P0[0] + 2e-4, P0[1]], { accuracy: 8, speed: 0 }); flushTimeouts(); frames(1);
+  grab("btn-disp").fire("click"); flushTimeouts(); const fine = text("panel");
+  /* the middle of Houghton Lake, about two miles from any shore road */
+  const lake = [-84.745, 44.335];
+  fix(lake, { accuracy: 8, speed: 0 }); flushTimeouts(); frames(1);
+  const inLake = R.ME[0] === lake[0] && R.ME[1] === lake[1];
+  grab("lp-find") && (grab("lp-find")._listeners = {});
+  grab("c-loop").fire("click"); flushTimeouts(); grab("lp-find").fire("click"); flushTimeouts();
+  const loopCard = text("panel");
+  stop(); SX.tab("map"); flushTimeouts();
+  const off = (loopCard.match(/\+(\d+\.\d) mi off-network/) || [null, null])[1];
+  const st = { coarse: /±900 m/.test(coarse) && /coarse fix/i.test(coarse), fine: /±8 m/.test(fine) && !/coarse fix/i.test(fine),
+               inLake, loops: /\d mi/.test(loopCard), off: off === null ? null : +off };
+  const accOk = (x) => x.coarse && x.fine;
+  const loopOk = (x) => x.inLake && x.loops && x.off !== null && x.off > 0.3;
+  ok(accOk(st) && !accOk({ ...st, coarse: false }) && !accOk({ ...st, fine: false }),
+     `A296 · the dispatch card reads a ±900 m fix as "±900 m", a coarse fix (${st.coarse}), and a ±8 m fix as "±8 m" with no warning (${st.fine}); `
+     + `the judge rejects take 199's card, which said neither`);
+  ok(loopOk(st) && !loopOk({ ...st, off: null }),
+     `A297 · a loop from the middle of Houghton Lake says its approach, +${st.off} mi off-network (in the lake: ${st.inLake}); `
+     + `the judge rejects take 199's card, which said none`);
+}
+
+/* 9u · take 200 · A294 · a saved route for another machine clears the route
+   planned now, as the machine chip and a mode change do. A route planned
+   with the bike, then a saved route for the boat opened (legal on no land
+   class, so the reopen fails): no route is left planned under the boat, and
+   Ride is not refused as "not legal for a Kayak". Until take 199 the old
+   route stayed under the new machine (svOpen changed the machine and kept
+   it), and Ride said so and started nothing. */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav, SVO = sandbox.window.__svOpen, R = sandbox.window.__route, SX = sandbox.window.__sheet;
+  const text = (id) => String(grab(id)._html || "").replace(/<[^>]*>/g, " ");
+  const flagged = () => "ride" in grab("shell").dataset;
+  const stop = () => { for (let i = 0; i < 3 && flagged(); i++) { grab("c-ride").fire("click"); flushTimeouts(); frames(1); } };
+  const m0 = R.machine, ME0 = R.ME.slice();
+  R.setMachine("bike");
+  theMap._hit = []; theMap.fire("contextmenu", { lngLat: { lng: ME0[0] + 0.02, lat: ME0[1] + 0.01 } });
+  grab("pc-route") && grab("pc-route").fire("click"); flushTimeouts();
+  const planned = !!N.plan();
+  SVO({ n: "Old paddle", f: ME0.slice(), t: [ME0[0] + 0.05, ME0[1] + 0.03], lbl: "Old paddle", m: "kayak", p: "fast" }); flushTimeouts();
+  const left = !!N.plan(), mach = R.machine;
+  SX.tab("ride"); flushTimeouts(); grab("c-ride").fire("click"); flushTimeouts();
+  const refused = /not legal for a/.test(text("panel"));
+  stop(); R.setMachine(m0); SX.tab("map"); flushTimeouts();
+  const st = { planned, mach, left, refused };
+  const svmOk = (x) => x.planned && x.mach === "kayak" && !x.left && !x.refused;
+  ok(svmOk(st) && !svmOk({ ...st, left: true, refused: true }),
+     `A294 · a saved route for the boat opened over a bike route leaves no route planned under the boat (${JSON.stringify(st)}); `
+     + `the judge rejects take 199's (the bike route kept under the kayak, and Ride refused)`);
 }
 
 /* 10 · nothing ever left the origin */

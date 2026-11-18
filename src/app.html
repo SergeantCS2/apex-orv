@@ -1204,7 +1204,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 199</span>
+    <span id="title"><b>APEX</b> ORV · Take 200</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -1610,6 +1610,14 @@ function restrictOf(e){
    the machine changes. */
 var _legalMemo={};
 function machineLegal(e){
+  /* take 200 · A291 · a freeway is never ridable, by any machine or on foot
+     (no ORV may use any part of an interstate in Michigan; MDOT opens other
+     state highways only on signed connector segments). Until take 199 OSM's
+     motorways were class paved, legal for every machine: 5,003 interstate
+     edges, 2,430 mi, and a start near I-75 snapped onto it (PROVEN on the
+     shipped graph, the take-198 safety audit). Checked before the memo: the
+     memo is keyed by bundle and class, and an edge's ref is not in either */
+  if(e.fw)return false;
   var mk=machine+':'+e.bi+':'+e.c, hit=_legalMemo[mk];
   if(hit!==undefined)return hit;
   return (_legalMemo[mk]=_machineLegal(e))}
@@ -1647,6 +1655,17 @@ var EDGES=GR.e.map(function(e,i){return {a:e[0],b:e[1],L:e[2],c:CLS[e[3]],
   d:e.length<8||e[7]!==0,
   /* A75: the posted route number. Older payloads have no ninth field. */
   rf:(e.length>8&&e[8]>=0)?NM[e[8]]:null}});
+/* take 200 · A291 · which edges are freeways: the bundle's fw (graph.py, OSM
+   highway=motorway, from take 200's build), and on any bundle an edge posted
+   as an interstate (ref "I 75", alone or in a list; "BL I 75", a business
+   loop on surface streets, is not one) */
+var FW_I=/^I[ -]?\d+$/;
+function isFreeway(e){
+  var k=BK.indexOf('fw');
+  if(k>=0&&e.bi>=0&&B[e.bi]&&B[e.bi][k])return true;
+  if(e.rf){var p=String(e.rf).split(';');for(var i=0;i<p.length;i++)if(FW_I.test(p[i].trim()))return true}
+  return false}
+var FW_N=0;EDGES.forEach(function(e){if(isFreeway(e)){e.fw=1;FW_N++}});
 /* take 197 · A10 · the maintainer, 2026-11-05 (approved): "on the trail's
    card, not the map". OSM's surface where a mapper recorded it, carried in
    the edge's bundle as `sf` (tools/surface.py: an OSM line's own tag, or the
@@ -2614,6 +2633,13 @@ function runCard(a,b,riv){
   var swapped=(a!==putIn);
   var mid=c.f.filter(function(f){return f.mi>lo+0.05&&f.mi<hi-0.05});
   var dams=mid.filter(function(f){return f.k==='dam'});
+  /* take 200 · A292 · a dam within 0.05 river-mi of either end was left out,
+     and the card said "No dams between them": Camp Ten Bridge (58.35) to
+     the access below Mio Dam (61.58) passes the dam at 61.54 (PROVEN on the
+     shipped corridor; 84 stops sit that close to a dam). River miles are
+     not precise enough to say which side of a dam such a stop is on, so
+     the card says the dam is at that end, and to check */
+  var nearDams=c.f.filter(function(f){return f.k==='dam'&&f.mi>=lo-0.05&&f.mi<=hi+0.05&&dams.indexOf(f)<0});
   var camps=mid.filter(function(f){return f.k==='camp'});
   var acc=mid.filter(function(f){return f.k==='launch'||f.k==='access'});
   var nm=function(f){return f.n||PADKIND[f.k]||f.k};
@@ -2626,7 +2652,11 @@ function runCard(a,b,riv){
     rows.push('<b style="color:var(--danger-text)">'+dams.length+' dam'+(dams.length>1?'s':'')+
       ' on the way — '+dams.map(nm).join(', ')+'. You must take out and portage '+
       (dams.length>1?'each one':'it')+'.</b>');
-  else
+  nearDams.forEach(function(d){var atIn=Math.abs(d.mi-lo)<=Math.abs(d.mi-hi);
+    rows.push('<b style="color:var(--danger-text)">'+nm(d)+' is at the '+(atIn?'put-in':'take-out')+' ('+
+      Math.abs(d.mi-(atIn?lo:hi)).toFixed(2)+' river-mi from it). The map cannot tell which side of the dam '+
+      'that access is on: check before you '+(atIn?'launch':'set out')+', and portage; never run a dam.</b>')});
+  if(!dams.length&&!nearDams.length)
     rows.push('<b>No dams between them.</b>');
   if(acc.length)
     rows.push(acc.length+' other access point'+(acc.length>1?'s':'')+
@@ -4405,8 +4435,18 @@ function gridBuild(){
   var t0=Date.now(), nodes=new Map(), edges=new Map();
   function put(m,k,v){var a=m.get(k);if(a)a.push(v);else m.set(k,[v])}
   for(var i=0;i<NODES.length;i++){var c=gcell(NODES[i]);put(nodes,gkey(c[0],c[1]),i)}
+  /* take 200 · A293 · an edge is filed in every cell its segments cross, not
+     only the cells its vertices sit in: 30,511 of 41,361 paved miles are in
+     spans over 0.25 mi with no vertex inside (10 m simplification, edges
+     split only at junctions), and a search from mid-span found other roads
+     first (the take-198 safety audit, PROVEN on the shipped graph). Steps of
+     a quarter cell along each segment */
   for(var e=0;e<EDGES.length;e++){var g=decode(GR.g[e]),last=-1;
-    for(var k=0;k<g.length;k++){var c2=gcell(g[k]),kk=gkey(c2[0],c2[1]);
+    for(var k=0;k<g.length;k++){
+      if(k>0){var a0=g[k-1],b0=g[k],ns=Math.ceil(Math.max(Math.abs(b0[0]-a0[0]),Math.abs(b0[1]-a0[1]))/(GCS/4));
+        for(var st=1;st<ns;st++){var c3=gcell([a0[0]+(b0[0]-a0[0])*st/ns,a0[1]+(b0[1]-a0[1])*st/ns]),k3=gkey(c3[0],c3[1]);
+          if(k3!==last){put(edges,k3,e);last=k3}}}
+      var c2=gcell(g[k]),kk=gkey(c2[0],c2[1]);
       if(kk!==last){put(edges,kk,e);last=kk}}}
   GRID={nodes:nodes,edges:edges,ms:Date.now()-t0};
   try{window.__gridMs=GRID.ms}catch(e){}
@@ -4426,8 +4466,20 @@ function gridRings(ll,idx,visit,maxR){
       for(var dy=-r+1;dy<=r-1;dy++){hit(-r,dy);hit(r,dy)}}
     if(visit.done(r))return}}
 /* the ring r is at least (r-0.5)*cell away in the smaller (EW) direction,
-   so once that exceeds the best distance no later ring can beat it */
+   so once that exceeds the best distance no later ring can beat it.
+   take 200 · A300 (OPEN) · not quite: the point can sit at its own cell's
+   edge, and a cell of ring 1 then touches it; and a cell's east-west width
+   at 48.3°N (cos 0.665) is narrower than at 44.4° (0.714). At 68 of 400
+   points near a cell's edge the search returned a farther line (0.447 mi
+   against 0.322; the take-198 review, measured on the shipped graph). The
+   routing snap (nearestNode, its users) keeps this bound for now: corrected,
+   a loop's re-join snapped to a nearer node on another road and re-joined
+   at the loop's end (smoke's A234 check, PROVEN), which needs its own look.
+   The read-only answers use ringMiSafe */
 function ringMi(r){return Math.max(0,r-0.5)*GCS*0.714*69}
+/* take 200 · A293 · the safe bound, for the dispatch's nearest road and
+   nearest pavement (and so the place card's "nearest:"): they only read */
+function ringMiSafe(r){return Math.max(0,r-1)*GCS*0.66*69}
 
 function nearestNode(ll){
   var G=gridBuild(), best=1e18,bi=-1;
@@ -4818,6 +4870,12 @@ function svOpen(rec){
      handler sets machIdx, machine and the label inline, so do the same three
      things here rather than inventing a helper (landmine 102: check the code,
      not your memory of it). */
+  /* take 200 · A294 · a saved route for another machine clears the route
+     planned now, as the machine chip and a mode change do (take 188): svOpen
+     changed the machine and kept it, and when the reopen failed (A288) the
+     old route stayed planned under the new machine, and Ride refused it as
+     "not legal for a Kayak … plan it again" (PROVEN in smoke) */
+  if(rec.m&&MACHINE[rec.m]&&rec.m!==machine&&last){logAct('route cleared: saved route for '+rec.m);clearRoute()}
   if(rec.m&&MACHINE[rec.m]){
     machine=rec.m;
     var _mi=ORDER.indexOf(rec.m);if(_mi>=0)machIdx=_mi;
@@ -5101,7 +5159,11 @@ function buildLoops(startNode,targetMi){
       /* score: distance error dominates, then how much is ridden twice */
       var score=f.err+f.L.repeat*0.9;
       if(!best||score<best.score){best={score:score,L:f.L}}}
-    if(best)out.push({h:sh.h,k:sh.k,s:summarise(best.L.path),snap:0,
+    /* take 200 · A297 · the off-network approach, out to the trail and back
+       from it, is part of the ride: it was 0 here, so the card never said
+       "+2.0 mi off-network" and its miles and fuel line left the approach
+       out (the take-198 safety audit) */
+    if(best)out.push({h:sh.h,k:sh.k,s:summarise(best.L.path),snap:2*snapMiles(ME,startNode),
                       na:startNode,nb:startNode,repeat:best.L.repeat})});
   return out}
 el('btn-home').addEventListener('click',function(){
@@ -5229,8 +5291,11 @@ function renderRoutes(out,auto){
   out.forEach(function(o,i){
     var s=o.s,mins=Math.round(s.hrs*60),
         arrive=nowH+s.hrs,dark=(ss!==null&&arrive>ss),
-        overFuel=(fuel&&s.mi>fuel);
-    warn[i]={fuel:overFuel?s.mi-fuel:0,dark:dark,
+        /* take 200 · A297 · the fuel check counts the off-network miles too
+           (dashed on the map, ridden all the same) */
+        tot=s.mi+(o.snap>0.15?o.snap:0),
+        overFuel=(fuel&&tot>fuel);
+    warn[i]={fuel:overFuel?tot-fuel:0,dark:dark,
              adv:s.adv>0.05?s.adv:0,snap:o.snap>0.15?o.snap:0};
     html+='<div class="rc'+(i===sel?' sel':'')+'" data-i="'+i+'">'+
       '<h5>'+o.h+(o.dup?' ·<span class="sub"> same line</span>':'')+'</h5>'+
@@ -5243,7 +5308,7 @@ function renderRoutes(out,auto){
          cards end on a whole row and scroll for the rest, so a warning
          after the profile sat out of view under a clean edge that read as
          the whole card. The all-clear lines stay at the foot */
-      (overFuel?'<div class="sub warn">'+ic('fuel')+(s.mi-fuel).toFixed(1)+' mi past your range</div>':'')+
+      (overFuel?'<div class="sub warn">'+ic('fuel')+(tot-fuel).toFixed(1)+' mi past your range</div>':'')+
       (dark?'<div class="sub warn">'+ic('dark')+'arrives after dark</div>':'')+
       (s.adv>0.05?'<div class="sub warn">'+s.adv.toFixed(1)+' mi unverified (OSM)</div>':'')+
       (o.snap>0.15?'<div class="sub warn">+'+o.snap.toFixed(1)+
@@ -6301,17 +6366,15 @@ function nearestPavement(ll){
   var visit=function(list){
     for(var j=0;j<list.length;j++){var i=list[j];if(seen[i])continue;seen[i]=1;
       var e=EDGES[i];if(e.c!=='paved'&&e.c!=='minor')continue;
-      var g=decode(GR.g[i]);
-      for(var k=0;k<g.length;k++){var d=mi(ll,g[k]);if(d<best){best=d;bp=g[k];be=e}}}};
-  visit.done=function(r){return be!==null&&ringMi(r+1)>best};
+      var lp=linePt(ll,decode(GR.g[i]));if(lp.d<best){best=lp.d;bp=lp.p;be=e}}};
+  visit.done=function(r){return be!==null&&ringMiSafe(r+1)>best};
   gridRings(ll,G.edges,visit,400);
   if(be)return {p:bp,d:best,e:be};
   best=1e9;
   for(var i=0;i<EDGES.length;i++){var e=EDGES[i];
     if(e.c!=='paved'&&e.c!=='minor')continue;
-    var g=decode(GR.g[i]);
-    for(var k=0;k<g.length;k++){var d=mi(ll,g[k]);
-      if(d<best){best=d;bp=g[k];be=e}}}
+    var lp=linePt(ll,decode(GR.g[i]));
+    if(lp.d<best){best=lp.d;bp=lp.p;be=e}}
   return {p:bp,d:best,e:be}}
 
 /* 4.12 — what this app is not. A promise about its own limits, in the app,
@@ -6334,6 +6397,15 @@ var JX = GR.jx || {};
 var TRUCK=null, tM=null, crumbs=[], crumbMi=0, riding=null, lost=false, offAlert=false;
 
 function mi(a,b){var dx=(b[0]-a[0])*0.714*69,dy=(b[1]-a[1])*69;return Math.hypot(dx,dy)}
+/* take 200 · A293 · the nearest point of a decoded line to p, and its
+   distance in miles, by segNear (point to segment, the tap handler's). A
+   line's distance is to its segments, not its vertices: on a long straight
+   span the vertices are up to a mile apart */
+function linePt(p,g){var best=1e9,bp=null;
+  if(g.length===1)return {p:g[0],d:mi(p,g[0])};
+  for(var k=0;k+1<g.length;k++){var q=segNear(p,g[k],g[k+1]);
+    if(q.d<best){best=q.d;bp=[g[k][0]+(g[k+1][0]-g[k][0])*q.t,g[k][1]+(g[k+1][1]-g[k][1])*q.t]}}
+  return {p:bp,d:best}}
 function bearing(a,b){var t=Math.PI/180,
   y=Math.sin((b[0]-a[0])*t)*Math.cos(b[1]*t),
   x=Math.cos(a[1]*t)*Math.sin(b[1]*t)-Math.sin(a[1]*t)*Math.cos(b[1]*t)*Math.cos((b[0]-a[0])*t);
@@ -6736,8 +6808,8 @@ function rideReport(R){
 var BACK_FC={type:'FeatureCollection',features:[]};
 function backSet(fc){BACK_FC=fc;map.getSource('back').setData(fc)}
 /* the breadcrumb line: a line needs two points (one crumb draws nothing) */
-function crumbFC(){return {type:'FeatureCollection',features:crumbs.length>1?[{type:'Feature',
-  properties:{},geometry:{type:'LineString',coordinates:crumbs}}]:[]}}
+function crumbFC(){var parts=crumbParts(crumbs);return {type:'FeatureCollection',features:parts.length?[{type:'Feature',
+  properties:{},geometry:{type:'MultiLineString',coordinates:parts}}]:[]}}
 function trackDraw(){
   try{if(TRUCK)truckPin();else if(tM){tM.remove();tM=null}}catch(e){}
   try{map.getSource('crumb').setData(crumbFC())}catch(e){}
@@ -6759,6 +6831,11 @@ function startRecording(at){
     truckPin();
     rideStart(at);
     if(RESUMED_RIDE){RIDE.t0=RESUMED_RIDE.t0;RIDE.mi0=RESUMED_RIDE.mi0||0;RESUMED_RIDE=null}
+    /* take 200 · A295 · the first fix after Resume is part of the track: it
+       was not recorded, and the next fix joined the trip's last saved point.
+       A step across the time the app was closed longer than a gap is drawn
+       as a break */
+    record(at);
     /* take 188 · A221 · this branch returned before hudShow(true), so a
        resumed trip rode on with no HUD (PROVEN live on take 187, step 3) */
     hudShow(true);
@@ -6770,6 +6847,17 @@ function startRecording(at){
   backSet({type:'FeatureCollection',features:[]});
   syncSafety()}
 
+/* take 200 · A295 · a step longer than this between two recorded fixes is a
+   gap: the GPS saw nothing in between (a dropout, the screen locked and the
+   page asleep, the app closed and the trip resumed). The track does not
+   draw it as a line, and Retrace neither draws it nor counts it as ground
+   ridden, and says so. The ride's miles keep its straight line (a floor on
+   the distance travelled, which navigation's progress reads). At a fix a
+   second, 0.25 mi is 900 mph; a 15 s dropout at 30 mph is 0.13 */
+var CRUMB_GAP=0.25;
+function crumbParts(cs){var parts=[],cur=[];
+  for(var i=0;i<cs.length;i++){if(i&&mi(cs[i-1],cs[i])>CRUMB_GAP){if(cur.length>1)parts.push(cur);cur=[]}cur.push(cs[i])}
+  if(cur.length>1)parts.push(cur);return parts}
 function record(at){
   if(!crumbs.length)return;
   var prev=crumbs[crumbs.length-1], d=mi(prev,at);
@@ -6808,8 +6896,11 @@ function offRouteHtml(ft){return 'Off route — '+ft+' ft from your line'+
   '<small>Tap Retrace to follow your own track back to the truck.</small>'}
 function checkOffRoute(){
   if(!last||sel===null||!crumbs.length)return;
-  var pts=[];last[sel].s.path.forEach(function(e){pts=pts.concat(decode(GR.g[e.i]))});
-  var best=1e9;for(var i=0;i<pts.length;i++){var d=mi(ME,pts[i]);if(d<best)best=d}
+  /* take 200 · A293 · to the route's segments, edge by edge (an edge's
+     stored direction is not the ride's, so lines are not joined across
+     edges): to its vertices, the middle of a straight span over 0.32 mi read
+     as off route, and the phone buzzed on the planned line */
+  var best=1e9;last[sel].s.path.forEach(function(e){var lp=linePt(ME,decode(GR.g[e.i]));if(lp.d<best)best=lp.d});
   var off=best>0.16;                    /* ~260 m from the planned line */
   if(off&&!offAlert){offAlert=true;buzz([120,80,120,80,220]);
     el('alert').className='on';
@@ -6823,17 +6914,20 @@ el('btn-retrace').addEventListener('click',function(){
      GPS fix and refuses without one, so the old "Ride it … or GPS" offered
      a second way that is gone */
   if(crumbs.length<2)return show('Nothing recorded yet. Retrace follows the track a ride records \u2014 tap <b>Ride it</b> (Ride tab) with a GPS fix to start one.','fail');
-  var back=crumbs.slice().reverse(), d=0;
-  for(var i=1;i<back.length;i++)d+=mi(back[i-1],back[i]);
+  var back=crumbs.slice().reverse(), d=0, gaps=0, gmax=0;
+  for(var i=1;i<back.length;i++){var s=mi(back[i-1],back[i]);if(s>CRUMB_GAP){gaps++;if(s>gmax)gmax=s}else d+=s}
   backSet({type:'FeatureCollection',features:[
-    {type:'Feature',properties:{},geometry:{type:'LineString',coordinates:back}}]});
+    {type:'Feature',properties:{},geometry:{type:'MultiLineString',coordinates:crumbParts(back)}}]});
   var b=new maplibregl.LngLatBounds();back.forEach(function(c){b.extend(c)});
   map.fitBounds(b,{padding:50,duration:700});
   el('alert').className='';offAlert=false;ridePublish();
   show('<span class="tn">Retrace</span><br><span class="meta">no router · no network</span><br>'+
    '<b>'+d.toFixed(2)+' mi</b> back along the track you actually rode · '+
    compass(bearing(ME,TRUCK))+' to the truck · '+back.length+' points<br>'+
-   'Every foot of this is ground you have already covered.','')});
+   (gaps?'<b>'+gaps+' break'+(gaps>1?'s':'')+' where the GPS saw nothing</b> (the longest '+gmax.toFixed(1)+' mi): '+
+     'they are left out, not drawn as straight lines. Every drawn foot is ground you have already covered; '+
+     'between a break\u2019s ends you rode somewhere this phone did not see.'
+    :'Every foot of this is ground you have already covered.'),'')});
 
 /* 4.7 — the dispatch card. Decimal degrees is what Oscoda and Ogemaw ask for.
    Junctions are named by what meets there, never by a number we invented. */
@@ -6841,15 +6935,13 @@ function nearestEdge(ll){
   var G=gridBuild(), best=1e9,be=null,seen={};
   var visit=function(list){
     for(var j=0;j<list.length;j++){var i=list[j];if(seen[i])continue;seen[i]=1;
-      var g=decode(GR.g[i]);
-      for(var k=0;k<g.length;k++){var d=mi(ll,g[k]);if(d<best){best=d;be=EDGES[i]}}}};
-  visit.done=function(r){return be!==null&&ringMi(r+1)>best};
+      var lp=linePt(ll,decode(GR.g[i]));if(lp.d<best){best=lp.d;be=EDGES[i]}}};
+  visit.done=function(r){return be!==null&&ringMiSafe(r+1)>best};
   gridRings(ll,G.edges,visit,400);
   return be?{e:be,d:best}:nearestEdge_linear(ll)}
 function nearestEdge_linear(ll){
   var best=1e9,be=null;
-  for(var i=0;i<EDGES.length;i++){var g=decode(GR.g[i]);
-    for(var k=0;k<g.length;k++){var d=mi(ll,g[k]);if(d<best){best=d;be=EDGES[i]}}}
+  for(var i=0;i<EDGES.length;i++){var lp=linePt(ll,decode(GR.g[i]));if(lp.d<best){best=lp.d;be=EDGES[i]}}
   return {e:be,d:best}}
 /* Take 134: the last linear scan in dispatch, 723 ms over the junction table
    once hiking doubled the graph. Rings over the node grid, keeping only
@@ -6880,7 +6972,7 @@ el('btn-disp').addEventListener('click',function(){
      time. The card reads A237's one reader: a live fix prints as it did;
      otherwise the last real fix of this session, with its clock time and
      age, said before the coordinates; with no real fix, it refuses. */
-  var lf=liveFix(),FX=lf?lf.at:ME_FIX?ME_FIX.at.slice():null;
+  var lf=liveFix(),FX=lf?lf.at:ME_FIX?ME_FIX.at.slice():null,FACC=ME_FIX?ME_FIX.acc:null;
   if(!FX)return show('<b>No GPS fix yet.</b><br>The start pin is not a position: this card '+
     'reads your <i>actual</i> location to dispatch, so it will not print a coordinate you '+
     'are not standing at.','fail');
@@ -6895,8 +6987,10 @@ el('btn-disp').addEventListener('click',function(){
   setTimeout(function(){
     var ME=FX;
     var ne=nearestEdge(ME), nj=nearestJunction(ME);
+    /* take 200 · A296 · the fix's accuracy, said with the coordinate */
     var out=old+'<span class="tn">'+ME[1].toFixed(5)+'  '+ME[0].toFixed(5)+'</span>'+
-      '<span class="meta">decimal degrees</span><br>';
+      '<span class="meta">decimal degrees \u00b7 '+(FACC?'\u00b1'+Math.round(FACC)+' m':'accuracy not reported')+'</span><br>'+
+      (FACC&&FACC>100?'<b>A coarse fix (\u00b1'+Math.round(FACC)+' m):</b> say so with the coordinate, and read a new one when the sky is clear.<br>':'');
     var bits=[];
     /* The address goes FIRST after the coordinate. A street name and number is
        what a dispatcher types into their own system; the trail name and junction
@@ -7356,14 +7450,19 @@ function navRiverGuide(at,acc,st,mps){
   /* what is coming downstream: a dam first if within 3 mi, else the next
      access or camp within 5 */
   var f=L.c.f,next=null,dam=null;
-  for(var i=0;i<f.length;i++){var q=f[i];if(q.mi<=st.rm+0.03||q.mi>bmi+0.02)continue;
+  /* take 200 · A292 · a dam is announced until it is passed: features within
+     0.03 mi ahead were skipped, dams too, so a put-in 0.02 mi above Mio Dam
+     never heard of it */
+  for(var i=0;i<f.length;i++){var q=f[i];if((q.k==='dam'?q.mi<=st.rm:q.mi<=st.rm+0.03)||q.mi>bmi+0.02)continue;
     if(q.k==='dam'&&!dam&&q.mi-st.rm<=3)dam=q;
     if(!next&&(q.k==='access'||q.k==='launch'||q.k==='camp')&&q.mi-st.rm<=5)next=q}
   var up=_rmHist.length>=5&&(_rmHist[0]-_rmHist[_rmHist.length-1])>0.05;
   var line1;
-  if(dam){line1='<b><span class="arw">'+ic('warn')+'</span>Dam in '+(dam.mi-st.rm).toFixed(1)+' mi \u2014 portage'+(dam.n?' \u00b7 '+dam.n:'')+'</b>';
+  if(dam){var dmi=dam.mi-st.rm,close=dmi<0.1;
+    /* take 200 · A292 · under a tenth of a mile it read "Dam in 0.0 mi" */
+    line1='<b><span class="arw">'+ic('warn')+'</span>'+(close?'Dam just ahead':'Dam in '+dmi.toFixed(1)+' mi')+' \u2014 portage'+(close?' now':'')+(dam.n?' \u00b7 '+dam.n:'')+'</b>';
     var dk='dam|'+dam.mi.toFixed(2);if(VOICE.near!==dk){VOICE.near=dk;
-      navSay('Dam in '+(dam.mi-st.rm).toFixed(1)+' miles. Portage.')}}
+      navSay(close?'Dam just ahead. Portage now.':'Dam in '+dmi.toFixed(1)+' miles. Portage.')}}
   else if(next)line1='<b><span class="arw">'+ic('downstream')+'</span>'+(next.k==='camp'?'Camp':'Access')+' in '+(next.mi-st.rm).toFixed(1)+' mi'+(next.n?' \u00b7 '+next.n:'')+'</b>';
   else line1='<b><span class="arw">'+ic('downstream')+'</span>Downstream to '+(RUN.b.n||'take-out')+'</b>';
   var craft=(MACHINE[machine]&&MACHINE[machine].mph)?MACHINE[machine].lbl.toLowerCase():null;
@@ -7624,7 +7723,10 @@ var posMode='none',awayMi=0;
    placeDist's was). meFix() is called where a real fix becomes ME: the
    ride's onFix and the one-shot locate. */
 var ME_FIX=null;
-function meFix(at){ME_FIX={at:at.slice(),t:Date.now()};
+/* take 200 · A296 · and the fix's reported accuracy (metres), which the
+   dispatch card reads out beside the coordinate; null when the phone gave
+   none. It was dropped: five decimals implied metres whatever the fix */
+function meFix(at,acc){ME_FIX={at:at.slice(),t:Date.now(),acc:(typeof acc==='number'&&isFinite(acc)&&acc>0)?acc:null};
   /* take 189 · cold audit · the 'you' pin and Locate's YOU follow every
      real fix, not only the one-shot locate's (they stayed at the startup
      fix for the whole session) */
@@ -7648,7 +7750,7 @@ function liveFix(){
      Mark this spot mark an old position as fresh (landmine 252) */
   var age=meOnFix()?Date.now()-ME_FIX.t:-1;
   if(!meOnFix()||age<0||age>GPS_STALE_MS)return null;
-  return {at:ME_FIX.at.slice(),t:ME_FIX.t,age:age}}
+  return {at:ME_FIX.at.slice(),t:ME_FIX.t,age:age,acc:ME_FIX.acc}}
 /* the clock time of the fix ME holds (ME_FIX.t: FIX_T is the ride's, which
    a one-shot locate never sets and navStart zeroes) */
 function meClock(){try{return new Date(ME_FIX.t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
@@ -7840,7 +7942,7 @@ function onFix(at,acc,mps,deg){
   /* speed and heading arrived on every fix since take 21 and were discarded on
      both drivers. A82: the data was already flowing (take 78). */
   if(posMode==='gps')hudSet(mps,deg,at,true);
-  if(!gotFix){gotFix=true;startRecording(at);ME=at.slice();mM.setLngLat(ME);meFix(ME);
+  if(!gotFix){gotFix=true;startRecording(at);ME=at.slice();mM.setLngLat(ME);meFix(ME,acc);
     if(!NAV.on)map.easeTo({center:ME,zoom:14.5,duration:600});
     /* take 188 · landmine 135 · quiet: the first fix opened the drawer over
        the map the moment a ride began; the peek line keeps the live-GPS
@@ -7857,7 +7959,7 @@ function onFix(at,acc,mps,deg){
        :tkd<0.02?'Trip resumed \u2014 you are at the truck, where it was pinned. Ride.'
        :'Trip resumed \u2014 the truck stays where it was pinned, '+
         navFmt(tkd*1609.34)+' '+compass(bearing(ME,TRUCK))+'. Ride.'),PEEK_LIVE);return}
-  ME=at.slice();mM.setLngLat(ME);meFix(ME);record(ME);checkOffRoute();peekGps();
+  ME=at.slice();mM.setLngLat(ME);meFix(ME,acc);record(ME);checkOffRoute();peekGps();
   /* take 188 · A222 · paint after record(): painted before this fix was on
      the track, Trip lagged Recorded by one fix. The one paint of the fix
      (cold audit: hudSet above only notes it) */
@@ -9228,7 +9330,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
                    gridBuild:gridBuild,
                    nearestPavement:nearestPavement,countyAt:countyAt,
                    addressAt:addressAt,get ME(){return ME}};
-    window.__route={buildLoops:buildLoops,nearestNode:nearestNode,
+    window.__route={buildLoops:buildLoops,nearestNode:nearestNode,isFreeway:isFreeway,fwN:function(){return FW_N},
                     machineLegal:machineLegal,EDGES:EDGES,ADJ:ADJ,attrs:attrs,
                     setMachine:function(m){if(MACHINE[m])machine=m},
                     get machine(){return machine},spd:spd,MACHINE:MACHINE,
@@ -10674,7 +10776,7 @@ function locateOnce(cb,ms,mark){
     if(!youM){var d=mk('you');youM=new maplibregl.Marker({element:d}).setLngLat(YOU).addTo(map)}
     else youM.setLngLat(YOU);
     classifyFix(at,true);
-    if(posMode==='away')showAway(acc); else{posMode='gps';ME=at.slice();mM.setLngLat(ME);meFix(ME);paint();syncSafety()}
+    if(posMode==='away')showAway(acc); else{posMode='gps';ME=at.slice();mM.setLngLat(ME);meFix(ME,acc);paint();syncSafety()}
     drawCoverage();
     if(cb)try{cb(at)}catch(e){}};
   /* take 188 · cold audit · its OWN watch (gpsWatch), closed through the
@@ -10685,10 +10787,10 @@ function locateOnce(cb,ms,mark){
   /* take 199 · A284 · a caller's mark: its answer is dropped when the rider
      has moved on (the fix itself still lands: YOU, ME and the marker) */
   var keep=function(){return cardStill(mark)};
-  h=gpsWatch(function(at){
+  h=gpsWatch(function(at,acc){
     if(done)return; done=true;
     var k=keep();if(!k)cb=null;
-    fin();handle(at,null);
+    fin();handle(at,acc);
   },function(){ if(!done){done=true; fin(); if(cb&&keep())try{cb(null,'error')}catch(e){}} },ms);
   if(!h){if(done)return;if(cb)try{cb(null,'none')}catch(e){};return}   /* no receiver at all: say so, not "no fix" */
   /* (a driver that answered inside gpsWatch, before the handle existed,
@@ -10927,7 +11029,9 @@ map.on('click',function(e){
   out+='<span class="tag '+(a.auth==='legal'?'legal':'adv')+'">'+
     (a.src==='dnr'?'DNR · legal':a.src==='usfs'?'USFS · legal':'OSM · advisory')+'</span>';
   if(a.st&&a.st.toLowerCase().indexOf('temporarily')===0)out+='<span class="tag shut">closed</span>';
-  if(MACHINE[machine].ok.indexOf(ed.c)<0)
+  /* take 200 · A291 · a freeway says so, whatever the machine */
+  if(ed.fw)out+='<span class="tag shut">freeway: no ORV, no one on foot</span>';
+  else if(MACHINE[machine].ok.indexOf(ed.c)<0)
     out+='<span class="tag shut">illegal for your machine</span>';
   out+='<br>';
   var bits=[];

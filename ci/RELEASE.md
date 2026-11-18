@@ -1,20 +1,15 @@
-**Take 199 — Resume never stops a ride; slow GPS answers stay out of your way.**
+**Take 200 — No routes on freeways; dams at the ends of a paddle run; honest distances.**
 
-If the app restarts mid-trip and you press Ride before answering "Resume
-your trip?", the offer waits quietly on the peek line; Resume carries the
-trip on from the first fix. It no longer stops the ride you started.
+No machine, and no one on foot, is routed on an interstate or other
+freeway any more; a tapped freeway says so. A paddle run whose put-in or
+take-out sits beside a dam names the dam, and navigation warns until you
+pass it.
 
-A GPS answer that comes late (Set home's "My location", Locate) no longer
-clears a route you planned meanwhile or opens the drawer over a ride.
-Locate no longer leaves a hidden GPS watch running for the rest of the day.
-A failed HD save says so in a short note instead of covering the map, and
-a saved route that no longer routes says so without pretending otherwise.
+The dispatch card names the road you are on and says how accurate the fix
+is. The off-route alert no longer buzzes in the middle of a long straight
+stretch of your route. Retrace leaves out stretches the GPS never saw
+instead of drawing straight lines across them, and a loop says how far its
+start is from the trail.
 
-Take 198 had no release of its own (its build stalled twice on a slow
-build machine), so its two changes arrive here: Back from the HD card
-before it has loaded keeps the drawer folded, and counting saved HD
-imagery no longer reads every saved tile at each start.
-
-On the phone: start a ride, close the app, reopen it and press Ride at
-once: does the peek line offer the trip? Press Locate with GPS just on:
-does the map fly to you, and nothing else stay on?
+On the phone: plan a route near I-75: does it stay off it? Tap Dispatch
+standing on a long road: does it name that road?

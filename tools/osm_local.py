@@ -44,6 +44,8 @@ reach CI.
 import json
 import os
 import sys
+import time
+import urllib.error
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -125,7 +127,26 @@ def extract_path(state):
         return fp
     print(f"  downloading {url}")
     tmp = fp + ".part"
-    urllib.request.urlretrieve(url, tmp)
+    # take 200: a transfer cut short is tried again, four tries in all, with
+    # a pause that grows. PR #17's run 140 got 283.7 of 318.1 MB from the
+    # extract's host and the ingest stopped there; urlretrieve checks the
+    # length the server announced and raises ContentTooShortError
+    last = None
+    for attempt in range(1, 5):
+        try:
+            urllib.request.urlretrieve(url, tmp)
+            break
+        except (urllib.error.URLError, OSError) as e:   # ContentTooShortError is a URLError
+            last = e
+            print(f"  download try {attempt} of 4 failed: {str(e)[:140]}", flush=True)
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            if attempt < 4:
+                time.sleep(20 * attempt)
+    else:
+        raise last
     os.replace(tmp, fp)
     print(f"  downloaded {os.path.getsize(fp)/1048576:.0f} MB")
     return fp
