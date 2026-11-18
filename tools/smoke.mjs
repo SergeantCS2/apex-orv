@@ -4883,6 +4883,70 @@ if (!NO_GPS) {
   }
 }
 
+/* 9w · take 202 · A309, A310. River miles on one scale: every dam's own
+   point reads its recorded mile on the app's river line (the line summed a
+   fixed 0.714 while the corridor's miles use the local latitude: 113 of 141
+   dams 0.1 mi or more off), and a paddler 0.05 mi above Portland Municipal
+   Dam hears "Dam just ahead", placed by the corridor's scale computed here,
+   not by the app's. A dam just below the take-out is on the card, at
+   arrival, and after a missed landing (Mio Pond T-Dock, Mio Dam 0.2 below). */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav, P = sandbox.window.__paddle, MO = sandbox.window.__mode;
+  const text = (id) => String(grab(id)._html || "").replace(/<[^>]*>/g, "");
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1], accuracy: 5 }, extra || {}) });
+  const stop = () => { if (flagged()) grab("hud-stop").fire("click"); if (flagged()) grab("c-ride").fire("click"); flushTimeouts(); frames(1); };
+  const CS = (P && P.data && P.data.c) || [];
+  const proj = (L, at) => { const cosl = Math.cos(at[1] * Math.PI / 180), ax = at[0] * cosl, ay = at[1]; let best = 1e18, bi = 0, bt = 0;
+    for (let i = 0; i < L.pts.length - 1; i++) { const p = L.pts[i], q = L.pts[i + 1], px = p[0] * cosl, py = p[1], qx = q[0] * cosl, qy = q[1];
+      const dx = qx - px, dy = qy - py, L2 = dx * dx + dy * dy; let t = L2 ? ((ax - px) * dx + (ay - py) * dy) / L2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d2 = (ax - px - t * dx) ** 2 + (ay - py - t * dy) ** 2; if (d2 < best) { best = d2; bi = i; bt = t; } }
+    return (L.cum[bi] + bt * (L.cum[bi + 1] - L.cum[bi])) / 1609.34; };
+  /* the corridor's own scale (tools/corridor.py metres()), for placing fixes */
+  const corM = (a, b) => Math.hypot((b[0] - a[0]) * 111320 * Math.cos(a[1] * Math.PI / 180), (b[1] - a[1]) * 111320);
+  const corAt = (c, mi) => { const pts = [].concat(...c.g); let acc = 0; for (let i = 0; i + 1 < pts.length; i++) { const d = corM(pts[i], pts[i + 1]);
+      if (acc + d >= mi * 1609.34) { const t = (mi * 1609.34 - acc) / Math.max(1e-9, d); return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; } acc += d; } return pts[pts.length - 1]; };
+  /* A309 · every dam within 60 m of its line */
+  let n = 0, bad = 0, worst = 0, wn = "";
+  for (const c of CS) { const L = N.riverLine(c.n); if (!L) continue;
+    for (const f of c.f) { if (f.k !== "dam" || !(f.off < 60)) continue; n++;
+      const e = Math.abs(proj(L, f.p) - f.mi); if (e >= 0.1) bad++; if (e > worst) { worst = e; wn = c.n + (f.n ? " · " + f.n : ""); } } }
+  const m0 = MO.get(); MO.apply("water", { silent: true }); flushTimeouts();
+  const gr = CS.find((x) => x.n === "Grand River"), pd = gr && gr.f.find((f) => f.k === "dam" && /Portland/.test(f.n || ""));
+  const upA = pd && gr.f.filter((f) => (f.k === "access" || f.k === "launch") && f.mi < pd.mi - 1 && f.mi > pd.mi - 8).pop();
+  const dnB = pd && gr.f.find((f) => (f.k === "access" || f.k === "launch") && f.mi > pd.mi + 0.3);
+  let strip309 = "";
+  if (upA && dnB) { grab("pd-nav")._listeners = {}; P.run(upA, dnB, gr.n); flushTimeouts();
+    grab("pd-nav").fire("click"); flushTimeouts(); frames(1);
+    fix(corAt(gr, pd.mi - 0.05), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1);
+    strip309 = text("nav-g"); stop(); }
+  const s309 = { n, bad, worst, strip: strip309, portland: !!(upA && dnB) };
+  const ok309 = (x) => x.n > 100 && x.bad === 0 && x.portland && /Dam just ahead/.test(x.strip);
+  ok(ok309(s309) && !ok309({ ...s309, bad: 113 }) && !ok309({ ...s309, strip: "Dam in 2.5 mi — portage" }),
+     `A309 · ${n} dams read their own mile on the app's river line (${bad} off by 0.1 mi or more; worst ${worst.toFixed(3)} mi, ${wn}); `
+     + `0.05 mi above Portland Municipal Dam by the corridor's scale the strip reads "${strip309.slice(0, 60)}"; the judge rejects take 201's 113 off and "Dam in 2.5 mi" at the dam`);
+  /* A310 · Camp Ten Bridge to Mio Pond T-Dock, Mio Dam 0.2 mi below it */
+  const au = CS.find((x) => x.n === "Au Sable River");
+  const st = (mi, k) => au && au.f.find((f) => Math.abs(f.mi - mi) < 0.006 && (!k || f.k === k));
+  const ten = st(58.35), td = au && au.f.find((f) => /Mio Pond T-Dock/.test(f.n || "")), md = au && au.f.find((f) => f.k === "dam" && /Mio Dam/.test(f.n || ""));
+  if (!ten || !td || !md) ok(false, `A310 · this bundle's Au Sable lacks the stops the drill names (ten ${!!ten}, T-Dock ${!!td}, Mio Dam ${!!md})`);
+  else {
+    grab("pd-nav")._listeners = {}; P.run(ten, td, au.n); flushTimeouts(); const card = text("panel");
+    grab("pd-nav").fire("click"); flushTimeouts(); frames(1);
+    fix(corAt(au, td.mi - 0.4), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1); const near = text("nav-g");
+    fix(corAt(au, td.mi), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1); const arrive = text("nav-g");
+    fix(corAt(au, td.mi + 0.12), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1); const past = text("nav-g");
+    stop();
+    const s310 = { card: /Mio Dam is .* below the take-out/.test(card), near: /Mio Dam is .* below the take-out/.test(near),
+                   arrive: /reached the take-out/.test(arrive) && /Mio Dam/.test(arrive), past: /Past the take-out/.test(past) && /Mio Dam/.test(past) };
+    const ok310 = (x) => x.card && x.near && x.arrive && x.past;
+    ok(ok310(s310) && !ok310({ ...s310, past: false }) && !ok310({ ...s310, card: false }),
+       `A310 · Camp Ten Bridge to Mio Pond T-Dock: the card names Mio Dam below the take-out (${s310.card}), 0.4 mi out the strip says so (${s310.near}), `
+       + `arrival names it ("${arrive.slice(0, 70)}"), and 0.12 mi past the landing "${past.slice(0, 60)}"; the judge rejects take 201's silence after arrival and a card without it`);
+  }
+  MO.apply(m0, { silent: true }); flushTimeouts();
+}
+
 /* 10 · nothing ever left the origin */
 ok(remoteAsked.length === 0, `zero remote requests (${remoteAsked.length})`);
 

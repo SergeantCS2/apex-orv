@@ -832,6 +832,10 @@ function runCard(a,b,riv){
       'that access is on: check before you '+(atIn?'launch':'set out')+', and portage; never run a dam.</b>')});
   if(!dams.length&&!nearDams.length)
     rows.push('<b>No dams between them.</b>');
+   
+  c.f.forEach(function(d){if(d.k!=='dam'||d.mi<=hi+0.05||d.mi>hi+0.5||nearDams.indexOf(d)>=0)return;
+    rows.push('<b style="color:var(--danger-text)">'+nm(d)+' is '+rivDist(d.mi-hi)+' below the take-out. '+
+      'Land at the take-out; past it the river runs to the dam.</b>')});
   if(acc.length)
     rows.push(acc.length+' other access point'+(acc.length>1?'s':'')+
       ' on the way'+(acc.length<=4?': '+acc.map(nm).join(', '):''));
@@ -4314,12 +4318,15 @@ function runNavClear(){RUN=null;HUDG=null;NAV.riverBrg=null;_rmHist=[]}
 function corridorByName(riv){
   for(var i=0;i<((PADDLE&&PADDLE.c)||[]).length;i++)if(PADDLE.c[i].n===riv)return PADDLE.c[i];
   return null}
+ 
+function rivDist(m){return m<0.1?Math.max(10,Math.round(m*528)*10)+' ft':m.toFixed(1)+' mi'}
+function rivM(a,b){return Math.hypot((b[0]-a[0])*111320*Math.cos(a[1]*Math.PI/180),(b[1]-a[1])*111320)}
 function riverLine(riv){
   if(_riverCache[riv])return _riverCache[riv];
   var c=corridorByName(riv);if(!c)return null;
   var pts=[],cum=[];
   c.g.forEach(function(g){g.forEach(function(p){
-    cum.push(pts.length?cum[cum.length-1]+mi(pts[pts.length-1],p)*1609.34:0);pts.push(p)})});
+    cum.push(pts.length?cum[cum.length-1]+rivM(pts[pts.length-1],p):0);pts.push(p)})});
   return _riverCache[riv]={pts:pts,cum:cum,total:cum[cum.length-1],seg:0,c:c}}
 function navRiver(at){
   if(!RUN){NAV.riverBrg=null;return null}
@@ -4351,17 +4358,29 @@ function navRiverGuide(at,acc,st,mps){
   var remain=bmi-st.rm;
   _rmHist.push(st.rm);if(_rmHist.length>6)_rmHist.shift();
    
+  var below=null;if(bmi>=RUN.a.mi)for(var ib=0;ib<L.c.f.length;ib++){var qb=L.c.f[ib];
+    if(qb.k==='dam'&&qb.mi>bmi+0.02&&qb.mi<=bmi+0.5){below=qb;break}}
+  var belowTxt=below?(below.n||'A dam')+' is '+rivDist(below.mi-bmi)+' below':'';
+   
   var toB=RUN.b.p?mi(at,RUN.b.p)*1609.34:1e9,acc_=Math.max(15,acc||0);
   if(!RUN.arrived&&(toB<Math.max(40,acc_)||remain<0.03)){
     RUN.arrived=true;NAV.follow=false;HUDG={togo:0,min:null};navChip();
     g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('arrive')+'</span>You have reached the take-out</b>'+
-      '<span class="eta">'+(RUN.b.n||'Take-out')+'</span>';ridePublish();
+      '<span class="eta">'+(RUN.b.n||'Take-out')+(below?' \u00b7 '+belowTxt+': land here':'')+'</span>';ridePublish();
     buzz([80,60,80,60,200]);
-    navSay('You have reached the take-out'+(RUN.b.n?', '+RUN.b.n:''));
+    navSay('You have reached the take-out'+(RUN.b.n?', '+RUN.b.n:'')+(below?'. A dam is '+rivDist(below.mi-bmi).replace('ft','feet').replace('mi','miles')+' below. Land here.':''));
     rideCard('<b>Take-out reached</b><div class="sub">'+(RUN.b.n||'Your take-out')+
-      '. Recording continues until you stop it.</div>','','Take-out reached \u00b7 '+(RUN.b.n||'your take-out'));
+      '. Recording continues until you stop it.</div>'+(below?'<div class="sub warn">'+belowTxt+'. Land here; past the take-out the river runs to it.</div>':''),
+      '','Take-out reached \u00b7 '+(RUN.b.n||'your take-out'));
     logAct('nav  take-out reached');return true}
-  if(RUN.arrived)return true;
+  if(RUN.arrived){
+    if(below&&st.rm>bmi+0.02&&st.rm<below.mi){var dd=below.mi-st.rm,cl=dd<0.1;
+      g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('warn')+'</span>Past the take-out \u2014 '+
+        (cl?'dam just ahead, land now':'dam in '+rivDist(dd)+', land')+(below.n?' \u00b7 '+below.n:'')+'</b>';
+      var bk='below|'+below.mi.toFixed(2)+(cl?'|c':'');
+      if(VOICE.near!==bk){VOICE.near=bk;buzz([200,100,200]);navSay(cl?'Dam just ahead. Land now.':'You are past the take-out. Dam ahead. Land.')}
+      ridePublish()}
+    return true}
    
   var f=L.c.f,next=null,dam=null;
    
@@ -4377,6 +4396,7 @@ function navRiverGuide(at,acc,st,mps){
       navSay(close?'Dam just ahead. Portage now.':'Dam in '+dmi.toFixed(1)+' miles. Portage.')}}
   else if(next)line1='<b><span class="arw">'+ic('downstream')+'</span>'+(next.k==='camp'?'Camp':'Access')+' in '+(next.mi-st.rm).toFixed(1)+' mi'+(next.n?' \u00b7 '+next.n:'')+'</b>';
   else line1='<b><span class="arw">'+ic('downstream')+'</span>Downstream to '+(RUN.b.n||'take-out')+'</b>';
+  if(below&&!dam&&remain<1)line1+='<span class="sub warn">'+belowTxt+' the take-out: land there</span>';
   var craft=(MACHINE[machine]&&MACHINE[machine].mph)?MACHINE[machine].lbl.toLowerCase():null;
    
   if(mps>0.6){_navSpd.push(mps);if(_navSpd.length>60)_navSpd.shift()}
