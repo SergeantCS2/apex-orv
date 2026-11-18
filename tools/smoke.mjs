@@ -4996,6 +4996,51 @@ if (!NO_GPS) {
      `A311 · 140 ft from the truck the cell reads "${c140}" and the peek line "${p140}"; 30 ft from it "${c30}" / "${p30}"; the judge rejects take 201's "0.0 mi S"`);
 }
 
+/* 9y · take 202 · A314 · a long way round is shown, not refused. Every
+   profile that found a legal route over the cap (8 mi, or 8x the crow-fly
+   distance plus 5) was dropped, and with all dropped the card said "No
+   legal route … Try a wider machine" (the take-201 audit: 3 of 300 random
+   legal pairs 0.2-0.35 mi apart route 8-16.6 mi with restrictions and
+   machines ignored). For this pass's machine a seeded search of up to 300
+   pairs finds such a pair or does not (it says which); the card itself is
+   reached on a real pair by tightening the cap (planted, and put back). */
+if (!NO_GPS) {
+  const R = sandbox.window.__route;
+  if (!R || !R.route || !R.NODES || !R.go || !R.DETOUR) ok(false, "A314 · route hooks missing");
+  else {
+    /* a land machine: earlier drills leave Water's craft selected */
+    const MO9 = sandbox.window.__mode, mode0 = MO9 ? MO9.get() : null, mach0 = R.machine;
+    if (MO9 && mode0 === "water") { MO9.apply("ride", { silent: true }); flushTimeouts(); }
+    if (!R.MACHINE[R.machine] || R.MACHINE[R.machine].mph) R.setMachine("bike");
+    const NODES = R.NODES, f = R.PROFILES[0].f, ME0 = R.ME.slice(), D0 = { ...R.DETOUR };
+    const dmi = (a, b) => Math.hypot((b[0] - a[0]) * 0.714 * 69, (b[1] - a[1]) * 69);
+    const G = new Map(), key = (p) => Math.floor(p[0] / 0.01) + "," + Math.floor(p[1] / 0.01);
+    for (let i = 0; i < NODES.length; i++) { const k = key(NODES[i]); if (!G.has(k)) G.set(k, []); G.get(k).push(i); }
+    let seed = 20261118; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const pairNear = () => { for (let t = 0; t < 50; t++) { const a = Math.floor(rnd() * NODES.length), pa = NODES[a], cx = Math.floor(pa[0] / 0.01), cy = Math.floor(pa[1] / 0.01), cand = [];
+        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const b of (G.get((cx + dx) + "," + (cy + dy)) || [])) { const d = dmi(pa, NODES[b]); if (d >= 0.2 && d <= 0.35) cand.push(b); }
+        if (cand.length) return [a, cand[Math.floor(rnd() * cand.length)]]; } return null; };
+    let real = null, tries = 0, routed = null; const t0 = Date.now();
+    while (tries < 300 && Date.now() - t0 < 45000) { const pr = pairNear(); if (!pr) break; tries++;
+      const pa = R.route(pr[0], pr[1], f); if (!pa) continue; let L = 0; for (const e of pa) L += e.L; L /= 1609.34;
+      if (!routed) routed = { a: pr[0], b: pr[1], d: dmi(NODES[pr[0]], NODES[pr[1]]), L };
+      if (L > Math.max(8, routed.d * 8 + 5)) { real = { a: pr[0], b: pr[1], L }; break; } }
+    const use = real || routed;
+    if (!use) ok(false, `A314 · no routable pair found to plan (${tries} tried; machine ${R.machine}, mode ${sandbox.window.__mode ? sandbox.window.__mode.get() : "?"})`);
+    else {
+      if (!real) Object.assign(R.DETOUR, { min: 0, k: 1, add: 0 });   /* planted: any route longer than the crow flies is over */
+      R.setME(NODES[use.a]); R.go(NODES[use.b].slice(), "the long way"); flushTimeouts();
+      const card = String(grab("panel")._html || "").replace(/<[^>]*>/g, " ");
+      Object.assign(R.DETOUR, D0); R.setME(ME0); try { grab("btn-clear") && grab("btn-clear").fire("click"); } catch (e) {} flushTimeouts();
+      R.setMachine(mach0); if (MO9 && mode0 && MO9.get() !== mode0) { MO9.apply(mode0, { silent: true }); flushTimeouts(); }
+      const ok314 = (t) => /the only legal way: \d+\.\d mi for places/.test(t) && !/No legal route/.test(t);
+      ok(ok314(card) && !ok314("No legal route for a dirt bike between those two points"),
+         `A314 · ${real ? "a real pair over the cap (" + real.L.toFixed(1) + " mi)" : "the cap tightened (planted) on a real pair " + use.d.toFixed(2) + " mi apart, its route " + use.L.toFixed(1) + " mi; no pair over the real cap in " + tries + " seeded tries for this machine"}: `
+         + `the card shows the route and says so ("${(card.match(/the only legal way.*?apart\./) || ["none"])[0]}"); the judge rejects take 201's "No legal route"`);
+    }
+  }
+}
+
 /* 10 · nothing ever left the origin */
 ok(remoteAsked.length === 0, `zero remote requests (${remoteAsked.length})`);
 

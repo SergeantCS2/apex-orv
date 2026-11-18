@@ -836,7 +836,7 @@ function runCard(a,b,riv){
     rows.push('<b>No dams between them.</b>');
    
   c.f.forEach(function(d){if(d.k!=='dam'||d.mi<=hi+0.05||d.mi>hi+0.5||nearDams.indexOf(d)>=0)return;
-    rows.push('<b style="color:var(--danger-text)">'+nm(d)+' is '+rivDist(d.mi-hi)+' below the take-out. '+
+    rows.push('<b style="color:var(--danger-text)">'+nm(d)+' is '+shortDist(d.mi-hi)+' below the take-out. '+
       'Land at the take-out; past it the river runs to the dam.</b>')});
   if(acc.length)
     rows.push(acc.length+' other access point'+(acc.length>1?'s':'')+
@@ -2638,6 +2638,8 @@ var last=null,sel=null;
  
 function routeAuto(auto){return (auto&&typeof auto==='object')?{k:auto.k||null,resume:!!auto.resume,rejoin:auto.rejoin||null}
   :{k:typeof auto==='string'?auto:null,resume:false,rejoin:null}}
+ 
+var DETOUR={min:8,k:8,add:5};
 function routeToPoint(dest,label,auto){
   logAct('route to '+(label||'?'));
    
@@ -2655,17 +2657,21 @@ function routeToPoint(dest,label,auto){
      
     var _dbg={a:a,b:b,sa:sa,sb:sb,tSnap:Math.round(_tSnap),got:[]};
     try{window.__routeDbg=_dbg}catch(e){}
-    var _crow=mi(ME,dest);
+    var _crow=mi(ME,dest),far=null;
     PROFILES.forEach(function(p){var _tp=performance.now();var pa=route(a,b,p.f);
       _dbg.got.push(p.k+':'+(pa?pa.length:'null')+':'+Math.round(performance.now()-_tp)+'ms');
       if(!pa)return;
        
       var _len=0;for(var _q=0;_q<pa.length;_q++)_len+=pa[_q].L;
       _len/=1609.34;
-      if(_len>Math.max(8, _crow*8+5)){
-        _dbg.got[_dbg.got.length-1]+=':absurd('+Math.round(_len)+'mi)';return}
+      if(_len>Math.max(DETOUR.min,_crow*DETOUR.k+DETOUR.add)){
+        _dbg.got[_dbg.got.length-1]+=':absurd('+Math.round(_len)+'mi)';
+        if(!far||_len<far.len)far={p:p,pa:pa,len:_len};return}
       out.push({h:p.h,k:p.k,s:summarise(pa),snap:sa+sb,na:a,nb:b})});
     try{window.__routeDbg=_dbg}catch(e){}
+     
+    if(!out.length&&far)out.push({h:far.p.h,k:far.p.k,s:summarise(far.pa),snap:sa+sb,na:a,nb:b,
+      far:{mi:far.len,crow:_crow}});
     if(!out.length)return show('<b>No legal route</b> for a '+
       MACHINE[machine].lbl+' between those two points. Try a wider machine, or move the pins nearer a trail.','fail');
     RFROM=ME.slice();RTO=dest.slice();DESTLBL=label||'there';
@@ -2845,6 +2851,8 @@ function renderRoutes(out,auto){
       (s.adv>0.05?'<div class="sub warn">'+s.adv.toFixed(1)+' mi unverified (OSM)</div>':'')+
       (o.snap>0.15?'<div class="sub warn">+'+o.snap.toFixed(1)+
         ' mi off-network (dashed) to reach the trail</div>':'')+
+      (o.far?'<div class="sub warn">the only legal way: '+o.far.mi.toFixed(1)+' mi for places '+
+        shortDist(o.far.crow)+' apart. Check the map before you ride it.</div>':'')+
        
       (function(){
         var pd=s.mi>0?Math.round(100*s.des/s.mi):0;
@@ -4320,7 +4328,7 @@ function corridorByName(riv){
   for(var i=0;i<((PADDLE&&PADDLE.c)||[]).length;i++)if(PADDLE.c[i].n===riv)return PADDLE.c[i];
   return null}
  
-function rivDist(m){return m<0.1?Math.max(10,Math.round(m*528)*10)+' ft':m.toFixed(1)+' mi'}
+function shortDist(m){return m<0.1?Math.max(10,Math.round(m*528)*10)+' ft':m.toFixed(1)+' mi'}
 function rivM(a,b){return Math.hypot((b[0]-a[0])*111320*Math.cos(a[1]*Math.PI/180),(b[1]-a[1])*111320)}
 function riverLine(riv){
   if(_riverCache[riv])return _riverCache[riv];
@@ -4361,7 +4369,7 @@ function navRiverGuide(at,acc,st,mps){
    
   var below=null;if(bmi>=RUN.a.mi)for(var ib=0;ib<L.c.f.length;ib++){var qb=L.c.f[ib];
     if(qb.k==='dam'&&qb.mi>bmi+0.02&&qb.mi<=bmi+0.5){below=qb;break}}
-  var belowTxt=below?(below.n||'A dam')+' is '+rivDist(below.mi-bmi)+' below':'';
+  var belowTxt=below?(below.n||'A dam')+' is '+shortDist(below.mi-bmi)+' below':'';
    
   var toB=RUN.b.p?mi(at,RUN.b.p)*1609.34:1e9;
   if(!RUN.arrived&&arriveNear(toB,acc,remain*1609.34,st.off,40,0.03*1609.34)){
@@ -4369,7 +4377,7 @@ function navRiverGuide(at,acc,st,mps){
     g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('arrive')+'</span>You have reached the take-out</b>'+
       '<span class="eta">'+(RUN.b.n||'Take-out')+(below?' \u00b7 '+belowTxt+': land here':'')+'</span>';ridePublish();
     buzz([80,60,80,60,200]);
-    navSay('You have reached the take-out'+(RUN.b.n?', '+RUN.b.n:'')+(below?'. A dam is '+rivDist(below.mi-bmi).replace('ft','feet').replace('mi','miles')+' below. Land here.':''));
+    navSay('You have reached the take-out'+(RUN.b.n?', '+RUN.b.n:'')+(below?'. A dam is '+shortDist(below.mi-bmi).replace('ft','feet').replace('mi','miles')+' below. Land here.':''));
     rideCard('<b>Take-out reached</b><div class="sub">'+(RUN.b.n||'Your take-out')+
       '. Recording continues until you stop it.</div>'+(below?'<div class="sub warn">'+belowTxt+'. Land here; past the take-out the river runs to it.</div>':''),
       '','Take-out reached \u00b7 '+(RUN.b.n||'your take-out'));
@@ -4377,7 +4385,7 @@ function navRiverGuide(at,acc,st,mps){
   if(RUN.arrived){
     if(below&&st.rm>bmi+0.02&&st.rm<below.mi){var dd=below.mi-st.rm,cl=dd<0.1;
       g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('warn')+'</span>Past the take-out \u2014 '+
-        (cl?'dam just ahead, land now':'dam in '+rivDist(dd)+', land')+(below.n?' \u00b7 '+below.n:'')+'</b>';
+        (cl?'dam just ahead, land now':'dam in '+shortDist(dd)+', land')+(below.n?' \u00b7 '+below.n:'')+'</b>';
       var bk='below|'+below.mi.toFixed(2)+(cl?'|c':'');
       if(VOICE.near!==bk){VOICE.near=bk;buzz([200,100,200]);navSay(cl?'Dam just ahead. Land now.':'You are past the take-out. Dam ahead. Land.')}
       ridePublish()}
@@ -5820,6 +5828,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
                    nearestPavement:nearestPavement,countyAt:countyAt,
                    addressAt:addressAt,get ME(){return ME}};
     window.__route={buildLoops:buildLoops,nearestNode:nearestNode,isFreeway:isFreeway,fwN:function(){return FW_N},
+                    route:route,PROFILES:PROFILES,NODES:NODES,go:routeToPoint,setME:function(p){ME=p.slice()},DETOUR:DETOUR,
                     machineLegal:machineLegal,EDGES:EDGES,ADJ:ADJ,attrs:attrs,
                     setMachine:function(m){if(MACHINE[m])machine=m},
                     get machine(){return machine},spd:spd,MACHINE:MACHINE,
