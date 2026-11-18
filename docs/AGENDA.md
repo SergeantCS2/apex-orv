@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 200.* Ranked by blocking-ness, not by interest.
+*Current as of take 201.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -6260,3 +6260,162 @@ cell's edge the search returned a farther line (0.447 mi against 0.322).
   nearest node on the loop or route being ridden, is a design question.
 - **Ruled out:** correcting the routing snap in the same take as finding
   what it changes.
+## A301 — A whole-state HD save showed only between zoom 11.5 and 12.5 · FOUND take 200 (the third audit; PROVEN by a render probe on take 200's build) · BUILT take 201
+The whole state is saved at z13 only (A190), and the resolver answered
+every z14 and z15 tile nobody saved with a blank PNG. The vendored MapLibre
+5.24 draws raster tiles a level above the camera and falls back to a parent
+only for a child with no data; a blank PNG is data. So from camera zoom
+12.6 up the blanks drew over the overzoomed z12 base, and the saved z13
+showed only between about 11.5 and 12.5: the tier's "one level sharper
+than the built-in map, everywhere" held for one zoom level.
+- **Built, take 201:** a z14 or z15 tile nobody saved, under a saved z13
+  tile, is served that tile's share of the z13, scaled up (hdAncestor:
+  createImageBitmap, an OffscreenCanvas crop, JPEG 0.92), from the nearest
+  saved level above (a z15 under a saved z14 is cut from the z14). Saved
+  pixels only: with no saved tile above it the tile stays blank. A WebView
+  without OffscreenCanvas gets the blank, as before.
+- Held by render A301: a solid red z13 is saved, its z15 child resolves to
+  a red centre pixel (254,0,0,255), and a z15 tile with no saved parent
+  stays blank; a mutant without the crop fails it.
+- UNKNOWN until the phone: the crop's cost on the Fold (one decode and one
+  encode of a 256 px tile per unsaved child in view).
+- **Ruled out:** saving the whole state at z14 too. Four times the tiles
+  (about 49,600) and about 860 MB at the measured 17.7 KB a tile, for
+  pixels the z13 already holds.
+
+## A302 — A finished HD save never redrew the satellite · FOUND take 201 (proving A301 in render, PROVEN) · BUILT take 201
+refreshSat read map.style.sourceCaches, which MapLibre 5 renamed
+style.tileManagers (0 occurrences of sourceCaches in the vendored 5.24
+build). The lookup returned nothing, so no error was thrown, and the
+try/catch hid nothing either: the blank tiles drawn before a save stayed
+until they left the tile cache, and the rider saw no change where they had
+just saved.
+- **Built, take 201:** map.refreshTiles('satpatch') (public in 5.24),
+  which reloads the source's tiles in place, drawn until the new ones
+  land; clearTiles through tileManagers or sourceCaches is the fallback
+  for a build without it.
+- Held by render A302, by what is drawn: over a bundle patch in Hybrid,
+  the camera still, a save's end asks for the patch's tiles again and
+  keeps them drawn. A mutant with clearTiles (the first fix) empties the
+  source and asks for nothing; one reading sourceCaches (take 200) asks for
+  nothing. The app's other read of a MapLibre
+  internal (the glyph manager, for the self-test) already says UNKNOWN
+  when it is missing.
+- **Ruled out:** clearTiles, the first fix: it empties the source and
+  sets nothing that makes the next frame ask for tiles again (the review
+  of take 201, read in the vendored code); measured: 8 tiles drawn before a
+  save, 0 at its end and still 0 1.5 s later, no tile asked for.
+- **Ruled out:** removing and re-adding the satellite source: every layer
+  that reads it would have to go and come back, in order.
+
+## A303 — An HD save never ended when the phone's storage filled · FOUND take 200 (the third audit) · BUILT take 201
+The store's write listened for complete and error only. When a write goes
+over the quota, Chrome aborts its transaction with QuotaExceededError and
+sends no error event (PROVEN, Chrome 138 under a 1 MB quota: the put
+succeeds, then only the transaction's abort fires). The write never
+settled, so the save's lanes hung: the screen stayed on, the chip froze at
+"HD n%", Stop could not end it, and no Save button came back until a
+restart. The card itself promised that a save stops itself if space runs
+out.
+- **Built, take 201:** the write settles on abort. A quota error reads
+  "the phone has no more room for saved imagery", from the abort or from
+  the request itself (an engine that raises it at the write: the review of
+  take 201); the save ends with it, keeps what landed and lets the screen
+  sleep, and the card asks for space instead of saying a re-run continues.
+- Held by render A303: an abort planted where the quota's comes (after the
+  write succeeded) settles the write, and under a real quota cut through
+  CDP a save ends, says why and releases the screen; take 200's never
+  ended. A mutant without the abort handler fails both.
+- **Ruled out:** checking navigator.storage.estimate before each tile. It
+  is an estimate, and a write can still fail at commit; the abort is the
+  phone's own answer.
+
+## A304 — One missing tile stopped an HD save at the same place every time · FOUND take 200 (the third audit, PROVEN against the imagery service) · BUILT take 201
+The imagery service answers 404 for some tiles (13/2888/2207 and its
+neighbours over Algoma, Ontario; PROVEN by the audit's requests). A tile
+that failed twice stopped the save, and the same save run again skipped
+what it had and stopped at the same tile: a view of Drummond Island and
+the North Channel could never be saved past z13.
+- **Built, take 201:** a 404 is a tile the service does not have: it is
+  counted as missing, not retried, and the save goes on. The end card says
+  "(N the imagery service does not have)". With 24 or more missing and
+  more than twice as many missing as saved, the save stops: "the imagery
+  service did not have N of the first M tiles; it may have moved or be
+  down" (the review of take 201: a service answering 404 everywhere ran
+  the whole plan to "finished").
+- Held by render A304: one tile of twelve answers 404, and the save ends
+  with 11 saved, 1 missing and no error; a service answering 404 for every
+  tile stops the save early; mutants of each fail it.
+- **Ruled out:** treating every 4xx as missing. A 403 or 429 is the
+  service refusing, not lacking the tile: the save stops so the rider
+  sees why.
+
+## A305 — The HD card quoted tiles already saved · FOUND take 200 (the third audit, PROVEN by reading) · BUILT take 201
+Each tier left out only the tiles the bundle ships. After a county was
+saved, the card quoted the same tiles, megabytes and Save button; "already
+sharp here — built in or saved" never came for a saved area; and the space
+check asked for room the tiles already had.
+- **Built, take 201:** the card reads the saved tiles' keys (getAllKeys:
+  the keys only, no tile's bytes) and leaves them out of every tier's
+  count, size and space check, and the tiles the service answered 404 for
+  this session too, naming how many (they are never stored, so the card
+  offered the same Save for ever: the review of take 201).
+- Held by render A305: with eight of a z15 view's nine tiles saved and the
+  ninth not found, the card says "already sharp here · 1 the imagery
+  service does not have"; a mutant without the filter quotes them.
+- **Ruled out:** one read per planned tile. The whole-state plan is about
+  12,400 tiles: 12,400 transactions each time the card opens.
+
+## A306 — "Delete all saved HD" during a download left tiles behind · FOUND take 200 (the third audit) · BUILT take 201
+Delete stopped the save and cleared after a fixed 350 ms, and a tile still
+being fetched was written after the clear: up to six tiles came back.
+- **Built, take 201:** a tile that arrives after Stop is not stored, and
+  Delete clears once the save has ended.
+- Held by render A306: two slow tiles in flight when Stop comes, and none
+  is stored; a mutant without the check stores both.
+- **Ruled out:** a longer fixed wait. Any fixed wait guesses how long a
+  fetch takes, and a slow tile takes seconds.
+
+## A307 — Saved routes and spots: Rename and Delete hit every record of that name · FOUND take 200 (the third audit, PROVEN by reading) · BUILT take 201
+Delete and rename acted on every record with the tapped one's name, in
+every region, the hidden "saved in a different region" ones too; the Saved
+panel's rename took a name already in use (the Mark card's refused one);
+two options of one plan with the same rounded miles got one name, so the
+second Save replaced the first while the card said "Saved as"; and the
+caps (40 routes, 200 spots) dropped the oldest without a word. Rename B to
+"Sunday" while A is "Sunday", delete either, and both were gone.
+- **Built, take 201:** delete and rename act on the record tapped (found
+  by its whole content); a rename to a name in use in this region is
+  refused with a toast; a route's name carries its option's label, a
+  loop's its shape ("most trail", "fastest"); the save card says which
+  route or spot the cap dropped.
+- Held by smoke 9v A307 (both same-named routes kept but the deleted one,
+  the rename refused, the dropped route and spot named, the loop shapes
+  named apart); the judge rejects take 200's readings.
+- **Ruled out:** giving saved records ids. Every record already on a phone
+  would need one written in, and the content already tells two records
+  apart.
+
+## A308 — Address search opened at the westernmost match in the state · FOUND take 200 (the third audit, PROVEN on the shipped address index) · BUILT take 201
+A typed address took the first segment whose name contained the text, and
+the index is sorted by name and then west to east: "100 Main St" (336
+candidates) opened in the far west of the Upper Peninsula, a street row
+("Main St", 230 ZIPs) always opened at its westernmost segment, and "100
+Main St, Mio" found nothing, because the town became part of the name.
+- **Built, take 201:** every segment whose name and range fit is a
+  candidate, exact names before partial ones, and the nearest wins: to the
+  rider (the start pin when there is no live fix, and the row says which),
+  or to a town the map knows, typed after a comma; a ZIP chooses within
+  it, and the state ("MI", "Michigan", with or without its ZIP) is read as
+  the state. A town the map does not know is said, not dropped. A street
+  row opens at its stretch nearest the rider. The row says it chose:
+  "Address · the nearest of 9 to the start pin · add a ZIP for another"
+  ("7901 Main St" with no fix); N counts segments, not the two sides of
+  one (15 ranges there).
+- Held by smoke 9v A308 (the nearest candidate, the ZIP's, the street's
+  nearest stretch, the row's words, an unknown town said, "MI" not read as
+  Mio, a known town choosing); the judge rejects take 200's
+  first-in-the-index match, a silent choice and a dropped town.
+- **Ruled out:** a row for every candidate. 336 rows of "100 Main St"
+  would show nine arbitrary ones; one row, nearest first, saying how to
+  ask for another, is a choice the rider can see and change.

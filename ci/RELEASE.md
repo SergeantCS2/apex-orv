@@ -1,15 +1,16 @@
-**Take 200 — No routes on freeways; dams at the ends of a paddle run; honest distances.**
+**Take 201 — Saved HD imagery that shows where you ride; saves that finish; addresses near you.**
 
-No machine, and no one on foot, is routed on an interstate or other
-freeway any more; a tapped freeway says so. A paddle run whose put-in or
-take-out sits beside a dam names the dam, and navigation warns until you
-pass it.
+A whole-state HD save now sharpens the map at riding zoom too, not only
+when zoomed out, and the map redraws as soon as a save finishes. A save no
+longer hangs when the phone runs out of room: it stops, keeps what landed
+and says why. A tile the imagery service does not have is skipped instead
+of stopping the save, the HD card stops quoting tiles you already saved,
+and Delete all during a download leaves nothing behind.
 
-The dispatch card names the road you are on and says how accurate the fix
-is. The off-route alert no longer buzzes in the middle of a long straight
-stretch of your route. Retrace leaves out stretches the GPS never saw
-instead of drawing straight lines across them, and a loop says how far its
-start is from the trail.
+Searching an address finds the one nearest you, and says how many it
+chose from; add a town or ZIP after a comma for another ("100 Main St,
+Mio"). A street opens at its stretch nearest you. Renaming or deleting one
+saved route or spot no longer touches another with the same name.
 
-On the phone: plan a route near I-75: does it stay off it? Tap Dispatch
-standing on a long road: does it name that road?
+On the phone: after a whole-state save, zoom in on a trail: is the photo
+sharp? Search a common street name: does it open near you?

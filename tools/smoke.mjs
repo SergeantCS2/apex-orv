@@ -224,6 +224,8 @@ class MapStub {
   cameraForBounds(b) { const w = b[0][0], s0 = b[0][1], e = b[1][0], n = b[1][1];
     return { center: [(w + e) / 2, (s0 + n) / 2], zoom: 12 }; }
   triggerRepaint() { record.repaints = (record.repaints || 0) + 1; }
+  /* take 201 · A302 · a save's end reloads the satellite's tiles in place */
+  refreshTiles(id) { record.refreshed = (record.refreshed || 0) + 1; }
   getSource(n) { return { setData: (d) => { (record.setData[n] ||= []).push(d); } }; }
   /* take 196 · A14 · the slope bands are added on first use, as in MapLibre */
   addSource(id, s) { record.sources[id] = s; }

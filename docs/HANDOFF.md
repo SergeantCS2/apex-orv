@@ -1,4 +1,132 @@
-# HANDOFF — through Take 200 · V3
+# HANDOFF — through Take 201 · V3
+
+## Take 201 — 2026-11-18 — A whole-state HD save shows at riding zoom (A301); a finished save redraws (A302); a save ends when storage fills (A303), skips tiles the service lacks (A304), quotes only what is not saved (A305) and leaves nothing after Delete (A306); saved records act on the one tapped (A307); an address opens nearest the rider (A308)
+
+RECORDED FIRST. The maintainer, 2026-11-18: "build take 198 - potentially
+199 and 200 … work until my usage is up", then "ensure you continue
+afterwards automatically". Built on take 200 (main 735cfe5).
+
+Where the take came from: a third read-only audit (a subagent), aimed at
+the HD imagery store and saves, address search and saved records. 7
+findings; each was read again here and fixed with a check watched failing
+on a copy of the built app with the fix taken out. One more (A302) was
+found while proving the first in render.
+
+A301 — the whole state is saved at z13 only, and the resolver answered
+every z14 and z15 tile nobody saved with a blank PNG, which MapLibre 5.24
+treats as data: from camera zoom 12.6 up the blanks drew over the base,
+and the saved state showed only between about 11.5 and 12.5 (PROVEN, a
+render probe on take 200's build). Now such a tile is served its share of
+the saved z13 above it, scaled up; saved pixels only, never invented.
+
+A302 — refreshSat cleared the drawn satellite through style.sourceCaches,
+which MapLibre 5 calls tileManagers (0 occurrences in the vendored build):
+no save since at least take 159 redrew the map when it ended (landmine
+268). Now tileManagers.
+
+A303 — a write over the quota aborts at commit with no error event
+(PROVEN, Chrome 138 under a 1 MB quota: the put succeeds, then only the
+transaction's abort fires), and the store listened for error and complete
+only: the save hung, the screen stayed on and Stop could not end it. Now
+the write settles on abort, and the save ends with "the phone has no more
+room for saved imagery".
+
+A304 — the imagery service answers 404 for some tiles over Ontario; two on
+one tile stopped the save at the same place every run. Now a 404 is a
+missing tile, counted and said; a 403 or 429 still stops the save.
+
+A305 — the HD card quoted saved tiles again. Now it reads the saved keys
+(no bytes) and leaves them out of every tier.
+
+A306 — Delete all during a download cleared after a fixed 350 ms and a
+fetch in flight wrote its tile back. Now a tile after Stop is not stored,
+and Delete clears once the save has ended.
+
+A307 — Rename and Delete acted on every saved route or spot with that
+name, in every region; a rename took a name in use; two options with the
+same miles shared a name and the second Save replaced the first; the caps
+dropped records silently. Now each acts on the record tapped, a rename to
+a used name is refused, a route's name carries its option, and the save
+card names what the cap dropped.
+
+A308 — address search took the first match in an index sorted west to
+east: "100 Main St" (336 candidates) opened in the far western Upper
+Peninsula, a street row opened at its westernmost segment, and "100 Main
+St, Mio" found nothing. Now the nearest candidate wins (exact names
+first), a town or ZIP after a comma chooses another, a street opens at its
+stretch nearest the rider, and the row says "the nearest of N".
+
+The review of take 201 (a subagent's cold read of the diff; 7 findings
+and 1 minor, all fixed, each with a check):
+- a town after the comma that the map does not know was dropped without a
+  word, and ", MI" matched Mio by prefix; the state is read as the state,
+  a town is matched whole or by four letters or more, and an unknown one
+  is said ("not a town this map knows · add a ZIP"). With no live fix the
+  row says "to the start pin", not "to you";
+- clearTiles emptied the satellite source and set nothing that asks for
+  its tiles again; map.refreshTiles reloads them in place (A302's first
+  drill counted the call, not the map: measured: 8 tiles drawn before a save, 0 at its end and still 0 1.5 s later, no tile asked for);
+- both loop shapes were still named "Loop" (the label is cut at its first
+  " ·", and a loop's starts "Loop · ");
+- the 201st spot still dropped the oldest without a word (only routes
+  said it);
+- "the nearest of N" counted both sides of a segment (100 for 66);
+- a service answering 404 everywhere ran the whole plan to "finished", and
+  404 tiles, never stored, were quoted for ever;
+- a quota error raised by the write itself read "null";
+- minor: a z15 under a saved z14 was cut from the z13.
+
+Take 200's CI, recorded here (PROVEN from the logs): run 140 stopped at
+the Michigan extract's download, cut short; with the retry, run 141 went
+green (cold, bundle 68 min). The rebuilt graph marks 7,932 freeway edges,
+4,996 of them posted as interstates; smoke's A291 drill read every one
+refused for all four machines. Merged as 735cfe5.
+
+What I got wrong:
+- the first A303 drill aborted the transaction straight after the write;
+  that fires a bubbling error take 200 already caught, so the drill could
+  not fail (read before it ran; landmine 269), and the first A302 control
+  compared a constant;
+- the first quota probe stored one repeated byte, which IndexedDB
+  compresses: eight 300 KB writes used 119 KB and nothing faulted
+  (landmine 269);
+- the real-quota drill first ran inside the render's long-lived page: the
+  cut did not bite its save, and take 192's 150-tile save after it stored
+  nothing (UNKNOWN why; a fresh page bites at once, as the probe did). In
+  a browser context of its own it bit, but I had dropped the override's
+  removal, and the override is the origin's, not the context's: take
+  192's save failed again. Removed in a finally now; take 192's check
+  reads 150 saved;
+- the mutant's cut of the abort handler kept a brace and broke its parse;
+  every check failed for that reason, not its own, and it was cut again;
+- the address row first said "the nearest of 29", counting partial names
+  the exact ones outrank; it counts the rank chosen from;
+- A302's first fix (clearTiles) and its drill (a spy counting the call)
+  judged the call, not what the rider sees; the review read the vendored
+  code and found the source left empty. The drill now reads tiles drawn
+  and tiles asked for, with the camera still (landmine 266's rule).
+
+Verified here (Chrome 138; the bundle of main's newest green run):
+- smoke, all five passes PASSED before the review's fixes (314 / 217 /
+  54 ok, fatal 6, dead 33), and on the rebased seal after them (315 / 218 / 54 ok, fatal 6, dead 33);
+- render: the full run PASSED before the review's fixes (693 ok), and
+  `--only=imagery` after them and on the rebased seal (55 ok);
+- a probe of IndexedDB under a real 1 MB quota (Chrome 138): the write
+  succeeds, then the transaction aborts with QuotaExceededError and no
+  error event;
+- mutants of the built app, each failing its own checks: the six HD fixes
+  reverted together (A301-A306, all six fail, the real-quota part too);
+  the review's HD fixes (clearTiles only: A302's tiles 8 drawn, then 0,
+  nothing asked for; no 404 ceiling; missing tiles quoted) and take 200's
+  sourceCaches (nothing asked for); the saved-record and address fixes
+  (rename unchecked, first-fit geocode, first-segment street, a silent
+  row; delete by name and a silent cap; the pre-review qualifier, ranges
+  counted, the loop label, a silent spot cap: ", MI" read as Mio);
+- the 38 gate checks that need no pipeline output PASSED on the seal;
+  check_stubs first caught smoke's map stub without refreshTiles, the
+  call A302's fix added (added to the stub).
+UNKNOWN until the phone: the crop's cost on the Fold, and the whole-state
+save seen at riding zoom.
 
 ## Take 200 — 2026-11-18 — No freeway is routable (A291); a dam at either end of a paddle run is said (A292); distances to a line are to its segments (A293, A300); a saved route for another machine clears the planned one (A294); Retrace breaks at GPS gaps (A295); dispatch says its accuracy (A296); a loop says its approach (A297)
 
