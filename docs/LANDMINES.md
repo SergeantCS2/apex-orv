@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 197.*
+*Current as of take 198.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -173,6 +173,7 @@ Start here. Do not read top to bottom.
 | A step skips after a module it loads was edited, though every file it opened is unchanged | 261 |
 | CI rebuilds everything cold ("Cache not found") right after a change to the cache's path list | 262 |
 | A mutant that removes a trace's record still passes: something else records it by accident | 263 |
+| A drill reads that something landed (or a timing of 0 ms) before it could have: it counted elements the rider cannot see | 264 |
 
 ---
 
@@ -3511,3 +3512,14 @@ invisible. Rule: a tracer ignores everything it does itself (a re-entry
 guard in the hook and in every patched call), and each record it makes is
 proved by the mutant that removes it.
 
+**264. Elements in the DOM are not elements on screen.** Take 198's A279
+drill timed the HD card's storage read by polling for its tier cards in
+`#panel`. On take 197's build it read 0 ms (PROVEN 2026-11-18): the panel
+under the Tools index still held the last HD card's tier cards from an
+earlier drill, hidden, and the poll counted them at once. The wait derived
+from that time was then too short to see the late card it was there to
+catch. The app had the same lesson written in hdSeen() since take 192 ("the
+card's line being in the DOM does not say it is seen"). Rule: a drill that
+waits for something to land counts what is drawn (a rect with height) in
+the state that shows it (the HD tool up, not the index), and a time it
+measures is checked against a floor it cannot have beaten.

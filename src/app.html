@@ -1204,7 +1204,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 197</span>
+    <span id="title"><b>APEX</b> ORV · Take 198</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -3041,13 +3041,27 @@ function inPatch(z,x,y){var b=(TILES&&TILES.boxes)||[];
    it. The read path ships first and alone — proven before any UI exists.
    Writers (the area downloader, the streaming cache) arrive in later
    takes and own the LRU; this module only reads, writes, counts, clears. */
-var HD=(function(){
-  var DBN='apex-hd',ST='tiles',db=null;
+/* take 198 · A281 · the store is made by a function so render can open a
+   scratch database through the same code (a version-1 store with tiles in
+   it, upgraded); the app's own is HD below */
+function hdStore(DBN){
+  var ST='tiles',db=null;
+  /* version 2 adds an index on each tile's size, so stats() reads sizes from
+     the index's keys: until take 197 it called getAll(), which loads every
+     saved tile's bytes into memory to count them, at every start (hdChip),
+     every HD card and every save's end; a whole-state save is ~180 MB */
   function open(){return db?Promise.resolve(db):new Promise(function(res,rej){
-    var q=indexedDB.open(DBN,1);
-    q.onupgradeneeded=function(){q.result.createObjectStore(ST)};
-    q.onsuccess=function(){db=q.result;res(db)};
-    q.onerror=function(){rej(q.error)}})}
+    var q=indexedDB.open(DBN,2);
+    /* the names lists are read as arrays: the lists' own contains method
+       reads to the gate's stub check as an Element's, which smoke does not
+       model */
+    q.onupgradeneeded=function(){var d=q.result,s,has=function(l,n){return Array.prototype.indexOf.call(l,n)>=0};
+      s=has(d.objectStoreNames,ST)?q.transaction.objectStore(ST):d.createObjectStore(ST);
+      if(!has(s.indexNames,'s'))s.createIndex('s','s')};
+    q.onsuccess=function(){db=q.result;
+      db.onversionchange=function(){try{db.close()}catch(e){}db=null};res(db)};
+    q.onerror=function(){rej(q.error)};
+    q.onblocked=function(){rej(new Error('the HD store is open elsewhere'))}})}
   function tx(mode,fn){return open().then(function(d){return new Promise(function(res,rej){
     var t=d.transaction(ST,mode),q=fn(t.objectStore(ST));
     t.oncomplete=function(){res(q?q.result:undefined)};
@@ -3058,11 +3072,17 @@ var HD=(function(){
     put:function(z,x,y,buf){return tx('readwrite',function(s){
       return s.put({b:buf,s:buf.byteLength,t:Date.now()},z+'/'+x+'/'+y)})},
     del:function(z,x,y){return tx('readwrite',function(s){return s.delete(z+'/'+x+'/'+y)})},
-    stats:function(){return tx('readonly',function(s){return s.getAll()})
-      .then(function(all){all=all||[];var b=0;for(var i=0;i<all.length;i++)b+=(all[i].s||0);
-        return {tiles:all.length,bytes:b}})},
+    /* the count from count(), the bytes from the size index's keys: no
+       tile's bytes leave the store */
+    stats:function(){return open().then(function(d){return new Promise(function(res,rej){
+      var t=d.transaction(ST,'readonly'),s=t.objectStore(ST),n=0,b=0,c=s.count(),k=s.index('s').openKeyCursor();
+      c.onsuccess=function(){n=c.result};
+      k.onsuccess=function(){var r=k.result;if(r){b+=(+r.key||0);r.continue()}};
+      t.oncomplete=function(){res({tiles:n,bytes:b})};
+      t.onerror=function(){rej(t.error)}})})},
     clear:function(){return tx('readwrite',function(s){return s.clear()})}};
-})();
+}
+var HD=hdStore('apex-hd');
 /* take 144 · the resolver's order of address: inside a declared box the
    BUNDLE answers, as it always has; outside every box the SAVED HD STORE
    answers before blank does — that is the entire trick that lets a rider's
@@ -8124,6 +8144,18 @@ function hdCard(confirmId){
      still there (the tool up, or its first open from the index) */
   var inSheet=SHEET.tab&&(SHEET_PENDING==='c-hdmanage'||SHEET.tool==='c-hdmanage'),sTab=SHEET.tab;
   Promise.all([HD.stats(),HDDL.quota()]).then(function(res){
+    /* take 198 · A279 · the rider left before the read landed (Back, a tab,
+       another row): the card is not written. Until take 197 it was, through
+       show(), which opened the drawer again over the map the rider had gone
+       back to, the Tools strip over it (PROVEN, render on take 197's build).
+       Still there means the HD tool up, or the Tools index its row was
+       tapped from with no other row's card pending.
+       Ruled out (take 198, measured): opening the tool at once with a
+       one-line "reading" card. The drawer shrank to that line and grew back,
+       and in render each resize redraws the map: the card took 4.4 s to land
+       against under 0.7 s */
+    var still=SHEET.tab===sTab&&(SHEET.tool==='c-hdmanage'||(SHEET.tool===null&&!SHEET_PENDING));
+    if(inSheet&&!still)return;
     var st=res[0],q=res[1],busy=HDDL.busy();
     /* take 190 · A259 · artboard 18: the three tiers as cards — name, tiles
        and size, the note, and its own Save, with no accent (saves stay
@@ -8154,7 +8186,7 @@ function hdCard(confirmId){
     h+='<div class="k">SAVED ON THIS PHONE</div><div class="sub" id="hd-saved">'+st.tiles.toLocaleString()+
         ' tiles · '+(st.bytes/1048576).toFixed(1)+' MB</div>'+
       (st.tiles?'<button class="chip" id="hd-del">'+ic('del')+'<span>Delete all saved HD</span></button>':'');
-    if(inSheet&&SHEET.tab===sTab&&(SHEET.tool==='c-hdmanage'||(SHEET.tool===null&&!SHEET_PENDING)))SHEET_PENDING='c-hdmanage';
+    if(inSheet)SHEET_PENDING='c-hdmanage';
     show(h);
     tiers.forEach(function(t){
       var g=el('hd-go-'+t.id);if(g)g.addEventListener('click',function(){startHDSave(t.tiles,t.label);hdCard()});
@@ -9180,7 +9212,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     /* take 188 · A202 D7 · what the low-zoom chaining cost, or why it failed */
     window.__netLo={n:NETLO.length,ms:NETLO_MS,err:NETLO_ERR,z:NETLO_Z,edges:nf2.length,cls:NETLO_CLS.slice(),
       skip:Object.keys(NETLO_SKIP),layers:Object.keys(NETFT)};
-    window.__hd=HD;
+    window.__hd=HD;window.__hdStore=hdStore;
     /* take 145 · app.js is wrapped (the take-127 lesson): nothing reaches
        window unless placed there. The drill drives the save loop through
        these. */
