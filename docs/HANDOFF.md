@@ -106,6 +106,20 @@ container's hazards payload and slope bands):
 UNKNOWN until the phone: the HD read's time on the Fold, and what the start
 costs after a whole-state save there.
 
+CI, round 1 (PR #15, run 131, PROVEN from its log): the cache was not
+found for any key (main's last save was run 127 on 2026-11-08, ten days
+before; INFERRED: GitHub evicts a cache unused for seven days), so the
+build was cold: pipeline 1,640 s, every compute step stamped afresh.
+Smoke passed five times (607), render passed (685), and the gate failed
+one check: check_offline found `https://maplibre.invalid/` in
+vendor/maplibre-gl-csp.js. ci/bundle.sh fetched `maplibre-gl@5` from
+unpkg, which now resolves 5.24.1; take 197 shipped 5.24.0 (landmine 265).
+Reproduced here: the same failure with 5.24.1's file in www/vendor, a
+pass with 5.24.0's (byte-identical to take 197's APK: sha256 a1f1847b…).
+The fix: ci/bundle.sh fetches 5.24.0 and checks the three files' sha256
+against take 197's; a 5.24.1 file stops the build with the landmine named
+(tested). A failed job saves no cache, so round 2 is cold too.
+
 ## Take 197 — 2026-11-07 — Every data source named, in the app and the store listing (A280); the trail card's surface (A10); the step stamps ignore the import system's scans (A207)
 
 RECORDED FIRST. The maintainer, 2026-11-07: "go, build take 197 with all

@@ -174,6 +174,7 @@ Start here. Do not read top to bottom.
 | CI rebuilds everything cold ("Cache not found") right after a change to the cache's path list | 262 |
 | A mutant that removes a trace's record still passes: something else records it by accident | 263 |
 | A drill reads that something landed (or a timing of 0 ms) before it could have: it counted elements the rider cannot see | 264 |
+| The gate fails on code nobody changed: a file fetched at build time by a version range changed underneath | 265 |
 
 ---
 
@@ -3523,3 +3524,14 @@ card's line being in the DOM does not say it is seen"). Rule: a drill that
 waits for something to land counts what is drawn (a rect with height) in
 the state that shows it (the HD tool up, not the index), and a time it
 measures is checked against a floor it cannot have beaten.
+
+**265. A version range fetched at build time is a change nobody made.**
+ci/bundle.sh fetched MapLibre from unpkg as `maplibre-gl@5`. Take 197 built
+with 5.24.0; by take 198's run (PR #15, run 131, 2026-11-18) unpkg resolved
+5.24.1, whose main script carries a new origin string
+(`https://maplibre.invalid/`), and the gate's offline check failed a build
+whose app had not changed (PROVEN: the job log, and locally with 5.24.1 in
+www/vendor). The licence check pinned 5.24.0's LICENSE by hash while the
+code itself floated. Rule: every file fetched at build time names an exact
+version and is held to its hash; moving it is a take of its own, its hash
+and every pin that names its version moved together.
