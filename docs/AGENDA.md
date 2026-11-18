@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 201.* Ranked by blocking-ness, not by interest.
+*Current as of take 202.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -6419,3 +6419,173 @@ Main St, Mio" found nothing, because the town became part of the name.
 - **Ruled out:** a row for every candidate. 336 rows of "100 Main St"
   would show nine arbitrary ones; one row, nearest first, saying how to
   ask for another, is a choice the rider can see and change.
+## A309 — The paddle guide and the dams measured river miles on two scales · FOUND take 201 (the fourth audit, PROVEN on the shipped corridor) · BUILT take 202
+tools/corridor.py writes each stop's and dam's river mile with metres()
+(111,320 m a degree, east-west scaled by the cosine of each step's own
+latitude); the app's river line summed mi(), whose fixed 0.714 is right
+only near 44.4°N. The paddler's mile and the dams' miles disagreed: of 141
+dams within 60 m of their line, 113 read 0.1 mi or more off, worst 2.89 mi
+(River Raisin); at Portland Municipal Dam the strip read "Dam in 2.5 mi"
+at the dam, and Forestville Dam's warning came 0.9 mi early.
+- **Built, take 202:** the river line sums with the corridor's own scale
+  (rivM). Measured here: 0 of 141 dams off by 0.1 mi, worst 0.019 mi.
+- Held by smoke 9w A309: every dam's point reads its recorded mile on the
+  app's line, and 0.05 mi above Portland Municipal Dam, placed by the
+  corridor's scale computed in the drill (not the app's), the strip reads
+  "Dam just ahead"; a mutant on the old scale fails both (113 off; "Dam in
+  2.6 mi" at the dam).
+- **Ruled out:** changing mi() everywhere. Every distance in the app reads
+  it, and the routing graph's lengths come from the pipeline; the river
+  line is the one place two scales met.
+
+## A310 — A dam just below the take-out was never mentioned · FOUND take 201 (the fourth audit, PROVEN on the shipped corridor) · BUILT take 202
+55 access, launch or camp stops sit 0.05-0.5 river-mi above a dam (Mio
+Pond T-Dock, 0.2 mi above Mio Dam). The card said "No dams between them",
+the guide skipped anything past the take-out, and once the take-out was
+reached the guide returned at once: a paddler who missed the landing
+heard nothing as the river carried them to the dam.
+- **Built, take 202:** for a downstream run, the first dam 0.05 to 0.5
+  river-mi below the take-out is on the card ("Mio Dam is 0.2 mi below the
+  take-out. Land at the take-out; past it the river runs to the dam."), on
+  the strip as the take-out nears, at arrival (screen and voice), and past
+  the landing whether it was "reached" or not ("Past the take-out — dam
+  just ahead, land now"). A dam within 0.05 of the take-out is at it (the
+  card cannot tell which side) and is announced as a dam ahead.
+- Held by smoke 9w A310 (card, 0.4 mi out, arrival, 0.12 mi past, a miss
+  40 m off the line never reached, and Natalie to Dollarville Dam Boat
+  Launch with the dam 0.03 below it); mutants fail.
+- **Ruled out:** a wider window than half a mile: past that the next
+  stop's card names the dam, and a warning that far below reads as noise.
+
+## A311 — The truck read "0.0 mi" up to 260 ft away, with a bearing · FOUND take 201 (the fourth audit, PROVEN by reading) · BUILT take 202
+The peek line and the To truck cell rounded to a tenth of a mile: "Truck
+0.0 mi S" up to about 260 ft, a bearing to where the rider stood.
+- **Built, take 202:** under a tenth of a mile the distance is in feet
+  (to 10 ft), and inside 60 ft (GPS error) it reads "here" with no
+  bearing; the ride stats line reads the same.
+- Held by smoke 9x A311 (a real ride: 140 ft reads "140 ft S", 30 ft
+  "here"); a mutant on the old rounding fails.
+- **Ruled out:** two decimals of a mile. "0.03 mi" is still a bearing to
+  noise inside GPS error, and feet are what a rider paces off.
+
+## A312 — One coarse fix could declare arrival · FOUND take 201 (the fourth audit, PROVEN by reading) · BUILT take 202
+The arrival ring took the fix's accuracy with no cap (a fallback fix 300
+m off with a 500 m radius arrived), arrival stays set, and "under 25 m of
+line left" arrived for a fix far off the line's end.
+- **Built, take 202:** one rule for routes and take-outs (arriveNear): a
+  fix coarser than 75 m arrives nowhere, and the line rule needs the fix
+  on the line.
+- Held by smoke 9w A312 (four planted cases, and a 400 m fix 0.15 mi
+  short of a real take-out does not reach it); a mutant fails.
+- **Ruled out:** filtering coarse fixes out of the ride: they still carry
+  the track and the HUD; only arrival needs a fix good enough to say so.
+
+## A313 — The compass gave bearings without saying from where · FOUND take 201 (the fourth audit, PROVEN by reading) · BUILT take 202
+The compass rows measure from ME, which with no fix is the start pin and
+after a Stop the last fix, frozen while the rider walks; the Tools compass
+opens no GPS watch.
+- **Built, take 202:** the rows open with where they are measured from,
+  the place cards' own words ("From your position", "From your last GPS
+  fix (10:42)", "From the start pin").
+- Held by smoke 9x A313; a mutant without the line fails.
+- **Ruled out:** opening a GPS watch whenever the compass is open: a
+  watch keeps the receiver at high accuracy until it is stopped (A285
+  removed a hidden one); saying where the rows measure from is honest
+  without one.
+
+## A314 — A long way round was reported as "No legal route" · FOUND take 201 (the fourth audit, PROVEN on the shipped graph) · BUILT take 202
+A route longer than max(8, 8 × crow-fly + 5) miles is dropped as absurd
+(take 117), and with every profile dropped the card said "No legal route
+… Try a wider machine". Some legal places a fifth of a mile apart are
+8-16.6 mi apart by any legal line (a river, a closed stretch).
+- **Built, take 202:** when every profile found a route and all were over
+  the cap, the shortest is shown, saying "the only legal way: 11.5 mi for
+  places 0.2 mi apart. Check the map before you ride it."
+- A re-route mid-ride onto the long way opens the card and says so (it
+  read "Re-routed" with the warning in the folded cards).
+- Held by smoke 9y A314 (a real pair over the cap, found by a seeded
+  search, planned and re-routed onto); a mutant fails. The cap is a named
+  setting (DETOUR).
+- **Ruled out:** raising the cap: it exists to keep a 100-mile answer to a
+  2-mile question from the expensive summary, and a long way round is
+  still worth a warning.
+
+## A315 — Ride after a Stop moved the truck and kept the old spot nowhere · FOUND take 201 (the fourth audit, PROVEN by reading) · BUILT take 202 (a safety net); A316 OPEN
+Stop ends the trip (take 189), and the next Ride's first fix pins the
+truck where the rider is. A Stop at lunch and Ride again moved the truck
+to the lunch spot, and To truck, the compass and Retrace led there.
+- **Built, take 202:** when a new trip pins the truck more than 0.1 mi
+  from where it was, within 12 hours of the Stop, the old spot is saved as
+  a waypoint ("Truck before 1:58 PM"; after a second Stop and Ride, "Ride
+  start before …", the spot then held being the last ride's start) and a
+  toast says so; the Stop card says what Ride does next. The self-test's
+  drill and the simulator keep nothing.
+- Held by smoke 9x A315 (both names); a mutant fails.
+- **Ruled out:** keeping every earlier truck: the next day's ride from
+  another trailhead would file yesterday's truck, and Saved fills.
+
+## A316 — Should Ride after a Stop continue the trip? · FOUND take 201 (the fourth audit) · OPEN, the maintainer's call
+A315 keeps the old truck spot; the track and the trip's clock still
+restart. Options: (a) as now, Stop ends the trip; (b) Ride within N hours
+of a Stop asks "Continue the trip (truck kept, 8.2 mi) or start new?";
+(c) a Pause distinct from Stop.
+- **Ruled out:** choosing for the maintainer; each changes what Stop
+  means on every ride.
+
+## A317 — Arrival at the end of the line, short of an off-network place; a home across the lake · FOUND take 201 (the fourth audit, PROVEN on the shipped data) · BUILT take 202
+A route's line ends at the node its destination snapped to; the leg past
+it (counted on the route card) was not in To go, and "under 25 m of line
+left" arrived there: 408 of 902 campgrounds end more than 0.15 mi short.
+nearestNode has no limit, so a home set by GPS in Milwaukee routed to the
+Michigan shore 76.8 mi away and "arrived at home" there.
+- **Built, take 202:** with more than 50 m past the line's end, arrival is
+  at the place only, To go counts that leg (the walk left, once on it),
+  walking it is not off route, and at the line's end the strip says "the
+  last 0.2 mi is off the mapped network (dashed)". A destination more than
+  3 mi from every line the machine may ride is refused with its distance;
+  a GPS home that far from the network is kept, and the card says so.
+- Held by smoke 9z A317 (a real place 0.21 mi off the network ridden to
+  the line's end, walked, and reached; Milwaukee refused); a mutant fails.
+- **Ruled out:** routing a guessed path across the gap: it is dashed
+  because nothing mapped is there.
+
+## A318 — Turns from one unnamed track onto another were never cued · FOUND take 201 (the fourth audit, PROVEN on the shipped graph) · BUILT take 202
+directions() merged consecutive steps that share a name and id, and every
+unnamed line is "two-track": 57% of track miles are unnamed, and 129,738
+turns of 50° or more at their junctions merged away (no strip line, no
+voice, Turns one step).
+- **Built, take 202:** at a junction of three or more lines this machine
+  may ride, a move from one unnamed line onto another starts a new step
+  when it turns 45° or more and some other legal way is less than 60°
+  sharper, or when another legal way is straighter by more than 10° (a
+  fork: "Keep left/right"). The strip and the voice say "the unnamed
+  two-track", as Turns does.
+- Held by smoke 9za A318 (a real turn split, a real 45°+ move whose other
+  ways are far sharper kept as one step, a real fork cued "Keep"; the
+  app's own directions()); a mutant fails.
+- Measured by the review on the first rule (any line counted, 45°): of
+  158,493 moves onto the straightest unnamed line, 27,714 were cued, about
+  4,800 needlessly; 44,193 moves off a straighter line by under 45° got no
+  cue. The rule above answers both.
+- **Ruled out:** breaking at every bend: a degree-2 node is no choice, and
+  a cue there is noise.
+
+## A319 — The compass's north and declination · FOUND take 201 (the fourth audit, INFERRED) · OPEN, needs the phone
+The heading takes deviceorientation's alpha as north, and Chrome on
+Android fires the relative event as well as the absolute one (a likely
+cause of A201's jumpiness; the self-test's "(relative)" tag would show
+it). DECL_W = 7° is north-east Michigan's declination, used statewide.
+- **Ruled out:** changing the heading source without the Fold's own
+  reading: the self-test line is the measurement to take first.
+
+## A320 — Voice cues after a re-route, and near a turn · FOUND take 201 (the fourth audit, INFERRED) · OPEN, to measure
+The voice key is reset only by navStop, so a re-route can stay silent on
+its first turn; the 90 m near/far switch has no hysteresis, so a rider
+stopped about 90 m short can hear the cue repeat.
+- **Ruled out:** changing the voice rules without a drill that rides a
+  re-route through the guide and counts what is said.
+
+## A321 — A resumed loop is re-planned as a route to its start · FOUND take 201 (the fourth audit, INFERRED) · OPEN
+After a restart mid-loop, the resumed trip's route is planned point to
+point to the loop's start, not as the rest of the loop.
+- **Ruled out:** fixing without a drill of a loop resumed after a restart.

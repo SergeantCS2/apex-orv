@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 201.*
+*Current as of take 202.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -179,6 +179,7 @@ Start here. Do not read top to bottom.
 | A mutant of the fix passes its drill: the drill never reached the path the fix changed | 267 |
 | An HD save ends and the map keeps its old tiles: a library internal read by name returned nothing after a rename | 268 |
 | A drill passes the build it was written to fail: its planted fault landed where the real one does not | 269 |
+| A drill's search over real data finds nothing: an earlier drill left the machine or mode it depends on | 270 |
 
 ---
 
@@ -3598,3 +3599,14 @@ and eight of them used 119 KB of a 1 MB quota. Rule: plant a fault at the
 moment and in the shape the real one arrives, from a probe of the real
 one, and check that the plant took (here, the probe's own usage figure)
 before reading the result.
+
+**270. A drill inherits the state the drills before it left.** Take 202's
+A314 drill searched 900 seeded pairs of real nodes for a legal route over
+the detour cap and found none, then 300 more and found no routable pair at
+all: the router answered nothing for every one. An earlier drill had put
+the app in Water mode and back, and the machine was still the paddle
+craft, so no land edge was legal. Set to a land machine, the first search
+found a pair 0.2 mi apart whose legal routes run 11.5 to 13.9 mi. Rule: a
+drill sets what its reading depends on (mode, machine, start pin), says it
+in its line, and puts it back; a search that finds nothing reports what it
+searched with.

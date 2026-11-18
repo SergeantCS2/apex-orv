@@ -1,16 +1,18 @@
-**Take 201 — Saved HD imagery that shows where you ride; saves that finish; addresses near you.**
+**Take 202 — Dam warnings on time on every river; honest arrivals; turns on unnamed tracks.**
 
-A whole-state HD save now sharpens the map at riding zoom too, not only
-when zoomed out, and the map redraws as soon as a save finishes. A save no
-longer hangs when the phone runs out of room: it stops, keeps what landed
-and says why. A tile the imagery service does not have is skipped instead
-of stopping the save, the HD card stops quoting tiles you already saved,
-and Delete all during a download leaves nothing behind.
+On the water, dam warnings now come when you reach the dam on every river,
+not up to two and a half miles early or late, and a dam just below your
+take-out is named on the card, as you come in, and if you miss the
+landing.
 
-Searching an address finds the one nearest you, and says how many it
-chose from; add a town or ZIP after a comma for another ("100 Main St,
-Mio"). A street opens at its stretch nearest you. Renaming or deleting one
-saved route or spot no longer touches another with the same name.
+Arrival waits for a GPS fix good enough to say so, and for a place off the
+trail it is at the place, not where the trail ends. Turns from one unnamed
+two-track onto another are called. The truck's distance reads in feet up
+close, and "here" when you are at it. The compass says where it measures
+from. A long way round is shown with a warning instead of "No legal
+route", and a home far from any trail on the map is refused rather than
+routed to the nearest shore. A Stop and a new ride keep the old truck spot
+under Saved.
 
-On the phone: after a whole-state save, zoom in on a trail: is the photo
-sharp? Search a common street name: does it open near you?
+On the phone: on a paddle run, does the dam warning come as you reach the
+dam? Ride a turn between two unnamed two-tracks: is it called?
