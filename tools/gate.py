@@ -2981,13 +2981,17 @@ def check_render():
         return fails.append(
             "tools/verify_palette.mjs missing — nothing proves the legend "
             "swatches match the colours the map paints (take 77)")
-    r = subprocess.run(["node", vp], capture_output=True, text=True, timeout=300)
+    # take 199: 600 s, for the page load's own 180 s and the app's 120 s after
+    # it (main's run 134 died at the load's old 120 s); the load line, how
+    # long it took or which requests stayed open, is said either way
+    r = subprocess.run(["node", vp], capture_output=True, text=True, timeout=600)
+    load = next((l.strip() for l in r.stdout.splitlines() if l.strip().startswith("(palette:")), "")
     if r.returncode:
         bad = [l.strip() for l in r.stdout.splitlines() if "FAIL" in l][:2]
-        fails.append("palette render failed: " + ("; ".join(bad) or r.stderr[-120:]))
+        fails.append("palette render failed: " + ("; ".join(bad) or r.stderr[-120:]) + (" " + load if load else ""))
     else:
         n = sum(1 for l in r.stdout.splitlines() if l.strip().startswith("ok"))
-        notes.append(f"palette: browser confirms swatch == map paint, {n} checks")
+        notes.append(f"palette: browser confirms swatch == map paint, {n} checks" + (" " + load if load else ""))
 
 
 # ── 6b2. The repo must build the app it claims to ────────────────────────────

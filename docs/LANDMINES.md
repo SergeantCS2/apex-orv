@@ -3432,6 +3432,17 @@ made — here, that no drawn stack still holds a place the model says is
 alone — and waits for it, with a ceiling that only answers a frame that
 never comes.
 
+**Corollary (take 199) — a page load is a frame too.** Main's take 198
+build (run 134) and take 195's (run 120) died at the render's 60 s
+navigation ceiling after a cold build, run 134 having first read 0 water
+labels after one fixed 2.4 s idle, and run 134's re-run died at the
+palette verifier's 120 s; other runs of the same code passed. A ceiling
+sized for a quiet machine is a fixed ceiling. Every page load the gate
+makes waits up to 180 s, says how long it took, and with no network quiet
+names the requests still open and goes on only if the app came up; the
+water labels are read until placed, to a 20 s ceiling that only a layer
+that never draws reaches.
+
 **257. A cloud session's git can push its branch, not a tag.** Takes 185
 to 189 were tagged by the sessions on the workstation, with the
 maintainer's own git; he never ran a tag command. On 2026-11-02 this cloud

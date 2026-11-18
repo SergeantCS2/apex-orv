@@ -92,6 +92,30 @@ Verified here (Chrome 138; the bundle of main's newest green run):
 UNKNOWN until the phone: the quiet offer's peek line on the Fold, and
 Locate's single watch in the field.
 
+After the seal (2026-11-18, before the merge): main's take 198 build (run
+134, cold) failed in the render. The water labels read 0 of 12,803 after
+one fixed 2.4 s idle, then the heavy tail's fresh browser could not load
+the page in 60 s ("Navigation timeout of 60000 ms exceeded"). Re-run once
+(take 195's run 120 precedent): the render passed (685 green) and the
+palette verifier then could not load its page in 120 s. The same code
+passed on PR runs 133 and 136, whose palette step took about 40 s, page
+load included. INFERRED: main's runners after a cold build were slow to
+serve the 257 MB bundle; UNKNOWN whether a request hung. Take 198 has no
+green build of main, so no release and no tag of its own (the tag workflow
+tags only a commit with one); its code ships in take 199's release.
+This take carries the fix (landmine 256's corollary):
+- every page load the gate makes (render's two, the palette verifier's)
+  waits up to 180 s and says how long it took; with no network quiet it
+  names the requests still open and goes on only if the app came up;
+- the water labels are read until placed, to a 20 s ceiling;
+- the gate gives the palette verifier 600 s (it had 300, less than a slow
+  load and the wait after it).
+Verified here: `--only=labels` PASSED (load 13.0 s); with the ceiling cut
+to 1 ms it said so and went on once the app was up (36.6 s); with the app
+planted dead it said "never came up" and failed; a copy whose water labels
+never draw failed after 19 reads in 20.8 s; the palette verifier PASSED
+(load 13.1 s); the 37 no-pipeline gate checks PASSED.
+
 ## Take 198 — 2026-11-18 — Back before the HD card lands folds and stays folded (A279); HD stats stop reading every saved tile (A281); stale agenda headings corrected (A282)
 
 RECORDED FIRST. The maintainer, 2026-11-18: "go, build take 198 -
