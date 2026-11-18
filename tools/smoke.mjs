@@ -4925,6 +4925,7 @@ if (!NO_GPS) {
   ok(ok309(s309) && !ok309({ ...s309, bad: 113 }) && !ok309({ ...s309, strip: "Dam in 2.5 mi — portage" }),
      `A309 · ${n} dams read their own mile on the app's river line (${bad} off by 0.1 mi or more; worst ${worst.toFixed(3)} mi, ${wn}); `
      + `0.05 mi above Portland Municipal Dam by the corridor's scale the strip reads "${strip309.slice(0, 60)}"; the judge rejects take 201's 113 off and "Dam in 2.5 mi" at the dam`);
+  let coarse312 = null;
   /* A310 · Camp Ten Bridge to Mio Pond T-Dock, Mio Dam 0.2 mi below it */
   const au = CS.find((x) => x.n === "Au Sable River");
   const st = (mi, k) => au && au.f.find((f) => Math.abs(f.mi - mi) < 0.006 && (!k || f.k === k));
@@ -4934,6 +4935,8 @@ if (!NO_GPS) {
     grab("pd-nav")._listeners = {}; P.run(ten, td, au.n); flushTimeouts(); const card = text("panel");
     grab("pd-nav").fire("click"); flushTimeouts(); frames(1);
     fix(corAt(au, td.mi - 0.4), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1); const near = text("nav-g");
+    /* A312 · a coarse fix (400 m) 0.15 mi short of the take-out does not reach it */
+    fix(corAt(au, td.mi - 0.15), { speed: 1.2, heading: 0, accuracy: 400 }); flushTimeouts(); frames(1); coarse312 = text("nav-g");
     fix(corAt(au, td.mi), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1); const arrive = text("nav-g");
     fix(corAt(au, td.mi + 0.12), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1); const past = text("nav-g");
     stop();
@@ -4944,7 +4947,53 @@ if (!NO_GPS) {
        `A310 · Camp Ten Bridge to Mio Pond T-Dock: the card names Mio Dam below the take-out (${s310.card}), 0.4 mi out the strip says so (${s310.near}), `
        + `arrival names it ("${arrive.slice(0, 70)}"), and 0.12 mi past the landing "${past.slice(0, 60)}"; the judge rejects take 201's silence after arrival and a card without it`);
   }
+  /* A312 · arrival needs a fix good enough to say so */
+  const A = N.arriveNear, old = (to, acc, rem) => to < Math.max(25, Math.max(15, acc || 0)) || rem < 25;
+  const cases = A ? [A(300, 500, 2000, 300, 25, 25), A(20, 8, 2000, 20, 25, 25), A(200, 10, 10, 200, 25, 25), A(200, 10, 10, 5, 25, 25)] : [];
+  const s312 = { cases: cases.join(","), coarse: coarse312 };
+  const ok312 = (x) => x.cases === "false,true,false,true" && x.coarse !== null && !/reached the take-out/.test(x.coarse);
+  ok(ok312(s312) && !ok312({ ...s312, cases: [old(300, 500, 2000), old(20, 8, 2000), old(200, 10, 10), old(200, 10, 10)].join(",") })
+     && !ok312({ ...s312, coarse: "You have reached the take-out" }),
+     `A312 · arrival: 300 m off with a 500 m fix, at the end of the line 200 m off it: no; 20 m away, or on the line's end: yes (${s312.cases}); `
+     + `a 400 m fix 0.15 mi short of Mio Pond T-Dock reads "${String(coarse312).slice(0, 50)}"; the judge rejects take 201's ring with no cap`);
   MO.apply(m0, { silent: true }); flushTimeouts();
+}
+
+/* 9x · take 202 · A311 · the truck's distance in feet under a tenth of a
+   mile, and "here" inside GPS error. Until take 201 the peek line and the
+   To truck cell read "Truck 0.0 mi S" up to 260 ft: a bearing to where the
+   rider stood. A real ride: the first fix pins the truck, then fixes 140 ft
+   and 30 ft north of it. */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav;
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1], accuracy: 5 }, extra || {}) });
+  const stop = () => { for (let i = 0; i < 3 && flagged(); i++) { grab("c-ride").fire("click"); flushTimeouts(); frames(1); } };
+  stop();
+  const P0 = sandbox.window.__route.ME.slice();
+  grab("c-ride").fire("click"); flushTimeouts();
+  fix(P0, { speed: 2 }); flushTimeouts(); frames(1);
+  const T = N.truck();
+  const north = (ft) => [T[0], T[1] + ft * 0.3048 / 111320];
+  let c140 = "", p140 = "", c30 = "", p30 = "";
+  if (T) { fix(north(140), { speed: 2 }); flushTimeouts(); frames(1);
+    c140 = String(grab("v-truck").textContent || ""); p140 = N.peekText();
+    fix(north(30), { speed: 1 }); flushTimeouts(); frames(1);
+    c30 = String(grab("v-truck").textContent || ""); p30 = N.peekText(); }
+  stop();
+  /* A313 · the compass says where its bearings are measured from */
+  const SX = sandbox.window.__sheet; let cmpTxt = "";
+  if (SX && T) { SX.tab("tools"); flushTimeouts(); grab("c-compass").fire("click"); flushTimeouts();
+    cmpTxt = String(grab("cmpsheet")._html || "").replace(/<br>/g, " | ").replace(/<[^>]*>/g, "");
+    SX.back(); flushTimeouts(); }
+  const from313 = /From (your position|your last GPS fix \(|the start pin|the planning start|the simulated position)/;
+  const ok313 = (t) => from313.test(t) && t.search(from313) < t.indexOf("Truck");
+  ok(ok313(cmpTxt) && !ok313(cmpTxt.replace(from313, "")),
+     `A313 · the compass's rows say where they are measured from before the first bearing ("${(cmpTxt.match(/From [^|]*/) || ["none"])[0].trim()}"); the judge rejects take 201's rows with no origin`);
+  const st = { T: !!T, c140, p140, c30, p30 };
+  const okT = (x) => x.T && x.c140 === "140 ft S" && x.p140 === "Truck 140 ft S" && x.c30 === "here" && x.p30 === "Truck here";
+  ok(okT(st) && !okT({ ...st, c140: "0.0 S", p140: "Truck 0.0 mi S" }) && !okT({ ...st, c30: "0.0 S" }),
+     `A311 · 140 ft from the truck the cell reads "${c140}" and the peek line "${p140}"; 30 ft from it "${c30}" / "${p30}"; the judge rejects take 201's "0.0 mi S"`);
 }
 
 /* 10 · nothing ever left the origin */

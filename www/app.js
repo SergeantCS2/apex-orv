@@ -740,6 +740,8 @@ function cmpRows(hdg){
   if(HOME)row('Home',HOME);
   wpLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region})
     .slice(0,6).forEach(function(x){row(x.n,x.p)});
+   
+  if(out.length)out.unshift('<span class="sub">From '+meNoun(true)+'</span>');
   return out}
 
 function cmpPaint(){
@@ -3964,7 +3966,7 @@ function syncSafety(){
   if(tv.parentNode)tv.parentNode.className='cell';
   if(rv.parentNode)rv.parentNode.className='cell';
   var d=mi(ME,TRUCK), b=bearing(ME,TRUCK);
-  tv.textContent=(d<10?d.toFixed(1):Math.round(d))+' '+compass(b);
+  tv.textContent=truckTxt(d,b,false);
   tv.className='v'+(d>8?' warn':' good');
   rv.textContent=crumbMi.toFixed(1);
    
@@ -4069,8 +4071,7 @@ el('btn-disp').addEventListener('click',function(){
       bits.push('Nearest junction <b>'+nm+'</b> — '+
         (nj.d<0.19?(nj.d*5280|0)+' ft':nj.d.toFixed(2)+' mi')+' '+
         compass(bearing(ME,[NODES[nj.n][0],NODES[nj.n][1]])))}
-    if(TRUCK)bits.push('Truck <b>'+mi(ME,TRUCK).toFixed(2)+' mi '+
-      compass(bearing(ME,TRUCK))+'</b>');
+    if(TRUCK)bits.push('Truck <b>'+truckTxt(mi(ME,TRUCK),bearing(ME,TRUCK),true)+'</b>');
     var ev=elevAt(ME);if(ev!==null)bits.push('Elevation <b>'+ft(ev)+' ft</b>');
     var np=nearestPavement(ME);
     if(np.p)bits.push('Nearest pavement <b>'+np.d.toFixed(2)+' mi '+
@@ -4362,8 +4363,8 @@ function navRiverGuide(at,acc,st,mps){
     if(qb.k==='dam'&&qb.mi>bmi+0.02&&qb.mi<=bmi+0.5){below=qb;break}}
   var belowTxt=below?(below.n||'A dam')+' is '+rivDist(below.mi-bmi)+' below':'';
    
-  var toB=RUN.b.p?mi(at,RUN.b.p)*1609.34:1e9,acc_=Math.max(15,acc||0);
-  if(!RUN.arrived&&(toB<Math.max(40,acc_)||remain<0.03)){
+  var toB=RUN.b.p?mi(at,RUN.b.p)*1609.34:1e9;
+  if(!RUN.arrived&&arriveNear(toB,acc,remain*1609.34,st.off,40,0.03*1609.34)){
     RUN.arrived=true;NAV.follow=false;HUDG={togo:0,min:null};navChip();
     g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('arrive')+'</span>You have reached the take-out</b>'+
       '<span class="eta">'+(RUN.b.n||'Take-out')+(below?' \u00b7 '+belowTxt+': land here':'')+'</span>';ridePublish();
@@ -4505,6 +4506,9 @@ function loopRejoin(at,G,pr){try{
     NAVG=null;
     return true}
   return false}catch(e){return false}}
+ 
+function arriveNear(toM,acc,remainM,offM,ring,left){var a=Math.max(15,acc||0);if(a>75)return false;
+  return toM<Math.max(ring,a)||(remainM<left&&offM<Math.max(25,a))}
 function navFmt(m){return m<320?(Math.round(m*3.281/50)*50)+' ft':(m/1609.34).toFixed(1)+' mi'}
 function navGuide(at,acc,mps){
   if(!NAV.on)return;
@@ -4518,8 +4522,8 @@ function navGuide(at,acc,mps){
   var pr=navProject(at,G.loop?rid+1609.34:null,G.loop?rid:null);G.seg=pr.seg;
   var remain=Math.max(0,G.total-pr.prog);
    
-  var toDest=mi(at,G.dest)*1609.34,acc_=Math.max(15,acc||0);
-  var near=(toDest<Math.max(25,acc_)||remain<25);
+  var toDest=mi(at,G.dest)*1609.34;
+  var near=arriveNear(toDest,acc,remain,pr.off,25,25);
   if(G.loop)near=near&&rid>=G.total*0.5;
   if(!G.arrived&&near){
     G.arrived=true;NAV.follow=false;HUDG={togo:0,min:null};navChip();
@@ -5867,7 +5871,8 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       window.__search=function(q,all){return all?searchAll(q):search(q)};
       window.__voice=VOICE;window.__say=navSay;window.__voiceProbe=navVoiceProbe;
       window.__voiceLine=stVoiceNative;window.__ttsRetry=TTS_RETRY;    
-      window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,
+      window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,peekText:function(){return railPeekText()},arriveNear:arriveNear,
+        truck:function(){return TRUCK?TRUCK.slice():null},
          
          
         sim:function(){railSet(false);startSim()},simStop:stopRide,
@@ -7173,13 +7178,17 @@ var RAIL_MANUAL=false;
  
 var GPS_WAIT='Waiting for a GPS fix';
 function rideWaiting(){return !!(rideMode&&!gotFix&&!riding)}
+ 
+function truckTxt(d,b,unit){var f=d*5280;
+  if(f<60)return 'here';
+  if(d<0.1)return Math.round(f/10)*10+' ft '+compass(b);
+  return (d<10?d.toFixed(1):Math.round(d))+(unit?' mi':'')+' '+compass(b)}
 function railPeekText(){
   if(rideWaiting())return GPS_WAIT+' \u2014 '+(RESUMING?crumbMi.toFixed(1)+' mi recorded, kept':'nothing recorded yet');
    
   if(gotFix&&fixStale())return 'No GPS fix since '+fixClock();
   if(TRUCK&&ME){
-    var d=mi(ME,TRUCK);
-    return 'Truck '+(d<10?d.toFixed(1):Math.round(d))+' mi '+compass(bearing(ME,TRUCK))}
+    return 'Truck '+truckTxt(mi(ME,TRUCK),bearing(ME,TRUCK),true)}
   if(RAIL_AT)return 'Details';
   return ''}
 
