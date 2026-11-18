@@ -3045,12 +3045,17 @@ function inPatch(z,x,y){var b=(TILES&&TILES.boxes)||[];
    scratch database through the same code (a version-1 store with tiles in
    it, upgraded); the app's own is HD below */
 function hdStore(DBN){
-  var ST='tiles',db=null;
+  var ST='tiles',db=null,dbp=null;
   /* version 2 adds an index on each tile's size, so stats() reads sizes from
      the index's keys: until take 197 it called getAll(), which loads every
      saved tile's bytes into memory to count them, at every start (hdChip),
      every HD card and every save's end; a whole-state save is ~180 MB */
-  function open(){return db?Promise.resolve(db):new Promise(function(res,rej){
+  /* take 198 · the review: one open at a time. The boot's hdChip and the tile
+     resolver opened together and made two connections, and a versionchange
+     closed whichever one db named; the pending open is shared now, and each
+     connection closes itself */
+  function open(){if(db)return Promise.resolve(db);if(dbp)return dbp;
+    dbp=new Promise(function(res,rej){
     var q=indexedDB.open(DBN,2);
     /* the names lists are read as arrays: the lists' own contains method
        reads to the gate's stub check as an Element's, which smoke does not
@@ -3058,10 +3063,11 @@ function hdStore(DBN){
     q.onupgradeneeded=function(){var d=q.result,s,has=function(l,n){return Array.prototype.indexOf.call(l,n)>=0};
       s=has(d.objectStoreNames,ST)?q.transaction.objectStore(ST):d.createObjectStore(ST);
       if(!has(s.indexNames,'s'))s.createIndex('s','s')};
-    q.onsuccess=function(){db=q.result;
-      db.onversionchange=function(){try{db.close()}catch(e){}db=null};res(db)};
-    q.onerror=function(){rej(q.error)};
-    q.onblocked=function(){rej(new Error('the HD store is open elsewhere'))}})}
+    q.onsuccess=function(){var c=q.result;db=c;
+      c.onversionchange=function(){try{c.close()}catch(e){}if(db===c){db=null;dbp=null}};res(c)};
+    q.onerror=function(){dbp=null;rej(q.error)};
+    q.onblocked=function(){rej(new Error('the HD store is open elsewhere'))}});
+    return dbp}
   function tx(mode,fn){return open().then(function(d){return new Promise(function(res,rej){
     var t=d.transaction(ST,mode),q=fn(t.objectStore(ST));
     t.oncomplete=function(){res(q?q.result:undefined)};
@@ -3079,7 +3085,8 @@ function hdStore(DBN){
       c.onsuccess=function(){n=c.result};
       k.onsuccess=function(){var r=k.result;if(r){b+=(+r.key||0);r.continue()}};
       t.oncomplete=function(){res({tiles:n,bytes:b})};
-      t.onerror=function(){rej(t.error)}})})},
+      t.onerror=function(){rej(t.error)};
+      t.onabort=function(){rej(t.error||new Error('the HD count was aborted'))}})})},
     clear:function(){return tx('readwrite',function(s){return s.clear()})}};
 }
 var HD=hdStore('apex-hd');
@@ -8142,7 +8149,8 @@ function hdCard(confirmId){
      which time a sheet row's pending mark is gone: whether it belongs in the
      sheet is decided NOW, and honoured when it is written if the rider is
      still there (the tool up, or its first open from the index) */
-  var inSheet=SHEET.tab&&(SHEET_PENDING==='c-hdmanage'||SHEET.tool==='c-hdmanage'),sTab=SHEET.tab;
+  var inSheet=SHEET.tab&&(SHEET_PENDING==='c-hdmanage'||SHEET.tool==='c-hdmanage'),sTab=SHEET.tab,
+    rl=el('rail'),wasUp=!!rl&&!/\bfolded\b/.test(rl.className);
   Promise.all([HD.stats(),HDDL.quota()]).then(function(res){
     /* take 198 · A279 · the rider left before the read landed (Back, a tab,
        another row): the card is not written. Until take 197 it was, through
@@ -8156,6 +8164,10 @@ function hdCard(confirmId){
        against under 0.7 s */
     var still=SHEET.tab===sTab&&(SHEET.tool==='c-hdmanage'||(SHEET.tool===null&&!SHEET_PENDING));
     if(inSheet&&!still)return;
+    /* the same outside a sheet (the review of take 198): a card asked for
+       with the drawer up (a save's end redrawing it) is dropped when the
+       rider folded the drawer meanwhile; one asked for folded opens it */
+    if(!inSheet&&wasUp&&rl&&/\bfolded\b/.test(rl.className))return;
     var st=res[0],q=res[1],busy=HDDL.busy();
     /* take 190 · A259 · artboard 18: the three tiers as cards — name, tiles
        and size, the note, and its own Save, with no accent (saves stay

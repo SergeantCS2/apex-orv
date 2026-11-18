@@ -66,6 +66,23 @@ shipped (A112, A117, A136/A137, A139, A142–A149, the bleed numbered A156,
 A190, A203). Each says what shipped, citing the code, and what is still
 open.
 
+The review of take 198 (the code-review skill, 7 findings; 4 fixed, 3
+left):
+- render's A279 drill now requires one Back to come before the card lands
+  (the index at the tap); a fast read would have passed it untested;
+- the same late card outside a sheet (a save's end redrawing the card) is
+  dropped when the rider folded the drawer meanwhile;
+- the HD store shares one pending open: the boot's hdChip and the tile
+  resolver opened together and made two connections, and a versionchange
+  closed whichever one `db` named; each connection now closes itself;
+- stats() settles when its transaction aborts, instead of never;
+- left: onblocked rejects while the open stays alive (the next call finds
+  it); the tiers are planned before the read (planned after, "this view"
+  would quote the view after the drawer moved); the per-tile key walk at
+  start (A281 rules out a running total).
+- considered: take 197's code never meets the version-2 store. Android
+  refuses a lower versionCode, and versionCode is the take (A177).
+
 What I got wrong:
 - the first A279 fix opened the tool at once with a placeholder card, and
   made the card four times slower to land; measured, and ruled out;

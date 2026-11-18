@@ -1110,18 +1110,21 @@ function inPatch(z,x,y){var b=(TILES&&TILES.boxes)||[];
  
  
 function hdStore(DBN){
-  var ST='tiles',db=null;
+  var ST='tiles',db=null,dbp=null;
    
-  function open(){return db?Promise.resolve(db):new Promise(function(res,rej){
+   
+  function open(){if(db)return Promise.resolve(db);if(dbp)return dbp;
+    dbp=new Promise(function(res,rej){
     var q=indexedDB.open(DBN,2);
      
     q.onupgradeneeded=function(){var d=q.result,s,has=function(l,n){return Array.prototype.indexOf.call(l,n)>=0};
       s=has(d.objectStoreNames,ST)?q.transaction.objectStore(ST):d.createObjectStore(ST);
       if(!has(s.indexNames,'s'))s.createIndex('s','s')};
-    q.onsuccess=function(){db=q.result;
-      db.onversionchange=function(){try{db.close()}catch(e){}db=null};res(db)};
-    q.onerror=function(){rej(q.error)};
-    q.onblocked=function(){rej(new Error('the HD store is open elsewhere'))}})}
+    q.onsuccess=function(){var c=q.result;db=c;
+      c.onversionchange=function(){try{c.close()}catch(e){}if(db===c){db=null;dbp=null}};res(c)};
+    q.onerror=function(){dbp=null;rej(q.error)};
+    q.onblocked=function(){rej(new Error('the HD store is open elsewhere'))}});
+    return dbp}
   function tx(mode,fn){return open().then(function(d){return new Promise(function(res,rej){
     var t=d.transaction(ST,mode),q=fn(t.objectStore(ST));
     t.oncomplete=function(){res(q?q.result:undefined)};
@@ -1138,7 +1141,8 @@ function hdStore(DBN){
       c.onsuccess=function(){n=c.result};
       k.onsuccess=function(){var r=k.result;if(r){b+=(+r.key||0);r.continue()}};
       t.oncomplete=function(){res({tiles:n,bytes:b})};
-      t.onerror=function(){rej(t.error)}})})},
+      t.onerror=function(){rej(t.error)};
+      t.onabort=function(){rej(t.error||new Error('the HD count was aborted'))}})})},
     clear:function(){return tx('readwrite',function(s){return s.clear()})}};
 }
 var HD=hdStore('apex-hd');
@@ -4838,11 +4842,14 @@ function hdCard(confirmId){
   var conf=typeof confirmId==='string'?confirmId:null;
   var tiers=hdTiers(),pr;
    
-  var inSheet=SHEET.tab&&(SHEET_PENDING==='c-hdmanage'||SHEET.tool==='c-hdmanage'),sTab=SHEET.tab;
+  var inSheet=SHEET.tab&&(SHEET_PENDING==='c-hdmanage'||SHEET.tool==='c-hdmanage'),sTab=SHEET.tab,
+    rl=el('rail'),wasUp=!!rl&&!/\bfolded\b/.test(rl.className);
   Promise.all([HD.stats(),HDDL.quota()]).then(function(res){
      
     var still=SHEET.tab===sTab&&(SHEET.tool==='c-hdmanage'||(SHEET.tool===null&&!SHEET_PENDING));
     if(inSheet&&!still)return;
+     
+    if(!inSheet&&wasUp&&rl&&/\bfolded\b/.test(rl.className))return;
     var st=res[0],q=res[1],busy=HDDL.busy();
      
     var h=(inSheet?'':'<b>HD imagery</b>')+

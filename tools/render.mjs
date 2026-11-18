@@ -4856,6 +4856,9 @@ if (zoomed.trails > 0) {
     return { drawn: true, T, landed, wait, runs };
   });
   if (a279.drawn) {
+    /* at least one Back came before the card landed (the sheet still on the
+       index at the tap): a fast read would otherwise pass without the late
+       path ever running (the review of take 198) */
     /* the read's time has a floor it cannot beat, one poll (landmine 264: on
        take 197's build a count of hidden cards read 0 ms) */
     /* at the tap the Tools sheet is up (its index until the read lands, or
@@ -4870,7 +4873,7 @@ if (zoomed.trails > 0) {
     const plants = [{ ...good, after: { ...good.after, folded: false } },
       { ...good, after: { ...good.after, tab: "tools", kind: "index" } },
       { ...good, at: { tab: "map", kind: null, tool: null } }];
-    ok(a279.T !== null && a279.T >= 25 && a279.landed.tiers >= 2 && a279.wait > a279.T && a279.runs.length === 4 && a279.runs.every(runOk)
+    ok(a279.T !== null && a279.T >= 25 && a279.landed.tiers >= 2 && a279.runs.some((r) => r.at.kind === "index") && a279.wait > a279.T && a279.runs.length === 4 && a279.runs.every(runOk)
        && runOk(good) && !plants.some(runOk),
        `A279 · from the Map tab, Back tapped before the HD card lands folds the drawer, and the card the rider left `
        + `never opens it again (the read took ${a279.T} ms; each Back was watched for ${a279.wait} ms): `
