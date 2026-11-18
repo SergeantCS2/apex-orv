@@ -1,4 +1,118 @@
-# HANDOFF — through Take 199 · V3
+# HANDOFF — through Take 200 · V3
+
+## Take 200 — 2026-11-18 — No freeway is routable (A291); a dam at either end of a paddle run is said (A292); distances to a line are to its segments (A293, A300); a saved route for another machine clears the planned one (A294); Retrace breaks at GPS gaps (A295); dispatch says its accuracy (A296); a loop says its approach (A297)
+
+RECORDED FIRST. The maintainer, 2026-11-18: "build take 198 - potentially
+199 and 200 … work until my usage is up". Built on take 199 (main 75310e5)
+while takes 198 and 199 were in CI.
+
+Where the take came from: a second read-only audit (a subagent), aimed at
+confident wrong answers on the safety paths (the dispatch card, Return home
+and Retrace, re-routing, every number a card states, legality). 8 findings;
+each was read again here, measured where it could be on the shipped graph,
+and fixed with a check watched failing on a copy of the built app with the
+fix taken out. Two questions go to the maintainer (A298, A299).
+
+A291 — interstates. graph.py mapped OSM motorway to `paved`, which every
+machine may ride: 5,003 interstate edges (2,430 mi) were legal for the
+bike, the quad, the side-by-side and on foot, and a start 95 m east of
+I-75 snapped onto it (PROVEN on the shipped graph). Now graph.py marks
+motorways (`fw`), the bundle carries the mark, and machineLegal refuses a
+marked edge, or one posted as an interstate, for every machine; the card
+says so. check_freeway_rules holds the wiring and the interstate rule
+(9 planted refs; 2 breakages watched failing); smoke 9p holds the refusal.
+UNKNOWN until CI: how many motorway edges the rebuilt graph marks.
+
+A292 — paddle dams. A dam within 0.05 river-mi of either end was left off
+the card ("No dams between them": Camp Ten Bridge to the access below Mio
+Dam passes it), and navigation skipped dams within 0.03 mi ahead. Now a dam
+at either end is said, with which-side-of-the-dam caution, and announced
+until passed ("Dam just ahead — portage now").
+
+A293 — segment distance. nearestEdge, nearestPavement and the off-route
+alert measured to vertices, and the edge grid filed an edge only in its
+vertices' cells: mid-span the dispatch read another road, pavement read
+half a mile off while standing on it, and the phone buzzed "Off route" on
+the planned line. Now all three measure to segments (segNear), and an edge
+is filed in every cell its segments cross. Measured here: without the
+denser grid, 60 of the 400 longest spans' middles still read another road.
+
+A294 — svOpen changed the machine and kept the planned route; after a
+failed reopen Ride refused it as "not legal for a Kayak". Now a saved route
+for another machine clears the route planned now, as the chip and a mode
+change do. (First fixed in the wrong place: landmine 267.)
+
+A295 — Retrace across gaps. A 6 mi jump between fixes was drawn straight
+under "Every foot of this is ground you have already covered". Now a step
+over 0.25 mi is a break in the track and in Retrace, Retrace counts only
+seen ground and names the breaks, and the first fix after Resume is
+recorded. The ride's miles keep the straight line: leaving gaps out of
+them was tried, and a loop's progress (capped by miles ridden) then read a
+mile more to go after a Stop (ruled out, measured).
+
+A296 — dispatch accuracy: the fix's accuracy is kept and said ("±8 m";
+over 100 m, a coarse fix). A297 — a loop's off-network approach is said
+and counted in the fuel line; every card's fuel line counts off-network
+miles.
+
+A298 (OPEN): the fuel check ignores miles already ridden; the app cannot
+know when the tank was filled. A299 (OPEN): state trunklines are open to
+ORVs only on MDOT's signed connectors; the router treats them as pavement.
+
+A300 — the grid search stopped a ring early (the review of takes 199 and
+200): its bound took ring r to be r-0.5 cells away, but a point at its
+cell's edge touches ring 1, and a cell is narrower in the north. At 68 of
+400 points near a cell's edge it returned a farther line (measured on the
+shipped graph). The dispatch's nearest road and nearest pavement now search
+with the safe bound (24 boundary probes against brute force in smoke 9r; a
+mutant misses 3). The routing snap keeps the old one, OPEN: corrected, a
+rider 450 m off a loop snapped to a nearer node on another road and
+re-joined the loop at its end (smoke's A234 check, PROVEN).
+
+The review of takes 199 and 200 (a subagent's cold read of the diff, 6
+findings; for take 200: 3 fixed, 1 split):
+- A300 above (the read-only answers fixed, the snap OPEN);
+- check_freeway_rules failed a region with no freeway (neml-bullgap); it
+  fails only a bundle whose posted interstates carry no mark;
+- smoke 9p's snap check read the app's own mark, so on a build without it
+  it could not fail; it reads the posted ref.
+And from take 200's full render: the route-card cue's control passed on a
+stale cue, because the first card's own warnings matched it once A297's
+fuel line wrapped; the control now plants warnings until they differ.
+
+Take 199's CI, recorded here (PROVEN from the logs): PR run 136 green
+(cold, bundle 50 min: smoke five passes, render, gate, bundle 257 MB);
+after main's take 198 build died twice at page loads (run 134), take 199
+took the busy-runner fix and run 137 went green in 31 min, its page loads
+8.9 s, 8.0 s and the palette's 7.8 s. Merged as 75310e5. Take 198 has no
+release or tag of its own (no green build of main).
+
+What I got wrong:
+- A294's first fix went where the symptom showed (Navigate this run), and
+  a drill that could not fail held it; the mutant that survived showed the
+  route never reached Water by that path (landmine 267);
+- A295 first left gaps out of the ride's miles, and navigation's loop
+  progress, which reads them, broke; ruled out, measured;
+- the A293 drill first used a span whose vertices sat within one ring of
+  its middle, and could not fail without the denser grid (landmine 267);
+- correcting the grid's ring bound everywhere changed a loop's re-join;
+  the routing snap keeps the old bound until that is looked at (A300).
+
+Verified here (Chrome 138; the bundle of main's newest green run; this
+graph predates A291's mark, so the app's interstate rule refuses the
+5,003 posted edges, and CI's rebuilt graph carries the mark):
+- smoke, all five passes PASSED on the final build: 312 / 215 / 54 ok,
+  fatal 6, dead 33;
+- render, the full run PASSED on the final build: 686 ok;
+- 13 mutants of the built app, each failing its own check: the freeway
+  refusal, the card's and the guide's dam rules, vertex distance, no denser
+  grid, the old ring bound, svOpen keeping the route, no gap rule, the
+  first resumed fix dropped, accuracy dropped, the loop approach at 0 (and
+  the two first-framing mutants that survived, landmine 267);
+- gate check_freeway_rules with 2 planted breakages watched failing; the
+  37 gate checks that need no pipeline output PASSED.
+UNKNOWN until CI: the freeway edges the rebuilt graph marks. UNKNOWN until
+the phone: the dispatch's road and accuracy line in the field.
 
 ## Take 199 — 2026-11-18 — Resume never stops a running ride (A283); slow GPS answers stay out of what the rider moved on to (A284); no hidden GPS watch (A285); away fixes, failed HD saves and failed saved routes stop opening the drawer or claiming success (A286–A288); DNR boat launches designed (A290)
 

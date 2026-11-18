@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 199.*
+*Current as of take 200.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -176,6 +176,7 @@ Start here. Do not read top to bottom.
 | A drill reads that something landed (or a timing of 0 ms) before it could have: it counted elements the rider cannot see | 264 |
 | The gate fails on code nobody changed: a file fetched at build time by a version range changed underneath | 265 |
 | A check passes while the product does the wrong thing: it judges the words said after the action, not the action | 266 |
+| A mutant of the fix passes its drill: the drill never reached the path the fix changed | 267 |
 
 ---
 
@@ -3557,3 +3558,16 @@ itself, and the saved trip it ended, then passed every build until take
 the wrong question. Rule: when a review finds an action doing the wrong
 thing, the check holds the action (the ride rides on, the trip is kept),
 and the words are a second assertion, never the only one.
+
+**267. A mutant that survives is the drill saying it does not test the fix.**
+Take 200 took each fix out of a copy of the built app. Two copies passed:
+without the densified edge grid, the A293 drill's 0.95 mi span still read
+its own road (its vertices sat within one grid ring of its middle); and
+without the first A294 fix the drill still navigated, because a mode change
+clears the route and the state the fix guarded never formed. The first gap
+was closed by giving the drill the five longest spans in the bundle (the
+grid's case: 60 of the 400 longest spans read another road without it,
+measured); the second showed the fix was in the wrong place, and moved it
+to where the stale route was made (svOpen). Rule: a fix is not held until a
+copy without it fails its drill; a copy that passes sends you back to the
+drill, or to the fix.

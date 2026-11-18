@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 199.* Ranked by blocking-ness, not by interest.
+*Current as of take 200.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -6099,3 +6099,164 @@ What it would add, the design to approve or change:
   (retired) and university mirrors of MRBIS (copies that lag).
 - **Ruled out:** a time to launch or fees beyond the Passport flag; the layer
   does not say them.
+
+## A291 — Interstates were routable for every machine · FOUND take 199 (the safety audit, PROVEN on the shipped graph) · BUILT take 200
+tools/graph.py mapped OSM highway=motorway (and trunk) to class `paved`, and
+every machine's allow-list holds `paved`: the bike, the quad, the
+side-by-side and on foot could all be routed on a freeway. The shipped graph
+holds 5,003 edges posted as interstates (2,430 mi), every one of them
+`paved`. Ramps are not mapped, so the interstate is nearly an island: a
+start 95 m east of I-75 (44.95824,-84.67234) snapped onto it, and a Return
+home from there rode 50 mi of interstate or was refused. No ORV may use any
+part of an interstate in Michigan (MCL 324.81131 as amended by 2013 PA 119;
+MDOT's ORV page).
+- **Built, take 200:** graph.py marks OSM motorways (`fw`), emit_graph
+  bundles the mark, and machineLegal refuses a marked edge for every
+  machine, before its memo (keyed by bundle and class). On any bundle the
+  app also refuses an edge posted as an interstate ("I 75", alone or in a
+  list; "BL I 75", a business loop, is not one). A tapped freeway's card
+  says "freeway: no ORV, no one on foot".
+- Held by gate check_freeway_rules (the wiring, the interstate rule on 9
+  planted refs, and on a built bundle the mark carried; 2 planted breakages
+  watched failing) and smoke 9p (every interstate edge refused for all four
+  machines, other pavement kept, the I-75 start snaps to a legal
+  non-freeway edge; a mutant without the refusal fails it, snapping onto
+  I-75 exactly as the audit found).
+- UNKNOWN until CI: how many edges the rebuilt graph marks (motorways that
+  are not interstates, US-131's freeway, M-6, are marked by the tag).
+- **Ruled out:** a new class for freeways. Ten class-keyed tables, styles
+  and gate checks would move to draw the same pavement; a mark on the edge
+  changes only who may ride it.
+- **Ruled out:** holding US and M trunklines out here too; that is A299,
+  the maintainer's call.
+
+## A292 — A dam beside the put-in or take-out was left out of the paddle card and never warned · FOUND take 199 (the safety audit, PROVEN on the shipped corridor) · BUILT take 200
+runCard left out any dam within 0.05 river-mi of either end, and said "No
+dams between them"; navRiverGuide skipped features within 0.03 mi ahead,
+dams too. Camp Ten Bridge (58.35) to the access below Mio Dam (61.58) passes
+the dam at 61.54; an access 0.02 mi above it never heard of it. 84 stops sit
+within 0.05 mi of a dam.
+- **Built, take 200:** a dam at either end is said on the card ("Mio Dam
+  is at the take-out (0.04 river-mi from it). The map cannot tell which
+  side of the dam that access is on: check …; never run a dam."), and "No
+  dams between them" only when none is near. Navigation announces a dam
+  until it is passed; under a tenth of a mile it reads "Dam just ahead —
+  portage now".
+- Held by smoke 9q; mutants of each half fail it.
+- **Ruled out:** a tighter window (0.01 mi). River miles of a stop and a
+  dam are not that precise; the card names a dam near an end and says the
+  map cannot tell which side of it the access is.
+
+## A293 — Distances to a line were measured to its vertices · FOUND take 199 (the safety audit, PROVEN on the shipped graph) · BUILT take 200
+The dispatch's nearest road and nearest pavement, the place card's
+"nearest:" and the off-route alert measured to vertices; emit_graph keeps
+10 m simplification and splits edges only at junctions, so 30,511 of 41,361
+paved miles sit in spans over 0.25 mi with no vertex inside. Mid-span on
+30th Avenue the dispatch read "On or near 11 Mile Road — 2650 ft"; nearest
+pavement read a median 0.47 mi while standing on it; riding the middle of a
+span over 0.32 mi buzzed "Off route". And the edge grid filed an edge only
+in the cells of its vertices, so even measured to segments, the middle of a
+long span read another road: 60 of the 400 longest spans (measured here on
+the shipped graph).
+- **Built, take 200:** linePt (on segNear, the tap handler's point-to-
+  segment) for nearestEdge, nearestPavement and checkOffRoute (edge by
+  edge, never joined across edges); gridBuild files an edge in every cell
+  its segments cross (quarter-cell steps); and nearestEdge and
+  nearestPavement search one ring further (ringMiSafe; A300 below), so 24
+  probes at grid-cell edges read what brute force reads.
+- Held by smoke 9r: a mid-span point reads its own road and pavement at 0;
+  the five longest spans' middles read their own road; riding the middle
+  of a long span of the planned line raises no alert. Mutants (vertex
+  distance; no densified grid) fail it.
+- **Ruled out:** densifying the graph's geometry in emit_graph (more
+  vertices in every edge); the bundle grows for a search the grid answers.
+
+## A294 — Opening a saved route for another machine kept the planned route under the new machine · FOUND take 200 (its dam drill, PROVEN in smoke) · BUILT take 200
+svOpen set the machine to the saved route's and kept the route planned now;
+the machine chip and a mode change both clear it (take 188). When the
+reopen failed (A288), the old route stayed planned under the new machine,
+and any Ride was refused: "This route is not legal for a Kayak … Nothing
+started" (found when take 200's dam drill could not navigate a river run
+after the A288 drill). First read as "entering Water keeps the route": a
+debug run showed a mode change clears it (PROVEN), so the fix went where
+the route survived.
+- **Built, take 200:** a saved route for another machine clears the route
+  planned now, as the chip does.
+- Held by smoke 9u (a bike route, then a saved route for the boat: no route
+  left under the boat, Ride not refused); a mutant without the clear fails
+  it, and fails A292's navigation with it.
+- **Ruled out:** clearing a land route when a river run is navigated (the
+  first fix): the route could not survive into Water once svOpen clears it,
+  and a fix at the wrong place hides the cause.
+
+## A295 — Retrace drew straight lines across GPS gaps and called them ground covered · FOUND take 199 (the safety audit) · BUILT take 200
+record() joined each fix to the last whatever lay between; the track and
+Retrace drew a 6 mi jump (a dropout, a locked screen, a resumed trip) as a
+straight line, across swamp or water, under "Every foot of this is ground
+you have already covered". And the first fix after Resume was not recorded.
+- **Built, take 200:** a step over 0.25 mi between recorded fixes is a gap.
+  The track and Retrace draw it as a break (MultiLineString); Retrace counts
+  only the ground it saw and says "N breaks where the GPS saw nothing";
+  the ride's miles keep the straight line (a floor on the distance, which
+  navigation's progress reads). The first resumed fix is recorded.
+- Held by smoke 9s and the A230 check (both resumed fixes on the track);
+  mutants fail them.
+- **Ruled out:** (measured, take 200) leaving gaps out of the ride's miles.
+  Navigation caps a loop's progress by the miles ridden, and a loop drill
+  then read a mile more to go after a Stop.
+
+## A296 — The dispatch card read out a coordinate with no accuracy · FOUND take 199 (the safety audit; the dropped accuracy PROVEN) · BUILT take 200
+ME_FIX kept no accuracy and locateOnce dropped it; the card printed five
+decimals, which imply metres, whatever the fix.
+- **Built, take 200:** the fix's accuracy is kept and printed ("±12 m",
+  or "accuracy not reported"); over 100 m the card says it is a coarse fix,
+  to say so with the coordinate and read a new one when the sky is clear.
+- Held by smoke 9t; a mutant fails it.
+- **Ruled out:** refusing to print a coarse fix; a dispatcher can still use
+  a coordinate with its margin said, and refusing is worse in the field.
+
+## A297 — A loop's card left out its off-network approach · FOUND take 199 (the safety audit) · BUILT take 200
+buildLoops set snap to 0, so a loop from a start 2 mi off the network said
+neither "+off-network" nor counted it in the fuel line; the route card's
+fuel check left every route's off-network miles out.
+- **Built, take 200:** a loop's approach is twice the start's distance to
+  the network, and the fuel check counts off-network miles on every card.
+- Held by smoke 9t (a loop from the middle of Houghton Lake says +2.8 mi
+  off-network); a mutant fails it.
+- **Ruled out:** adding the approach into the loop's headline miles; the
+  card keeps the loop's own length and says the approach beside it, as a
+  route's card does.
+
+## A298 — The fuel check ignores the miles already ridden · FOUND take 199 (the safety audit) · OPEN, the maintainer's call
+The range is compared with the route's miles only; ROADMAP 4.20 says routes
+are flagged against "what's left". The app does not know when the tank was
+filled (a ride's miles are not miles since a fill-up), so subtracting them
+could be as wrong as not. Question for the maintainer: subtract the ride's
+miles, ask "filled up at the start?", or leave the range as a full tank.
+- **Ruled out:** subtracting without asking; the app cannot know the tank.
+
+## A299 — State highways open to ORVs only on MDOT's signed connector segments · FOUND take 200 (reading the law for A291) · OPEN, the maintainer's call
+Michigan opens state trunklines (US and M routes) to ORVs only on approved,
+signed connector segments (MCL 324.81131, MDOT's ORV page); county roads by
+local ordinance. The router treats every trunkline as pavement and the card
+counts road miles. Question for the maintainer: hold trunklines out like
+freeways (crossing them only), or keep them with a warning on the card.
+- **Ruled out:** a list of MDOT's approved segments; none was found to read
+  (the search, 2026-11-18), and a guessed list would be a confident wrong
+  answer.
+
+## A300 — The grid search stops a ring early · FOUND take 200 (the take-198 review; measured on the shipped graph) · BUILT take 200 for the read-only answers; OPEN for the routing snap
+gridRings' stop rule took ring r to be (r-0.5) cells away; a point at its
+own cell's edge touches ring 1, and a cell's east-west width at 48.3°N is
+narrower than the 0.714 the bound assumed. At 68 of 400 points near a
+cell's edge the search returned a farther line (0.447 mi against 0.322).
+- **Built, take 200:** ringMiSafe ((r-1) cells at cos 0.66) for
+  nearestEdge and nearestPavement, which only read; smoke 9r's 24
+  boundary probes against brute force; a mutant with the old bound misses 3.
+- **OPEN:** nearestNode (every route's start, the snap, the re-join) keeps
+  the old bound. Corrected, A234's re-join snapped a rider 450 m off a loop
+  to a nearer node on another road, and the leg met the loop at its end
+  (PROVEN, smoke). Whether the snap should be the nearest node, or the
+  nearest node on the loop or route being ridden, is a design question.
+- **Ruled out:** correcting the routing snap in the same take as finding
+  what it changes.
