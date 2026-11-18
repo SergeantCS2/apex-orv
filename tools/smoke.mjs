@@ -224,6 +224,8 @@ class MapStub {
   cameraForBounds(b) { const w = b[0][0], s0 = b[0][1], e = b[1][0], n = b[1][1];
     return { center: [(w + e) / 2, (s0 + n) / 2], zoom: 12 }; }
   triggerRepaint() { record.repaints = (record.repaints || 0) + 1; }
+  /* take 201 · A302 · a save's end reloads the satellite's tiles in place */
+  refreshTiles(id) { record.refreshed = (record.refreshed || 0) + 1; }
   getSource(n) { return { setData: (d) => { (record.setData[n] ||= []).push(d); } }; }
   /* take 196 · A14 · the slope bands are added on first use, as in MapLibre */
   addSource(id, s) { record.sources[id] = s; }
@@ -4790,6 +4792,95 @@ if (!NO_GPS) {
   ok(svmOk(st) && !svmOk({ ...st, left: true, refused: true }),
      `A294 · a saved route for the boat opened over a bike route leaves no route planned under the boat (${JSON.stringify(st)}); `
      + `the judge rejects take 199's (the bike route kept under the kayak, and Ride refused)`);
+}
+
+/* 9v · take 201 · A307, A308. Saved routes and spots are acted on as the
+   record tapped, not every record with its name; a rename never takes a
+   name in use; the cap says what it dropped. An address resolves to the
+   candidate nearest the rider (or the town or ZIP typed after a comma),
+   exact names first, and a street opens at its stretch nearest the rider.
+   Until take 200 delete and rename hit every same-named record, and an
+   address or street opened at the westernmost match in the state. */
+{
+  const SV = sandbox.window.__saved, G = sandbox.window.__geo, R = sandbox.window.__route;
+  if (!SV || !G || !G.ADDR) ok(false, `take 201 · hooks missing (__saved ${!!SV}, __geo ${!!G})`);
+  else {
+    /* A307 */
+    const ls = sandbox.window.localStorage, keep = { sv: SV.svLoad(), wp: SV.wpLoad() };
+    const A = { n: "Sunday", f: [1, 1], t: [2, 2], m: "bike", ts: 1 }, B = { n: "Sunday", f: [3, 3], t: [4, 4], m: "bike", ts: 2 }, C = { n: "Other", f: [5, 5], t: [6, 6], m: "bike", ts: 3 };
+    SV.svWrite([A, B, C]);
+    const ren = SV.rename(SV.svLoad, SV.svWrite, C, "Sunday");
+    SV.del(SV.svLoad, SV.svWrite, A);
+    const left = SV.svLoad().map((x) => x.n + "@" + x.ts).join(",");
+    const many = []; for (let i = 0; i < 41; i++) many.push({ n: "r" + i, f: [i, i], t: [i, i + 1], m: "bike", ts: 100 + i });
+    SV.svWrite(many.slice(1).reverse()); SV.svAdd(many[0]);   /* 40 held, oldest r40… newest r1, then one more */
+    const dropped = SV.dropped();
+    /* the review of take 201: the 201st spot says what it dropped too, and
+       the two loop shapes keep different names */
+    const spots = []; for (let i = 0; i < 200; i++) spots.push({ n: "s" + i, p: [i, i], ts: 100 + i });
+    SV.wpWrite(spots); SV.wpAdd({ n: "new spot", p: [0, 0], ts: 999 });
+    const wpNote = SV.wpDropped();
+    SV.svWrite(keep.sv); SV.wpWrite(keep.wp);
+    const loopNames = (SV.loopH || []).map((h) => SV.svLabel(h + " \u00b7 19.8 mi"));
+    const st7 = { ren, left, dropped, wpNote, loopNames };
+    const svOk = (x) => x.ren === "taken" && x.left === "Sunday@2,Other@3" && !!x.dropped && /s199/.test(x.wpNote)
+      && x.loopNames.length === 2 && x.loopNames[0] !== x.loopNames[1] && x.loopNames.indexOf("Loop") < 0;
+    ok(svOk(st7) && !svOk({ ...st7, left: "Other@3" }) && !svOk({ ...st7, ren: "ok" }) && !svOk({ ...st7, dropped: null })
+       && !svOk({ ...st7, wpNote: "" }) && !svOk({ ...st7, loopNames: ["Loop", "Loop"] }),
+       `A307 · a rename to a name in use is refused (${ren}); deleting one of two routes named alike leaves the other (${left}); `
+       + `the 41st route says which one it dropped ("${dropped}"), and the 201st spot (${/s199/.test(wpNote) ? "names s199" : "silent"}); `
+       + `the loop shapes keep their names (${loopNames.join(" / ")}); the judge rejects take 200's (both deleted, the rename taken, a silent drop, "Loop" twice)`);
+    /* A308 · the street name with the most segments, a number in range on many */
+    const S = G.ADDR.segs, names = G.ADDR.names, cnt = {};
+    for (const g of S) cnt[g[0]] = (cnt[g[0]] || 0) + 1;
+    const si = +Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0], nm = names[si];
+    const ME0 = R.ME.slice(), dmi = (a, b) => Math.hypot((b[0] - a[0]) * 0.714 * 69, (b[1] - a[1]) * 69);
+    const fits = (num, zip) => { const out = []; for (let gi = 0; gi < S.length; gi++) { const g = S[gi]; if (g[0] !== si) continue; if (zip && String(g[9] || "") !== zip) continue;
+      for (const rg of [[g[5], g[6]], [g[7], g[8]]]) { if (!rg[0] && !rg[1]) continue; const lo = Math.min(rg[0], rg[1]), hi = Math.max(rg[0], rg[1]);
+        if (num < lo || num > hi) continue; const t = hi > lo ? Math.max(0, Math.min(1, (num - rg[0]) / (rg[1] - rg[0]))) : 0.5;
+        out.push({ c: [g[1] + (g[3] - g[1]) * t, g[2] + (g[4] - g[2]) * t], zip: String(g[9] || ""), seg: gi }); } } return out; };
+    let num = 0, cands = [];
+    for (const g of S) { if (g[0] !== si) continue; const n0 = Math.min(g[5] || 1e9, g[7] || 1e9); if (n0 < 1e9) { const c = fits(n0, ""); if (c.length > cands.length) { cands = c; num = n0; } } if (cands.length > 5) break; }
+    const got = G.geocode(num + " " + nm.toLowerCase());
+    const near = cands.slice().sort((a, b) => dmi(ME0, a.c) - dmi(ME0, b.c))[0], first = cands[0];
+    const far = cands.slice().sort((a, b) => dmi(ME0, b.c) - dmi(ME0, a.c))[0];
+    const gz = far ? G.geocode(num + " " + nm.toLowerCase() + ", " + far.zip) : null;
+    const row = (sandbox.window.__search(nm.toLowerCase(), true) || []).find((x) => x.k === "street" && x.t === nm);
+    const sn = row && row.st !== undefined ? SV.streetNear(row.st, ME0) : null;
+    let bestMid = null, bd = 1e9; for (const g of S) if (g[0] === si) { const c = [(g[1] + g[3]) / 2, (g[2] + g[4]) / 2], d = dmi(ME0, c); if (d < bd) { bd = d; bestMid = c; } }
+    const same = (a, b) => !!a && !!b && Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9;
+    const arow = (sandbox.window.__search(num + " " + nm.toLowerCase(), true) || []).find((x) => x.k === "address");
+    const zrow = far ? (sandbox.window.__search(num + " " + nm.toLowerCase() + ", " + far.zip, true) || []).find((x) => x.k === "address") : null;
+    const nseg = new Set(cands.map((c) => c.seg)).size;
+    const st8 = { name: nm, num, cands: nseg, nearest: !!got && same(got.c, near.c), zip: !!gz && far && gz.t.endsWith(", " + far.zip),
+                  street: same(sn, bestMid), n: got ? got.n : 0, said: arow ? arow.s : "", zsaid: zrow ? zrow.s : "?" };
+    /* the row says it chose (N counts segments, not the two sides of one:
+       the review of take 201), from where, and how to ask for another;
+       with a ZIP typed it does not ask */
+    const saidOk = (x) => x.said.indexOf("nearest of " + x.cands + " to ") >= 0 && /add a ZIP/.test(x.said) && !/add a ZIP/.test(x.zsaid);
+    const geoOk = (x) => x.cands >= 2 && x.nearest && x.zip && x.street && x.n === x.cands && saidOk(x);
+    ok(geoOk(st8) && !geoOk({ ...st8, nearest: false }) && !geoOk({ ...st8, street: false }) && !geoOk({ ...st8, said: "" }),
+       `A308 · "${num} ${nm}" (${nseg} segments, ${cands.length} ranges) resolves to the one nearest the rider (${st8.nearest}), with ", ${far ? far.zip : "?"}" to that ZIP's (${st8.zip}); `
+       + `the street row opens at its stretch nearest the rider (${st8.street}); the row says so ("${st8.said}"; with the ZIP "${st8.zsaid}"); the judge rejects take 200's first-in-the-index match and a silent choice`);
+    /* the review of take 201: what follows the comma. A town the map does
+       not know is said, not dropped; ", MI" is the state, not Mio; a ZIP
+       after the state still chooses; a town the map knows chooses the
+       candidate nearest it */
+    const q0 = num + " " + nm.toLowerCase();
+    const gu = G.geocode(q0 + ", nowhereville"), gm = G.geocode(q0 + ", MI"), gmz = far ? G.geocode(q0 + ", MI " + far.zip) : null;
+    const urow = (sandbox.window.__search(q0 + ", nowhereville", true) || []).find((x) => x.k === "address");
+    const PL = (sandbox.window.PLACES || []).filter((p) => p[3] === "town" || !p[3]);
+    let town = null;
+    if (PL.length > 1) { const p0 = PL.slice().sort((a, b) => dmi(ME0, [b[1], b[2]]) - dmi(ME0, [a[1], a[2]]))[0];
+      const gt = G.geocode(q0 + ", " + p0[0]), nt = cands.slice().sort((a, b) => dmi([p0[1], p0[2]], a.c) - dmi([p0[1], p0[2]], b.c))[0];
+      town = { name: p0[0], ok: !!gt && !gt.unk && same(gt.c, nt.c) && gt.who === p0[0] }; }
+    const stq = { unk: !!gu && gu.unk === "nowhereville" && same(gu.c, got.c), usaid: urow ? urow.s : "",
+                  mi: !!gm && !gm.unk && same(gm.c, got.c) && gm.who === got.who, miWho: gm ? gm.who : null, miZip: !!gmz && gmz.t.endsWith(", " + far.zip), town };
+    const qualOk = (x) => x.unk && /not a town this map knows/.test(x.usaid) && /add a ZIP/.test(x.usaid) && x.mi && x.miZip && (!x.town || x.town.ok);
+    ok(qualOk(stq) && !qualOk({ ...stq, usaid: "Address" }) && !qualOk({ ...stq, mi: false }),
+       `A308 · after the comma: an unknown town is said ("${stq.usaid}"), ", MI" is the state (${stq.mi}: nearest ${stq.miWho}), ", MI ${far ? far.zip : "?"}" chooses that ZIP (${stq.miZip}), `
+       + `${town ? "a known town (" + town.name + ") chooses the candidate nearest it (" + town.ok + ")" : "no second town in this bundle to choose by"}; the judge rejects a dropped town and Mio for MI`);
+  }
 }
 
 /* 10 · nothing ever left the origin */

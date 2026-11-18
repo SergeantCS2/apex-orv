@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 200.*
+*Current as of take 201.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -177,6 +177,8 @@ Start here. Do not read top to bottom.
 | The gate fails on code nobody changed: a file fetched at build time by a version range changed underneath | 265 |
 | A check passes while the product does the wrong thing: it judges the words said after the action, not the action | 266 |
 | A mutant of the fix passes its drill: the drill never reached the path the fix changed | 267 |
+| An HD save ends and the map keeps its old tiles: a library internal read by name returned nothing after a rename | 268 |
+| A drill passes the build it was written to fail: its planted fault landed where the real one does not | 269 |
 
 ---
 
@@ -3571,3 +3573,28 @@ measured); the second showed the fix was in the wrong place, and moved it
 to where the stale route was made (svOpen). Rule: a fix is not held until a
 copy without it fails its drill; a copy that passes sends you back to the
 drill, or to the fix.
+
+**268. A library's internal, read by name, reads as nothing when the
+library renames it.** refreshSat cleared the satellite's drawn tiles
+through map.style.sourceCaches. MapLibre 5 calls them style.tileManagers,
+and the vendored 5.24 build has no sourceCaches at all (PROVEN: 0
+occurrences). The lookup returned undefined, so nothing threw and nothing
+logged: every HD save since at least take 159 (the repo's first commit
+already fetched MapLibre 5 and held this read) ended without a redraw, and
+no check read it (take 201, A302, found while proving A301 in render).
+Rule: a read of a library's private or internal name says when it finds
+nothing (the self-test's glyph reader says UNKNOWN), a check reads it on
+the vendored build, and a MapLibre bump greps the app for every such name.
+
+**269. A planted fault has to land where the real one does.** Take 201's
+first A303 drill aborted the store's transaction straight after the write.
+An abort before the request runs fires an error on the request, which
+bubbles to the transaction's onerror, and take 200's code already caught
+that: the drill would have passed the build it was written to fail. The
+quota's real abort comes at commit, after the write succeeded, with no
+error event (PROVEN, Chrome 138 under a 1 MB quota). The first quota probe
+also faulted nothing: 300 KB of one repeated byte is stored compressed,
+and eight of them used 119 KB of a 1 MB quota. Rule: plant a fault at the
+moment and in the shape the real one arrives, from a probe of the real
+one, and check that the plant took (here, the probe's own usage figure)
+before reading the result.
