@@ -4531,6 +4531,37 @@ if (!NO_GPS) {
   }
 }
 
+/* 9p · take 200 · A291 · no machine, and no one on foot, is routed on a
+   freeway. On this bundle every edge posted as an interstate is refused for
+   the bike, the quad, the side-by-side and on foot; pavement that is not a
+   freeway stays legal; and a start 95 m east of I-75 (the take-198 safety
+   audit's point, 44.95824 -84.67234) snaps to a node that has a legal edge
+   which is not a freeway. Until take 199 every interstate edge was legal
+   pavement and that start snapped onto I-75. */
+{
+  const R = sandbox.window.__route;
+  if (!R || typeof R.isFreeway !== "function") ok(false, "A291 · no __route.isFreeway hook");
+  else {
+    const iv = /^I[ -]?\d+$/, m0 = R.machine;
+    const inter = R.EDGES.filter((e) => e.rf && String(e.rf).split(";").some((x) => iv.test(x.trim())));
+    const legalOn = {};
+    for (const m of ["bike", "quad", "sxs", "walk"]) { R.setMachine(m); legalOn[m] = inter.filter((e) => R.machineLegal(e)).length; }
+    R.setMachine("bike");
+    const pavedKept = R.EDGES.filter((e) => e.c === "paved" && !e.fw).slice(0, 2000).filter((e) => R.machineLegal(e)).length;
+    const snapOk = (ll) => { const n = R.nearestNode(ll); if (n < 0) return { n, legal: 0, fw: 0 };
+      const ad = R.ADJ[n] || []; return { n, legal: ad.filter((e) => R.machineLegal(e) && !e.fw).length, fw: ad.filter((e) => e.fw).length }; };
+    const at = snapOk([-84.67234, 44.95824]);
+    R.setMachine(m0);
+    const st = { interstate: inter.length, marked: R.fwN(), legalOn, pavedKept, at };
+    const fwOk = (x) => x.interstate > 0 && x.marked >= x.interstate && Object.values(x.legalOn).every((n) => n === 0)
+      && x.pavedKept > 0 && x.at.n >= 0 && x.at.legal > 0;
+    ok(fwOk(st) && !fwOk({ ...st, legalOn: { ...legalOn, bike: inter.length } }) && !fwOk({ ...st, at: { n: 1, legal: 0, fw: 2 } }),
+       `A291 · ${st.interstate.toLocaleString()} interstate edges (${st.marked.toLocaleString()} marked freeways) are refused for every machine `
+       + `(${JSON.stringify(legalOn)}); ${pavedKept} other paved edges stay legal; a start 95 m east of I-75 snaps to a node with `
+       + `${at.legal} legal non-freeway edges; the judge rejects take 199's (every interstate edge legal) and a snap onto I-75`);
+  }
+}
+
 /* 10 · nothing ever left the origin */
 ok(remoteAsked.length === 0, `zero remote requests (${remoteAsked.length})`);
 

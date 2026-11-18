@@ -342,6 +342,11 @@ for e in aoi_stream.elements():
     (show if _show_only else net).append({"c": c, "src": "osm", "auth": "advisory",
                 "n": t.get("name"), "ref": (t.get("ref") or "").strip() or None,
                 "sf": _surface.clean(t.get("surface")),    # A10, take 197
+                # take 200 · A291 · a limited-access highway: drawn as pavement,
+                # never routed (no ORV, and no one on foot, may use any part of
+                # an interstate or other freeway in Michigan); the app's
+                # machineLegal refuses an edge whose bundle says fw
+                "fw": 1 if t.get("highway") == "motorway" else None,
                 "geometry": {"type": "LineString",
                              "coordinates": [[p["lon"], p["lat"]] for p in g]}})
     osm_n += 1
@@ -435,6 +440,7 @@ for f, pts in polys:
                                   "ref": f.get("ref"),      # A75, take 88
                                   "rst": f.get("rst"),      # A101, take 95
                                   "sf": f.get("sf"),        # A10, take 197
+                                  "fw": f.get("fw"),        # A291, take 200
                                   "pts": run[:]})
             cur, run = n2, [p]
 print(f"noded: {len(nodes)} nodes, {len(edges)} edges")

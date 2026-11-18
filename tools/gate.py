@@ -1943,8 +1943,8 @@ def check_surface_rules():
                             (g, "_surface.assign(net, _SF)", "graph.py gives agency lines their duplicate's surface"),
                             (g, '"sf": f.get("sf"),', "graph.py's edges carry the surface"),
                             (g, '"sf": _surface.clean(t.get("surface")),', "graph.py's OSM lines carry their own"),
-                            (eg, 'e.get("sf"))', "emit_graph.py bundles the surface"),
-                            (eg, '"rst","sf"]', "emit_graph.py names it in bk"),
+                            (eg, 'e.get("sf")', "emit_graph.py bundles the surface"),
+                            (eg, '"rst","sf"', "emit_graph.py names it in bk"),
                             (app, "bits.push(surfaceBit(a));", "the trail card says it")):
         if need not in src:
             bad.append(f"not wired: {what}")
@@ -1952,6 +1952,53 @@ def check_surface_rules():
         return fails.append("surface (A10): " + "; ".join(bad))
     notes.append(f"surface (A10): {len(want)} planted lines and 5 tag values read as A10 says (a duplicate's surface "
                  "taken, half-covered none, a split both said, OSM and kept values left alone); graph to card wired")
+
+
+def check_freeway_rules():
+    """take 200 (A291): no machine, and no one on foot, is routed on a
+    freeway. graph.py marks OSM's motorways (fw), emit_graph bundles the
+    mark, and the app's machineLegal refuses a marked edge before its memo;
+    on any bundle the app also refuses an edge posted as an interstate. The
+    interstate rule is held to planted refs; a built bundle must carry the
+    mark on some edges, or the producer broke quietly."""
+    import glob
+    g, eg, app = read("tools", "graph.py") or "", read("tools", "emit_graph.py") or "", read("src", "app.html") or ""
+    bad = []
+    for src, need, what in ((g, '"fw": 1 if t.get("highway") == "motorway" else None,', "graph.py marks OSM motorways"),
+                            (g, '"fw": f.get("fw"),', "graph.py's edges carry the mark"),
+                            (eg, 'e.get("fw"))', "emit_graph.py bundles it"),
+                            (eg, '"sf","fw"]', "emit_graph.py names it in bk"),
+                            (app, "if(e.fw)return false;\n  var mk=machine+", "machineLegal refuses a freeway before its memo"),
+                            (app, "EDGES.forEach(function(e){if(isFreeway(e)){e.fw=1;FW_N++}});", "every edge is marked at load")):
+        if need not in src:
+            bad.append(f"not wired: {what}")
+    m = re.search(r"var FW_I=/(.+?)/;", app)
+    if not m:
+        bad.append("the app's interstate rule (FW_I) not found")
+    else:
+        rx = re.compile(m.group(1).replace("\\d", "\\d"))
+        isI = lambda ref: any(rx.match(p.strip()) for p in ref.split(";"))
+        for ref, want in (("I 75", True), ("I-696", True), ("I75", True), ("US 23;I 75", True), ("BL I 75", False),
+                          ("US 131", False), ("M 6", False), ("I 75 Business", False), ("H58", False)):
+            if isI(ref) != want:
+                bad.append(f"the interstate rule reads {ref!r} as {'one' if not want else 'not one'}")
+    seen = []
+    for gp in sorted(glob.glob(os.path.join(ROOT, "bundles", "*", "graph.json"))):
+        G = json.load(open(gp))
+        bk = G.get("bk", [])
+        if "fw" not in bk:
+            bad.append(f"{os.path.basename(os.path.dirname(gp))}: the graph's bundles name no fw")
+            continue
+        k, B, nm = bk.index("fw"), G.get("b", []), G.get("nm", [])
+        flagged = sum(1 for e in G.get("e", []) if e[6] >= 0 and B[e[6]][k])
+        inter = sum(1 for e in G.get("e", []) if len(e) > 8 and e[8] >= 0 and m and isI(nm[e[8]]))
+        if not flagged:
+            bad.append(f"{os.path.basename(os.path.dirname(gp))}: no edge carries fw ({inter} posted as interstates)")
+        seen.append(f"{flagged:,} freeway edges marked, {inter:,} posted as interstates")
+    if bad:
+        return fails.append("freeways (A291): " + "; ".join(bad))
+    notes.append("freeways (A291): graph to router wired; the interstate rule reads 9 planted refs right"
+                 + (f"; built bundle: {'; '.join(seen)}" if seen else "; no built bundle here (CI checks the mark)"))
 
 
 def check_osm_fallback():
@@ -3579,7 +3626,7 @@ def check_ledger_order():
 for fn in (check_handoff, check_stamps, check_release_notes, check_offline, check_splash, check_scrub,
            check_style, check_palette, check_badges, check_tokens, check_scale, check_icons, check_glyphs,
            check_licences, check_machine_legality,
-           check_ledgers, check_osm_fallback, check_gauges_fallback, check_hazards_rules, check_stepstamp, check_slope_rules, check_sources_credited, check_surface_rules, check_drawn,
+           check_ledgers, check_osm_fallback, check_gauges_fallback, check_hazards_rules, check_stepstamp, check_slope_rules, check_sources_credited, check_surface_rules, check_freeway_rules, check_drawn,
            check_region_clean, check_no_duplicate_defs, check_ledger_order,
            check_layer_control,
            check_artifacts_agree, check_agenda, check_syntax, check_stubs,

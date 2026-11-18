@@ -163,6 +163,8 @@ function restrictOf(e){
  
 var _legalMemo={};
 function machineLegal(e){
+   
+  if(e.fw)return false;
   var mk=machine+':'+e.bi+':'+e.c, hit=_legalMemo[mk];
   if(hit!==undefined)return hit;
   return (_legalMemo[mk]=_machineLegal(e))}
@@ -192,6 +194,14 @@ var EDGES=GR.e.map(function(e,i){return {a:e[0],b:e[1],L:e[2],c:CLS[e[3]],
   d:e.length<8||e[7]!==0,
    
   rf:(e.length>8&&e[8]>=0)?NM[e[8]]:null}});
+ 
+var FW_I=/^I[ -]?\d+$/;
+function isFreeway(e){
+  var k=BK.indexOf('fw');
+  if(k>=0&&e.bi>=0&&B[e.bi]&&B[e.bi][k])return true;
+  if(e.rf){var p=String(e.rf).split(';');for(var i=0;i<p.length;i++)if(FW_I.test(p[i].trim()))return true}
+  return false}
+var FW_N=0;EDGES.forEach(function(e){if(isFreeway(e)){e.fw=1;FW_N++}});
  
 function surfaceBit(a){
   if(!a||!a.sf)return 'Surface not recorded';
@@ -5653,7 +5663,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
                    gridBuild:gridBuild,
                    nearestPavement:nearestPavement,countyAt:countyAt,
                    addressAt:addressAt,get ME(){return ME}};
-    window.__route={buildLoops:buildLoops,nearestNode:nearestNode,
+    window.__route={buildLoops:buildLoops,nearestNode:nearestNode,isFreeway:isFreeway,fwN:function(){return FW_N},
                     machineLegal:machineLegal,EDGES:EDGES,ADJ:ADJ,attrs:attrs,
                     setMachine:function(m){if(MACHINE[m])machine=m},
                     get machine(){return machine},spd:spd,MACHINE:MACHINE,
@@ -6980,7 +6990,9 @@ map.on('click',function(e){
   out+='<span class="tag '+(a.auth==='legal'?'legal':'adv')+'">'+
     (a.src==='dnr'?'DNR · legal':a.src==='usfs'?'USFS · legal':'OSM · advisory')+'</span>';
   if(a.st&&a.st.toLowerCase().indexOf('temporarily')===0)out+='<span class="tag shut">closed</span>';
-  if(MACHINE[machine].ok.indexOf(ed.c)<0)
+   
+  if(ed.fw)out+='<span class="tag shut">freeway: no ORV, no one on foot</span>';
+  else if(MACHINE[machine].ok.indexOf(ed.c)<0)
     out+='<span class="tag shut">illegal for your machine</span>';
   out+='<br>';
   var bits=[];
