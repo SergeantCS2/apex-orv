@@ -91,7 +91,20 @@ What I got wrong:
   (0 ms; landmine 264). It counts cards on screen under the HD tool, and
   the time has a floor.
 
-Verified here: VERIFIED_HERE
+Verified here (Chrome 138; the bundle of main's newest green run, plus this
+container's hazards payload and slope bands):
+- smoke, all five passes PASSED on the final build: 300 / 212 / 54 ok,
+  fatal 6, dead 33;
+- render, the full run PASSED on the final build: 685 ok, 0 failed (the
+  contour-lines line names its absence, as before);
+- render `--only=imagery,tools` PASSED before the review's fixes, A279's
+  read 3.0 s from the Map tab;
+- watched failing: the A279 drill on take 197's build (the late card
+  opened the drawer after the 150 ms Back); the A281 drill on a mutant of
+  the built app with take 197's stats() (value reads 1, key cursors 0);
+- the 37 gate checks that need no pipeline output PASSED.
+UNKNOWN until the phone: the HD read's time on the Fold, and what the start
+costs after a whole-state save there.
 
 ## Take 197 — 2026-11-07 — Every data source named, in the app and the store listing (A280); the trail card's surface (A10); the step stamps ignore the import system's scans (A207)
 
