@@ -1141,10 +1141,14 @@ function hdStore(DBN){
     q.onerror=function(){dbp=null;rej(q.error)};
     q.onblocked=function(){rej(new Error('the HD store is open elsewhere'))}});
     return dbp}
+   
   function tx(mode,fn){return open().then(function(d){return new Promise(function(res,rej){
     var t=d.transaction(ST,mode),q=fn(t.objectStore(ST));
     t.oncomplete=function(){res(q?q.result:undefined)};
-    t.onerror=function(){rej(t.error)}})})}
+    t.onerror=function(){rej(t.error)};
+    t.onabort=function(){var e=t.error;
+      rej(e&&e.name==='QuotaExceededError'?new Error('the phone has no more room for saved imagery'):
+        (e||new Error('the HD store write was aborted')))}})})}
   return {
     get:function(z,x,y){return tx('readonly',function(s){return s.get(z+'/'+x+'/'+y)})
       .then(function(v){return v?v.b:null})},
@@ -1159,7 +1163,9 @@ function hdStore(DBN){
       t.oncomplete=function(){res({tiles:n,bytes:b})};
       t.onerror=function(){rej(t.error)};
       t.onabort=function(){rej(t.error||new Error('the HD count was aborted'))}})})},
-    clear:function(){return tx('readwrite',function(s){return s.clear()})}};
+    clear:function(){return tx('readwrite',function(s){return s.clear()})},
+     
+    keys:function(){return tx('readonly',function(s){return s.getAllKeys()}).then(function(k){return k||[]})}};
 }
 var HD=hdStore('apex-hd');
  
@@ -1172,8 +1178,19 @@ function _satResolve(params){
     return fetch('bundle/imagery/'+z+'/'+x+'/'+y+'.jpg')
       .then(function(r){return r.ok?r.arrayBuffer().then(function(b){return {data:b}}):blank()})
       .catch(blank);
-  return HD.get(z,x,y).then(function(b){return b?{data:b}:blank()}).catch(blank);
+  return HD.get(z,x,y).then(function(b){return b?{data:b}:
+    hdAncestor(z,x,y).then(function(a){return a?{data:a}:blank()})}).catch(blank);
 }
+ 
+function hdAncestor(z,x,y){
+  if(z<=13||typeof createImageBitmap!=='function'||typeof OffscreenCanvas==='undefined')return Promise.resolve(null);
+  var d=z-13,ax=x>>d,ay=y>>d,k=1<<d,qx=x-(ax<<d),qy=y-(ay<<d);
+  return HD.get(13,ax,ay).then(function(b){if(!b)return null;
+    return createImageBitmap(new Blob([b])).then(function(im){
+      var c=new OffscreenCanvas(256,256),g=c.getContext('2d'),s=im.width/k;
+      g.drawImage(im,qx*s,qy*s,s,s,0,0,256,256);try{im.close()}catch(e){}
+      return c.convertToBlob({type:'image/jpeg',quality:0.92})}).then(function(bl){return bl.arrayBuffer()})})
+    .catch(function(){return null})}
 if(SPARSE)maplibregl.addProtocol('apexsat',_satResolve);
  
 var WAKE=(function(){
@@ -1241,29 +1258,33 @@ var HDDL=(function(){
     return Promise.resolve({known:false})}
   function fetchTile(z,x,y){
     return fetch(USGS.replace('{z}',z).replace('{y}',y).replace('{x}',x))
-      .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer()})}
+      .then(function(r){if(!r.ok){var e=new Error('HTTP '+r.status);e.status=r.status;throw e}return r.arrayBuffer()})}
+   
+  function missingErr(e){return !!e&&(e.status===404||/HTTP 404/.test(String(e.message||e)))}
   function sleep(ms){return new Promise(function(r){setTimeout(r,ms)})}
   function save(what,onp,label){
     if(running)return Promise.resolve(null);
     running=true;stopReq=false;
     var tiles=(what&&what.length&&Array.isArray(what[0]))?what:plan(what||[]);
-    var done=0,skipped=0,bytes=0,inflight=0,peak=0,retries=0,pauses=0,err=null;
+    var done=0,skipped=0,missing=0,bytes=0,inflight=0,peak=0,retries=0,pauses=0,err=null;
     label=label||'this view';
     prog={label:label,done:0,skipped:0,total:tiles.length,t0:Date.now(),eta:null};
     WAKE.hold('hd');
-    function report(){prog.done=done;prog.skipped=skipped;
+    function report(){prog.done=done;prog.skipped=skipped+missing;
        
       var el=(Date.now()-prog.t0)/1000;
-      prog.eta=(done>=60&&el>0)?Math.round((tiles.length-done-skipped)/(done/el)):null;
-      if(onp)onp(done+skipped,tiles.length,label)}
+      prog.eta=(done>=60&&el>0)?Math.round((tiles.length-done-skipped-missing)/(done/el)):null;
+      if(onp)onp(done+skipped+missing,tiles.length,label)}
     function one(t){
       return HD.get(t[0],t[1],t[2]).then(function(have){
         if(have){skipped++;return}
         return M.fetchTile(t[0],t[1],t[2])
-          .catch(function(){retries++;
+          .catch(function(e){if(missingErr(e))return 404;retries++;
              
             return sleep(PAUSE).then(function(){return stopReq?null:M.fetchTile(t[0],t[1],t[2])})})
-          .then(function(buf){if(!buf)return;return HD.put(t[0],t[1],t[2],buf)
+          .catch(function(e){if(missingErr(e))return 404;throw e})
+           
+          .then(function(buf){if(buf===404){missing++;return}if(!buf||stopReq)return;return HD.put(t[0],t[1],t[2],buf)
             .then(function(){done++;bytes+=buf.byteLength})})})}
     function batch(start,end){
       var j=start;
@@ -1283,7 +1304,7 @@ var HDDL=(function(){
         pauses++;return sleep(PAUSE)}).then(function(){return batches(end)})}
     return batches(0).then(function(){
       running=false;prog=null;WAKE.drop('hd');
-      return {error:err,done:done,skipped:skipped,bytes:bytes,total:tiles.length,
+      return {error:err,done:done,skipped:skipped,missing:missing,bytes:bytes,total:tiles.length,
               stopped:stopReq,peak:peak,retries:retries,pauses:pauses,label:label}})}
   var M={plan:plan,planPoly:planPoly,statePlan:statePlan,quota:quota,
     save:save,fetchTile:fetchTile,estimate:estimate,EST_Z:EST_Z,
@@ -2401,13 +2422,23 @@ function wpWrite(a){
   if(!svAvailable())return false;
   try{localStorage.setItem(WPKEY,JSON.stringify(a));return true}catch(e){return false}}
 
+ 
+var SAVED_DROPPED=null;
 function wpAdd(rec){
   var a=wpLoad().filter(function(x){return x.n!==rec.n});
-  a.unshift(rec);
-  if(a.length>200)a=a.slice(0,200);
+  a.unshift(rec);SAVED_DROPPED=null;
+  if(a.length>200){SAVED_DROPPED=a[200].n;a=a.slice(0,200)}
   return wpWrite(a)?a:null}
 
 function wpDel(n){return wpWrite(wpLoad().filter(function(x){return x.n!==n}))}
+ 
+function savedIdx(list,rec){var k=JSON.stringify(rec);
+  for(var i=0;i<list.length;i++)if(JSON.stringify(list[i])===k)return i;return -1}
+function savedDel(load,write,rec){var a=load(),i=savedIdx(a,rec);if(i<0)return false;a.splice(i,1);return write(a)}
+function savedRename(load,write,rec,n){var a=load(),i=savedIdx(a,rec);if(i<0)return 'gone';
+  var mine=function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region};
+  for(var j=0;j<a.length;j++)if(j!==i&&a[j].n===n&&mine(a[j]))return 'taken';
+  a[i].n=n;return write(a)?'ok':'fail'}
 
 function wpName(at){
    
@@ -2437,8 +2468,8 @@ function svAdd(rec){
   var a=svLoad();
    
   a=a.filter(function(x){return x.n!==rec.n});
-  a.unshift(rec);
-  if(a.length>40)a=a.slice(0,40);
+  a.unshift(rec);SAVED_DROPPED=null;
+  if(a.length>40){SAVED_DROPPED=a[40].n;a=a.slice(0,40)}
   return svWrite(a)?a:null}
 
 function svDel(name){
@@ -2464,7 +2495,8 @@ function svName(){
   var d=new Date(),md=(d.getMonth()+1)+'/'+d.getDate();
   var isLoop=(o.na===o.nb&&LOOP_MI>0);
   return (isLoop?'Loop ':'')+o.s.mi.toFixed(1)+' mi'+
-    (isLoop?'':' to '+(DESTLBL||'there'))+' · '+md}
+     
+    (isLoop?'':' to '+(DESTLBL||'there'))+(o.h?' · '+String(o.h).replace(/ ·.*$/,''):'')+' · '+md}
 
 function svOpen(rec){
   if(!rec)return;
@@ -2562,22 +2594,24 @@ function buildSavedPanel(){
     map.easeTo({center:x.p,zoom:Math.max(map.getZoom(),14),duration:500});
     placeCard(x.p,'wpt',x.n)});
   bindw('data-wpdel',function(x){
-    logAct('act  delete waypoint '+x.n);wpDel(x.n);wpDraw();buildSavedPanel()});
+    logAct('act  delete waypoint '+x.n);savedDel(wpLoad,wpWrite,x);wpDraw();buildSavedPanel()});
   bindw('data-wpren',function(x){
     var n=null;
     try{n=window.prompt?window.prompt('Name this waypoint',x.n):null}catch(e){n=null}
-    if(!n)return;
-    var all=wpLoad().map(function(y){return y.n===x.n?(y.n=n,y):y});
-    wpWrite(all);wpDraw();buildSavedPanel()});
+    if(!n||n===x.n)return;
+    var r=savedRename(wpLoad,wpWrite,x,n);
+    if(r==='taken')return toast('A spot is already called \u201c'+n+'\u201d. Choose another name.',3200);
+    wpDraw();buildSavedPanel()});
   bind('data-svopen',function(r){logAct('act  open saved '+r.n);svOpen(r)});
   bind('data-svdel',function(r){logAct('act  delete saved '+r.n);
-    svDel(r.n);buildSavedPanel()});
+    savedDel(svLoad,svWrite,r);buildSavedPanel()});
   bind('data-svren',function(r){
     var n=null;
     try{n=window.prompt?window.prompt('Name this route',r.n):null}catch(e){n=null}
-    if(!n)return;
-    var all=svLoad().map(function(x){return x.n===r.n?(x.n=n,x):x});
-    svWrite(all);buildSavedPanel()})}
+    if(!n||n===r.n)return;
+    var res=savedRename(svLoad,svWrite,r,n);
+    if(res==='taken')return toast('A route is already called \u201c'+n+'\u201d. Choose another name.',3200);
+    buildSavedPanel()})}
 
 var last=null,sel=null;
  
@@ -2857,7 +2891,8 @@ function renderRoutes(out,auto){
     if(!svAdd(rec))return show('<b>Could not save.</b> This phone would not let '+
       'the app store it \u2014 its storage may be full or blocked.','fail');
     logAct('act  saved route '+rec.n);
-    show('Saved as <b>'+rec.n+'</b>.<br><span class="sub">Kept on this phone only. '+
+    show('Saved as <b>'+rec.n+'</b>.<br>'+(SAVED_DROPPED?'<span class="sub warn">40 routes is the limit: the oldest, \u201c'+
+      SAVED_DROPPED+'\u201d, was removed to make room.</span><br>':'')+'<span class="sub">Kept on this phone only. '+
       'Reopening it routes again on the current map, so closures and reroutes '+
       'stay up to date \u2014 the line may differ from today\u2019s.</span>','pass')});
   Array.prototype.forEach.call(document.querySelectorAll('.rc'),function(c){
@@ -2969,7 +3004,7 @@ function buildIndex(){
     ADDR.segs.forEach(function(g){if(first[g[0]]===undefined)first[g[0]]=g});
     ADDR.names.forEach(function(nm,i){
       if(seen[nm]||first[i]===undefined)return;seen[nm]=1;var g=first[i];
-      rows.push({t:nm,k:'street',c:[(g[1]+g[3])/2,(g[2]+g[4])/2],cls:'addr'})})}
+      rows.push({t:nm,k:'street',c:[(g[1]+g[3])/2,(g[2]+g[4])/2],cls:'addr',st:i})})}
   rows.forEach(function(r){r.l=r.t.toLowerCase();
      
     r.z=r.l.replace(/[^a-z0-9]/g,'')});
@@ -2981,7 +3016,9 @@ function search(q,all){
   var rows=buildIndex(),out=[];
    
   var gc=geocode(q);
-  if(gc)out.push([-1,-1,0,{t:gc.t,k:'address',c:gc.c,cls:'addr'}]);
+   
+  if(gc)out.push([-1,-1,0,{t:gc.t,k:'address',c:gc.c,cls:'addr',
+    s:gc.n>1?'Address \u00b7 the nearest of '+gc.n.toLocaleString()+(gc.q?'':' \u00b7 add a town or ZIP for another'):''}]);
   var qz=q.replace(/[^a-z0-9]/g,'');
   for(var i=0;i<rows.length;i++){var r=rows[i],p=r.l.indexOf(q);
     if(p>=0){
@@ -3021,7 +3058,7 @@ function renderHits(all){
   el('hits').innerHTML='<div class="k" id="hits-n">'+(n>list.length?'First '+list.length+' of '+n:n+' result'+(n===1?'':'s'))+
     ' \u00b7 offline</div><div class="sbox">'+list.map(function(r,i){
     return '<button class="srow hit" data-i="'+i+'"><span class="sr-t"><span class="sr-l">'+r.t+'</span>'+
-      '<span class="sr-s">'+(KIND_WORD[r.k]||r.k)+'</span></span><span class="sr-c">'+ic('next')+'</span></button>'}).join('')+'</div>';
+      '<span class="sr-s">'+(r.s||KIND_WORD[r.k]||r.k)+'</span></span><span class="sr-c">'+ic('next')+'</span></button>'}).join('')+'</div>';
   Array.prototype.forEach.call(document.querySelectorAll('.hit'),function(d){
     if(d.dataset.i===undefined)return;
     d.addEventListener('click',function(){
@@ -3048,6 +3085,9 @@ function renderHits(all){
             'in Water mode a launch pin works too.</span>','');
         }
         return}
+       
+      if(r.k==='street'&&r.st!==undefined){var nc=streetNear(r.st,ME);
+        if(nc)r={t:r.t,k:r.k,c:nc,cls:r.cls,st:r.st}}
        
       if(arm==='homeaddr'){
         HOME=r.c.slice();homeSave();homeMark();arm=null;syncArm();clearRoute();syncSafety();
@@ -4853,7 +4893,8 @@ function hdChipTxt(t){var e=el('c-hd');if(e)e.querySelector('span').textContent=
 function hdChip(){HD.stats().then(function(st){
   if(!HDDL.busy())hdChipTxt(st.tiles?('HD · '+(st.bytes/1048576).toFixed(0)+' MB'):'HD');
   var e=el('c-hd');if(e)e.className='basebtn'+(st.tiles?' on':'')}).catch(function(){})}
-function refreshSat(){try{var sc=(map.style.sourceCaches||{})['satpatch'];
+ 
+function refreshSat(){try{var sc=(map.style.tileManagers||map.style.sourceCaches||{})['satpatch'];
   if(sc){sc.clearTiles();map.triggerRepaint()}}catch(e){}}
  
 function hdProgTxt(pr){
@@ -4869,7 +4910,8 @@ function hdEnded(r){
   if(hdSeen())return hdCard();
   var k=el('hd-dlk'),o=el('hd-stop'),sv=el('hd-saved');
   if(k)k.textContent=(r.stopped?'STOPPED ':'SAVED ')+String(r.label).toUpperCase();
-  e.textContent=(r.done+r.skipped).toLocaleString()+' of '+r.total.toLocaleString()+' tiles'+
+  e.textContent=(r.done+r.skipped+(r.missing||0)).toLocaleString()+' of '+r.total.toLocaleString()+' tiles'+
+    (r.missing?' ('+r.missing.toLocaleString()+' the imagery service does not have)':'')+
     (r.stopped?' \u2014 what landed is kept':' \u2014 finished');
   if(o&&o.parentNode)o.parentNode.removeChild(o);
    
@@ -4906,13 +4948,17 @@ function hdCard(confirmId){
    
   var inSheet=SHEET.tab&&(SHEET_PENDING==='c-hdmanage'||SHEET.tool==='c-hdmanage'),sTab=SHEET.tab,
     rl=el('rail'),wasUp=!!rl&&!/\bfolded\b/.test(rl.className);
-  Promise.all([HD.stats(),HDDL.quota()]).then(function(res){
+  Promise.all([HD.stats(),HDDL.quota(),HD.keys().catch(function(){return []})]).then(function(res){
      
     var still=SHEET.tab===sTab&&(SHEET.tool==='c-hdmanage'||(SHEET.tool===null&&!SHEET_PENDING));
     if(inSheet&&!still)return;
      
     if(!inSheet&&wasUp&&rl&&/\bfolded\b/.test(rl.className))return;
     var st=res[0],q=res[1],busy=HDDL.busy();
+     
+    var saved={};(res[2]||[]).forEach(function(k){saved[k]=1});
+    tiers.forEach(function(t){t.tiles=t.tiles.filter(function(c){return !saved[c[0]+'/'+c[1]+'/'+c[2]]});
+      t.n=t.tiles.length;t.mb=HDDL.estimate(t.tiles)/1048576});
      
     var h=(inSheet?'':'<b>HD imagery</b>')+
       '<div class="sub">Sharper satellite for places you choose. Nothing downloads on its own \u2014 save on wifi.</div>';
@@ -4949,7 +4995,9 @@ function hdCard(confirmId){
     var d=el('hd-del');if(d)d.addEventListener('click',function(){
        
       HDDL.stop();
-      setTimeout(function(){HD.clear().then(function(){refreshSat();hdChip();hdCard()})},350)});
+       
+      (function w(n){if(HDDL.busy()&&n<100)return setTimeout(function(){w(n+1)},100);
+        HD.clear().then(function(){refreshSat();hdChip();hdCard()})})(0)});
   })}
  
 el('c-hd').addEventListener('click',function(){
@@ -5504,25 +5552,39 @@ function addressAt(at,wide){
     out.txt=(bd<0.1?Math.round(bd*5280)+' ft':bd.toFixed(1)+' mi')+' '+c+' of '+txt}
   return out}
 
-function geocode(q){
+ 
+function placeNamed(q){q=String(q||'').toLowerCase().trim();if(!q)return null;
+  var b=null;for(var i=0;i<PLACES.length;i++){var n=String(PLACES[i][0]).toLowerCase();
+    if(n===q)return [PLACES[i][1],PLACES[i][2]];if(!b&&n.indexOf(q)===0)b=[PLACES[i][1],PLACES[i][2]]}
+  return b}
+function geocode(q,ref){
    
   if(!ADDR||!ADDR.segs)return null;
-  var m=/^\s*(\d+)\s+(.+?)\s*$/.exec(q);
+  var m=/^\s*(\d+)\s+([^,]+?)\s*(?:,\s*(.*?))?\s*$/.exec(q);
   if(!m)return null;
-  var want=+m[1],nm=m[2].toLowerCase().replace(/\.$/,'');
-  var S=ADDR.segs,hit=null;
+  var want=+m[1],nm=m[2].toLowerCase().replace(/\.$/,''),qual=(m[3]||'').toLowerCase().trim();
+  var zip=/^\d{5}$/.test(qual)?qual:'',at=ref||ME;
+  if(qual&&!zip){var pl=placeNamed(qual);if(pl)at=pl}
+  var S=ADDR.segs,best=null,n=0;
   for(var i=0;i<S.length;i++){var g=S[i];
-    var name=ADDR.names[g[0]].toLowerCase();
-    if(name.indexOf(nm)<0)continue;
+    var name=ADDR.names[g[0]].toLowerCase(),exact=name===nm;
+    if(!exact&&name.indexOf(nm)<0)continue;
+    if(zip&&String(g[9]||'')!==zip)continue;
     [[g[5],g[6]],[g[7],g[8]]].forEach(function(rg){
-      if(hit||!rg[0]&&!rg[1])return;
+      if(!rg[0]&&!rg[1])return;
       var lo=Math.min(rg[0],rg[1]),hi=Math.max(rg[0],rg[1]);
       if(want<lo||want>hi)return;
       var t=hi>lo?(want-rg[0])/(rg[1]-rg[0]):0.5;
       t=Math.max(0,Math.min(1,t));
-      hit={c:[g[1]+(g[3]-g[1])*t, g[2]+(g[4]-g[2])*t],
-           t:want+' '+ADDR.names[g[0]]+(g[9]?', '+g[9]:'')}})}
-  return hit}
+      var c=[g[1]+(g[3]-g[1])*t, g[2]+(g[4]-g[2])*t],rk=exact?0:1,d=at?mi(at,c):0;n++;
+      if(!best||rk<best.rk||(rk===best.rk&&d<best.d))
+        best={c:c,t:want+' '+ADDR.names[g[0]]+(g[9]?', '+g[9]:''),rk:rk,d:d}})}
+  return best?{c:best.c,t:best.t,n:n,q:!!qual}:null}
+ 
+function streetNear(si,at){if(!ADDR||!ADDR.segs)return null;at=at||ME;var b=null,bd=1e9;
+  for(var i=0;i<ADDR.segs.length;i++){var g=ADDR.segs[i];if(g[0]!==si)continue;
+    var c=[(g[1]+g[3])/2,(g[2]+g[4])/2],d=at?mi(at,c):0;if(d<bd){bd=d;b=c}}
+  return b}
 
  
 var dropM=null,DROP=null;
@@ -5729,7 +5791,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       skip:Object.keys(NETLO_SKIP),layers:Object.keys(NETFT)};
     window.__hd=HD;window.__hdStore=hdStore;
      
-    window.__locateOnce=locateOnce;window.__svOpen=svOpen;window.__cardn=function(){return CARDN};
+    window.__locateOnce=locateOnce;window.__svOpen=svOpen;window.__saved={svLoad:svLoad,svWrite:svWrite,wpLoad:wpLoad,wpWrite:wpWrite,svAdd:svAdd,wpAdd:wpAdd,del:savedDel,rename:savedRename,dropped:function(){return SAVED_DROPPED},streetNear:streetNear,panel:buildSavedPanel};window.__cardn=function(){return CARDN};
      
     window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__hdSave=startHDSave;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};window.__back={onBack:onBack,open:backOpen,panelOpen:panelOpen,state:function(){return BACK},toast:toast};window.__privacy=function(u){var o=PRIVACY_URL;if(u!==undefined)PRIVACY_URL=u;return o};window.__tour={start:tourStart,next:tourNext,close:tourClose,seen:tourSeen,reset:tourReset,state:function(){return TOUR},steps:TOUR_STEPS};
     window.__ph={index:PHOTOS,html:photoHTML};
@@ -6078,7 +6140,7 @@ function stData(){
     var g0=ADDR.segs[0],mid=[(g0[1]+g0[3])/2,(g0[2]+g0[4])/2];
     var a0=addressAt(mid);
     if(!a0)stAdd('DATA','address-roundtrip',false,'a segment midpoint resolved to nothing');
-    else{var f=geocode(a0.n+' '+a0.street);
+    else{var f=geocode(a0.n+' '+a0.street,mid);
       if(!f)stAdd('DATA','address-roundtrip',false,'"'+a0.txt+'" did not geocode back');
       else{var m2=mi(mid,f.c);
         stAdd('DATA','address-roundtrip',m2<0.6,

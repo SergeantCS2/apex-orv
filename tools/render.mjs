@@ -1222,6 +1222,132 @@ if (zoomed.trails > 0) {
        + `(${JSON.stringify({ folded: a287.folded, card: a287.card })}); the judge rejects take 198's card over the map, and silence`);
   }
 
+  /* take 201 · A301–A306 · the HD store and its saves, in real Chrome.
+     A301: a z15 tile nobody saved, under a saved z13, is served the z13's
+     share (red in, red out), not a blank. A302: a save's end clears the
+     drawn satellite tiles (MapLibre 5's tileManagers). A303: a write whose
+     transaction aborts at commit settles. A304: a 404 tile is counted
+     missing and the save goes on. A305: the HD card leaves saved tiles out
+     of its quote. A306: a tile landing after Stop is not stored. Each judge
+     is shown take 200's reading, and a mutant with all six reverted fails
+     all six (the take's HANDOFF). */
+  const hdx = await page.evaluate(async () => {
+    const S = window.__sat, H = window.__hd, D = window.HDDL, m = window.map;
+    if (!S || !H || !D || typeof window.__hdSave !== "function" || !window.__hdTiers || !window.__hdCard) return { missing: true };
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms)), out = {};
+    const boxes = (S.tiles.boxes || []).filter((b) => b[0] === 13);
+    const b13 = boxes[0] || [13, 4000, 3000, 4001, 3001];
+    /* a z13 tile with no patch on it or on the z15 tiles read below */
+    const clear = (x, y) => !S.inPatch(13, x, y) && !S.inPatch(13, x + 3, y) &&
+      !S.inPatch(15, x * 4 + 1, y * 4 + 2) && !S.inPatch(15, (x + 3) * 4, y * 4);
+    let ox = b13[3] + 13, oy = b13[2] + 3, guard = 0;
+    while (!clear(ox, oy) && guard++ < 200) ox += 11;
+    const red = async () => { const c = new OffscreenCanvas(256, 256), g = c.getContext("2d"); g.fillStyle = "#ff0000"; g.fillRect(0, 0, 256, 256);
+      return (await c.convertToBlob({ type: "image/png" })).arrayBuffer(); };
+    const px = async (buf) => { const im = await createImageBitmap(new Blob([buf])), c = new OffscreenCanvas(im.width, im.height), g = c.getContext("2d");
+      g.drawImage(im, 0, 0); const d = g.getImageData(im.width >> 1, im.height >> 1, 1, 1).data; return [im.width, d[0], d[1], d[2], d[3]]; };
+    await H.clear();
+    /* A301 */
+    await H.put(13, ox, oy, await red());
+    out.kid = await px((await S.resolve({ url: `apexsat://15/${ox * 4 + 1}/${oy * 4 + 2}` })).data);
+    out.lone = await px((await S.resolve({ url: `apexsat://15/${(ox + 3) * 4}/${oy * 4}` })).data);
+    /* A302 */
+    const tm = (m.style.tileManagers || {})["satpatch"]; let clears = 0;
+    if (tm) { const o = tm.clearTiles; tm.clearTiles = function () { clears++; return o.apply(tm, arguments); };
+      const f0 = D.fetchTile; D.fetchTile = () => Promise.resolve(new ArrayBuffer(400));
+      window.__hdSave([[14, ox * 2, oy * 2]], "this view"); for (let k = 0; k < 100 && D.busy(); k++) await sleep(50);
+      await sleep(100); D.fetchTile = f0; tm.clearTiles = o; }
+    out.clears = clears; out.tm = !!tm;
+    /* A303 · the quota's abort comes at commit, after the write itself
+       succeeded: no error event, only the transaction's abort. Planted
+       that way (aborting before the request runs fires an error on it,
+       which take 200's onerror caught: no control) */
+    const P0 = IDBObjectStore.prototype.put; let aborted = 0;
+    IDBObjectStore.prototype.put = function () { const r = P0.apply(this, arguments);
+      r.addEventListener("success", () => { try { r.transaction.abort(); aborted++; } catch (e) {} }); return r; };
+    out.abort = await Promise.race([H.put(15, 1, 1, new ArrayBuffer(10)).then(() => "resolved", () => "rejected"), sleep(3000).then(() => "hung")]);
+    IDBObjectStore.prototype.put = P0; out.aborted = aborted;
+    out.after303 = await H.get(15, 1, 1).then((b) => (b ? b.byteLength : 0));
+    /* A304 · one tile of a plan answers 404, twice */
+    const plan = []; for (let k = 0; k < 12; k++) plan.push([15, (ox + 5) * 4 + k, oy * 4]);
+    const f1 = D.fetchTile;
+    D.fetchTile = (z, x, y) => { if (x === plan[3][1]) { const e = new Error("HTTP 404"); e.status = 404; return Promise.reject(e); } return Promise.resolve(new ArrayBuffer(300)); };
+    out.r404 = await D.save(plan, null, "this view"); D.fetchTile = f1;
+    /* A305 · the card after every tile of this view is saved: a small view
+       (z15 over the test tile), the camera put back after */
+    await H.clear();
+    const was = { c: m.getCenter(), z: m.getZoom() }, nn = 8192;
+    m.jumpTo({ center: [(ox + 0.5) / nn * 360 - 180, Math.atan(Math.sinh(Math.PI * (1 - 2 * (oy + 0.5) / nn))) * 180 / Math.PI], zoom: 15 });
+    const view = window.__hdTiers().find((t) => t.id === "view");
+    out.viewN = view ? view.tiles.length : 0;
+    if (view) { for (const t of view.tiles) await H.put(t[0], t[1], t[2], new ArrayBuffer(16));
+      try { window.__sheet.exit(); } catch (e) {}
+      window.__hdCard(); await sleep(1500);
+      const t0 = document.querySelector("#panel .hdtier");
+      out.card = t0 ? t0.textContent.replace(/\s+/g, " ").slice(0, 200) : ""; }
+    try { window.__sheet.exit(); } catch (e) {}
+    try { window.railSet(false); } catch (e) {}
+    m.jumpTo({ center: was.c, zoom: was.z });
+    /* A306 · a tile in flight when Stop comes is not stored */
+    await H.clear();
+    const f2 = D.fetchTile; D.fetchTile = () => sleep(600).then(() => new ArrayBuffer(300));
+    const pr = D.save([[15, 3, 3], [15, 3, 4]], null, "this view"); await sleep(100); D.stop(); out.r306 = await pr;
+    D.fetchTile = f2; await sleep(200); out.afterStop = (await H.stats()).tiles;
+    await H.clear(); try { window.__hdChip(); } catch (e) {}
+    return out;
+  });
+  if (hdx.missing) ok(false, "A301–A306 · the HD hooks are missing");
+  else {
+    const redPx = (p) => !!p && p[1] > 200 && p[2] < 40 && p[3] < 40 && p[4] > 200;
+    const a301 = (x) => redPx(x.kid) && !redPx(x.lone);
+    ok(a301(hdx) && !a301({ ...hdx, kid: hdx.lone }),
+       `A301 · a z15 tile nobody saved under a saved z13 is served the z13's share (centre pixel ${JSON.stringify(hdx.kid)}), and one with no saved z13 above it stays blank (${JSON.stringify(hdx.lone)}); the judge rejects take 200's blank`);
+    const a302 = (x) => x.tm && x.clears >= 1;
+    ok(a302(hdx) && !a302({ ...hdx, clears: 0 }),
+       `A302 · a save's end clears the drawn satellite tiles through MapLibre 5's tileManagers (${hdx.clears} clear${hdx.clears === 1 ? "" : "s"}); take 200 read style.sourceCaches, which 5.24 does not have, and cleared none`);
+    const a303 = (x) => x.abort === "rejected" && x.aborted >= 1 && x.after303 === 0;
+    ok(a303(hdx) && !a303({ ...hdx, abort: "hung" }),
+       `A303 · a write whose transaction aborts at commit settles (${hdx.abort}, ${hdx.aborted} abort, ${hdx.after303} B kept); take 200's put hung: the quota's abort brings no error event`);
+    const r = hdx.r404 || {};
+    const a304 = (x) => !x.error && x.missing === 1 && x.done === 11;
+    ok(a304(r) && !a304({ ...r, error: "HTTP 404", missing: 0, done: 3 }),
+       `A304 · a tile the service answers 404 for is counted missing and the save goes on (${r.done} done, ${r.missing} missing, error ${r.error}); the judge rejects take 200's stop at it`);
+    const a305 = (x) => x.viewN > 0 && /already sharp here/.test(x.card || "");
+    ok(a305(hdx) && !a305({ ...hdx, card: `This view${hdx.viewN} tiles · under 1 MBSave HD for this view` }),
+       `A305 · with all ${hdx.viewN} of the view's tiles saved, the card says it is already sharp here instead of quoting them again ("${(hdx.card || "").slice(0, 90)}"); the judge rejects take 200's quote`);
+    const a306 = (x) => x.afterStop === 0 && !!x.r306 && x.r306.stopped;
+    ok(a306(hdx) && !a306({ ...hdx, afterStop: 2 }),
+       `A306 · a tile still in flight when Stop comes is not stored (${hdx.afterStop} saved after Stop); take 200 stored it, after a Delete all too`);
+  }
+
+  /* take 201 · A303, the real thing: the origin's quota cut to 1 MB through
+     CDP (1 MB over what it holds) and a save of 300 KB tiles of random bytes (constant bytes compress
+     and never fill it). Chrome aborts the fourth write's transaction with
+     QuotaExceededError and no error event (PROVEN, the take's probe). The
+     save must end, let the screen sleep, and say why; take 200's hung. */
+  const qcdp = await page.target().createCDPSession(), qorigin = new URL(page.url()).origin;
+  const qused = await page.evaluate(async () => { await window.__hd.clear(); return (await navigator.storage.estimate()).usage || 0; });
+  let qset = true; try { await qcdp.send("Storage.overrideQuotaForOrigin", { origin: qorigin, quotaSize: qused + 1024 * 1024 }); } catch (e) { qset = String(e.message || e); }
+  const hq = qset !== true ? { skipped: qset } : await page.evaluate(async () => {
+    const H = window.__hd, D = window.HDDL, W = window.__wake, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    await H.clear();
+    const f0 = D.fetchTile;
+    D.fetchTile = () => { const u = new Uint8Array(300 * 1024); for (let o = 0; o < u.length; o += 65536) crypto.getRandomValues(u.subarray(o, o + 65536)); return Promise.resolve(u.buffer); };
+    const plan = []; for (let k = 0; k < 8; k++) plan.push([15, 7 + k, 7]);
+    const r = await Promise.race([D.save(plan, null, "this view"), sleep(15000).then(() => "hung")]);
+    D.fetchTile = f0;
+    const out = { r: r === "hung" ? "hung" : { error: r && r.error, done: r && r.done }, busy: D.busy(), holds: W ? W.holds() : -1 };
+    await H.clear().catch(() => {});
+    return out;
+  });
+  try { await qcdp.send("Storage.overrideQuotaForOrigin", { origin: qorigin }); } catch (e) {}
+  if (hq.skipped) ok(true, `A303 · real quota: CDP could not cut the quota here (${hq.skipped}); the planted abort above stands`);
+  else {
+    const q303 = (x) => x.r !== "hung" && /no more room/.test(x.r.error || "") && !x.busy && x.holds === 0 && x.r.done >= 1;
+    ok(q303(hq) && !q303({ ...hq, r: "hung", busy: true }),
+       `A303 · under a real 1 MB quota a save ends and says why ("${hq.r.error}", ${hq.r.done} of 8 saved), the screen let go (holds ${hq.holds}, busy ${hq.busy}); take 200's never ended`);
+  }
+
   /* Take 145 · the HD chip and the save loop (A160). The fetcher seam is
      replaced with a stub, the bbox comes from the bundle's own box list
      (landmine 197), and the loop is proven whole: plan, save, progress,
