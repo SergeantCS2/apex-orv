@@ -5565,7 +5565,7 @@ function geocode(q,ref){
   var want=+m[1],nm=m[2].toLowerCase().replace(/\.$/,''),qual=(m[3]||'').toLowerCase().trim();
   var zip=/^\d{5}$/.test(qual)?qual:'',at=ref||ME;
   if(qual&&!zip){var pl=placeNamed(qual);if(pl)at=pl}
-  var S=ADDR.segs,best=null,n=0;
+  var S=ADDR.segs,best=null,nr=[0,0];
   for(var i=0;i<S.length;i++){var g=S[i];
     var name=ADDR.names[g[0]].toLowerCase(),exact=name===nm;
     if(!exact&&name.indexOf(nm)<0)continue;
@@ -5576,10 +5576,11 @@ function geocode(q,ref){
       if(want<lo||want>hi)return;
       var t=hi>lo?(want-rg[0])/(rg[1]-rg[0]):0.5;
       t=Math.max(0,Math.min(1,t));
-      var c=[g[1]+(g[3]-g[1])*t, g[2]+(g[4]-g[2])*t],rk=exact?0:1,d=at?mi(at,c):0;n++;
+      var c=[g[1]+(g[3]-g[1])*t, g[2]+(g[4]-g[2])*t],rk=exact?0:1,d=at?mi(at,c):0;nr[rk]++;
       if(!best||rk<best.rk||(rk===best.rk&&d<best.d))
         best={c:c,t:want+' '+ADDR.names[g[0]]+(g[9]?', '+g[9]:''),rk:rk,d:d}})}
-  return best?{c:best.c,t:best.t,n:n,q:!!qual}:null}
+   
+  return best?{c:best.c,t:best.t,n:nr[best.rk],q:!!qual}:null}
  
 function streetNear(si,at){if(!ADDR||!ADDR.segs)return null;at=at||ME;var b=null,bd=1e9;
   for(var i=0;i<ADDR.segs.length;i++){var g=ADDR.segs[i];if(g[0]!==si)continue;

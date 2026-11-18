@@ -1320,32 +1320,47 @@ if (zoomed.trails > 0) {
        `A306 · a tile still in flight when Stop comes is not stored (${hdx.afterStop} saved after Stop); take 200 stored it, after a Delete all too`);
   }
 
-  /* take 201 · A303, the real thing: the origin's quota cut to 1 MB through
-     CDP (1 MB over what it holds) and a save of 300 KB tiles of random bytes (constant bytes compress
-     and never fill it). Chrome aborts the fourth write's transaction with
-     QuotaExceededError and no error event (PROVEN, the take's probe). The
-     save must end, let the screen sleep, and say why; take 200's hung. */
-  const qcdp = await page.target().createCDPSession(), qorigin = new URL(page.url()).origin;
-  const qused = await page.evaluate(async () => { await window.__hd.clear(); return (await navigator.storage.estimate()).usage || 0; });
-  let qset = true; try { await qcdp.send("Storage.overrideQuotaForOrigin", { origin: qorigin, quotaSize: qused + 1024 * 1024 }); } catch (e) { qset = String(e.message || e); }
-  const hq = qset !== true ? { skipped: qset } : await page.evaluate(async () => {
-    const H = window.__hd, D = window.HDDL, W = window.__wake, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    await H.clear();
-    const f0 = D.fetchTile;
-    D.fetchTile = () => { const u = new Uint8Array(300 * 1024); for (let o = 0; o < u.length; o += 65536) crypto.getRandomValues(u.subarray(o, o + 65536)); return Promise.resolve(u.buffer); };
-    const plan = []; for (let k = 0; k < 8; k++) plan.push([15, 7 + k, 7]);
-    const r = await Promise.race([D.save(plan, null, "this view"), sleep(15000).then(() => "hung")]);
-    D.fetchTile = f0;
-    const out = { r: r === "hung" ? "hung" : { error: r && r.error, done: r && r.done }, busy: D.busy(), holds: W ? W.holds() : -1 };
-    await H.clear().catch(() => {});
-    return out;
-  });
-  try { await qcdp.send("Storage.overrideQuotaForOrigin", { origin: qorigin }); } catch (e) {}
-  if (hq.skipped) ok(true, `A303 · real quota: CDP could not cut the quota here (${hq.skipped}); the planted abort above stands`);
+  /* take 201 · A303, the real thing: the origin's quota cut through CDP to
+     1 MB over what it holds, and a save of 300 KB tiles of random bytes
+     (constant bytes are stored compressed and never fill it, landmine 269).
+     Chrome aborts the fourth write's transaction with QuotaExceededError and
+     no error event (PROVEN, the take's probe). The save must end, let the
+     screen sleep and say why; take 200's never ended. In a browser context
+     of its own (a fresh page, as the probe): run inside this long-lived
+     page, the cut did not bite the drill's save and take 192's save after
+     it stored nothing (measured, the take's first run) */
+  let hq = null, qcdp = null, qorigin = null;
+  const qctx = await browser.createBrowserContext();
+  try {
+    const qp = await qctx.newPage();
+    await qp.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle0", timeout: 180000 });
+    await qp.waitForFunction(() => window.__hd && window.HDDL && window.__wake, { timeout: 120000 });
+    qcdp = await qp.target().createCDPSession(); qorigin = new URL(qp.url()).origin;
+    const e0 = await qp.evaluate(async () => { await window.__hd.stats(); await window.__hd.clear();
+      const e = await navigator.storage.estimate(); return { q: e.quota, u: e.usage || 0 }; });
+    await qcdp.send("Storage.overrideQuotaForOrigin", { origin: qorigin, quotaSize: e0.u + 1024 * 1024 });
+    hq = await qp.evaluate(async () => {
+      const D = window.HDDL, W = window.__wake, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      const e1 = await navigator.storage.estimate();
+      D.fetchTile = () => { const u = new Uint8Array(300 * 1024); for (let o = 0; o < u.length; o += 65536) crypto.getRandomValues(u.subarray(o, o + 65536)); return Promise.resolve(u.buffer); };
+      const plan = []; for (let k = 0; k < 8; k++) plan.push([15, 7 + k, 7]);
+      const r = await Promise.race([D.save(plan, null, "this view"), sleep(15000).then(() => "hung")]);
+      const e2 = await navigator.storage.estimate();
+      return { r: r === "hung" ? "hung" : { error: r && r.error, done: r && r.done }, busy: D.busy(), holds: W.holds(),
+               q1: e1.quota, u2: e2.usage };
+    });
+    hq.e0 = e0;
+  } catch (e) { hq = { skipped: String((e && e.message) || e).slice(0, 160) }; }
+  /* the override is the origin's, not the context's: left in place, the
+     main page's saves after it stored nothing (measured, the take's second
+     run) */
+  finally { if (qcdp) await qcdp.send("Storage.overrideQuotaForOrigin", { origin: qorigin }).catch(() => {});
+    await qctx.close().catch(() => {}); }
+  if (hq.skipped) ok(false, `A303 · real quota: the drill could not run (${hq.skipped})`);
   else {
-    const q303 = (x) => x.r !== "hung" && /no more room/.test(x.r.error || "") && !x.busy && x.holds === 0 && x.r.done >= 1;
-    ok(q303(hq) && !q303({ ...hq, r: "hung", busy: true }),
-       `A303 · under a real 1 MB quota a save ends and says why ("${hq.r.error}", ${hq.r.done} of 8 saved), the screen let go (holds ${hq.holds}, busy ${hq.busy}); take 200's never ended`);
+    const q303 = (x) => x.r !== "hung" && /no more room/.test(x.r.error || "") && !x.busy && x.holds === 0 && x.r.done >= 1 && x.r.done < 8;
+    ok(q303(hq) && !q303({ ...hq, r: "hung", busy: true }) && !q303({ ...hq, r: { error: null, done: 8 } }),
+       `A303 · under a real quota (${Math.round(hq.q1 / 1024)} KB, ${Math.round(hq.e0.u / 1024)} KB held first) a save of 300 KB tiles ends and says why ("${hq.r.error}", ${hq.r.done} of 8 saved, ${Math.round(hq.u2 / 1024)} KB then held), the screen let go (holds ${hq.holds}, busy ${hq.busy}); the judge rejects take 200's hang and a cut that never bit`);
   }
 
   /* Take 145 · the HD chip and the save loop (A160). The fetcher seam is
