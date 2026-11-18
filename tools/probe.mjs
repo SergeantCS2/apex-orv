@@ -137,43 +137,83 @@ if (mode === "shots") {
     window.guideShow(); }, GUIDEKEY); await s(500); await shot("5-first-run-guide");
   console.log("screens written to " + out);
 } else if (mode === "take") {
-  /* the scenes takes 185–186 changed: the first-open card, Camp at three
-     scales (the maintainer's five screenshots were 5, 3 and 2 miles),
-     Layers → Pins in Camp, the Set home card, a pin card. Deterministic
-     cameras from the bundle's anchors so a scene means the same each take. */
+  /* the scenes take 203 changed, each on the bundle's own data, as a dirt
+     bike unless it says otherwise: a DNR hiking trail's card (A322, A325),
+     a route card's climb and profile (A323), a permanently closed trail's
+     card (A324), a county riding area (A326), a route before sunrise and a
+     river run that ends after sunset on a pinned clock (A327), and a camp
+     named Modern (A328). Earlier takes' scenes are in their commits. */
   const out = OUT; mkdirSync(out, { recursive: true });
   const s = (ms) => new Promise((r) => setTimeout(r, ms));
   const shot = async (name) => { await pg.screenshot({ path: `${out}/${name}.png` }); console.log("  " + name + ".png"); };
-  /* map.loaded() flips before the app's own load handler has run, and that
-     handler folds the rail (railSet(false)) — two unfolds lost that race
-     before this wait existed. The hooks are defined by the load handler, so
-     their presence proves it ran. */
-  await pg.waitForFunction(() => window.__nav && window.__stack && window.__mode, { timeout: 60000 });
+  await pg.waitForFunction(() => window.__nav && window.__route && window.__mode && window.__areas, { timeout: 60000 });
   await s(300);
   const settle = async () => { await pg.evaluate(async () => { const s2 = (ms) => new Promise((r) => setTimeout(r, ms));
-    const m = window.map; try { window.__stack && window.__stack.run(); } catch (e) {}
-    for (let i = 0; i < 40; i++) { if (m.areTilesLoaded()) break; await s2(300); }
+    const m = window.map; for (let i = 0; i < 40; i++) { if (m.areTilesLoaded()) break; await s2(300); }
     await Promise.race([new Promise((r) => m.once("idle", r)), s2(5000)]); await s2(500); }); };
   await pg.evaluate(() => { try { window.__tour && window.__tour.close && window.__tour.close(); } catch (e) {}
-    try { window.guideClose(true); } catch (e) {}
-    /* unfold the drawer through the app's own hook, not a peek click that
-       toggles whatever state it finds (the first run of this scene shot a
-       folded drawer — the visual loop's first catch, take 186) */
-    try { window.railSet(true); } catch (e) {} });   /* a top-level function: a global */
-  await s(700); await shot("01-first-open-card");
-  await pg.evaluate(() => { try { window.railSet(false); } catch (e) {} });
-  const gr = await pg.evaluate(() => { const a = (window.BUNDLE && window.BUNDLE.anchors || []).find((x) => /Grayling/.test(x[0]));
-    return a ? [a[1], a[2]] : null; }) || [-84.7145, 44.6614];
-  await pg.evaluate(() => window.__mode.apply("camp", { silent: true })); await s(300);
-  for (const [z, label] of [[9.0, "5mi"], [9.8, "3mi"], [10.6, "2mi"]]) {
-    await pg.evaluate((c, z) => window.map.jumpTo({ center: c, zoom: z }), gr, z); await settle(); await shot(`02-camp-${label}-z${z}`); }
-  await pg.evaluate(() => document.getElementById("c-layers").click()); await s(500);
-  await pg.evaluate(() => { const p = document.getElementById("lyrpanel"); if (p) p.scrollTop = p.scrollHeight; }); await s(200);
-  await shot("03-layers-pins-in-camp");
-  await pg.evaluate(() => document.getElementById("c-layers").click()); await s(200);
-  await pg.evaluate(() => document.querySelector('#tabs .tab[data-go="plan"]').click()); await s(300);
-  await pg.evaluate(() => document.getElementById("c-home").click()); await s(500); await shot("04-set-home-card");
-  await pg.evaluate(() => document.querySelector('#tabs .tab[data-go="map"]').click()); await s(200);
+    try { window.guideClose(true); } catch (e) {} window.__route.setMachine("bike"); });
+  /* a line's card through the map's own click handler, at one of the
+     line's nodes, the hit test answering with that line (a tap's pixel can
+     land beside a curved line; the card is the app's, unchanged) */
+  const tapEdge = async (pick, name) => {
+    const at = await pg.evaluate((pick) => { const R = window.__route, f = new Function("e", "R", "return " + pick), e = R.EDGES.find((x) => f(x, R)) || null;
+      if (!e) return null; const a = R.NODES[e.a]; return [a[0], a[1], e.i, e.c]; }, pick);
+    if (!at) { console.log("  (no edge for " + name + ")"); return; }
+    await pg.evaluate((c) => window.map.jumpTo({ center: [c[0], c[1]], zoom: 15.5 }), at); await settle();
+    await pg.evaluate((c) => { const m = window.map, q = m.queryRenderedFeatures.bind(m);
+      m.queryRenderedFeatures = (g, o) => { const L = (o && o.layers) || [];
+        return L.includes(c[3]) ? [{ properties: { i: c[2], c: c[3] }, layer: { id: c[3] }, geometry: { type: "Point", coordinates: [c[0], c[1]] } }] : []; };
+      try { const p = m.project([c[0], c[1]]), cv = m.getCanvas(), r = cv.getBoundingClientRect();
+        for (const t of ["mousedown", "mouseup", "click"]) cv.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, clientX: r.left + p.x, clientY: r.top + p.y })); }
+      finally { setTimeout(() => { m.queryRenderedFeatures = q; }, 400); } }, at);
+    await s(800); await pg.evaluate(() => { try { window.railSet(true); } catch (e) {} }); await s(500); await shot(name); };
+  await tapEdge(`(e.bi>=0&&R.attrs(e).auth==='nonorv'&&/North Country/.test(e.n||'')&&!/closed/i.test(R.attrs(e).st||''))`, "01-hiking-trail-card-dirt-bike");
+  await tapEdge(`(e.bi>=0&&/closed permanent/i.test(R.attrs(e).st||''))`, "02-closed-permanent-card");
+  /* a route near Mio: its card's climb, drop and profile */
+  /* a route near Mio a dirt bike may ride: the first of a ring of points
+     4-6 mi out the router can reach */
+  const pair = await pg.evaluate(() => { try { window.railSet(false); } catch (e) {} const R = window.__route;
+    const a = R.nearestNode([-84.13, 44.65]), f = R.PROFILES[0].f;
+    for (let k = 0; k < 24; k++) { const ang = k * Math.PI / 12, d = 0.07 + (k % 3) * 0.02;
+      const b = R.nearestNode([-84.13 + Math.cos(ang) * d / 0.714, 44.65 + Math.sin(ang) * d]);
+      const p = b >= 0 ? R.route(a, b, f) : null; if (p && p.length > 20) return [a, b]; }
+    return null; });
+  if (pair) await pg.evaluate((pr) => { const R = window.__route, A = R.NODES[pr[0]], B = R.NODES[pr[1]];
+    R.setME(A); R.go(B.slice(), "the probe's end");
+    window.map.fitBounds([[Math.min(A[0], B[0]) - 0.02, Math.min(A[1], B[1]) - 0.02], [Math.max(A[0], B[0]) + 0.02, Math.max(A[1], B[1]) + 0.02]], { duration: 0 }); }, pair);
+  else console.log("  (no routable pair near Mio)");
+  await s(1500); await settle(); await pg.evaluate(() => { try { window.railSet(true); } catch (e) {} }); await s(600);
+  await pg.evaluate(() => { const c = document.querySelector(".rc.sel") || document.querySelector(".rc"); if (c) c.scrollTop = c.scrollHeight; }); await s(300);
+  await shot("03-route-card-climb-profile");
+  /* the same route, planned 2.5 h before sunrise (the page's clock pinned) */
+  const pin = (h) => pg.evaluate((h) => { const RD = window.__RD || (window.__RD = window.Date), R = window.__route, me = R.ME;
+    const t = R.sun(me[1], me[0], new RD()), d = new RD(); d.setHours(0, 0, 0, 0); const ms = d.getTime() + Math.round((t[h[0]] + h[1]) * 3600000);
+    window.Date = class extends RD { constructor(...a) { if (a.length) super(...a); else super(ms); } static now() { return RD.now(); } }; }, h);
+  const unpin = () => pg.evaluate(() => { if (window.__RD) window.Date = window.__RD; });
+  await pin(["rise", -2.5]);
+  if (pair) await pg.evaluate((pr) => { const R = window.__route; R.go(R.NODES[pr[1]].slice(), "the probe's end"); }, pair);
+  await s(1500); await pg.evaluate(() => { try { window.railSet(true); } catch (e) {} }); await s(500);
+  await shot("04-route-card-before-sunrise"); await unpin();
+  await pg.evaluate(() => { try { document.getElementById("btn-clear").click(); } catch (e) {} try { window.railSet(false); } catch (e) {} });
+  /* a river run launched an hour before sunset */
+  await pin(["set", -1]);
+  await pg.evaluate(() => { const P = window.__paddle, rv = (P.data && P.data.c || []).find((c) => /Au Sable/.test(c.n) && c.f.length > 4) || P.data.c[0];
+    const f = rv.f.filter((x) => x.k !== "parking"), a = f[0], b = f.find((x) => x.mi - a.mi > 6) || f[f.length - 1];
+    window.map.jumpTo({ center: a.p, zoom: 11 }); P.run(a, b, rv.n); try { window.railSet(true); } catch (e) {} });
+  await s(900); await shot("05-river-run-ends-after-sunset"); await unpin();
+  /* a county riding area */
+  await pg.evaluate(() => { const m = window.__areas; m.card({ n: "The Mounds ORV Park", o: "County", ac: 213 });
+    try { window.railSet(true); } catch (e) {} });
+  await s(600); await shot("06-county-riding-area-card");
+  /* a camp named Modern, from the bundle's own pin */
+  const camp = await pg.evaluate(() => { const f = window.map.getStyle().sources.poi.data.features.find((x) => /Algonac-Modern/.test(x.properties.n || ""));
+    return f ? f.geometry.coordinates : null; });
+  if (camp) { await pg.evaluate((c) => window.map.jumpTo({ center: c, zoom: 15 }), camp); await settle();
+    await pg.evaluate((c) => { const p = window.map.project(c), cv = window.map.getCanvas(), r = cv.getBoundingClientRect();
+      for (const t of ["mousedown", "mouseup", "click"]) cv.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, clientX: r.left + p.x, clientY: r.top + p.y })); }, camp);
+    await s(800); await pg.evaluate(() => { try { window.railSet(true); } catch (e) {} }); await s(400); await shot("07-camp-named-modern"); }
+  else console.log("  (no Algonac-Modern pin in this bundle)");
   console.log("take " + TAKE + " scenes written to " + out);
 } else if (mode === "state") {
   const out = OUT; mkdirSync(out, { recursive: true });

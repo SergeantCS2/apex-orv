@@ -17,9 +17,22 @@ TOL = 10 / 111320
 g = json.load(open("graph_raw.json"))
 nodes, edges = g["nodes"], g["edges"]
 
+# take 203 · A322 · `foot` (a named hiking trail, OSM's or an agency's
+# non-ORV line: walkable, never ridable) has been a routable class since take
+# 134, and was missing here: ci.get(c, 10) shipped every foot edge as
+# `track`, which every ORV machine may ride. About 10,576 mi of DNR and USFS
+# hiking trail (Iron Belle, North Country, Shore-to-Shore, High Country
+# Pathway) were routable for a dirt bike or a quad (the take-202 audit,
+# PROVEN on the shipped bundle). Appended, so every other index is unchanged;
+# and a class this list does not name now stops the build instead of
+# becoming another class.
 CLS = ["route72", "trail50", "moto24", "mccct", "fstrail", "fsroad",
-       "closed", "fsclosed", "paved", "minor", "track"]
+       "closed", "fsclosed", "paved", "minor", "track", "foot"]
 ci = {c: i for i, c in enumerate(CLS)}
+_unknown = sorted({e["c"] for e in g["edges"]} - set(CLS))
+if _unknown:
+    raise SystemExit(f"emit_graph: routable classes the bundle cannot name: {_unknown} — "
+                     f"they would ship as another class (take 203, A322)")
 
 names, nidx = [], {}
 def name_id(s):
@@ -155,7 +168,7 @@ for e in edges:
     if len(pts) < 2:
         pts = [tuple(e["pts"][0]), tuple(e["pts"][-1])]
     E.append([remap[e["a"]], remap[e["b"]], round(e["L"]),
-              ci.get(e["c"], 10), name_id(e.get("n")), name_id(e.get("id")),
+              ci[e["c"]], name_id(e.get("n")), name_id(e.get("id")),
               bundle_id(e),
               # A60: 0 = routable but not drawn. The fact lives WITH the edge it
               # describes rather than in a parallel list that can go missing

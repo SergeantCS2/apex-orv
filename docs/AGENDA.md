@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 202.* Ranked by blocking-ness, not by interest.
+*Current as of take 203.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -6578,14 +6578,199 @@ it). DECL_W = 7° is north-east Michigan's declination, used statewide.
 - **Ruled out:** changing the heading source without the Fold's own
   reading: the self-test line is the measurement to take first.
 
-## A320 — Voice cues after a re-route, and near a turn · FOUND take 201 (the fourth audit, INFERRED) · OPEN, to measure
+## A320 — Voice cues after a re-route, and near a turn · FOUND take 201 (the fourth audit, INFERRED) · BUILT take 203 (PROVEN by a drill)
 The voice key is reset only by navStop, so a re-route can stay silent on
 its first turn; the 90 m near/far switch has no hysteresis, so a rider
 stopped about 90 m short can hear the cue repeat.
+- **Built, take 203:** what has been said is kept on each guide, per step:
+  far at most once, near at most once, never far after near; a new guide
+  (a re-route, a re-join, another card) starts with nothing said; and the
+  repeat filter no longer swallows a second turn with the same words.
+- Held by smoke 9zd A320 (a real route ridden with a captured phone
+  engine: one far and one near cue over six fixes either side of 90 m; a
+  wander 160 m off before the first turn, re-routed, and the new route's
+  first turn said; two turns 60 m apart with the same words both said).
+  The drill sets the re-route's 20 s mark back (an earlier drill had left
+  it 120 min in the future; landmine 272).
 - **Ruled out:** changing the voice rules without a drill that rides a
   re-route through the guide and counts what is said.
 
-## A321 — A resumed loop is re-planned as a route to its start · FOUND take 201 (the fourth audit, INFERRED) · OPEN
+## A321 — A resumed loop is re-planned as a route to its start · FOUND take 201 (the fourth audit, INFERRED) · BUILT take 203 (PROVEN by a drill)
 After a restart mid-loop, the resumed trip's route is planned point to
 point to the loop's start, not as the rest of the loop.
+- **Built, take 203:** the trip record keeps the loop (its edges, ends,
+  shape, re-join and the progress ridden) with the bundle it was planned
+  on; a resume on the same bundle rebuilds the same loop and carries on
+  from the progress saved, the peek line saying "the loop, back to the
+  start"; on another bundle, or with a line of it closed since or not
+  legal for the machine (the review of take 203: the replay had skipped
+  the router's checks), it routes to the start and says why.
+- Held by smoke 9zb A321 (a real 5.7 mi loop ridden to 1.7 mi, saved,
+  the app gone, resumed: the same loop from 1.7 mi; the record on another
+  bundle routes to the start with the toast, and so does the record with
+  one of its lines closed); a mutant fails.
 - **Ruled out:** fixing without a drill of a loop resumed after a restart.
+
+## A322 — Hiking-only agency trails were routable for every ORV machine · FOUND take 202 (the fifth audit, PROVEN on the shipped bundle) · BUILT take 203
+tools/emit_graph.py packed each edge's class with `ci.get(c, 10)`, and its
+fixed class list never had `foot`, the routable class graph.py has emitted
+since take 134 (a named hiking trail: walkable, never ridable). Every foot
+edge shipped as index 10, `track`, which every ORV machine may ride: 64,377
+edges of DNR and USFS non-ORV line (7,525 mi DNR, 3,051 mi USFS: the Iron
+Belle, North Country, Shore-to-Shore, High Country Pathway), and every
+named OSM path besides. The audit's simulated Most-trail dirt-bike routes
+ran 8.3 of 8.4 mi on the Iron Belle. check_class_legality read only the
+graph's `cls` header, which never held `foot`.
+- **Built, take 203:** emit_graph names `foot` (appended: every other
+  index unchanged) and stops the build on a class it cannot name;
+  machineLegal refuses an agency non-ORV line to every machine but walking,
+  whatever class it arrived as (so the restored bundle is safe too); the
+  trail card names the class "hiking trail".
+- Held by smoke 9zc A322 (every machine over every non-ORV edge: a dirt
+  bike, a quad and a side-by-side 0, on foot 63,888 once A324 closes the
+  closed ones; a dirt-bike route along the Iron Belle uses none), and the
+  gate's check_nonorv_routes (the wiring, two planted controls, and on a
+  built bundle: no non-ORV edge in a class an ORV machine may ride, and some
+  edge of class foot). A mutant without the app's guard fails 9zc (64,377
+  ridable; the Iron Belle route used 1,154 of them); the check fails on the
+  pre-fix bundle (64,377, no foot edge) and passes on that bundle with its
+  non-ORV edges reclassed foot; main's emit_graph ships a planted Iron Belle
+  edge as `track`, the new one as `foot`, and stops on a planted `horse`.
+- **Ruled out:** mapping `foot` to a show-only class. A walker routes on
+  it (take 134), and the walk machine's allow-list names it.
+
+## A323 — Climb, drop and the profile ignored the way an edge is ridden · FOUND take 202 (the fifth audit, PROVEN) · BUILT take 203
+terrain.py measures each edge's gain, loss and profile from a to b; the
+route summary added them whatever way the edge was ridden, so a route and
+its reverse read the same climb (Cadillac to Baldwin: climb 1,240 / drop
+1,060 ft where 912 / 1,388 is true), and the Easiest and Least climbing
+profiles charged a descent as a climb. The profile's first value already
+held the edge's start elevation and the summary added the start node's
+again: every elevation about doubled (2,867 ft on one route, above
+Michigan's 1,979 ft high point).
+- **Built, take 203:** the router hands each cost the way the edge is
+  taken; the summary, the turn list's climbs and the profile follow the
+  ridden direction (from the route's start node, or the chain of its
+  edges); the profile is the edge's own elevations.
+- Held by smoke 9ze A323 (a real route ridden partly against its edges'
+  sense: climb and drop swap exactly on its reverse, climb minus drop
+  matches its ends within the data's noise, the turn list sums to the
+  climb, the profile starts at the start's elevation and stays under 604 m,
+  and the router passes both directions).
+- **Ruled out:** judging by node elevations alone: 3% of edges start or end
+  on a sample up to 50 m from their node's (measured on the bundle), so the
+  exact check is the reverse route.
+
+## A324 — Open reroutes were refused and called closed; a permanently closed trail was routable · FOUND take 202 (the fifth audit, PROVEN) · BUILT take 203
+ingest.py closed a DNR line's class when its status began "Temporarily",
+and the card's closed tag used the same test: "Temporarily Open Reroute"
+(62 edges, 16.8 mi, the signed detour) was refused and labelled closed;
+"Closed Permanent" (4 MCCCT edges) was routable and tagged "DNR · legal".
+Hiking trails "Temporarily Closed Due To Timber Harvest" (489 edges) were
+open to walkers.
+- **Built, take 203:** ingest closes a class when the status says closed,
+  and reads a non-ORV line's non-motorised status (the walker's);
+  machineLegal refuses a line whose status says closed, to every machine
+  and on foot; the card says "closed", "open reroute", or "status not
+  published" for the DNR's "Unknown".
+- Held by smoke 9zf A324 (1,021 closed-status edges, 0 legal for any
+  machine; the detour, Unknown and Closed Permanent cards tapped through
+  the map's click) and the gate's check_closure_status (the wiring, two
+  planted controls, a built bundle: no detour bundled closed, no closed
+  status in an ORV class; it fails on the pre-fix bundle: 62 and 493).
+- **Ruled out:** routing the "Unknown" status as closed: they are
+  designated routes the DNR has not marked either way; the card says so.
+
+## A325 — The trail card's legality tags ignored the router's own rules · FOUND take 202 (the fifth audit, PROVEN) · BUILT take 203; seasons and the width text OPEN (A330)
+"DNR/USFS · legal" named the source, and "illegal for your machine" read
+the class alone: a quad on a "Trails open to motorcycles" line was held out
+by the router while its card said "USFS · legal · Moto open", and a DNR
+hiking trail read "DNR · legal".
+- **Built, take 203:** the tag is the router's rule (machineLegal: class,
+  per-vehicle restriction, non-ORV, closure); an agency's non-ORV line
+  reads "DNR · not an ORV trail".
+- Held by smoke 9zf A325 (a quad on a per-vehicle closed line, a DNR hiking
+  trail; planted take-202 cards rejected).
+- **Ruled out:** a tag per restriction: the restriction's own words are
+  printed below (A101), and the tag says only whether this machine may.
+
+## A326 — The riding-area card named the DNR for every area and no season · FOUND take 202 (the fifth audit, PROVEN) · BUILT take 203
+Every area read "DNR scramble area · trail permit required" and "you may
+ride anywhere on" year-round: The Mounds (a county park) and Bull Gap
+(federal) included.
+- **Built, take 203:** every area reads "On the DNR's list of riding areas
+  · County land" (the land the list names; no operator, since Holly Oaks
+  is state land a county runs), a State area keeps "trail permit
+  required", any other "its operator's own pass and rules apply", and
+  every card says its season and hours are not in the map's data.
+- Held by smoke 9zg A326 (three real areas' records; a planted take-202
+  card rejected).
+- **Ruled out:** printing seasons from memory (Silver Lake April 1 – Oct
+  31 is outside knowledge, INFERRED): the map says what its data holds.
+
+## A327 — Darkness was checked only at a trip's end, never on a river, and sunset ran up to 6.5 min off · FOUND take 202 (the fifth audit, PROVEN) · BUILT take 203
+The route card warned only when arrival passed sunset: a 05:00 start in
+November (sunrise 7:38) had no warning, and the drill's quiet case was
+04:00 at midsummer, before sunrise. A river run had no darkness line. The
+short sunset formula put the equation of time on its declination's +10-day
+angle: up to 6.5 min off, 4.6 min late at the winter solstice (measured
+here against NOAA's spreadsheet algorithm).
+- **Built, take 203:** sunrise and sunset by NOAA's solar calculator
+  (Meeus); a trip before sunrise says "starts before sunrise (7:38 AM)"; a
+  river run launched now that ends after sunset at the slow end of the
+  craft's pace says so.
+- Held by smoke 9zh A327 (36 days within 1.2 min of the USNO almanac
+  algorithm, a different method, where the short form was 6.5 min off; a
+  summer evening read on absolute time, whatever the phone's zone; the
+  app's darkness reader at three hours of a November day;
+  the route card before dawn and a river run an hour before sunset, on a
+  pinned clock). The take-188 drill's quiet case is now a quarter hour after
+  sunrise where the rider is.
+- **Ruled out:** NOAA's short "general solar position" formula: still 2-3
+  min off at sunrise and sunset (measured); and clock hours: a phone on
+  another zone or a night that changes the clock read them wrong (the
+  review).
+
+## A328 — A campground's type was guessed and printed as fact · FOUND take 202 (the fifth audit, PROVEN) · BUILT take 203
+poi.py called every DNR or USFS camp with no camp_site tag "rustic", and
+the card printed "rustic — vault toilets, no hookups" for Algonac-Modern
+Riverfront, Ionia-Modern, Burt Lake and P.H. Hoeft state parks; every DNR
+camp read "State forest campground".
+- **Built, take 203:** poi.camp_type reads only what OSM records (basic or
+  backcountry is rustic; serviced or power is modern; else unknown, "type
+  not recorded"); the card says "rustic (basic sites, as OSM records it)",
+  never rustic on a camp named Modern, and "State park campground (DNR)",
+  "State forest campground (DNR)" or "DNR campground" by the name.
+- Held by smoke 9zi A328 (a real camp's feature tapped with three records)
+  and the gate's check_camp_type (seven planted tag sets, take 202's guess
+  as the control, a built bundle: no Modern camp typed rustic; it fails on
+  the pre-fix bundle: Algonac-Modern Riverfront).
+- **Ruled out:** keeping the guess with a "probably": a camper decides by
+  the type, and "type not recorded" is the honest line.
+
+## A329 — Gauges: another stream's reading, and readings that can be old · FOUND take 202 (the fifth audit) · OPEN
+GAUGE.near takes the nearest gauge on any stream within 12 mi: about 121 of
+802 paddle stops get another stream's gauge though their own river has one
+in range (by an approximate name match: Huron at Gallup Park gets Malletts
+Creek). The button says "live"; one "as of" time (the flow's) covers stage
+and temperature, each its own series' last value; the fetch has no
+timeout.
+- **Ruled out:** fixing the match without a drill that pairs each stop's
+  river with the gauge's stream by the corridor's own river name, not a
+  guessed one.
+
+## A330 — The trail card's seasonal routes and width text · FOUND take 202 (the fifth audit) · OPEN
+B/BK routes (79 mi) are open May 1 – Nov 1 only; the restriction's words
+are printed, but nothing says "closed today" (enforcement is A101). 1,508
+mi of 72" routes print "Width 12 Feet And Over · Snowmobile Trail Permit",
+which reads as the ORV width and permit.
+- **Ruled out:** enforcing the season in the router before A101's
+  restriction reader parses dates; the card line can come first.
+
+## A331 — Minor findings of the fifth audit · OPEN
+Elevation readouts and dispatch's "Elevation" come from the nearest graph
+node at any distance (elevNear); bare hazard weights print "15000 t";
+height limits round to the nearest inch (up to half an inch of clearance
+overstated); the route ETA and the darkness check leave out the
+off-network leg's time.
+- **Ruled out:** folding these into take 203 without a drill each.

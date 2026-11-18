@@ -3603,7 +3603,12 @@ if (zoomed.trails > 0) {
           if (f.length) { nfName = f[0].properties.n; break; } } catch (e) { } }
       /* a typed campground, from the bundle, says its type on its card */
       const P = window.POIS ? window.POIS.p : [];
-      let typed = -1; for (let i = 0; i < P.length; i++) if (P[i].k === "camp" && P[i].ct && P[i].ct.op === "dnr" && P[i].ct.ty) { typed = i; break; }
+      /* take 203 · A328 · a camp is typed only as OSM records it, so the
+         built data may type none: a typed DNR camp if there is one, else any */
+      let typed = -1; for (let i = 0; i < P.length; i++) if (P[i].k === "camp" && P[i].ct && P[i].ct.op === "dnr" && P[i].ct.ty && !/modern/i.test(P[i].n || "")) { typed = i; break; }
+      /* (a camp named Modern is never called rustic, so it cannot show a typed card: the review of take 203) */
+      if (typed < 0) for (let i = 0; i < P.length; i++) if (P[i].k === "camp" && P[i].ct && P[i].ct.op === "dnr" && !/modern/i.test(P[i].n || "")) { typed = i; break; }
+      const hasTy = typed >= 0 && !!P[typed].ct.ty;
       let cardType = "", campKinds = false;
       if (typed >= 0) {
         const r = P[typed];
@@ -3620,7 +3625,8 @@ if (zoomed.trails > 0) {
       M.apply(was, { silent: true });
       m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z });
       return { modes, nfInRide, nfInCamp, pubInCamp, nfDrawn, nfName, typed, campKinds,
-               typedSays: /State forest campground/.test(cardType) && /rustic|modern/.test(cardType) };
+               /* take 203 · A328 · the DNR line follows the name (a state park, a state forest camp, or "DNR campground") */
+               typedSays: /(State forest|State park|DNR) campground/.test(cardType) && (!hasTy || /rustic|modern/.test(cardType)) && !/vault toilets/.test(cardType) };
     });
     if (cp.missing) ok(false, "mode hook missing");
     else {
@@ -3631,7 +3637,7 @@ if (zoomed.trails > 0) {
       ok(cp.nfDrawn > 0 && !!cp.nfName,
          `the Huron-Manistee is on the map in Camp (${cp.nfDrawn} feature(s), ${cp.nfName})`);
       ok(cp.typed >= 0 && cp.typedSays,
-         "a DNR campground's card says it is a state forest campground and whether it is rustic");
+         "a DNR campground's card says the DNR runs it (state forest, state park or DNR campground, by its name) and, when OSM records it, whether it is rustic");
     }
     /* Jacob: "do we need to adjust outdoors or any other mode?" Yes — camp
        sat in every mode at full prominence, and demote only ever reached

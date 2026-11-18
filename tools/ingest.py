@@ -462,9 +462,13 @@ for lid, namefield, cls in DNR_LAYERS:
     for f in query(DNR, lid, fields):
         a = f["properties"]
         status = clean(a.get("OpenClosedStatusORV")) or "Unknown"
+        # take 203 · A324 · closed is what the status says, not its first
+        # word: "Temporarily Open Reroute" (62 edges, 16.8 mi, the signed
+        # detour) was closed for starting "Temporarily", and "Closed
+        # Permanent" (4 MCCCT edges) stayed open (the take-202 audit)
         out.append({
             "geometry": f["geometry"],
-            "c": "closed" if status.lower().startswith("temporarily") else cls,
+            "c": "closed" if "closed" in status.lower() else cls,
             "n": short(clean(a.get(namefield)) or clean(a.get("TrailNamePrimary"))),
             "src": "dnr", "auth": "legal",
             "w": clean(a.get("TrailWidthFeet")),
@@ -523,8 +527,12 @@ for lid, what, cls in DNR_OTHER:
             "n": short(pick(a, "TrailNamePrimary", "Name", "DNRTrail",
                             "PRDTrailUnit") or what),
             "src": "dnr", "auth": "nonorv", "use": what,
-            "st": pick(a, "OpenClosedStatusORV", "OpenClosedStatusSnowmobile",
-                       "OpenClosedStatusNonmotor"),
+            # take 203 · A324 review · a non-ORV line is walked (A322), and a
+            # published closure now closes it to walkers: its status is the
+            # non-motorised one, not the first of the ORV, snowmobile and
+            # non-motorised fields (489 hiking edges were closed on a status
+            # that may have been another use's)
+            "st": pick(a, "OpenClosedStatusNonmotor"),
         })
 
 # ── USFS National Forest System trails ─────────────────────────────────────
