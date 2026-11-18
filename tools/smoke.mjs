@@ -62,6 +62,7 @@ const NO_GPS = args.includes("--no-gps");
 
 let failures = 0;
 const geo = { cb: null, err: null, cleared: 0, seq: 0, id: null, watches: new Map(), clearedIds: [] };
+const geoCtl = { triggers: 0 };
 const protocolsAdded = [];
 const markers = [];
 /* take 189 · fix round 2 · every Marker ever made, never spliced: the A237
@@ -334,7 +335,8 @@ const maplibregl = {
     remove() { this._removed = true; const i = markers.indexOf(this); if (i >= 0) markers.splice(i, 1); }
     getLngLat() { return this._ll; }
   },
-  GeolocateControl: class { on() { return this; } trigger() {} },
+  /* take 199 · A285 · its trigger() is counted: the app must never call it */
+  GeolocateControl: class { on() { return this; } trigger() { geoCtl.triggers++; } },
   LngLatBounds: class { extend() { return this; } },
   addProtocol(name) { protocolsAdded.push(name); },
 };
@@ -1856,25 +1858,29 @@ if (!NO_GPS) {
     }
     /* review of the audit fixes (F17's hold) · Resume presses Ride, and the
        press toggles: with a ride already running (pressed in the 3.2 s
-       before the offer came up) it STOPS it. The hold covered a Resume
-       only when the GPS refused, so 30 ms later the card read "Trip
-       resumed · route to …" with a live Ride it and nothing recording.
-       The trip as saved is put back afterwards (Stop ends it), for the
-       real Resume below. The judge is shown the unheld card. */
+       before the offer came up) it STOPPED it, and this drill held only
+       the card's words. take 199 · A283: with a ride running the offer is
+       not made, and nothing a stale Resume does touches the ride; the ride
+       rides on and the saved trip stays as saved. The judge is shown take
+       198's outcome (offered, the ride stopped). */
     {
       const ls = sandbox.window.localStorage, trip0 = ls.getItem("apex.trip.v1");
       grab("c-ride").fire("click");
       const running = "ride" in grab("shell").dataset && /Stop \(GPS\)/.test(String(grab("c-ride")._html || ""));
       grab("trip-resume")._listeners = {};
-      N.card();
+      const offered = N.card();
       grab("trip-resume").fire("click");
       flushTimeouts(); frames(2);
-      const ph = grab("panel")._html || "", pk = String(grab("peek-txt").textContent);
-      const held = (h, p) => !/Trip resumed/.test(h) && !/id="rc-ride"/.test(h) && !/^Trip resumed/.test(p);
-      ok(running && held(ph, pk) && !!N.plan() && !("ride" in grab("shell").dataset)
-         && !held('<div id="routes"><div class="rc sel"></div></div><button id="rc-ride"></button>', "Trip resumed · route to home is on the map"),
-         `a Resume whose Ride press stopped the ride already running keeps the stop's card ("${ph.replace(/<[^>]*>/g, "").slice(0, 60)}"; `
-         + `peek "${pk.slice(0, 40)}"): no "Trip resumed · route to …" with a live Ride it, nothing riding; the judge rejects that card`);
+      const ph = grab("panel")._html || "";
+      const st = { running, offered: !!offered, riding: "ride" in grab("shell").dataset, trip: N.load() !== null,
+                   resumed: /Trip resumed/.test(ph) };
+      const held = (x) => x.running && !x.offered && x.riding && x.trip && !x.resumed;
+      ok(held(st) && !held({ ...st, offered: true, riding: false }),
+         `A283 · with a ride already running the resume offer is not made and the ride rides on, the saved trip kept `
+         + `(${JSON.stringify(st)}); the judge rejects take 198's (offered, and its Resume stopped the ride)`);
+      /* the ride is stopped as a rider stops it (Stop ends the saved trip;
+         it is put back below, for the real Resume) */
+      for (let i = 0; i < 3 && "ride" in grab("shell").dataset; i++) { grab("c-ride").fire("click"); flushTimeouts(); }
       if (trip0 !== null) ls.setItem("apex.trip.v1", trip0);
       N.reset(); sandbox.window.hudShow(false);
     }
@@ -4388,6 +4394,109 @@ if (!NO_GPS) {
       ok(osm + ag > 0, `A10 · this bundle carries a surface on ${(osm + ag).toLocaleString()} of ${GRg.e.length.toLocaleString()} edges `
          + `(${osm.toLocaleString()} OSM, ${ag.toLocaleString()} DNR/USFS from the OSM duplicate on them)`);
     } else console.log(`  ..   A10 · this bundle predates A10 (its graph names no surface): every card reads "Surface not recorded"`);
+  }
+}
+
+/* 9o · take 199 · the take-198 audit's findings, each held where a rider
+   meets it (PROVEN by code read in the audit; each judge is shown the old
+   outcome). A283: the Resume card never stops a running ride. A284: a slow
+   GPS answer is dropped when the rider has moved on (Set home's "My
+   location" cleared a route planned meanwhile). A285: Locate never starts
+   MapLibre's hidden geolocate watch. A286: a one-off fix outside the region
+   leaves the drawer folded. A288: a saved route that no longer routes does
+   not re-select the route planned before or claim it was routed again. */
+{
+  const N = sandbox.window.__nav, L1 = sandbox.window.__locateOnce, SVO = sandbox.window.__svOpen, R = sandbox.window.__route;
+  const SX = sandbox.window.__sheet;
+  const riding = () => "ride" in grab("shell").dataset;
+  const folded = () => grab("rail").className === "folded";
+  const panel = () => String(grab("panel")._html || "");
+  const newWatch = (s0) => (geo.seq > s0 ? geo.watches.get(geo.seq) : null);
+  const fixAt = (w, ll) => w && w.cb({ coords: { longitude: ll[0], latitude: ll[1], accuracy: 8 } });
+  if (!N || !L1 || !SVO || !R || !SX) ok(false, `take 199 · hooks missing (__nav ${!!N}, __locateOnce ${!!L1}, __svOpen ${!!SVO}, __route ${!!R})`);
+  else {
+    try { sandbox.window.__tour.close("notnow"); } catch (e) {}
+    for (const id of ["modepanel", "actpanel", "lyrpanel", "diagpanel", "cmppanel", "guide"]) grab(id).hidden = true;
+    const ME0 = R.ME.slice(), m0 = R.machine;
+    /* A283 · the card is shown, a ride starts (the Ride tab), then Resume */
+    N.end(); N.save(true);
+    const shown = N.card(); flushTimeouts();
+    SX.tab("ride"); flushTimeouts(); grab("c-ride").fire("click"); flushTimeouts();
+    if (!riding()) console.log(`  ..   A283 · no ride starts in this pass (${NO_GPS ? "no receiver" : "refused"}): the Resume drill needs one`);
+    else {
+      const offered = N.card();              /* a second offer, with the ride up */
+      const r = grab("trip-resume"); r && r.fire("click"); flushTimeouts();
+      const after = { riding: riding(), trip: !!N.load(), offered: !!offered, shown: !!shown };
+      const resumeOk = (a) => a.shown && !a.offered && a.riding && a.trip;
+      ok(resumeOk(after) && !resumeOk({ ...after, riding: false, trip: false }) && !resumeOk({ ...after, offered: true }),
+         `A283 · with a ride running, Resume on the card shown before it leaves the ride riding and the saved trip kept, and the card is `
+         + `not offered again (${JSON.stringify(after)}); the judge rejects take 198's (the ride stopped, the trip ended) and an offer over the ride`);
+      grab("c-ride").fire("click"); flushTimeouts();
+      for (let i = 0; i < 3 && riding(); i++) { grab("c-ride").fire("click"); flushTimeouts(); }
+    }
+    N.end(); SX.tab("map"); flushTimeouts();
+    /* A284 · Set home → My location, then a route planned, then the fix */
+    if (NO_GPS) console.log("  ..   A284 · no receiver in this pass: My location answers at once");
+    else {
+      const homeRun = (planMeanwhile) => {
+        R.setMachine("bike");
+        SX.tab("plan"); flushTimeouts(); grab("c-home").fire("click"); flushTimeouts();
+        const s0 = geo.seq; grab("hc-me").fire("click");
+        const w = newWatch(s0);
+        let rc0 = 0;
+        if (planMeanwhile) {
+          theMap._hit = []; theMap.fire("contextmenu", { lngLat: { lng: ME0[0] + 0.02, lat: ME0[1] + 0.01 } });
+          grab("pc-route") && grab("pc-route").fire("click"); flushTimeouts();
+          rc0 = documentStub.querySelectorAll(".rc").length;
+        }
+        fixAt(w, ME0); flushTimeouts();
+        return { watch: !!w, rc0, rc1: documentStub.querySelectorAll(".rc").length, home: /Home is where you are/.test(panel()) };
+      };
+      const a = homeRun(true), b = homeRun(false);
+      const lateOk = (x) => x.watch && x.rc0 >= 2 && x.rc1 === x.rc0 && !x.home;
+      const stillOk = (x) => x.watch && x.home;
+      ok(lateOk(a) && stillOk(b) && !lateOk({ ...a, rc1: 0, home: true }),
+         `A284 · a fix that lands after the rider planned a route leaves the ${a.rc0} route cards and sets no home (${JSON.stringify(a)}); `
+         + `with nothing done meanwhile it sets home as asked (${JSON.stringify(b)}); the judge rejects take 198's (the route cleared, home set)`);
+      SX.tab("map"); flushTimeouts();
+    }
+    /* A285 · Locate: the hidden control's trigger is never called */
+    { const t0 = geoCtl.triggers, s0 = geo.seq, e0 = record.eased.length;
+      SX.tab("map"); flushTimeouts(); grab("c-locate").fire("click"); flushTimeouts();
+      const w = newWatch(s0); if (w) { fixAt(w, ME0); flushTimeouts(); }
+      const loc = { triggers: geoCtl.triggers - t0, watch: !!w, eased: record.eased.length - e0, card: /no GPS receiver|GPS fix/.test(panel()) };
+      const locOk = (x) => x.triggers === 0 && (x.watch ? x.eased >= 1 : (NO_GPS ? x.card : true));
+      ok(locOk(loc) && !locOk({ ...loc, triggers: 1 }),
+         `A285 · Locate never calls MapLibre's hidden geolocate trigger (${loc.triggers}); ${loc.watch ? `its own watch's fix moves the map (${loc.eased} eases)`
+           : NO_GPS ? `with no receiver it says so` : `the fix was fresh: the map moved at once`}; the judge rejects one trigger, take 198's cold path`); }
+    /* A286 · a one-off fix outside the region, with the drawer folded */
+    if (NO_GPS) console.log("  ..   A286 · no receiver in this pass");
+    else {
+      N.rail(false); flushTimeouts();
+      const c0 = folded(), s0 = geo.seq; L1(); const w = newWatch(s0);
+      fixAt(w, [-95.0, 30.0]); flushTimeouts();
+      const away = { folded0: c0, folded: folded(), watch: !!w, said: /mi from/.test(panel()) };
+      const awayOk = (x) => x.folded0 && x.folded && x.watch && x.said;
+      ok(awayOk(away) && !awayOk({ ...away, folded: false }),
+         `A286 · a one-off fix outside the region says how far away it is and leaves the folded drawer folded (${JSON.stringify(away)}); `
+         + `the judge rejects take 198's (the drawer opened)`);
+      try { N.pos("gps"); } catch (e) {}
+    }
+    /* A288 · a route planned, then a saved route that cannot route (a kayak
+       is legal on no land class) opened over it, its data rebuilt since */
+    { R.setMachine("bike");
+      theMap._hit = []; theMap.fire("contextmenu", { lngLat: { lng: ME0[0] + 0.02, lat: ME0[1] + 0.01 } });
+      grab("pc-route") && grab("pc-route").fire("click"); flushTimeouts();
+      const rc0 = documentStub.querySelectorAll(".rc").length, f0 = record.fitted;
+      SVO({ n: "Old run", f: ME0.slice(), t: [ME0[0] + 0.05, ME0[1] + 0.03], lbl: "Old run", m: "kayak", p: "fast", b: "a-rebuilt-bundle" });
+      flushTimeouts();
+      const sv = { rc0, fail: /Nothing legal nearby|No legal route/.test(panel()), again: /routed again/.test(panel()), fitted: record.fitted - f0 };
+      const svOk = (x) => x.rc0 >= 2 && x.fail && !x.again && x.fitted === 0;
+      ok(svOk(sv) && !svOk({ ...sv, again: true }) && !svOk({ ...sv, fitted: 1 }),
+         `A288 · a saved route that no longer routes says so and neither claims it was routed again nor flies to the route planned before `
+         + `(${JSON.stringify(sv)}); the judge rejects take 198's note and its re-selection`);
+      R.setMachine(m0);
+    }
   }
 }
 

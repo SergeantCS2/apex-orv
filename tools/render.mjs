@@ -1148,6 +1148,46 @@ if (zoomed.trails > 0) {
        + `take 197's getAll, a wrong byte count and a count with no key cursor (${plants.length} plants)`);
   }
 
+  /* take 199 · A287 · an HD save that fails while the rider is elsewhere
+     (the drawer folded, riding out of the camp's wifi) says so in a toast
+     and leaves the drawer as it was. Until take 198 its card went through
+     show(), which opened the drawer over the map or the ride and ended any
+     sheet. Two failures on one tile stop a save (take 178's rule), so the
+     fetcher refuses every tile. */
+  const a287 = await page.evaluate(async () => {
+    const S = window.__sat, H = window.__hd, D = window.HDDL;
+    if (!S || !H || !D || typeof window.__hdSave !== "function") return { missing: true };
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const boxes = (S.tiles.boxes || []).filter((b) => b[0] === 13);
+    const b13 = boxes[0] || [13, 4000, 3000, 4001, 3001];
+    let ox = b13[3] + 5, oy = b13[2], guard = 0;
+    while (S.inPatch(13, ox, oy) && guard++ < 200) ox += 11;
+    const n = 8192, inv = (x, y) => [x / n * 360 - 180, Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI];
+    const a = inv(ox + 0.05, oy + 0.05), c = inv(ox + 0.95, oy + 0.95);
+    const tiles = D.plan([a[0], c[1], c[0], a[1]]);
+    const f0 = D.fetchTile; await H.clear();
+    D.fetchTile = () => Promise.reject(new Error("HTTP 503"));
+    try { window.__sheet.exit(); } catch (e) {}
+    document.querySelector('#tabs .tab[data-go="map"]').click(); await sleep(250);
+    window.railSet(false); await sleep(400);
+    const rail = document.getElementById("rail"), t = document.getElementById("toast");
+    const before = /\bfolded\b/.test(rail.className);
+    window.__hdSave(tiles, "this view");
+    for (let k = 0; k < 300 && D.busy(); k++) await sleep(50);
+    await sleep(200);
+    const out = { before, busy: D.busy(), folded: /\bfolded\b/.test(rail.className),
+      toast: t && !t.hidden ? t.textContent : "", card: /Download stopped/.test(document.getElementById("panel").innerHTML) };
+    D.fetchTile = f0; await H.clear(); try { window.__hdChip(); } catch (e) {}
+    return out;
+  });
+  if (a287.missing) ok(false, "A287 · the HD save hooks are missing (window.__hdSave, HDDL)");
+  else {
+    const failOk = (x) => x.before && !x.busy && x.folded && /HD download stopped/.test(x.toast) && /Saved tiles are kept/.test(x.toast) && !x.card;
+    ok(failOk(a287) && !failOk({ ...a287, folded: false, card: true }) && !failOk({ ...a287, toast: "" }),
+       `A287 · an HD save that fails with the drawer folded says so in a toast ("${a287.toast}") and leaves the drawer folded `
+       + `(${JSON.stringify({ folded: a287.folded, card: a287.card })}); the judge rejects take 198's card over the map, and silence`);
+  }
+
   /* Take 145 · the HD chip and the save loop (A160). The fetcher seam is
      replaced with a stub, the bbox comes from the bundle's own box list
      (landmine 197), and the loop is proven whole: plan, save, progress,

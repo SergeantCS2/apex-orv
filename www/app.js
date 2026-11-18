@@ -2059,14 +2059,14 @@ function homeCard(prefix){
           'The hit you tap becomes home.'});
         arm='homeaddr';syncArm();return}
        
-      show('Waiting for a GPS fix…','');
+      show('Waiting for a GPS fix…','');var wm=cardMark();
       locateOnce(function(at,why){
         if(!at)return show(why==='none'
           ?'<b>This phone reports no GPS receiver.</b> Set home by address or by a tap on the map.'
           :'<b>No GPS fix in 25 s.</b> Try outside, or set home another way.','');
         HOME=at.slice();homeSave();homeMark();clearRoute();syncSafety();
         show('<b>Home is where you are.</b> Press and hold where you want to go and tap '+
-          '<b>Route here</b>.','')})})})}
+          '<b>Route here</b>.','')},null,wm)})})}
 el('c-home').addEventListener('click',function(){
   if(arm==='home'||arm==='homeaddr'){arm=null;syncArm();return ack('Cancelled.')}
   homeCard('')});
@@ -2477,8 +2477,10 @@ function svOpen(rec){
       presentRoutes(out);svPrefer(rec.p)},30);
     return}
   if(!rec.t)return show('<b>'+rec.n+'</b> has no destination saved.','fail');
+   
+  var prev=last;
   routeToPoint(rec.t,rec.lbl||'there');
-  setTimeout(function(){svPrefer(rec.p);if(note)el('panel').innerHTML+=note},80)}
+  setTimeout(function(){if(!last||last===prev)return;svPrefer(rec.p);if(note)el('panel').innerHTML+=note},80)}
 
 function svPrefer(k){
    
@@ -4059,6 +4061,8 @@ function tripResume(t){
     return true}catch(e){show('Could not resume the trip: '+e,'fail');return false}}
 function tripResumeCard(){
   var t=tripLoad();if(!t)return false;
+   
+  if(rideMode||riding)return false;
   var when=new Date(t.startedAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
   show('<b>Resume your trip?</b><div class="sub">Started '+when+' \u00b7 '+
     (t.crumbMi||0).toFixed(1)+' mi recorded'+(t.lbl?' \u00b7 heading to '+t.lbl:'')+
@@ -4067,6 +4071,9 @@ function tripResumeCard(){
     '<button class="chip" id="trip-resume">'+ic('ride')+'<span>Resume</span></button> '+
     '<button class="chip" id="trip-discard">'+ic('del')+'<span>Discard</span></button>','');
   el('trip-resume').addEventListener('click',function(){
+     
+    if(rideMode||riding){logAct('act  trip resume refused: a ride is running');
+      return ack('A ride is already running. The earlier trip was not resumed.')}
      
      
     if(tripResume(t)){el('c-ride').click();if(rideMode||riding)
@@ -4465,11 +4472,12 @@ function meNoun(own){var k=meIs();
     {sim:'the simulated position',away:'the planning start',pin:'the start pin'}[k]}
 function inRegion(at){var b=BUNDLE.bbox;if(!b)return true;
   return at[0]>=b[0]-0.02&&at[0]<=b[2]+0.02&&at[1]>=b[1]-0.02&&at[1]<=b[3]+0.02}
-function classifyFix(at){
+function classifyFix(at,quiet){
   logAct('gps  fix '+at[1].toFixed(5)+','+at[0].toFixed(5));
   if(inRegion(at)){posMode='gps';awayMi=0;bootEase(at);return}
   posMode='away';awayMi=mi(at,CTR);
-  show(awayHtml(!!rideMode),'')}
+   
+  if(!quiet)show(awayHtml(!!rideMode),'')}
  
 function awayHtml(ride){
   return ('<b>You are about '+Math.round(awayMi)+' mi from '+
@@ -4821,8 +4829,12 @@ function startHDSave(tiles,label){
   hdChipTxt('HD 0%');
   HDDL.save(tiles,function(d,t){hdChipTxt('HD '+Math.round(d/Math.max(1,t)*100)+'%');hdLive()},label)
     .then(function(r){hdChip();refreshSat();
-      if(r&&r.error)return show('<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
-        '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');
+       
+      if(r&&r.error){
+        if(hdSeen())return toolShow('c-hdmanage','<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
+          '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');
+        logAct('act  HD save stopped out of view: '+r.error);
+        return toast('HD download stopped ('+r.error+'). Saved tiles are kept.',4000)}
       hdEnded(r)})}
  
 function hdTiers(){
@@ -5666,6 +5678,8 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.__netLo={n:NETLO.length,ms:NETLO_MS,err:NETLO_ERR,z:NETLO_Z,edges:nf2.length,cls:NETLO_CLS.slice(),
       skip:Object.keys(NETLO_SKIP),layers:Object.keys(NETFT)};
     window.__hd=HD;window.__hdStore=hdStore;
+     
+    window.__locateOnce=locateOnce;window.__svOpen=svOpen;window.__cardn=function(){return CARDN};
      
     window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__hdSave=startHDSave;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};window.__back={onBack:onBack,open:backOpen,panelOpen:panelOpen,state:function(){return BACK},toast:toast};window.__privacy=function(u){var o=PRIVACY_URL;if(u!==undefined)PRIVACY_URL=u;return o};window.__tour={start:tourStart,next:tourNext,close:tourClose,seen:tourSeen,reset:tourReset,state:function(){return TOUR},steps:TOUR_STEPS};
     window.__ph={index:PHOTOS,html:photoHTML};
@@ -6742,12 +6756,13 @@ map.on('load',function(){makeBadges();setBasemap(bmi);wpDraw();showTab('map');
   railSet(false);buildActPanel();actLabel();
   setTimeout(renderHealth,1800);
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Geolocation;
-  if(C){try{C.requestPermissions().then(locateOnce).catch(locateOnce)}catch(e){locateOnce()}}
+   
+  if(C){try{C.requestPermissions().then(function(){locateOnce()}).catch(function(){locateOnce()})}catch(e){locateOnce()}}
   else locateOnce()});
 
  
 var YOU=null,YOU_T=0,youM=null,LOCATE_N=0,LOCATE_MS=25000;
-function locateOnce(cb,ms){
+function locateOnce(cb,ms,mark){
    
   ms=ms||LOCATE_MS;
    
@@ -6755,23 +6770,26 @@ function locateOnce(cb,ms){
     YOU=at.slice();YOU_T=Date.now();
     if(!youM){var d=mk('you');youM=new maplibregl.Marker({element:d}).setLngLat(YOU).addTo(map)}
     else youM.setLngLat(YOU);
-    classifyFix(at);
+    classifyFix(at,true);
     if(posMode==='away')showAway(acc); else{posMode='gps';ME=at.slice();mM.setLngLat(ME);meFix(ME);paint();syncSafety()}
     drawCoverage();
     if(cb)try{cb(at)}catch(e){}};
    
   var done=false,h=null,counted=false,
       fin=function(){if(counted){counted=false;LOCATE_N--}gpsClear(h)};
+   
+  var keep=function(){return cardStill(mark)};
   h=gpsWatch(function(at){
     if(done)return; done=true;
+    var k=keep();if(!k)cb=null;
     fin();handle(at,null);
-  },function(){ if(!done){done=true; fin(); if(cb)try{cb(null,'error')}catch(e){}} },ms);
+  },function(){ if(!done){done=true; fin(); if(cb&&keep())try{cb(null,'error')}catch(e){}} },ms);
   if(!h){if(done)return;if(cb)try{cb(null,'none')}catch(e){};return}    
    
   if(!done){LOCATE_N++;counted=true}else gpsClear(h);
    
   setTimeout(function(){ if(!done){done=true; fin();
-    if(cb)try{cb(null,'timeout')}catch(e){} } },ms);
+    if(cb&&keep())try{cb(null,'timeout')}catch(e){} } },ms);
    
   return function(){if(!done){done=true;fin()}}}
 
@@ -7032,6 +7050,7 @@ function cardHTML(h,s){show(h,s)}
 
  
 function showQuiet(h,peekLine){
+  CARDN++;
   sheetExit();    
   var p=el('panel');p.innerHTML=h;p.className='';
   var t=el('peek-txt');
@@ -7047,7 +7066,13 @@ function rideCard(h,s,peekLine){
   if(rideMode||riding){showQuiet(h,peekLine);return}
   show(h,s)}
 
+ 
+var CARDN=0;
+function railFolded(){var r=el('rail');return !!(r&&/\bfolded\b/.test(r.className))}
+function cardMark(){return {n:CARDN,up:!railFolded(),ride:rideUp()}}
+function cardStill(m){return !m||(m.n===CARDN&&rideUp()===m.ride&&(!m.up||!railFolded()))}
 function show(h,s){
+  CARDN++;
    
   if(SHEET_PENDING&&SHEET.tab){SHEET.tool=SHEET_PENDING;SHEET_PENDING=null;sheetPaint()}
   else sheetExit();
@@ -7076,9 +7101,14 @@ el('c-locate').addEventListener('click',function(){
     return locateOnce(function(at,why){
       if(at){flyToYou();return}
       show('<b>No new GPS fix.</b><br>Your last fix was at '+was+' \u2014 you may have '+
-        'moved since. Try again in the open.','')})}
-  locateOnce();
-  setTimeout(function(){if(!flyToYou())geo.trigger()},1200)});
+        'moved since. Try again in the open.','')},null,cardMark())}
+   
+  locateOnce(function(at,why){
+    if(at){flyToYou();return}
+    show(why==='none'?'<b>This phone reports no GPS receiver.</b> Place yourself by hand with '+
+        '<b>Start from my position</b> on the Plan tab.'
+      :'<b>No GPS fix in 25 s.</b> Location permission may be off, or the sky is hidden. Try again in the open, '+
+        'or place yourself by hand with <b>Start from my position</b> on the Plan tab.','fail')},null,cardMark())});
 geo.on('error',function(){show('Location unavailable — this phone did not give a position (location permission off, or no fix yet). Place yourself by hand with <b>Start from my position</b> on the Plan tab.','fail')});
 
  
