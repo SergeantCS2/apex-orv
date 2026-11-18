@@ -740,6 +740,8 @@ function cmpRows(hdg){
   if(HOME)row('Home',HOME);
   wpLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region})
     .slice(0,6).forEach(function(x){row(x.n,x.p)});
+   
+  if(out.length)out.unshift('<span class="sub">From '+meNoun(true)+'</span>');
   return out}
 
 function cmpPaint(){
@@ -832,6 +834,10 @@ function runCard(a,b,riv){
       'that access is on: check before you '+(atIn?'launch':'set out')+', and portage; never run a dam.</b>')});
   if(!dams.length&&!nearDams.length)
     rows.push('<b>No dams between them.</b>');
+   
+  c.f.forEach(function(d){if(d.k!=='dam'||d.mi<=hi+0.05||d.mi>hi+0.5||nearDams.indexOf(d)>=0)return;
+    rows.push('<b style="color:var(--danger-text)">'+nm(d)+' is '+shortDist(d.mi-hi)+' below the take-out. '+
+      'Land at the take-out; past it the river runs to the dam.</b>')});
   if(acc.length)
     rows.push(acc.length+' other access point'+(acc.length>1?'s':'')+
       ' on the way'+(acc.length<=4?': '+acc.map(nm).join(', '):''));
@@ -2111,6 +2117,12 @@ function homeCard(prefix){
           ?'<b>This phone reports no GPS receiver.</b> Set home by address or by a tap on the map.'
           :'<b>No GPS fix in 25 s.</b> Try outside, or set home another way.','');
         HOME=at.slice();homeSave();homeMark();clearRoute();syncSafety();
+         
+         
+        var hn=nearestNode(at),hs=hn>=0?snapMiles(at,hn):1e9;
+        if(hs>3)return show('<b>Home is where you are</b> \u2014 '+(hs<1e8?hs.toFixed(1)+' mi from':'far from')+
+          ' the nearest line a '+MACHINE[machine].lbl+' may ride on this map. <b>Return home</b> cannot route there; '+
+          'it is still marked, and the compass points to it.','');
         show('<b>Home is where you are.</b> Press and hold where you want to go and tap '+
           '<b>Route here</b>.','')},null,wm)})})}
 el('c-home').addEventListener('click',function(){
@@ -2632,6 +2644,8 @@ var last=null,sel=null;
  
 function routeAuto(auto){return (auto&&typeof auto==='object')?{k:auto.k||null,resume:!!auto.resume,rejoin:auto.rejoin||null}
   :{k:typeof auto==='string'?auto:null,resume:false,rejoin:null}}
+ 
+var DETOUR={min:8,k:8,add:5};
 function routeToPoint(dest,label,auto){
   logAct('route to '+(label||'?'));
    
@@ -2647,19 +2661,26 @@ function routeToPoint(dest,label,auto){
       MACHINE[machine].lbl+'. Every line within reach is off limits for that machine.','fail');
     var sa=snapMiles(ME,a),sb=snapMiles(dest,b);
      
+    if(sb>3)return show('<b>'+(label?label.charAt(0).toUpperCase()+label.slice(1):'That place')+' is '+sb.toFixed(1)+
+      ' mi from the nearest line a '+MACHINE[machine].lbl+' may ride on this map.</b> The map routes only to places on or near it.','fail');
+     
     var _dbg={a:a,b:b,sa:sa,sb:sb,tSnap:Math.round(_tSnap),got:[]};
     try{window.__routeDbg=_dbg}catch(e){}
-    var _crow=mi(ME,dest);
+    var _crow=mi(ME,dest),far=null;
     PROFILES.forEach(function(p){var _tp=performance.now();var pa=route(a,b,p.f);
       _dbg.got.push(p.k+':'+(pa?pa.length:'null')+':'+Math.round(performance.now()-_tp)+'ms');
       if(!pa)return;
        
       var _len=0;for(var _q=0;_q<pa.length;_q++)_len+=pa[_q].L;
       _len/=1609.34;
-      if(_len>Math.max(8, _crow*8+5)){
-        _dbg.got[_dbg.got.length-1]+=':absurd('+Math.round(_len)+'mi)';return}
+      if(_len>Math.max(DETOUR.min,_crow*DETOUR.k+DETOUR.add)){
+        _dbg.got[_dbg.got.length-1]+=':absurd('+Math.round(_len)+'mi)';
+        if(!far||_len<far.len)far={p:p,pa:pa,len:_len};return}
       out.push({h:p.h,k:p.k,s:summarise(pa),snap:sa+sb,na:a,nb:b})});
     try{window.__routeDbg=_dbg}catch(e){}
+     
+    if(!out.length&&far)out.push({h:far.p.h,k:far.p.k,s:summarise(far.pa),snap:sa+sb,na:a,nb:b,
+      far:{mi:far.len,crow:_crow}});
     if(!out.length)return show('<b>No legal route</b> for a '+
       MACHINE[machine].lbl+' between those two points. Try a wider machine, or move the pins nearer a trail.','fail');
     RFROM=ME.slice();RTO=dest.slice();DESTLBL=label||'there';
@@ -2839,6 +2860,8 @@ function renderRoutes(out,auto){
       (s.adv>0.05?'<div class="sub warn">'+s.adv.toFixed(1)+' mi unverified (OSM)</div>':'')+
       (o.snap>0.15?'<div class="sub warn">+'+o.snap.toFixed(1)+
         ' mi off-network (dashed) to reach the trail</div>':'')+
+      (o.far?'<div class="sub warn">the only legal way: '+o.far.mi.toFixed(1)+' mi for places '+
+        shortDist(o.far.crow)+' apart. Check the map before you ride it.</div>':'')+
        
       (function(){
         var pd=s.mi>0?Math.round(100*s.des/s.mi):0;
@@ -2869,7 +2892,9 @@ function renderRoutes(out,auto){
    
   var w0=RIDDEN_WARN;RIDDEN_WARN=warn[sel]||null;
   if(auto){
-    var w=warn[sel]||{},bits=[],ra=routeAuto(auto);
+    var w=warn[sel]||{},bits=[],ra=routeAuto(auto),far=out[sel]&&out[sel].far;
+     
+    if(far)bits.push('the only legal way: '+far.mi.toFixed(1)+' mi for places '+shortDist(far.crow)+' apart');
     if(w.fuel)bits.push(w.fuel.toFixed(1)+' mi past your range');
     if(w.dark)bits.push('arrives after dark');
     if(w.adv)bits.push(w.adv.toFixed(1)+' mi unverified (OSM)');
@@ -2878,7 +2903,7 @@ function renderRoutes(out,auto){
      
     if(!rideMode&&!riding){
       logAct('route cards held: the ride they were for is not running');return}
-    if((w.fuel&&!(w0&&w0.fuel))||(w.dark&&!(w0&&w0.dark)))show(html,'');
+    if(far||(w.fuel&&!(w0&&w0.fuel))||(w.dark&&!(w0&&w0.dark)))show(html,'');
     else rideCard(html,'',ra.resume
       ?(rideWaiting()?GPS_WAIT:'Trip resumed')+' \u00b7 route to '+(DESTLBL||'there')+(bits.length?' \u00b7 '+bits.join(' \u00b7 '):' is on the map')
        
@@ -3122,6 +3147,9 @@ el('c-search').addEventListener('click',function(){
 el('q').addEventListener('input',function(){if(SRCH.on)searchPaint()});
 
  
+ 
+function stepName(st){var n=st.name||'track';
+  return (/^(two-track|forest road|road|paved|trail)$/i.test(n)&&!st.id)?'the unnamed '+n:n}
 function turnWord(d){
   var a=((d+540)%360)-180,x=Math.abs(a);
   if(x<22)return ['Continue','straight'];
@@ -3135,21 +3163,31 @@ function directions(path,startNode){
   var cur=startNode,legs=[];
   for(var i=0;i<path.length;i++){var e=path[i],g=decode(GR.g[e.i]);
     var fwd=(e.a===cur);if(!fwd)g=g.slice().reverse();
-    legs.push({e:e,g:g,name:e.n||label(e.c),id:e.id,
+    legs.push({e:e,g:g,name:e.n||label(e.c),id:e.id,node:cur,
       inB:bearing(g[0],g[Math.min(1,g.length-1)]),
       outB:bearing(g[Math.max(0,g.length-2)],g[g.length-1])});
     cur=fwd?e.b:e.a}
   var steps=[],acc=null;
   for(var i=0;i<legs.length;i++){var L=legs[i];
     var key=L.name+'|'+(L.id||'');
-    if(acc&&acc.key===key){acc.mi+=L.e.L/1609.34;acc.up+=UP[L.e.i];acc.out=L.outB;
-      continue}
+     
+     
+    var cue=null;
+    if(acc&&acc.key===key&&!L.e.n&&!L.id){var jn=L.node,pi=legs[i-1].e.i,tc=((L.inB-acc.out+540)%360)-180,oth=[];
+      (ADJ[jn]||[]).forEach(function(e){if(e.i===pi||e.i===L.e.i||e.c==='closed'||e.c==='fsclosed'||!machineLegal(e))return;
+        var g2=decode(GR.g[e.i]);if(e.a!==jn)g2=g2.slice().reverse();
+        oth.push(((bearing(g2[0],g2[Math.min(1,g2.length-1)])-acc.out+540)%360)-180)});
+      if(oth.length){var so=oth.reduce(function(a,b){return Math.abs(b)<Math.abs(a)?b:a}),mo=Math.abs(so),at_=Math.abs(tc);
+        if(at_>=45&&mo<at_+60)cue=turnWord(tc);
+        else if(mo<at_-10)cue=at_>=22?turnWord(tc):(tc<so?['Keep left','bearleft']:['Keep right','bearright'])}}
+    if(acc&&acc.key===key&&!cue){
+      acc.mi+=L.e.L/1609.34;acc.up+=UP[L.e.i];acc.out=L.outB;continue}
     if(acc)steps.push(acc);
     acc={key:key,name:L.name,id:L.id,cls:L.e.c,mi:L.e.L/1609.34,up:UP[L.e.i],
-      inB:L.inB,out:L.outB,at:i}}
+      inB:L.inB,out:L.outB,at:i,tw:cue}}
   if(acc)steps.push(acc);
   for(var i=0;i<steps.length;i++){
-    steps[i].turn=i===0?['Start on','start']:turnWord(steps[i].inB-steps[i-1].out)}
+    steps[i].turn=i===0?['Start on','start']:(steps[i].tw||turnWord(steps[i].inB-steps[i-1].out))}
   return steps}
 
 el('btn-steps').addEventListener('click',function(){
@@ -3913,7 +3951,8 @@ function trackDraw(){
 function truckPin(){
   if(!tM)tM=new maplibregl.Marker({element:mk('truck','truck')}).setLngLat(TRUCK).addTo(map);
   else tM.setLngLat(TRUCK)}
-function startRecording(at){
+var TRUCK_KEPT=null,STOP_T=0;
+function startRecording(at,sim){
    
   if(RESUMING){RESUMING=false;
     if(!crumbs.length){crumbs=[at.slice()];crumbMi=0}
@@ -3927,7 +3966,18 @@ function startRecording(at){
      
     hudShow(true);
     return}
+   
+   
+   
+  var oldT=(!sim&&TRUCK&&STOP_T&&Date.now()-STOP_T<12*3600e3)?TRUCK.slice():null,kept=null,repin=!!TRUCK_KEPT;
   TRUCK=at.slice(); crumbs=[at.slice()]; crumbMi=0;
+  if(oldT&&mi(oldT,at)>0.1){var tn;try{tn=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}catch(e){tn='earlier'}
+     
+    kept=markUnique((repin?'Ride start before ':'Truck before ')+tn);
+    if(wpAdd({n:kept,p:oldT,r:BUNDLE.region||null,ts:Date.now()})){try{wpDraw()}catch(e){}TRUCK_KEPT=kept;
+      toast('The truck is pinned here now. Its last spot is saved as \u201c'+kept+'\u201d (Saved, on the Plan tab).',5000)}
+    else kept=null}
+  else if(!sim)TRUCK_KEPT=null;
   rideStart(at);
   hudShow(true);
   truckPin();
@@ -3960,7 +4010,7 @@ function syncSafety(){
   if(tv.parentNode)tv.parentNode.className='cell';
   if(rv.parentNode)rv.parentNode.className='cell';
   var d=mi(ME,TRUCK), b=bearing(ME,TRUCK);
-  tv.textContent=(d<10?d.toFixed(1):Math.round(d))+' '+compass(b);
+  tv.textContent=truckTxt(d,b,false);
   tv.className='v'+(d>8?' warn':' good');
   rv.textContent=crumbMi.toFixed(1);
    
@@ -4065,8 +4115,7 @@ el('btn-disp').addEventListener('click',function(){
       bits.push('Nearest junction <b>'+nm+'</b> — '+
         (nj.d<0.19?(nj.d*5280|0)+' ft':nj.d.toFixed(2)+' mi')+' '+
         compass(bearing(ME,[NODES[nj.n][0],NODES[nj.n][1]])))}
-    if(TRUCK)bits.push('Truck <b>'+mi(ME,TRUCK).toFixed(2)+' mi '+
-      compass(bearing(ME,TRUCK))+'</b>');
+    if(TRUCK)bits.push('Truck <b>'+truckTxt(mi(ME,TRUCK),bearing(ME,TRUCK),true,2)+'</b>');
     var ev=elevAt(ME);if(ev!==null)bits.push('Elevation <b>'+ft(ev)+' ft</b>');
     var np=nearestPavement(ME);
     if(np.p)bits.push('Nearest pavement <b>'+np.d.toFixed(2)+' mi '+
@@ -4314,12 +4363,15 @@ function runNavClear(){RUN=null;HUDG=null;NAV.riverBrg=null;_rmHist=[]}
 function corridorByName(riv){
   for(var i=0;i<((PADDLE&&PADDLE.c)||[]).length;i++)if(PADDLE.c[i].n===riv)return PADDLE.c[i];
   return null}
+ 
+function shortDist(m){return m<0.1?Math.max(10,Math.round(m*528)*10)+' ft':m.toFixed(1)+' mi'}
+function rivM(a,b){return Math.hypot((b[0]-a[0])*111320*Math.cos(a[1]*Math.PI/180),(b[1]-a[1])*111320)}
 function riverLine(riv){
   if(_riverCache[riv])return _riverCache[riv];
   var c=corridorByName(riv);if(!c)return null;
   var pts=[],cum=[];
   c.g.forEach(function(g){g.forEach(function(p){
-    cum.push(pts.length?cum[cum.length-1]+mi(pts[pts.length-1],p)*1609.34:0);pts.push(p)})});
+    cum.push(pts.length?cum[cum.length-1]+rivM(pts[pts.length-1],p):0);pts.push(p)})});
   return _riverCache[riv]={pts:pts,cum:cum,total:cum[cum.length-1],seg:0,c:c}}
 function navRiver(at){
   if(!RUN){NAV.riverBrg=null;return null}
@@ -4351,21 +4403,34 @@ function navRiverGuide(at,acc,st,mps){
   var remain=bmi-st.rm;
   _rmHist.push(st.rm);if(_rmHist.length>6)_rmHist.shift();
    
-  var toB=RUN.b.p?mi(at,RUN.b.p)*1609.34:1e9,acc_=Math.max(15,acc||0);
-  if(!RUN.arrived&&(toB<Math.max(40,acc_)||remain<0.03)){
+  var below=null;if(bmi>=RUN.a.mi)for(var ib=0;ib<L.c.f.length;ib++){var qb=L.c.f[ib];
+    if(qb.k==='dam'&&qb.mi>bmi+0.05&&qb.mi<=bmi+0.5){below=qb;break}}
+  var belowTxt=below?(below.n||'A dam')+' is '+shortDist(below.mi-bmi)+' below':'';
+   
+  if(below&&st.rm>bmi+0.05&&st.rm<below.mi){var dd=below.mi-st.rm,cl=dd<0.1;
+    g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('warn')+'</span>Past the take-out \u2014 '+
+      (cl?'dam just ahead, land now':'dam in '+shortDist(dd)+', land')+(below.n?' \u00b7 '+below.n:'')+'</b>';
+    var bk='below|'+below.mi.toFixed(2)+(cl?'|c':'');
+    if(VOICE.near!==bk){VOICE.near=bk;buzz([200,100,200]);navSay(cl?'Dam just ahead. Land now.':'You are past the take-out. Dam ahead. Land.')}
+    ridePublish();return true}
+   
+  var toB=RUN.b.p?mi(at,RUN.b.p)*1609.34:1e9;
+  if(!RUN.arrived&&arriveNear(toB,acc,remain*1609.34,st.off,40,0.03*1609.34)){
     RUN.arrived=true;NAV.follow=false;HUDG={togo:0,min:null};navChip();
     g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('arrive')+'</span>You have reached the take-out</b>'+
-      '<span class="eta">'+(RUN.b.n||'Take-out')+'</span>';ridePublish();
+      '<span class="eta">'+(RUN.b.n||'Take-out')+(below?' \u00b7 '+belowTxt+': land here':'')+'</span>';ridePublish();
     buzz([80,60,80,60,200]);
-    navSay('You have reached the take-out'+(RUN.b.n?', '+RUN.b.n:''));
+    navSay('You have reached the take-out'+(RUN.b.n?', '+RUN.b.n:'')+(below?'. A dam is '+shortDist(below.mi-bmi).replace('ft','feet').replace('mi','miles')+' below. Land here.':''));
     rideCard('<b>Take-out reached</b><div class="sub">'+(RUN.b.n||'Your take-out')+
-      '. Recording continues until you stop it.</div>','','Take-out reached \u00b7 '+(RUN.b.n||'your take-out'));
+      '. Recording continues until you stop it.</div>'+(below?'<div class="sub warn">'+belowTxt+'. Land here; past the take-out the river runs to it.</div>':''),
+      '','Take-out reached \u00b7 '+(RUN.b.n||'your take-out'));
     logAct('nav  take-out reached');return true}
   if(RUN.arrived)return true;
    
   var f=L.c.f,next=null,dam=null;
    
-  for(var i=0;i<f.length;i++){var q=f[i];if((q.k==='dam'?q.mi<=st.rm:q.mi<=st.rm+0.03)||q.mi>bmi+0.02)continue;
+   
+  for(var i=0;i<f.length;i++){var q=f[i];if((q.k==='dam'?q.mi<=st.rm:q.mi<=st.rm+0.03)||q.mi>bmi+(q.k==='dam'?0.05:0.02))continue;
     if(q.k==='dam'&&!dam&&q.mi-st.rm<=3)dam=q;
     if(!next&&(q.k==='access'||q.k==='launch'||q.k==='camp')&&q.mi-st.rm<=5)next=q}
   var up=_rmHist.length>=5&&(_rmHist[0]-_rmHist[_rmHist.length-1])>0.05;
@@ -4377,6 +4442,7 @@ function navRiverGuide(at,acc,st,mps){
       navSay(close?'Dam just ahead. Portage now.':'Dam in '+dmi.toFixed(1)+' miles. Portage.')}}
   else if(next)line1='<b><span class="arw">'+ic('downstream')+'</span>'+(next.k==='camp'?'Camp':'Access')+' in '+(next.mi-st.rm).toFixed(1)+' mi'+(next.n?' \u00b7 '+next.n:'')+'</b>';
   else line1='<b><span class="arw">'+ic('downstream')+'</span>Downstream to '+(RUN.b.n||'take-out')+'</b>';
+  if(below&&!dam&&remain<1)line1+='<span class="sub warn">'+belowTxt+' the take-out: land there</span>';
   var craft=(MACHINE[machine]&&MACHINE[machine].mph)?MACHINE[machine].lbl.toLowerCase():null;
    
   if(mps>0.6){_navSpd.push(mps);if(_navSpd.length>60)_navSpd.shift()}
@@ -4418,6 +4484,8 @@ function navPlan(){
   NAVG={o:o,steps:steps,marks:marks,pts:pts,cum:cum,total:cum[cum.length-1],
     dest:dst,lbl:DESTLBL,seg:sg,arrived:false,key:sel+'|'+(o.k||''),
     loop:lp,set:last,odo0:odo0,base:base,rid:base,appr:(lp&&!o.rj)?mi(dst,pts[0])*1609.34:0,
+     
+    offEnd:lp?0:mi(pts[pts.length-1],dst)*1609.34,
     legs:legs,ends:ends};
   return NAVG}
  
@@ -4485,6 +4553,9 @@ function loopRejoin(at,G,pr){try{
     NAVG=null;
     return true}
   return false}catch(e){return false}}
+ 
+function arriveNear(toM,acc,remainM,offM,ring,left){var a=Math.max(15,acc||0);if(a>75)return false;
+  return toM<Math.max(ring,a)||(remainM<left&&offM<Math.max(25,a))}
 function navFmt(m){return m<320?(Math.round(m*3.281/50)*50)+' ft':(m/1609.34).toFixed(1)+' mi'}
 function navGuide(at,acc,mps){
   if(!NAV.on)return;
@@ -4498,8 +4569,10 @@ function navGuide(at,acc,mps){
   var pr=navProject(at,G.loop?rid+1609.34:null,G.loop?rid:null);G.seg=pr.seg;
   var remain=Math.max(0,G.total-pr.prog);
    
-  var toDest=mi(at,G.dest)*1609.34,acc_=Math.max(15,acc||0);
-  var near=(toDest<Math.max(25,acc_)||remain<25);
+  var toDest=mi(at,G.dest)*1609.34;
+   
+  var offE=G.offEnd>50?G.offEnd:0;
+  var near=arriveNear(toDest,acc,remain,pr.off,25,offE?-1:25);
   if(G.loop)near=near&&rid>=G.total*0.5;
   if(!G.arrived&&near){
     G.arrived=true;NAV.follow=false;HUDG={togo:0,min:null};navChip();
@@ -4513,7 +4586,9 @@ function navGuide(at,acc,mps){
   if(G.arrived)return;
    
   var onAppr=G.loop&&mi(at,G.pts[0])*1609.34<=G.appr+40;
-  if(pr.off>40&&!onAppr){_navOff++}else _navOff=0;
+   
+  var onLeg=offE&&remain<40&&toDest<=offE+60;
+  if(pr.off>40&&!onAppr&&!onLeg){_navOff++}else _navOff=0;
   if(_navOff>=3&&Date.now()-_navReT>20000&&RTO){
     _navReT=Date.now();_navOff=0;
      
@@ -4530,17 +4605,20 @@ function navGuide(at,acc,mps){
   var ni=-1;for(var k=1;k<G.marks.length;k++){if(G.marks[k]>pr.prog+8){ni=k;break}}
    
   var etaMin=navEta(remain,(G.o&&G.o.s)?G.o.s.hrs:null,G.total);
-  HUDG={togo:remain/1609.34,min:etaMin};
+   
+  var togo=onLeg?toDest:remain+offE;
+  HUDG={togo:togo/1609.34,min:etaMin};
   var line1=ni<0
-    ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(remain)+' to '+(G.lbl||'destination')+'</b>'
+    ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(togo)+' to '+(G.lbl||'destination')+'</b>'+
+      (offE&&remain<200?'<span class="sub warn">the last '+navFmt(offE)+' is off the mapped network (dashed)</span>':'')
     :'<b><span class="arw">'+ic(G.steps[ni].turn[1])+'</span>In '+navFmt(G.marks[ni]-pr.prog)+
-      ' \u00b7 '+G.steps[ni].turn[0]+' onto '+G.steps[ni].name+'</b>';
+      ' \u00b7 '+G.steps[ni].turn[0]+' onto '+stepName(G.steps[ni])+'</b>';
    
   if(ni>=0){var d=G.marks[ni]-pr.prog,key=ni+'|'+(d<90?'near':'far');
     if(key!==VOICE.near){VOICE.near=key;
-      navSay((d<90?'':'In '+navFmt(d)+', ')+G.steps[ni].turn[0].toLowerCase()+' onto '+G.steps[ni].name)}}
+      navSay((d<90?'':'In '+navFmt(d)+', ')+G.steps[ni].turn[0].toLowerCase()+' onto '+stepName(G.steps[ni]))}}
   g.hidden=false;
-  g.innerHTML=line1+'<span class="eta">'+navFmt(remain)+' remaining'+
+  g.innerHTML=line1+'<span class="eta">'+navFmt(togo)+' remaining'+
     (etaMin!==null?' \u00b7 ~'+etaTxt(etaMin):'')+(pr.off>40?' \u00b7 '+navFmt(pr.off)+' off the line':'')+'</span>';
   ridePublish()}
 document.addEventListener('visibilitychange',function(){
@@ -4637,7 +4715,10 @@ function gpsStart(onFix,onFail){
 function gpsStop(){
   if(watchId===null)return;
   gpsClear(watchId);watchId=null}
-function stopReal(){var had=gotFix,wasRes=RESUMING;
+ 
+function STOP_NOTE(){return TRUCK?'<div class="sub">Ride again starts a new trip and pins the truck where you are then; '+
+  'within 12 hours, its spot now is kept under Saved.</div>':''}
+function stopReal(){var had=gotFix,wasRes=RESUMING;STOP_T=Date.now();
   gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=false;
    
   RESUMING=false;RESUMED_RIDE=null;
@@ -4651,7 +4732,7 @@ function stopReal(){var had=gotFix,wasRes=RESUMING;
     (crumbs.length>1?(wasRes?' Its ':' The last ')+'track ('+crumbMi.toFixed(2)+
       ' mi) is still on the map; <b>Retrace</b> follows it back.':''),'');
   if(!R)return show('Recording stopped. <b>'+crumbMi.toFixed(2)+
-    ' mi</b> on the track. <b>Retrace</b> follows it back.','');
+    ' mi</b> on the track. <b>Retrace</b> follows it back.'+STOP_NOTE(),'');
   logAct('ride end '+(R.hrs*60).toFixed(0)+'min '+R.fixes+' fixes');
   var txt=rideReport(R);
   show('<b>Ride recorded — '+crumbMi.toFixed(2)+' mi</b><br>'+
@@ -4659,7 +4740,7 @@ function stopReal(){var had=gotFix,wasRes=RESUMING;
     (R.medAcc!==null?' · median ±'+Math.round(R.medAcc*3.281)+' ft':'')+
     (R.drops?' · <b>'+R.drops+' GPS dropouts</b>':' · no dropouts')+
     (R.drain!==null?' · '+(R.drain*100).toFixed(1)+'% battery':'')+'</span><br>'+
-    '<b>Retrace</b> follows the track back.'+
+    '<b>Retrace</b> follows the track back.'+STOP_NOTE()+
     '<div style="margin-top:8px"><button class="chip" id="rr-copy">Copy ride report</button> '+
     '<button class="chip" id="rr-share">Share</button></div>','');
   var cp=el('rr-copy');
@@ -4765,7 +4846,7 @@ function startSim(){
   var pts=[];path.forEach(function(e){pts=pts.concat(decode(GR.g[e.i]))});
    
   if(pts.length&&mi(ME,pts[0])>mi(ME,pts[pts.length-1]))pts.reverse();
-  startRecording(pts[0]);ME=pts[0].slice();mM.setLngLat(ME);
+  startRecording(pts[0],true);ME=pts[0].slice();mM.setLngLat(ME);
   lost=false;var i=0;
   setChip('c-ride','stop','Stop',1);
   map.easeTo({center:ME,zoom:14.2,duration:600});
@@ -5796,6 +5877,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
                    nearestPavement:nearestPavement,countyAt:countyAt,
                    addressAt:addressAt,get ME(){return ME}};
     window.__route={buildLoops:buildLoops,nearestNode:nearestNode,isFreeway:isFreeway,fwN:function(){return FW_N},
+                    route:route,PROFILES:PROFILES,NODES:NODES,go:routeToPoint,setME:function(p){ME=p.slice()},DETOUR:DETOUR,directions:directions,
                     machineLegal:machineLegal,EDGES:EDGES,ADJ:ADJ,attrs:attrs,
                     setMachine:function(m){if(MACHINE[m])machine=m},
                     get machine(){return machine},spd:spd,MACHINE:MACHINE,
@@ -5847,7 +5929,8 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       window.__search=function(q,all){return all?searchAll(q):search(q)};
       window.__voice=VOICE;window.__say=navSay;window.__voiceProbe=navVoiceProbe;
       window.__voiceLine=stVoiceNative;window.__ttsRetry=TTS_RETRY;    
-      window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,
+      window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,peekText:function(){return railPeekText()},arriveNear:arriveNear,stepName:stepName,
+        truck:function(){return TRUCK?TRUCK.slice():null},
          
          
         sim:function(){railSet(false);startSim()},simStop:stopRide,
@@ -6256,7 +6339,7 @@ function stSafety(){
   try{
     var c=CTR,pts=[];
     for(var i=0;i<25;i++)pts.push([c[0]+i*0.0008,c[1]+i*0.0005]);
-    startRecording(pts[0]);
+    startRecording(pts[0],true);
     for(var j=1;j<pts.length;j++)record(pts[j]);
     stAdd('SAFETY','breadcrumb',crumbMi>0.5,crumbMi.toFixed(2)+' mi from 25 fixes');
     var straight=mi(pts[0],pts[pts.length-1]);
@@ -7153,13 +7236,17 @@ var RAIL_MANUAL=false;
  
 var GPS_WAIT='Waiting for a GPS fix';
 function rideWaiting(){return !!(rideMode&&!gotFix&&!riding)}
+ 
+function truckTxt(d,b,unit,dp){var f=d*5280;
+  if(f<60)return 'here';
+  if(d<0.1)return Math.round(f/10)*10+' ft '+compass(b);
+  return (d<10?d.toFixed(dp||1):Math.round(d))+(unit?' mi':'')+' '+compass(b)}
 function railPeekText(){
   if(rideWaiting())return GPS_WAIT+' \u2014 '+(RESUMING?crumbMi.toFixed(1)+' mi recorded, kept':'nothing recorded yet');
    
   if(gotFix&&fixStale())return 'No GPS fix since '+fixClock();
   if(TRUCK&&ME){
-    var d=mi(ME,TRUCK);
-    return 'Truck '+(d<10?d.toFixed(1):Math.round(d))+' mi '+compass(bearing(ME,TRUCK))}
+    return 'Truck '+truckTxt(mi(ME,TRUCK),bearing(ME,TRUCK),true)}
   if(RAIL_AT)return 'Details';
   return ''}
 

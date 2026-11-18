@@ -266,6 +266,8 @@ The screens are outside the repo: the "before" screens in
   numbers: take 201; agenda A301; landmine 268.
 - At take 201's seal (2026-11-18): agenda A308, landmine 269. Next
   numbers: take 202; agenda A309; landmine 270.
+- At take 202's seal (2026-11-18): agenda A321, landmine 270. Next
+  numbers: take 203; agenda A322; landmine 271.
 
 ## Order (as of 2026-11-01)
 

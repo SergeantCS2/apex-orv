@@ -4883,6 +4883,317 @@ if (!NO_GPS) {
   }
 }
 
+/* 9w · take 202 · A309, A310. River miles on one scale: every dam's own
+   point reads its recorded mile on the app's river line (the line summed a
+   fixed 0.714 while the corridor's miles use the local latitude: 113 of 141
+   dams 0.1 mi or more off), and a paddler 0.05 mi above Portland Municipal
+   Dam hears "Dam just ahead", placed by the corridor's scale computed here,
+   not by the app's. A dam just below the take-out is on the card, at
+   arrival, and after a missed landing (Mio Pond T-Dock, Mio Dam 0.2 below). */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav, P = sandbox.window.__paddle, MO = sandbox.window.__mode;
+  const text = (id) => String(grab(id)._html || "").replace(/<[^>]*>/g, "");
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1], accuracy: 5 }, extra || {}) });
+  const stop = () => { if (flagged()) grab("hud-stop").fire("click"); if (flagged()) grab("c-ride").fire("click"); flushTimeouts(); frames(1); };
+  const CS = (P && P.data && P.data.c) || [];
+  const proj = (L, at) => { const cosl = Math.cos(at[1] * Math.PI / 180), ax = at[0] * cosl, ay = at[1]; let best = 1e18, bi = 0, bt = 0;
+    for (let i = 0; i < L.pts.length - 1; i++) { const p = L.pts[i], q = L.pts[i + 1], px = p[0] * cosl, py = p[1], qx = q[0] * cosl, qy = q[1];
+      const dx = qx - px, dy = qy - py, L2 = dx * dx + dy * dy; let t = L2 ? ((ax - px) * dx + (ay - py) * dy) / L2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d2 = (ax - px - t * dx) ** 2 + (ay - py - t * dy) ** 2; if (d2 < best) { best = d2; bi = i; bt = t; } }
+    return (L.cum[bi] + bt * (L.cum[bi + 1] - L.cum[bi])) / 1609.34; };
+  /* the corridor's own scale (tools/corridor.py metres()), for placing fixes */
+  const corM = (a, b) => Math.hypot((b[0] - a[0]) * 111320 * Math.cos(a[1] * Math.PI / 180), (b[1] - a[1]) * 111320);
+  const corAt = (c, mi) => { const pts = [].concat(...c.g); let acc = 0; for (let i = 0; i + 1 < pts.length; i++) { const d = corM(pts[i], pts[i + 1]);
+      if (acc + d >= mi * 1609.34) { const t = (mi * 1609.34 - acc) / Math.max(1e-9, d); return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; } acc += d; } return pts[pts.length - 1]; };
+  /* A309 · every dam within 60 m of its line */
+  let n = 0, bad = 0, worst = 0, wn = "";
+  for (const c of CS) { const L = N.riverLine(c.n); if (!L) continue;
+    for (const f of c.f) { if (f.k !== "dam" || !(f.off < 60)) continue; n++;
+      const e = Math.abs(proj(L, f.p) - f.mi); if (e >= 0.1) bad++; if (e > worst) { worst = e; wn = c.n + (f.n ? " · " + f.n : ""); } } }
+  const m0 = MO.get(); MO.apply("water", { silent: true }); flushTimeouts();
+  const gr = CS.find((x) => x.n === "Grand River"), pd = gr && gr.f.find((f) => f.k === "dam" && /Portland/.test(f.n || ""));
+  const upA = pd && gr.f.filter((f) => (f.k === "access" || f.k === "launch") && f.mi < pd.mi - 1 && f.mi > pd.mi - 8).pop();
+  const dnB = pd && gr.f.find((f) => (f.k === "access" || f.k === "launch") && f.mi > pd.mi + 0.3);
+  let strip309 = "";
+  if (upA && dnB) { grab("pd-nav")._listeners = {}; P.run(upA, dnB, gr.n); flushTimeouts();
+    grab("pd-nav").fire("click"); flushTimeouts(); frames(1);
+    fix(corAt(gr, pd.mi - 0.05), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1);
+    strip309 = text("nav-g"); stop(); }
+  const s309 = { n, bad, worst, strip: strip309, portland: !!(upA && dnB) };
+  const ok309 = (x) => x.n > 100 && x.bad === 0 && x.portland && /Dam just ahead/.test(x.strip);
+  ok(ok309(s309) && !ok309({ ...s309, bad: 113 }) && !ok309({ ...s309, strip: "Dam in 2.5 mi — portage" }),
+     `A309 · ${n} dams read their own mile on the app's river line (${bad} off by 0.1 mi or more; worst ${worst.toFixed(3)} mi, ${wn}); `
+     + `0.05 mi above Portland Municipal Dam by the corridor's scale the strip reads "${strip309.slice(0, 60)}"; the judge rejects take 201's 113 off and "Dam in 2.5 mi" at the dam`);
+  let coarse312 = null;
+  /* A310 · Camp Ten Bridge to Mio Pond T-Dock, Mio Dam 0.2 mi below it */
+  const au = CS.find((x) => x.n === "Au Sable River");
+  const st = (mi, k) => au && au.f.find((f) => Math.abs(f.mi - mi) < 0.006 && (!k || f.k === k));
+  const ten = st(58.35), td = au && au.f.find((f) => /Mio Pond T-Dock/.test(f.n || "")), md = au && au.f.find((f) => f.k === "dam" && /Mio Dam/.test(f.n || ""));
+  if (!ten || !td || !md) ok(false, `A310 · this bundle's Au Sable lacks the stops the drill names (ten ${!!ten}, T-Dock ${!!td}, Mio Dam ${!!md})`);
+  else {
+    grab("pd-nav")._listeners = {}; P.run(ten, td, au.n); flushTimeouts(); const card = text("panel");
+    grab("pd-nav").fire("click"); flushTimeouts(); frames(1);
+    fix(corAt(au, td.mi - 0.4), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1); const near = text("nav-g");
+    /* A312 · a coarse fix (400 m) 0.15 mi short of the take-out does not reach it */
+    fix(corAt(au, td.mi - 0.15), { speed: 1.2, heading: 0, accuracy: 400 }); flushTimeouts(); frames(1); coarse312 = text("nav-g");
+    fix(corAt(au, td.mi), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1); const arrive = text("nav-g");
+    fix(corAt(au, td.mi + 0.12), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1); const past = text("nav-g");
+    stop();
+    /* the review of take 202: the same run, the landing missed wide of the
+       line (40 m off it, never "reached"): the dam is still said */
+    const off40 = (mi) => { const a = corAt(au, mi - 0.01), b = corAt(au, mi + 0.01), p0 = corAt(au, mi);
+      const dx = (b[0] - a[0]) * Math.cos(p0[1] * Math.PI / 180), dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+      return [p0[0] + (-dy / L) * 40 / 111320 / Math.cos(p0[1] * Math.PI / 180), p0[1] + (dx / L) * 40 / 111320]; };
+    grab("pd-nav")._listeners = {}; P.run(ten, td, au.n); flushTimeouts(); grab("pd-nav").fire("click"); flushTimeouts(); frames(1);
+    fix(corAt(au, td.mi - 0.4), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1);
+    fix(off40(td.mi + 0.1), { speed: 1.2, heading: 0, accuracy: 10 }); flushTimeouts(); frames(1); var wide = text("nav-g");
+    stop();
+    /* a dam 0.03 mi below the take-out is at it: announced as a dam ahead */
+    const tq = CS.find((x) => x.n === "Tahquamenon River"), nat = tq && tq.f.find((f) => /Natalie Boat Launch/.test(f.n || "")),
+      dvl = tq && tq.f.find((f) => /Dollarville Dam Boat Launch/.test(f.n || ""));
+    var atTo = "";
+    if (nat && dvl) { grab("pd-nav")._listeners = {}; P.run(nat, dvl, tq.n); flushTimeouts(); grab("pd-nav").fire("click"); flushTimeouts(); frames(1);
+      fix(corAt(tq, dvl.mi - 0.3), { speed: 1.2, heading: 0 }); flushTimeouts(); frames(1); atTo = text("nav-g"); stop(); }
+    const s310 = { card: /Mio Dam is .* below the take-out/.test(card), near: /Mio Dam is .* below the take-out/.test(near),
+                   arrive: /reached the take-out/.test(arrive) && /Mio Dam/.test(arrive), past: /Past the take-out/.test(past) && /Mio Dam/.test(past),
+                   wide: /Past the take-out/.test(wide) && /Mio Dam/.test(wide), atTo: /Dam in 0\.\d mi/.test(atTo) && /Dollarville Dam/.test(atTo) };
+    const ok310 = (x) => x.card && x.near && x.arrive && x.past && x.wide && x.atTo;
+    ok(ok310(s310) && !ok310({ ...s310, past: false }) && !ok310({ ...s310, card: false }) && !ok310({ ...s310, wide: false }) && !ok310({ ...s310, atTo: false }),
+       `A310 · Camp Ten Bridge to Mio Pond T-Dock: the card names Mio Dam below the take-out (${s310.card}), 0.4 mi out the strip says so (${s310.near}), `
+       + `arrival names it ("${arrive.slice(0, 70)}"), and 0.12 mi past the landing "${past.slice(0, 60)}"; missed 40 m off the line, never reached: "${wide.slice(0, 50)}"; `
+       + `Natalie to Dollarville Dam Boat Launch, the dam 0.03 below it, 0.3 mi out: "${atTo.slice(0, 50)}"; the judge rejects take 201's silence after arrival, a card without it, a wide miss unsaid and a dam at the take-out unsaid`);
+  }
+  /* A312 · arrival needs a fix good enough to say so */
+  const A = N.arriveNear, old = (to, acc, rem) => to < Math.max(25, Math.max(15, acc || 0)) || rem < 25;
+  const cases = A ? [A(300, 500, 2000, 300, 25, 25), A(20, 8, 2000, 20, 25, 25), A(200, 10, 10, 200, 25, 25), A(200, 10, 10, 5, 25, 25)] : [];
+  const s312 = { cases: cases.join(","), coarse: coarse312 };
+  const ok312 = (x) => x.cases === "false,true,false,true" && x.coarse !== null && !/reached the take-out/.test(x.coarse);
+  ok(ok312(s312) && !ok312({ ...s312, cases: [old(300, 500, 2000), old(20, 8, 2000), old(200, 10, 10), old(200, 10, 10)].join(",") })
+     && !ok312({ ...s312, coarse: "You have reached the take-out" }),
+     `A312 · arrival: 300 m off with a 500 m fix, at the end of the line 200 m off it: no; 20 m away, or on the line's end: yes (${s312.cases}); `
+     + `a 400 m fix 0.15 mi short of Mio Pond T-Dock reads "${String(coarse312).slice(0, 50)}"; the judge rejects take 201's ring with no cap`);
+  MO.apply(m0, { silent: true }); flushTimeouts();
+}
+
+/* 9x · take 202 · A311 · the truck's distance in feet under a tenth of a
+   mile, and "here" inside GPS error. Until take 201 the peek line and the
+   To truck cell read "Truck 0.0 mi S" up to 260 ft: a bearing to where the
+   rider stood. A real ride: the first fix pins the truck, then fixes 140 ft
+   and 30 ft north of it. */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav;
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1], accuracy: 5 }, extra || {}) });
+  const stop = () => { for (let i = 0; i < 3 && flagged(); i++) { grab("c-ride").fire("click"); flushTimeouts(); frames(1); } };
+  stop();
+  const P0 = sandbox.window.__route.ME.slice();
+  grab("c-ride").fire("click"); flushTimeouts();
+  fix(P0, { speed: 2 }); flushTimeouts(); frames(1);
+  const T = N.truck();
+  const north = (ft) => [T[0], T[1] + ft * 0.3048 / 111320];
+  let c140 = "", p140 = "", c30 = "", p30 = "";
+  if (T) { fix(north(140), { speed: 2 }); flushTimeouts(); frames(1);
+    c140 = String(grab("v-truck").textContent || ""); p140 = N.peekText();
+    fix(north(30), { speed: 1 }); flushTimeouts(); frames(1);
+    c30 = String(grab("v-truck").textContent || ""); p30 = N.peekText(); }
+  stop();
+  const stopCard = String(grab("panel")._html || "").replace(/<[^>]*>/g, " ");
+  /* A313 · the compass says where its bearings are measured from */
+  const SX = sandbox.window.__sheet; let cmpTxt = "";
+  if (SX && T) { SX.tab("tools"); flushTimeouts(); grab("c-compass").fire("click"); flushTimeouts();
+    cmpTxt = String(grab("cmpsheet")._html || "").replace(/<br>/g, " | ").replace(/<[^>]*>/g, "");
+    SX.back(); flushTimeouts(); }
+  const from313 = /From (your position|your last GPS fix \(|the start pin|the planning start|the simulated position)/;
+  const ok313 = (t) => from313.test(t) && t.search(from313) < t.indexOf("Truck");
+  ok(ok313(cmpTxt) && !ok313(cmpTxt.replace(from313, "")),
+     `A313 · the compass's rows say where they are measured from before the first bearing ("${(cmpTxt.match(/From [^|]*/) || ["none"])[0].trim()}"); the judge rejects take 201's rows with no origin`);
+  /* A315 · Ride again 0.3 mi away: a new trip pins the truck there, and the
+     spot it held is kept as a waypoint */
+  const SVx = sandbox.window.__saved, wp0 = SVx ? SVx.wpLoad() : [];
+  let T2 = null, keptW = null, rideStartW = null;
+  if (T && SVx) { grab("c-ride").fire("click"); flushTimeouts();
+    const C = [T[0], T[1] + 0.3 / 69]; fix(C, { speed: 2 }); flushTimeouts(); frames(1);
+    T2 = N.truck(); keptW = SVx.wpLoad().find((w) => /^Truck before /.test(w.n)) || null;
+    stop();
+    /* the second Stop and Ride: the spot then held was the last ride's start */
+    grab("c-ride").fire("click"); flushTimeouts(); fix([T[0], T[1] + 0.6 / 69], { speed: 2 }); flushTimeouts(); frames(1);
+    rideStartW = SVx.wpLoad().find((w) => /^Ride start before /.test(w.n)) || null;
+    stop(); SVx.wpWrite(wp0); }
+  const s315 = { note: /Ride again starts a new trip and pins the truck where you are then/.test(stopCard),
+                 moved: !!T2 && Math.abs(T2[1] - (T[1] + 0.3 / 69)) < 1e-6, kept: !!keptW && Math.abs(keptW.p[0] - T[0]) < 1e-9 && Math.abs(keptW.p[1] - T[1]) < 1e-9,
+                 second: !!rideStartW && Math.abs(rideStartW.p[1] - (T[1] + 0.3 / 69)) < 1e-6 };
+  const ok315 = (x) => x.note && x.moved && x.kept && x.second;
+  ok(ok315(s315) && !ok315({ ...s315, kept: false }) && !ok315({ ...s315, note: false }),
+     `A315 · the Stop card says Ride starts a new trip that re-pins the truck (${s315.note}); Ride again 0.3 mi away pins it there (${s315.moved}) `
+     + `and keeps the old spot as "${keptW ? keptW.n : "nothing"}" (${s315.kept}); a second Stop and Ride keeps the first ride's start as "${rideStartW ? rideStartW.n : "nothing"}" (${s315.second}); the judge rejects take 201's lost truck and a silent Stop card`);
+  const st = { T: !!T, c140, p140, c30, p30 };
+  const okT = (x) => x.T && x.c140 === "140 ft S" && x.p140 === "Truck 140 ft S" && x.c30 === "here" && x.p30 === "Truck here";
+  ok(okT(st) && !okT({ ...st, c140: "0.0 S", p140: "Truck 0.0 mi S" }) && !okT({ ...st, c30: "0.0 S" }),
+     `A311 · 140 ft from the truck the cell reads "${c140}" and the peek line "${p140}"; 30 ft from it "${c30}" / "${p30}"; the judge rejects take 201's "0.0 mi S"`);
+}
+
+/* 9y · take 202 · A314 · a long way round is shown, not refused. Every
+   profile that found a legal route over the cap (8 mi, or 8x the crow-fly
+   distance plus 5) was dropped, and with all dropped the card said "No
+   legal route … Try a wider machine" (the take-201 audit: 3 of 300 random
+   legal pairs 0.2-0.35 mi apart route 8-16.6 mi with restrictions and
+   machines ignored). For this pass's machine a seeded search of up to 300
+   pairs finds such a pair or does not (it says which); the card itself is
+   reached on a real pair by tightening the cap (planted, and put back). */
+if (!NO_GPS) {
+  const R = sandbox.window.__route;
+  if (!R || !R.route || !R.NODES || !R.go || !R.DETOUR) ok(false, "A314 · route hooks missing");
+  else {
+    /* a land machine: earlier drills leave Water's craft selected */
+    const MO9 = sandbox.window.__mode, mode0 = MO9 ? MO9.get() : null, mach0 = R.machine;
+    if (MO9 && mode0 === "water") { MO9.apply("ride", { silent: true }); flushTimeouts(); }
+    if (!R.MACHINE[R.machine] || R.MACHINE[R.machine].mph) R.setMachine("bike");
+    const NODES = R.NODES, f = R.PROFILES[0].f, ME0 = R.ME.slice(), D0 = { ...R.DETOUR };
+    const dmi = (a, b) => Math.hypot((b[0] - a[0]) * 0.714 * 69, (b[1] - a[1]) * 69);
+    const G = new Map(), key = (p) => Math.floor(p[0] / 0.01) + "," + Math.floor(p[1] / 0.01);
+    for (let i = 0; i < NODES.length; i++) { const k = key(NODES[i]); if (!G.has(k)) G.set(k, []); G.get(k).push(i); }
+    let seed = 20261118; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const pairNear = () => { for (let t = 0; t < 50; t++) { const a = Math.floor(rnd() * NODES.length), pa = NODES[a], cx = Math.floor(pa[0] / 0.01), cy = Math.floor(pa[1] / 0.01), cand = [];
+        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const b of (G.get((cx + dx) + "," + (cy + dy)) || [])) { const d = dmi(pa, NODES[b]); if (d >= 0.2 && d <= 0.35) cand.push(b); }
+        if (cand.length) return [a, cand[Math.floor(rnd() * cand.length)]]; } return null; };
+    let real = null, tries = 0, routed = null; const t0 = Date.now();
+    while (tries < 300 && Date.now() - t0 < 45000) { const pr = pairNear(); if (!pr) break; tries++;
+      const pa = R.route(pr[0], pr[1], f); if (!pa) continue; let L = 0; for (const e of pa) L += e.L; L /= 1609.34;
+      if (!routed) routed = { a: pr[0], b: pr[1], d: dmi(NODES[pr[0]], NODES[pr[1]]), L };
+      if (L > Math.max(8, routed.d * 8 + 5)) { real = { a: pr[0], b: pr[1], L }; break; } }
+    const use = real || routed;
+    if (!use) ok(false, `A314 · no routable pair found to plan (${tries} tried; machine ${R.machine}, mode ${sandbox.window.__mode ? sandbox.window.__mode.get() : "?"})`);
+    else {
+      if (!real) Object.assign(R.DETOUR, { min: 0, k: 1, add: 0 });   /* planted: any route longer than the crow flies is over */
+      R.setME(NODES[use.a]); R.go(NODES[use.b].slice(), "the long way"); flushTimeouts();
+      const card = String(grab("panel")._html || "").replace(/<[^>]*>/g, " ");
+      /* the review of take 202: a re-route (mid-ride) onto the long way says so */
+      const fl = () => "ride" in grab("shell").dataset, fx = (p) => geo.cb && geo.cb({ coords: { longitude: p[0], latitude: p[1], accuracy: 5, speed: 3 } });
+      for (let k = 0; k < 3 && fl(); k++) { grab("c-ride").fire("click"); flushTimeouts(); }
+      grab("c-ride").fire("click"); flushTimeouts(); fx(NODES[use.a]); fx(NODES[use.a]); frames(1);
+      grab("panel")._html = ""; R.go(NODES[use.b].slice(), "the long way", true); flushTimeouts();
+      /* what the rider sees: the drawer opened on the card, or the peek
+         line saying it (the card's own text is in the panel either way) */
+      const autoOpen = !/\bfolded\b/.test(String(grab("rail").className || "")), autoPeek = String(grab("peek-txt").textContent || "");
+      const autoCard = autoOpen ? String(grab("panel")._html || "").replace(/<[^>]*>/g, " ") : autoPeek;
+      for (let k = 0; k < 3 && fl(); k++) { grab("c-ride").fire("click"); flushTimeouts(); frames(1); }
+      Object.assign(R.DETOUR, D0); R.setME(ME0); try { grab("btn-clear") && grab("btn-clear").fire("click"); } catch (e) {} flushTimeouts();
+      R.setMachine(mach0); if (MO9 && mode0 && MO9.get() !== mode0) { MO9.apply(mode0, { silent: true }); flushTimeouts(); }
+      const ok314 = (t) => /the only legal way: \d+\.\d mi for places/.test(t) && !/No legal route/.test(t);
+      ok(ok314(card) && ok314(autoCard) && !ok314("No legal route for a dirt bike between those two points") && !ok314("Re-routed · the new route is on the map"),
+         `A314 · ${real ? "a real pair over the cap (" + real.L.toFixed(1) + " mi)" : "the cap tightened (planted) on a real pair " + use.d.toFixed(2) + " mi apart, its route " + use.L.toFixed(1) + " mi; no pair over the real cap in " + tries + " seeded tries for this machine"}: `
+         + `the card shows the route and says so ("${(card.match(/the only legal way.*?apart\./) || ["none"])[0]}"), and so does a re-route mid-ride (${ok314(autoCard)}: drawer ${autoOpen ? "opened on the card" : "folded, the peek line \"" + autoPeek.slice(0, 50) + "\""}); the judge rejects take 201's "No legal route" and a quiet "Re-routed"`);
+    }
+  }
+}
+
+/* 9z · take 202 · A317 · a place off the network is arrived at, not the
+   end of the line before it, and To go counts the last leg; a place far from
+   every legal line is not routed to. Until take 201 the guide arrived at the
+   snapped node (408 of 902 campgrounds end over 0.15 mi short), and a home in
+   Milwaukee snapped 76.8 mi across the lake (the take-201 audit). */
+if (!NO_GPS) {
+  const R = sandbox.window.__route, N = sandbox.window.__nav;
+  const text = (id) => String(grab(id)._html || "").replace(/<[^>]*>/g, " ");
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1], accuracy: 5 }, extra || {}) });
+  const stop = () => { for (let i = 0; i < 3 && flagged(); i++) { grab("c-ride").fire("click"); flushTimeouts(); frames(1); } };
+  const MO9 = sandbox.window.__mode, mode0 = MO9 ? MO9.get() : null, mach0 = R.machine, ME0 = R.ME.slice();
+  if (MO9 && mode0 === "water") { MO9.apply("ride", { silent: true }); flushTimeouts(); }
+  if (!R.MACHINE[R.machine] || R.MACHINE[R.machine].mph) R.setMachine("bike");
+  stop();
+  const NODES = R.NODES, dmi = (a, b) => Math.hypot((b[0] - a[0]) * 0.714 * 69, (b[1] - a[1]) * 69);
+  let seed = 4242; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  let pick = null;
+  for (let t = 0; t < 600 && !pick; t++) {
+    const p = NODES[Math.floor(rnd() * NODES.length)], ang = rnd() * 2 * Math.PI;
+    const dest = [p[0] + Math.cos(ang) * 0.3 / (0.714 * 69), p[1] + Math.sin(ang) * 0.3 / 69], b = R.nearestNode(dest);
+    if (b < 0) continue; const sb = dmi(dest, NODES[b]); if (sb < 0.15 || sb > 0.5) continue;
+    let cur = b, prev = -1; for (let k = 0; k < 10; k++) { const ad = (R.ADJ[cur] || []).filter((e) => R.machineLegal(e) && e.c !== "closed");
+      if (!ad.length) break; const e = ad[Math.floor(rnd() * ad.length)], nx = e.a === cur ? e.b : e.a; if (nx === prev) continue; prev = cur; cur = nx; }
+    if (cur === b || dmi(NODES[cur], NODES[b]) < 0.2 || !R.route(cur, b, R.PROFILES[0].f)) continue;
+    pick = { dest, a: cur, b, sb };
+  }
+  let s317 = { pick: !!pick };
+  if (pick) {
+    R.setME(NODES[pick.a]); R.go(pick.dest.slice(), "the camp"); flushTimeouts();
+    const cards = documentStub.querySelectorAll(".rc").length;
+    grab("c-ride").fire("click"); flushTimeouts();
+    fix(NODES[pick.a], { speed: 6 }); fix(NODES[pick.a], { speed: 6 }); frames(1);
+    const G = N.guide() || {}, pts = (G.pts || []).slice();
+    for (let i = 1; i < pts.length; i++) { fix(pts[i], { speed: 6 }); frames(1); }
+    const atEnd = { arrived: !!(N.guide() || {}).arrived, strip: text("nav-g"), togo: parseFloat(text("hud-togo")) };
+    /* the review of take 202: walk the leg (it re-routed after three fixes
+       off the line, every route empty) */
+    const e0 = pts[pts.length - 1], walk = [];
+    for (const k of [0.25, 0.5, 0.75]) { fix([e0[0] + (pick.dest[0] - e0[0]) * k, e0[1] + (pick.dest[1] - e0[1]) * k], { speed: 1.5 }); frames(1);
+      walk.push({ strip: text("nav-g"), togo: parseFloat(text("hud-togo")) }); }
+    fix(pick.dest, { speed: 2 }); frames(1);
+    const atDest = { arrived: !!(N.guide() || {}).arrived, strip: text("nav-g") };
+    stop(); try { grab("btn-clear") && grab("btn-clear").fire("click"); } catch (e) {} flushTimeouts();
+    s317 = { pick: true, cards, offEnd: G.offEnd || 0, sb: pick.sb, atEnd, atDest, walk };
+  }
+  /* a destination far from every legal line: Milwaukee */
+  R.setME(ME0); R.go([-87.906, 43.039], "home"); flushTimeouts(); const far = text("panel");
+  try { grab("btn-clear") && grab("btn-clear").fire("click"); } catch (e) {} flushTimeouts();
+  R.setMachine(mach0); if (MO9 && mode0 && MO9.get() !== mode0) { MO9.apply(mode0, { silent: true }); flushTimeouts(); }
+  s317.far = /Home is \d+\.\d mi from the nearest line/.test(far);
+  const walkOk = (w) => !!w && w.length === 3 && w.every((q) => !/Re-routing/.test(q.strip)) && w[2].togo < w[0].togo;
+  const ok317 = (x) => x.pick && x.cards > 0 && x.offEnd > 50 && !x.atEnd.arrived && /off the mapped network/.test(x.atEnd.strip)
+    && x.atEnd.togo > 0.1 && walkOk(x.walk) && x.atDest.arrived && x.far;
+  ok(ok317(s317) && !ok317({ ...s317, atEnd: { ...(s317.atEnd || {}), arrived: true } }) && !ok317({ ...s317, far: false })
+     && !ok317({ ...s317, walk: [{ strip: "Re-routing", togo: 0 }, { strip: "Re-routing", togo: 0 }, { strip: "Re-routing", togo: 0 }] }),
+     `A317 · a place ${s317.sb ? s317.sb.toFixed(2) : "?"} mi off the network: at the line's end the guide has not arrived (${s317.atEnd ? s317.atEnd.arrived : "?"}), `
+     + `To go ${s317.atEnd ? s317.atEnd.togo : "?"} mi and "${s317.atEnd ? (s317.atEnd.strip.match(/the last [^)]*\)/) || ["no note"])[0] : "?"}"; walking the leg To go ${s317.walk ? s317.walk.map((q) => q.togo).join(" → ") : "?"} mi${s317.walk && s317.walk.some((q) => /Re-routing/.test(q.strip)) ? ", RE-ROUTED" : ", no re-route"}; at the place it has (${s317.atDest ? s317.atDest.arrived : "?"}); `
+     + `a home in Milwaukee is refused ("${(far.match(/Home is .*? on this map\./) || ["routed"])[0]}"); the judge rejects take 201's arrival at the snapped node and the route across the lake`);
+}
+
+/* 9za · take 202 · A318 · a turn from one unnamed track onto another, at a
+   junction, is its own step, said as "the unnamed two-track". Unnamed
+   lines shared one key, so the turn merged away: no strip line, no voice,
+   Turns one step (57% of track miles unnamed: the take-201 audit). */
+{
+  const R = sandbox.window.__route;
+  if (!R || !R.directions) ok(false, "A318 · directions hook missing");
+  else {
+    const NODES = R.NODES, ADJ = R.ADJ, brg = (a, b) => (Math.atan2((b[0] - a[0]) * Math.cos(a[1] * Math.PI / 180), b[1] - a[1]) * 180 / Math.PI + 360) % 360;
+    const mach0 = R.machine; if (!R.MACHINE[R.machine] || R.MACHINE[R.machine].mph) R.setMachine("bike");
+    const legal = (e) => e.c !== "closed" && e.c !== "fsclosed" && R.machineLegal(e);
+    let found = null, seen = 0;
+    for (let j = 0; j < NODES.length && !found; j += 7) { const ad = ADJ[j] || []; if (ad.filter(legal).length < 3) continue;
+      const un = ad.filter((e) => !e.n && !e.id && e.c === "track"); if (un.length < 2) continue; seen++;
+      for (let x = 0; x < un.length && !found; x++) for (let y = 0; y < un.length && !found; y++) { if (x === y) continue;
+        const eA = un[x], eB = un[y], start = eA.a === j ? eA.b : eA.a, endB = eB.a === j ? eB.b : eB.a;
+        const turn = ((brg(NODES[j], NODES[endB]) - brg(NODES[start], NODES[j]) + 540) % 360) - 180;
+        if (Math.abs(turn) < 50 || Math.abs(turn) > 150) continue;
+        const st = R.directions([eA, eB], start);
+        if (st.length === 2) found = { j, st: st.map((q) => q.turn[0] + " " + q.name), turn: Math.round(turn) }; } }
+    /* controls (the review of take 202): a 45+ deg move whose every other
+       legal way is far sharper stays one step; a fork onto the less straight
+       branch says which branch */
+    let through = null, fork = null;
+    const turnOf = (j, a, b) => ((brg(NODES[j], NODES[b]) - brg(NODES[a], NODES[j]) + 540) % 360) - 180;
+    for (let j = 3; j < NODES.length && !(through && fork); j += 5) { const ad = (ADJ[j] || []).filter(legal); if (ad.length < 3) continue;
+      const un = ad.filter((e) => !e.n && !e.id && e.c === "track"); if (un.length < 2) continue;
+      for (const eA of un) for (const eB of un) { if (eA === eB || (through && fork)) continue;
+        const a = eA.a === j ? eA.b : eA.a, b = eB.a === j ? eB.b : eB.a, tc = turnOf(j, a, b);
+        const oth = ad.filter((e) => e !== eA && e !== eB).map((e) => turnOf(j, a, e.a === j ? e.b : e.a));
+        const mo = Math.min(...oth.map(Math.abs)), so = oth.find((t) => Math.abs(t) === mo);
+        if (!through && Math.abs(tc) >= 55 && Math.abs(tc) <= 100 && mo >= Math.abs(tc) + 75) { const st = R.directions([eA, eB], a); if (st.length === 1 || st.length === 2) through = { j, n: st.length, tc: Math.round(tc), mo: Math.round(mo) }; }
+        if (!fork && Math.abs(tc) >= 13 && Math.abs(tc) <= 20 && mo <= Math.abs(tc) - 13 && Math.abs(so - tc) > 15) { const st = R.directions([eA, eB], a); fork = { j, n: st.length, w: st.length > 1 ? st[1].turn[0] : "", tc: Math.round(tc), so: Math.round(so) }; } } }
+    R.setMachine(mach0);
+    const N9 = sandbox.window.__nav, nm = (found && N9 && N9.stepName) ? N9.stepName({ name: "two-track" }) : null;
+    const ok318 = (x) => !!x && x.st.length === 2 && /^(Bear|Turn|Sharp) (left|right) two-track$/.test(x.st[1]);
+    const ctl318 = (t, f) => !!t && t.n === 1 && !!f && f.n === 2 && /^Keep (left|right)$/.test(f.w);
+    ok(ok318(found) && !ok318(found && { ...found, st: [found.st[0]] }) && nm === "the unnamed two-track"
+       && ctl318(through, fork) && !ctl318(through && { ...through, n: 2 }, fork) && !ctl318(through, fork && { ...fork, n: 1, w: "" }),
+       `A318 · at a junction of ${found ? (ADJ[found.j] || []).length : "?"} lines an unnamed two-track turning ${found ? found.turn : "?"}° onto another is its own step (${found ? found.st.join(" → ") : "none found in " + seen + " junctions"}); `
+       + `strip and voice name it "${nm}"; a ${through ? through.tc : "?"}° move whose other legal ways are ${through ? through.mo : "?"}° or sharper stays ${through ? through.n : "?"} step; `
+       + `a fork onto the branch ${fork ? fork.tc : "?"}° off with another at ${fork ? fork.so : "?"}° is cued "${fork ? fork.w : "none found"}"; the judge rejects take 201's one merged step, a through-move cued, and a fork unsaid`);
+  }
+}
+
 /* 10 · nothing ever left the origin */
 ok(remoteAsked.length === 0, `zero remote requests (${remoteAsked.length})`);
 

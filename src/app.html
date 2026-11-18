@@ -1204,7 +1204,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 201</span>
+    <span id="title"><b>APEX</b> ORV · Take 202</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -2547,6 +2547,11 @@ function cmpRows(hdg){
   if(HOME)row('Home',HOME);
   wpLoad().filter(function(x){return !x.r||!BUNDLE.region||x.r===BUNDLE.region})
     .slice(0,6).forEach(function(x){row(x.n,x.p)});
+  /* take 202 · A313 · and from where: the rows measure from ME, which with
+     no fix is the start pin (the region's centre until placed) and after a
+     Stop the last fix, frozen while the rider walks; the Tools compass opens
+     no GPS watch of its own (the take-201 audit). The panel says which */
+  if(out.length)out.unshift('<span class="sub">From '+meNoun(true)+'</span>');
   return out}
 
 function cmpPaint(){
@@ -2658,6 +2663,12 @@ function runCard(a,b,riv){
       'that access is on: check before you '+(atIn?'launch':'set out')+', and portage; never run a dam.</b>')});
   if(!dams.length&&!nearDams.length)
     rows.push('<b>No dams between them.</b>');
+  /* take 202 · A310 · a dam just below the take-out: miss the landing and
+     the river carries you to it (55 stops sit 0.05-0.5 river-mi above a
+     dam; Mio Pond T-Dock is 0.2 above Mio Dam) */
+  c.f.forEach(function(d){if(d.k!=='dam'||d.mi<=hi+0.05||d.mi>hi+0.5||nearDams.indexOf(d)>=0)return;
+    rows.push('<b style="color:var(--danger-text)">'+nm(d)+' is '+shortDist(d.mi-hi)+' below the take-out. '+
+      'Land at the take-out; past it the river runs to the dam.</b>')});
   if(acc.length)
     rows.push(acc.length+' other access point'+(acc.length>1?'s':'')+
       ' on the way'+(acc.length<=4?': '+acc.map(nm).join(', '):''));
@@ -4394,6 +4405,14 @@ function homeCard(prefix){
           ?'<b>This phone reports no GPS receiver.</b> Set home by address or by a tap on the map.'
           :'<b>No GPS fix in 25 s.</b> Try outside, or set home another way.','');
         HOME=at.slice();homeSave();homeMark();clearRoute();syncSafety();
+        /* take 202 · A317 · a home outside the map's region is kept, and said:
+           Return home cannot route there */
+        /* the review: the distance that matters is to the network (routes
+           refuse past 3 mi, A317), not to the region's centre */
+        var hn=nearestNode(at),hs=hn>=0?snapMiles(at,hn):1e9;
+        if(hs>3)return show('<b>Home is where you are</b> \u2014 '+(hs<1e8?hs.toFixed(1)+' mi from':'far from')+
+          ' the nearest line a '+MACHINE[machine].lbl+' may ride on this map. <b>Return home</b> cannot route there; '+
+          'it is still marked, and the compass points to it.','');
         show('<b>Home is where you are.</b> Press and hold where you want to go and tap '+
           '<b>Route here</b>.','')},null,wm)})})}
 el('c-home').addEventListener('click',function(){
@@ -5078,6 +5097,10 @@ var last=null,sel=null;
    re-routed, so its lines say the trip resumed (routeAuto reads both). */
 function routeAuto(auto){return (auto&&typeof auto==='object')?{k:auto.k||null,resume:!!auto.resume,rejoin:auto.rejoin||null}
   :{k:typeof auto==='string'?auto:null,resume:false,rejoin:null}}
+/* the cap on a route's length against the crow-fly distance (take 117):
+   max(min, k x crow + add) miles. A harness can tighten it to reach the
+   long-way card (A314) on any pair */
+var DETOUR={min:8,k:8,add:5};
 function routeToPoint(dest,label,auto){
   logAct('route to '+(label||'?'));
   /* review of the audit fixes · RFROM, RTO and DESTLBL are set when the
@@ -5094,12 +5117,18 @@ function routeToPoint(dest,label,auto){
     if(a<0||b<0)return show('<b>Nothing legal nearby</b> for a '+
       MACHINE[machine].lbl+'. Every line within reach is off limits for that machine.','fail');
     var sa=snapMiles(ME,a),sb=snapMiles(dest,b);
+    /* take 202 · A317 · a destination far from every line the machine may
+       ride is not routed to: nearestNode has no limit, and a home in
+       Milwaukee snapped 76.8 mi across Lake Michigan, so the ride "arrived
+       at home" on the Michigan shore (the take-201 audit) */
+    if(sb>3)return show('<b>'+(label?label.charAt(0).toUpperCase()+label.slice(1):'That place')+' is '+sb.toFixed(1)+
+      ' mi from the nearest line a '+MACHINE[machine].lbl+' may ride on this map.</b> The map routes only to places on or near it.','fail');
     /* __routeDbg is a DELIBERATE bridge (take 117, kept at the 118 audit),
        sibling to __restrict: snap ids, snap miles, per-profile outcome and
        timing. It solved the statewide routing mystery once and costs bytes. */
     var _dbg={a:a,b:b,sa:sa,sb:sb,tSnap:Math.round(_tSnap),got:[]};
     try{window.__routeDbg=_dbg}catch(e){}
-    var _crow=mi(ME,dest);
+    var _crow=mi(ME,dest),far=null;
     PROFILES.forEach(function(p){var _tp=performance.now();var pa=route(a,b,p.f);
       _dbg.got.push(p.k+':'+(pa?pa.length:'null')+':'+Math.round(performance.now()-_tp)+'ms');
       if(!pa)return;
@@ -5107,10 +5136,18 @@ function routeToPoint(dest,label,auto){
          discarded BEFORE the expensive summary, not after (take 117) */
       var _len=0;for(var _q=0;_q<pa.length;_q++)_len+=pa[_q].L;
       _len/=1609.34;
-      if(_len>Math.max(8, _crow*8+5)){
-        _dbg.got[_dbg.got.length-1]+=':absurd('+Math.round(_len)+'mi)';return}
+      if(_len>Math.max(DETOUR.min,_crow*DETOUR.k+DETOUR.add)){
+        _dbg.got[_dbg.got.length-1]+=':absurd('+Math.round(_len)+'mi)';
+        if(!far||_len<far.len)far={p:p,pa:pa,len:_len};return}
       out.push({h:p.h,k:p.k,s:summarise(pa),snap:sa+sb,na:a,nb:b})});
     try{window.__routeDbg=_dbg}catch(e){}
+    /* take 202 · A314 · every profile found a legal route, each past the
+       cap: that is a long way round (a river, a closed stretch), not "no
+       legal route". The shortest is shown, saying how long it is for how
+       near (3 of 300 random legal pairs 0.2-0.35 mi apart route 8-16.6 mi:
+       the take-201 audit) */
+    if(!out.length&&far)out.push({h:far.p.h,k:far.p.k,s:summarise(far.pa),snap:sa+sb,na:a,nb:b,
+      far:{mi:far.len,crow:_crow}});
     if(!out.length)return show('<b>No legal route</b> for a '+
       MACHINE[machine].lbl+' between those two points. Try a wider machine, or move the pins nearer a trail.','fail');
     RFROM=ME.slice();RTO=dest.slice();DESTLBL=label||'there';
@@ -5390,6 +5427,8 @@ function renderRoutes(out,auto){
       (s.adv>0.05?'<div class="sub warn">'+s.adv.toFixed(1)+' mi unverified (OSM)</div>':'')+
       (o.snap>0.15?'<div class="sub warn">+'+o.snap.toFixed(1)+
         ' mi off-network (dashed) to reach the trail</div>':'')+
+      (o.far?'<div class="sub warn">the only legal way: '+o.far.mi.toFixed(1)+' mi for places '+
+        shortDist(o.far.crow)+' apart. Check the map before you ride it.</div>':'')+
       /* the composition, in the order a rider cares about */
       (function(){
         var pd=s.mi>0?Math.round(100*s.des/s.mi):0;
@@ -5446,7 +5485,10 @@ function renderRoutes(out,auto){
      any warning opens it, as before. */
   var w0=RIDDEN_WARN;RIDDEN_WARN=warn[sel]||null;
   if(auto){
-    var w=warn[sel]||{},bits=[],ra=routeAuto(auto);
+    var w=warn[sel]||{},bits=[],ra=routeAuto(auto),far=out[sel]&&out[sel].far;
+    /* take 202 · the review: a re-route onto the long way round (A314) said
+       "Re-routed" and kept the warning in the folded cards */
+    if(far)bits.push('the only legal way: '+far.mi.toFixed(1)+' mi for places '+shortDist(far.crow)+' apart');
     if(w.fuel)bits.push(w.fuel.toFixed(1)+' mi past your range');
     if(w.dark)bits.push('arrives after dark');
     if(w.adv)bits.push(w.adv.toFixed(1)+' mi unverified (OSM)');
@@ -5467,7 +5509,7 @@ function renderRoutes(out,auto){
        the ride runs is the whole rule */
     if(!rideMode&&!riding){
       logAct('route cards held: the ride they were for is not running');return}
-    if((w.fuel&&!(w0&&w0.fuel))||(w.dark&&!(w0&&w0.dark)))show(html,'');
+    if(far||(w.fuel&&!(w0&&w0.fuel))||(w.dark&&!(w0&&w0.dark)))show(html,'');
     else rideCard(html,'',ra.resume
       ?(rideWaiting()?GPS_WAIT:'Trip resumed')+' \u00b7 route to '+(DESTLBL||'there')+(bits.length?' \u00b7 '+bits.join(' \u00b7 '):' is on the map')
       /* take 189 · A234 · the re-join says what it is */
@@ -5753,6 +5795,11 @@ el('q').addEventListener('input',function(){if(SRCH.on)searchPaint()});
    A blue line is not an instruction. Someone who is lost and tired needs words
    they can read once and act on, and a turn list is also what you would relay
    over a radio. Consecutive edges on the same way collapse into one step. */
+/* take 202 · A318 · a step's name as the strip and the voice say it: an
+   unnamed line is "the unnamed two-track", not a name (the Turns list's
+   rule, take 70) */
+function stepName(st){var n=st.name||'track';
+  return (/^(two-track|forest road|road|paved|trail)$/i.test(n)&&!st.id)?'the unnamed '+n:n}
 function turnWord(d){
   var a=((d+540)%360)-180,x=Math.abs(a);
   if(x<22)return ['Continue','straight'];
@@ -5766,21 +5813,42 @@ function directions(path,startNode){
   var cur=startNode,legs=[];
   for(var i=0;i<path.length;i++){var e=path[i],g=decode(GR.g[e.i]);
     var fwd=(e.a===cur);if(!fwd)g=g.slice().reverse();
-    legs.push({e:e,g:g,name:e.n||label(e.c),id:e.id,
+    legs.push({e:e,g:g,name:e.n||label(e.c),id:e.id,node:cur,
       inB:bearing(g[0],g[Math.min(1,g.length-1)]),
       outB:bearing(g[Math.max(0,g.length-2)],g[g.length-1])});
     cur=fwd?e.b:e.a}
   var steps=[],acc=null;
   for(var i=0;i<legs.length;i++){var L=legs[i];
     var key=L.name+'|'+(L.id||'');
-    if(acc&&acc.key===key){acc.mi+=L.e.L/1609.34;acc.up+=UP[L.e.i];acc.out=L.outB;
-      continue}
+    /* take 202 · A318 · unnamed lines share one key ("two-track|"), so a
+       turn from one unnamed track onto another merged into one step: never
+       cued, Turns one line (57% of track miles are unnamed; 129,738 turns of
+       50 deg or more at their junctions: the take-201 audit). A step starts
+       there when it turns 45 deg or more at a junction (three or more lines
+       meet); a bend where two lines merely join is no choice */
+    /* the review of take 202, measured on the bundle: counting every line
+       at the node cued through-moves where the only other ways were closed
+       or illegal, and at forks the straighter branch the rider did NOT take
+       got no cue. The choice is among the lines this machine may ride:
+       a turn of 45 deg or more is cued unless every other way is at least
+       60 deg sharper; and when another way is straighter by more than 10
+       deg (a fork), the rider is told which branch: "Keep left/right" */
+    var cue=null;
+    if(acc&&acc.key===key&&!L.e.n&&!L.id){var jn=L.node,pi=legs[i-1].e.i,tc=((L.inB-acc.out+540)%360)-180,oth=[];
+      (ADJ[jn]||[]).forEach(function(e){if(e.i===pi||e.i===L.e.i||e.c==='closed'||e.c==='fsclosed'||!machineLegal(e))return;
+        var g2=decode(GR.g[e.i]);if(e.a!==jn)g2=g2.slice().reverse();
+        oth.push(((bearing(g2[0],g2[Math.min(1,g2.length-1)])-acc.out+540)%360)-180)});
+      if(oth.length){var so=oth.reduce(function(a,b){return Math.abs(b)<Math.abs(a)?b:a}),mo=Math.abs(so),at_=Math.abs(tc);
+        if(at_>=45&&mo<at_+60)cue=turnWord(tc);
+        else if(mo<at_-10)cue=at_>=22?turnWord(tc):(tc<so?['Keep left','bearleft']:['Keep right','bearright'])}}
+    if(acc&&acc.key===key&&!cue){
+      acc.mi+=L.e.L/1609.34;acc.up+=UP[L.e.i];acc.out=L.outB;continue}
     if(acc)steps.push(acc);
     acc={key:key,name:L.name,id:L.id,cls:L.e.c,mi:L.e.L/1609.34,up:UP[L.e.i],
-      inB:L.inB,out:L.outB,at:i}}
+      inB:L.inB,out:L.outB,at:i,tw:cue}}
   if(acc)steps.push(acc);
   for(var i=0;i<steps.length;i++){
-    steps[i].turn=i===0?['Start on','start']:turnWord(steps[i].inB-steps[i-1].out)}
+    steps[i].turn=i===0?['Start on','start']:(steps[i].tw||turnWord(steps[i].inB-steps[i-1].out))}
   return steps}
 
 el('btn-steps').addEventListener('click',function(){
@@ -6904,7 +6972,8 @@ function trackDraw(){
 function truckPin(){
   if(!tM)tM=new maplibregl.Marker({element:mk('truck','truck')}).setLngLat(TRUCK).addTo(map);
   else tM.setLngLat(TRUCK)}
-function startRecording(at){
+var TRUCK_KEPT=null,STOP_T=0;
+function startRecording(at,sim){
   /* take 170 audit · a RESUMED trip already holds its crumb line and clock;
      the first fix after Resume continues them rather than wiping them. The
      truck stays where it was pinned. */
@@ -6926,7 +6995,26 @@ function startRecording(at){
        resumed trip rode on with no HUD (PROVEN live on take 187, step 3) */
     hudShow(true);
     return}
+  /* take 202 · A315 · a new trip pins the truck where the rider is; the
+     spot it held is kept as a waypoint when it was anywhere else. Stop ends
+     the trip (take 189), so a Stop at lunch and Ride again moved the truck
+     to the lunch spot and To truck, the compass and Retrace led there, the
+     real truck kept nowhere (the take-201 audit). Whether Ride after a Stop
+     should continue the trip is the maintainer's (A316) */
+  /* only for a trip stopped in the last 12 hours (the lunch stop): the next
+     day's ride from another trailhead would file yesterday's truck */
+  /* (not for the self-test's drill or the simulator, which put TRUCK back
+     or invent a ride: the review of take 202) */
+  var oldT=(!sim&&TRUCK&&STOP_T&&Date.now()-STOP_T<12*3600e3)?TRUCK.slice():null,kept=null,repin=!!TRUCK_KEPT;
   TRUCK=at.slice(); crumbs=[at.slice()]; crumbMi=0;
+  if(oldT&&mi(oldT,at)>0.1){var tn;try{tn=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}catch(e){tn='earlier'}
+    /* the second Stop and Ride: the spot then held is the last ride's start,
+       not the truck (the review of take 202) */
+    kept=markUnique((repin?'Ride start before ':'Truck before ')+tn);
+    if(wpAdd({n:kept,p:oldT,r:BUNDLE.region||null,ts:Date.now()})){try{wpDraw()}catch(e){}TRUCK_KEPT=kept;
+      toast('The truck is pinned here now. Its last spot is saved as \u201c'+kept+'\u201d (Saved, on the Plan tab).',5000)}
+    else kept=null}
+  else if(!sim)TRUCK_KEPT=null;
   rideStart(at);
   hudShow(true);
   truckPin();
@@ -6968,7 +7056,7 @@ function syncSafety(){
   if(tv.parentNode)tv.parentNode.className='cell';
   if(rv.parentNode)rv.parentNode.className='cell';
   var d=mi(ME,TRUCK), b=bearing(ME,TRUCK);
-  tv.textContent=(d<10?d.toFixed(1):Math.round(d))+' '+compass(b);
+  tv.textContent=truckTxt(d,b,false);
   tv.className='v'+(d>8?' warn':' good');
   rv.textContent=crumbMi.toFixed(1);
   /* 4.11 — a safety feature that can fail silently needs to show it is alive */
@@ -7096,8 +7184,7 @@ el('btn-disp').addEventListener('click',function(){
       bits.push('Nearest junction <b>'+nm+'</b> — '+
         (nj.d<0.19?(nj.d*5280|0)+' ft':nj.d.toFixed(2)+' mi')+' '+
         compass(bearing(ME,[NODES[nj.n][0],NODES[nj.n][1]])))}
-    if(TRUCK)bits.push('Truck <b>'+mi(ME,TRUCK).toFixed(2)+' mi '+
-      compass(bearing(ME,TRUCK))+'</b>');
+    if(TRUCK)bits.push('Truck <b>'+truckTxt(mi(ME,TRUCK),bearing(ME,TRUCK),true,2)+'</b>');
     var ev=elevAt(ME);if(ev!==null)bits.push('Elevation <b>'+ft(ev)+' ft</b>');
     var np=nearestPavement(ME);
     if(np.p)bits.push('Nearest pavement <b>'+np.d.toFixed(2)+' mi '+
@@ -7485,12 +7572,21 @@ function runNavClear(){RUN=null;HUDG=null;NAV.riverBrg=null;_rmHist=[]}
 function corridorByName(riv){
   for(var i=0;i<((PADDLE&&PADDLE.c)||[]).length;i++)if(PADDLE.c[i].n===riv)return PADDLE.c[i];
   return null}
+/* take 202 · A309 · river miles on the corridor's own scale. tools/
+   corridor.py writes each stop's and dam's mile with metres() (111,320 m a
+   degree, east-west scaled by the cosine of the step's own latitude); the
+   line here summed mi(), whose fixed 0.714 is right only near 44.4°N. The
+   paddler's mile and the dams' miles were on two scales: 113 of 141 dams
+   read 0.1 mi or more off, Portland Municipal Dam 2.5 mi late, Forestville
+   0.9 early (the take-201 audit, PROVEN on the shipped corridor) */
+function shortDist(m){return m<0.1?Math.max(10,Math.round(m*528)*10)+' ft':m.toFixed(1)+' mi'}
+function rivM(a,b){return Math.hypot((b[0]-a[0])*111320*Math.cos(a[1]*Math.PI/180),(b[1]-a[1])*111320)}
 function riverLine(riv){
   if(_riverCache[riv])return _riverCache[riv];
   var c=corridorByName(riv);if(!c)return null;
   var pts=[],cum=[];
   c.g.forEach(function(g){g.forEach(function(p){
-    cum.push(pts.length?cum[cum.length-1]+mi(pts[pts.length-1],p)*1609.34:0);pts.push(p)})});
+    cum.push(pts.length?cum[cum.length-1]+rivM(pts[pts.length-1],p):0);pts.push(p)})});
   return _riverCache[riv]={pts:pts,cum:cum,total:cum[cum.length-1],seg:0,c:c}}
 function navRiver(at){
   if(!RUN){NAV.riverBrg=null;return null}
@@ -7521,16 +7617,35 @@ function navRiverGuide(at,acc,st,mps){
   var lo=Math.min(RUN.a.mi,RUN.b.mi),hi=Math.max(RUN.a.mi,RUN.b.mi),bmi=RUN.b.mi;
   var remain=bmi-st.rm;
   _rmHist.push(st.rm);if(_rmHist.length>6)_rmHist.shift();
+  /* take 202 · A310 · the first dam within half a mile below a downstream
+     run's take-out: said as the take-out nears, at arrival, and after it
+     while the paddler is between the two (arrival stays set, and the guide
+     returned at once, so a missed landing heard nothing) */
+  var below=null;if(bmi>=RUN.a.mi)for(var ib=0;ib<L.c.f.length;ib++){var qb=L.c.f[ib];
+    if(qb.k==='dam'&&qb.mi>bmi+0.05&&qb.mi<=bmi+0.5){below=qb;break}}
+  var belowTxt=below?(below.n||'A dam')+' is '+shortDist(below.mi-bmi)+' below':'';
+  /* the review of take 202: past the take-out with the dam ahead, whether
+     the landing was "reached" or not. Arrival needs the paddler near the
+     take-out or the line with a good fix (A312), and 40 of the 55 such
+     stops sit more than 25 m off the line: a paddler who crossed wide of
+     the landing heard nothing */
+  if(below&&st.rm>bmi+0.05&&st.rm<below.mi){var dd=below.mi-st.rm,cl=dd<0.1;
+    g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('warn')+'</span>Past the take-out \u2014 '+
+      (cl?'dam just ahead, land now':'dam in '+shortDist(dd)+', land')+(below.n?' \u00b7 '+below.n:'')+'</b>';
+    var bk='below|'+below.mi.toFixed(2)+(cl?'|c':'');
+    if(VOICE.near!==bk){VOICE.near=bk;buzz([200,100,200]);navSay(cl?'Dam just ahead. Land now.':'You are past the take-out. Dam ahead. Land.')}
+    ridePublish();return true}
   /* arrival at the take-out */
-  var toB=RUN.b.p?mi(at,RUN.b.p)*1609.34:1e9,acc_=Math.max(15,acc||0);
-  if(!RUN.arrived&&(toB<Math.max(40,acc_)||remain<0.03)){
+  var toB=RUN.b.p?mi(at,RUN.b.p)*1609.34:1e9;
+  if(!RUN.arrived&&arriveNear(toB,acc,remain*1609.34,st.off,40,0.03*1609.34)){
     RUN.arrived=true;NAV.follow=false;HUDG={togo:0,min:null};navChip();
     g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('arrive')+'</span>You have reached the take-out</b>'+
-      '<span class="eta">'+(RUN.b.n||'Take-out')+'</span>';ridePublish();
+      '<span class="eta">'+(RUN.b.n||'Take-out')+(below?' \u00b7 '+belowTxt+': land here':'')+'</span>';ridePublish();
     buzz([80,60,80,60,200]);
-    navSay('You have reached the take-out'+(RUN.b.n?', '+RUN.b.n:''));
+    navSay('You have reached the take-out'+(RUN.b.n?', '+RUN.b.n:'')+(below?'. A dam is '+shortDist(below.mi-bmi).replace('ft','feet').replace('mi','miles')+' below. Land here.':''));
     rideCard('<b>Take-out reached</b><div class="sub">'+(RUN.b.n||'Your take-out')+
-      '. Recording continues until you stop it.</div>','','Take-out reached \u00b7 '+(RUN.b.n||'your take-out'));
+      '. Recording continues until you stop it.</div>'+(below?'<div class="sub warn">'+belowTxt+'. Land here; past the take-out the river runs to it.</div>':''),
+      '','Take-out reached \u00b7 '+(RUN.b.n||'your take-out'));
     logAct('nav  take-out reached');return true}
   if(RUN.arrived)return true;
   /* what is coming downstream: a dam first if within 3 mi, else the next
@@ -7539,7 +7654,10 @@ function navRiverGuide(at,acc,st,mps){
   /* take 200 · A292 · a dam is announced until it is passed: features within
      0.03 mi ahead were skipped, dams too, so a put-in 0.02 mi above Mio Dam
      never heard of it */
-  for(var i=0;i<f.length;i++){var q=f[i];if((q.k==='dam'?q.mi<=st.rm:q.mi<=st.rm+0.03)||q.mi>bmi+0.02)continue;
+  /* take 202 · the review: a dam within 0.05 river-mi of the take-out is
+     at it (the card cannot tell which side), and is announced as a dam
+     ahead until passed; past 0.05 it is the dam below (A310) */
+  for(var i=0;i<f.length;i++){var q=f[i];if((q.k==='dam'?q.mi<=st.rm:q.mi<=st.rm+0.03)||q.mi>bmi+(q.k==='dam'?0.05:0.02))continue;
     if(q.k==='dam'&&!dam&&q.mi-st.rm<=3)dam=q;
     if(!next&&(q.k==='access'||q.k==='launch'||q.k==='camp')&&q.mi-st.rm<=5)next=q}
   var up=_rmHist.length>=5&&(_rmHist[0]-_rmHist[_rmHist.length-1])>0.05;
@@ -7551,6 +7669,7 @@ function navRiverGuide(at,acc,st,mps){
       navSay(close?'Dam just ahead. Portage now.':'Dam in '+dmi.toFixed(1)+' miles. Portage.')}}
   else if(next)line1='<b><span class="arw">'+ic('downstream')+'</span>'+(next.k==='camp'?'Camp':'Access')+' in '+(next.mi-st.rm).toFixed(1)+' mi'+(next.n?' \u00b7 '+next.n:'')+'</b>';
   else line1='<b><span class="arw">'+ic('downstream')+'</span>Downstream to '+(RUN.b.n||'take-out')+'</b>';
+  if(below&&!dam&&remain<1)line1+='<span class="sub warn">'+belowTxt+' the take-out: land there</span>';
   var craft=(MACHINE[machine]&&MACHINE[machine].mph)?MACHINE[machine].lbl.toLowerCase():null;
   /* take 189 · A235 · the sheet's Arrive and the strip print ONE estimate,
      the rule the route card, sheet and strip use for routes (navEta): the
@@ -7611,6 +7730,9 @@ function navPlan(){
   NAVG={o:o,steps:steps,marks:marks,pts:pts,cum:cum,total:cum[cum.length-1],
     dest:dst,lbl:DESTLBL,seg:sg,arrived:false,key:sel+'|'+(o.k||''),
     loop:lp,set:last,odo0:odo0,base:base,rid:base,appr:(lp&&!o.rj)?mi(dst,pts[0])*1609.34:0,
+    /* take 202 · A317 · the line ends at the node the destination snapped
+       to; what is left past it, off the network, in metres */
+    offEnd:lp?0:mi(pts[pts.length-1],dst)*1609.34,
     legs:legs,ends:ends};
   return NAVG}
 /* lim, want (a loop only, metres along the line): nothing past lim is
@@ -7710,6 +7832,14 @@ function loopRejoin(at,G,pr){try{
     NAVG=null;
     return true}
   return false}catch(e){return false}}
+/* take 202 · A312 · arrival needs a fix good enough to say so: the ring
+   took the fix's accuracy with no cap, so one coarse fallback fix 300 m off
+   with a 500 m radius ended guidance for good (arrival stays set), and the
+   "under 25 m of line left" rule took a fix far off the line's end. Now a
+   fix coarser than 75 m arrives nowhere, and the line rule needs the fix on
+   the line (the take-201 audit) */
+function arriveNear(toM,acc,remainM,offM,ring,left){var a=Math.max(15,acc||0);if(a>75)return false;
+  return toM<Math.max(ring,a)||(remainM<left&&offM<Math.max(25,a))}
 function navFmt(m){return m<320?(Math.round(m*3.281/50)*50)+' ft':(m/1609.34).toFixed(1)+' mi'}
 function navGuide(at,acc,mps){
   if(!NAV.on)return;
@@ -7732,8 +7862,12 @@ function navGuide(at,acc,mps){
   var pr=navProject(at,G.loop?rid+1609.34:null,G.loop?rid:null);G.seg=pr.seg;
   var remain=Math.max(0,G.total-pr.prog);
   /* arrival */
-  var toDest=mi(at,G.dest)*1609.34,acc_=Math.max(15,acc||0);
-  var near=(toDest<Math.max(25,acc_)||remain<25);
+  var toDest=mi(at,G.dest)*1609.34;
+  /* take 202 · A317 · with more than 50 m off the network past the line's
+     end, arrival is at the place, never at the end of the line: 408 of 902
+     campgrounds end more than 0.15 mi short of it (the take-201 audit) */
+  var offE=G.offEnd>50?G.offEnd:0;
+  var near=arriveNear(toDest,acc,remain,pr.off,25,offE?-1:25);
   if(G.loop)near=near&&rid>=G.total*0.5;
   if(!G.arrived&&near){
     G.arrived=true;NAV.follow=false;HUDG={togo:0,min:null};navChip();
@@ -7754,7 +7888,12 @@ function navGuide(at,acc,mps){
      the approach's length (+40 m) of the line's first point a loop is not
      off route; it is on its way to the line. */
   var onAppr=G.loop&&mi(at,G.pts[0])*1609.34<=G.appr+40;
-  if(pr.off>40&&!onAppr){_navOff++}else _navOff=0;
+  /* take 202 · the review: past the line's end on the off-network last leg
+     (A317) the rider is off the line by design; counted off route, three
+     fixes re-routed from the end node to the place, every profile answered
+     an empty route, and the strip sat on "Re-routing" with no arrival */
+  var onLeg=offE&&remain<40&&toDest<=offE+60;
+  if(pr.off>40&&!onAppr&&!onLeg){_navOff++}else _navOff=0;
   if(_navOff>=3&&Date.now()-_navReT>20000&&RTO){
     _navReT=Date.now();_navOff=0;
     /* take 189 · A234 · a LOOP re-joins itself ahead of the rider, so the
@@ -7775,18 +7914,22 @@ function navGuide(at,acc,mps){
      line, and the arrival estimate — take 188 · A217 · the same one the
      strip below prints and the route card gave (navEta) */
   var etaMin=navEta(remain,(G.o&&G.o.s)?G.o.s.hrs:null,G.total);
-  HUDG={togo:remain/1609.34,min:etaMin};
+  /* A317 · To go counts the off-network last leg, and at the line's end the
+     strip says what is left is off the network */
+  var togo=onLeg?toDest:remain+offE;
+  HUDG={togo:togo/1609.34,min:etaMin};
   var line1=ni<0
-    ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(remain)+' to '+(G.lbl||'destination')+'</b>'
+    ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(togo)+' to '+(G.lbl||'destination')+'</b>'+
+      (offE&&remain<200?'<span class="sub warn">the last '+navFmt(offE)+' is off the mapped network (dashed)</span>':'')
     :'<b><span class="arw">'+ic(G.steps[ni].turn[1])+'</span>In '+navFmt(G.marks[ni]-pr.prog)+
-      ' \u00b7 '+G.steps[ni].turn[0]+' onto '+G.steps[ni].name+'</b>';
+      ' \u00b7 '+G.steps[ni].turn[0]+' onto '+stepName(G.steps[ni])+'</b>';
   /* take 173 · voice: once when a turn becomes the next one, once more
      inside 300 ft; the text is the instruction, not the whole strip */
   if(ni>=0){var d=G.marks[ni]-pr.prog,key=ni+'|'+(d<90?'near':'far');
     if(key!==VOICE.near){VOICE.near=key;
-      navSay((d<90?'':'In '+navFmt(d)+', ')+G.steps[ni].turn[0].toLowerCase()+' onto '+G.steps[ni].name)}}
+      navSay((d<90?'':'In '+navFmt(d)+', ')+G.steps[ni].turn[0].toLowerCase()+' onto '+stepName(G.steps[ni]))}}
   g.hidden=false;
-  g.innerHTML=line1+'<span class="eta">'+navFmt(remain)+' remaining'+
+  g.innerHTML=line1+'<span class="eta">'+navFmt(togo)+' remaining'+
     (etaMin!==null?' \u00b7 ~'+etaTxt(etaMin):'')+(pr.off>40?' \u00b7 '+navFmt(pr.off)+' off the line':'')+'</span>';
   ridePublish()}
 document.addEventListener('visibilitychange',function(){
@@ -7949,7 +8092,10 @@ function gpsStart(onFix,onFail){
 function gpsStop(){
   if(watchId===null)return;
   gpsClear(watchId);watchId=null}
-function stopReal(){var had=gotFix,wasRes=RESUMING;
+/* take 202 · A315 · what Ride does next, said where the trip ends */
+function STOP_NOTE(){return TRUCK?'<div class="sub">Ride again starts a new trip and pins the truck where you are then; '+
+  'within 12 hours, its spot now is kept under Saved.</div>':''}
+function stopReal(){var had=gotFix,wasRes=RESUMING;STOP_T=Date.now();
   gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=false;
   /* take 189 · cold audit · Stop ends the trip (tripEnd), so a resumed
      trip's flags end with it: left set, the next Ride's peek said its miles
@@ -7969,7 +8115,7 @@ function stopReal(){var had=gotFix,wasRes=RESUMING;
     (crumbs.length>1?(wasRes?' Its ':' The last ')+'track ('+crumbMi.toFixed(2)+
       ' mi) is still on the map; <b>Retrace</b> follows it back.':''),'');
   if(!R)return show('Recording stopped. <b>'+crumbMi.toFixed(2)+
-    ' mi</b> on the track. <b>Retrace</b> follows it back.','');
+    ' mi</b> on the track. <b>Retrace</b> follows it back.'+STOP_NOTE(),'');
   logAct('ride end '+(R.hrs*60).toFixed(0)+'min '+R.fixes+' fixes');
   var txt=rideReport(R);
   show('<b>Ride recorded — '+crumbMi.toFixed(2)+' mi</b><br>'+
@@ -7977,7 +8123,7 @@ function stopReal(){var had=gotFix,wasRes=RESUMING;
     (R.medAcc!==null?' · median ±'+Math.round(R.medAcc*3.281)+' ft':'')+
     (R.drops?' · <b>'+R.drops+' GPS dropouts</b>':' · no dropouts')+
     (R.drain!==null?' · '+(R.drain*100).toFixed(1)+'% battery':'')+'</span><br>'+
-    '<b>Retrace</b> follows the track back.'+
+    '<b>Retrace</b> follows the track back.'+STOP_NOTE()+
     '<div style="margin-top:8px"><button class="chip" id="rr-copy">Copy ride report</button> '+
     '<button class="chip" id="rr-share">Share</button></div>','');
   var cp=el('rr-copy');
@@ -8125,7 +8271,7 @@ function startSim(){
   var pts=[];path.forEach(function(e){pts=pts.concat(decode(GR.g[e.i]))});
   /* orient the ride away from wherever we start */
   if(pts.length&&mi(ME,pts[0])>mi(ME,pts[pts.length-1]))pts.reverse();
-  startRecording(pts[0]);ME=pts[0].slice();mM.setLngLat(ME);
+  startRecording(pts[0],true);ME=pts[0].slice();mM.setLngLat(ME);
   lost=false;var i=0;
   setChip('c-ride','stop','Stop',1);
   map.easeTo({center:ME,zoom:14.2,duration:600});
@@ -9480,6 +9626,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
                    nearestPavement:nearestPavement,countyAt:countyAt,
                    addressAt:addressAt,get ME(){return ME}};
     window.__route={buildLoops:buildLoops,nearestNode:nearestNode,isFreeway:isFreeway,fwN:function(){return FW_N},
+                    route:route,PROFILES:PROFILES,NODES:NODES,go:routeToPoint,setME:function(p){ME=p.slice()},DETOUR:DETOUR,directions:directions,
                     machineLegal:machineLegal,EDGES:EDGES,ADJ:ADJ,attrs:attrs,
                     setMachine:function(m){if(MACHINE[m])machine=m},
                     get machine(){return machine},spd:spd,MACHINE:MACHINE,
@@ -9537,7 +9684,8 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       window.__search=function(q,all){return all?searchAll(q):search(q)};
       window.__voice=VOICE;window.__say=navSay;window.__voiceProbe=navVoiceProbe;
       window.__voiceLine=stVoiceNative;window.__ttsRetry=TTS_RETRY;   /* take 195 · A218 */
-      window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,
+      window.__nav={state:NAV,follow:navFollow,start:navStart,stop:navStop,fix:onFix,peekText:function(){return railPeekText()},arriveNear:arriveNear,stepName:stepName,
+        truck:function(){return TRUCK?TRUCK.slice():null},
         /* take 188 · A217 · the simulator, driven directly (landmine 111): a
            headless browser gets no fix, so the simulator-only Wrong turn
            needs a way into its state */
@@ -10082,7 +10230,7 @@ function stSafety(){
   try{
     var c=CTR,pts=[];
     for(var i=0;i<25;i++)pts.push([c[0]+i*0.0008,c[1]+i*0.0005]);
-    startRecording(pts[0]);
+    startRecording(pts[0],true);
     for(var j=1;j<pts.length;j++)record(pts[j]);
     stAdd('SAFETY','breadcrumb',crumbMi>0.5,crumbMi.toFixed(2)+' mi from 25 fixes');
     var straight=mi(pts[0],pts[pts.length-1]);
@@ -11234,14 +11382,21 @@ var RAIL_MANUAL=false;     /* did the rider fold it by hand? then leave it alone
    (the review of the lane, round 1) */
 var GPS_WAIT='Waiting for a GPS fix';
 function rideWaiting(){return !!(rideMode&&!gotFix&&!riding)}
+/* take 202 · A311 · the truck's distance: under a tenth of a mile in feet,
+   and inside GPS error (60 ft) "here", with no bearing. "Truck 0.0 mi N"
+   up to 260 ft gave a bearing to where the rider stood (the take-201 audit;
+   the peek line, the To truck cell and the ride stats) */
+function truckTxt(d,b,unit,dp){var f=d*5280;
+  if(f<60)return 'here';
+  if(d<0.1)return Math.round(f/10)*10+' ft '+compass(b);
+  return (d<10?d.toFixed(dp||1):Math.round(d))+(unit?' mi':'')+' '+compass(b)}
 function railPeekText(){
   if(rideWaiting())return GPS_WAIT+' \u2014 '+(RESUMING?crumbMi.toFixed(1)+' mi recorded, kept':'nothing recorded yet');
   /* a dropout: the truck distance would be measured from where the rider
      was; the line says the fix is old instead (the strip's words) */
   if(gotFix&&fixStale())return 'No GPS fix since '+fixClock();
   if(TRUCK&&ME){
-    var d=mi(ME,TRUCK);
-    return 'Truck '+(d<10?d.toFixed(1):Math.round(d))+' mi '+compass(bearing(ME,TRUCK))}
+    return 'Truck '+truckTxt(mi(ME,TRUCK),bearing(ME,TRUCK),true)}
   if(RAIL_AT)return 'Details';
   return ''}
 

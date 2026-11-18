@@ -3348,11 +3348,16 @@ if (zoomed.trails > 0) {
       /* then to the end */
       for (let d = Math.max(0, total - 200); d <= total; d += 40) { N.fix(at(d), 9, 6, 45); await s(120); }
       N.fix(pts[pts.length - 1], 9, 2, 45); await s(300);
+      /* take 202 · A317 · the line ends at the node the destination snapped
+         to; past 50 m of off-network leg the rider arrives at the place, so
+         the last fix is the destination itself */
+      const offEnd = Math.round(G.offEnd || 0), endArrived = /arrived/i.test(document.getElementById("nav-g").innerText);
+      if (G.dest) { N.fix(G.dest, 9, 2, 45); await s(300); }
       arrived = /arrived/i.test(document.getElementById("nav-g").innerText) || /You have arrived/.test(document.body.innerText);
       N.stopReal(); N.rail(false); N.pos(pm0);
       m.jumpTo({ center: [cam.c.lng, cam.c.lat], zoom: cam.z, bearing: cam.b, pitch: cam.p });
       return { total: Math.round(total), steps: G.steps.length, banner: banners.find((b) => /onto/.test(b)) || banners[0],
-               firstDist, lastDist, firstTurn, eta: etas.length > 0, offM, offText: /off the line|Re-routing/.test(gOff), arrived,
+               firstDist, lastDist, firstTurn, eta: etas.length > 0, offM, offText: /off the line|Re-routing/.test(gOff), arrived, offEnd, endArrived,
                glyphPlant, bannerIc, hrs, paceReads, totalExact: total, mps: PM };
     }, GLYPH_SRC, NAV_PACE_N || 10);
     if (gd.missing) ok(false, "guidance hooks missing");
@@ -3404,7 +3409,8 @@ if (zoomed.trails > 0) {
       ok(gd.glyphPlant && gd.bannerIc && gd.bannerIc.svg && !gd.bannerIc.glyph,
          `the turn banner draws its arrow as an icon and carries no text glyph ("${gd.bannerIc ? gd.bannerIc.text : "no banner"}"); `
          + "the glyph test catches a text arrow and passes plain words (its negative control)");
-      ok(gd.arrived, "reaching the end announces You have arrived");
+      ok(gd.arrived && (gd.offEnd <= 50 || !gd.endArrived),
+         `reaching the destination announces You have arrived (its off-network last leg ${gd.offEnd} m; at the line's end ${gd.endArrived ? "arrived" : "not yet"})`);
     }
   }
   /* Take 172 · A187 N3 · river navigation, on a REAL corridor from the bundle:

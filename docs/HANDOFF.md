@@ -1,4 +1,116 @@
-# HANDOFF — through Take 201 · V3
+# HANDOFF — through Take 202 · V3
+
+## Take 202 — 2026-11-18 — River miles on one scale (A309); a dam below the take-out said (A310); the truck in feet (A311); arrival needs a good fix (A312) and reaches an off-network place (A317); the compass says from where (A313); a long way round shown (A314); a Stop keeps the old truck spot (A315); turns between unnamed tracks cued (A318)
+
+RECORDED FIRST. The maintainer, 2026-11-18: "build take 198 - potentially
+199 and 200 … work until my usage is up", then "ensure you continue
+afterwards automatically". Built on take 201 (main 7bf1fa1).
+
+Where the take came from: a fourth read-only audit (a subagent), aimed at
+navigation, the ride recorder, the compass, Return home, Water mode and
+the numbers cards state. 8 findings and a gap; each was read again here,
+measured on the shipped data where it could be, and fixed with a check
+watched failing on a copy of the built app with the fix taken out. Four
+are recorded OPEN (A316, A319-A321).
+
+A309 — the paddle guide summed the river line with mi()'s fixed 0.714
+while tools/corridor.py writes each stop's and dam's mile with the local
+latitude: 113 of 141 dams read 0.1 mi or more off (worst 2.89 mi), and at
+Portland Municipal Dam the strip read "Dam in 2.5 mi" at the dam. Now the
+line uses the corridor's own scale: 0 off, worst 0.019 mi (PROVEN).
+
+A310 — a dam 0.05-0.5 river-mi below the take-out (55 stops; Mio Pond
+T-Dock is 0.2 above Mio Dam) is on the card, said as the take-out nears,
+at arrival and past the landing, arrived or not; a dam within 0.05 is at
+the take-out and announced as a dam ahead.
+
+A311 — the truck reads feet under a tenth of a mile and "here" inside 60
+ft ("Truck 0.0 mi S" up to 260 ft gave a bearing to the rider's own
+spot). A312 — arrival needs a fix of 75 m or better, and the "little line
+left" rule the fix on the line. A313 — the compass says where its
+bearings are measured from.
+
+A314 — a route over the detour cap on every profile is shown with "the
+only legal way: 11.5 mi for places 0.2 mi apart", not "No legal route";
+a re-route onto it says so.
+
+A315 — a new trip within 12 hours of a Stop keeps the truck's old spot as
+a waypoint, and the Stop card says what Ride does next. A316 (OPEN):
+whether Ride after a Stop should continue the trip.
+
+A317 — with an off-network last leg past the line's end, arrival is at the
+place, To go counts the leg, walking it is not off route; a destination
+more than 3 mi from every legal line is refused (a Milwaukee home routed
+to the Michigan shore and "arrived" there).
+
+A318 — turns from one unnamed track onto another at a junction are cued,
+and forks say which branch; the strip and voice say "the unnamed
+two-track".
+
+OPEN: A319 (the compass's north source and statewide declination, needs
+the phone), A320 (voice after a re-route and near a turn, to measure),
+A321 (a resumed loop re-planned to its start).
+
+The review of take 202 (a subagent's cold read of the diff; 7 findings and
+a measurement, all acted on):
+- the warning past the take-out ran only after "arrival", which A312 made
+  stricter: 40 of the 55 stops sit more than 25 m off the line, so a
+  paddler who missed the landing wide heard nothing. It runs on position
+  now, arrived or not;
+- walking the off-network leg counted as off route: three fixes re-routed
+  from the line's end, every route came back empty, and the strip sat on
+  "Re-routing" with no arrival. The leg is not off route now;
+- a re-route onto the long way was quiet; it opens the card now;
+- the self-test's drill and the simulator filed fake truck waypoints;
+  they keep nothing now;
+- a second Stop and Ride named the first ride's start "Truck before";
+  it is "Ride start before" now;
+- a dam 0.02-0.05 below the take-out was "below" in the guide while the
+  card called it at the take-out; one window (0.05) now;
+- A318's first rule, measured on the bundle: 27,714 moves onto the
+  straightest unnamed line cued (about 4,800 needlessly) and 44,193 fork
+  moves uncued; the rule now weighs only legal lines, keeps a move whose
+  other ways are far sharper, and cues forks ("Keep left/right");
+- minor: the out-of-region home message measured to the region's centre
+  (it measures to the network now), the ride stats lost a decimal of the
+  truck's distance (restored).
+
+Takes 200 and 201, recorded here (PROVEN from CI): main's take 200 build
+(run 142) released take-142 and CI tagged t200; take 201's PR run 144 went
+green (bundle 65 min, the graph rebuilt under take 200's base) and was
+merged as 7bf1fa1. The container restarted once at about 15:25 and killed
+take 202's first post-review render mid-run (INFERRED from process start
+times); it was run again.
+
+What I got wrong:
+- the A314 drill searched 1,200 pairs under the paddle craft an earlier
+  drill had left selected, and found nothing routable (landmine 270);
+- A315 first kept every earlier truck: each smoke pass filed six; the 12
+  hour window came from reading the drill's own output ("Truck before
+  1:58 PM 7");
+- A310's past-the-take-out branch first hung on arrival, and its drill put
+  every fix on the line, so it could not see the wide miss (the review);
+- A317's drill jumped from the line's end to the place in one fix, so it
+  never walked the leg (the review).
+
+Verified here (Chrome 138; the bundle of main's newest green run):
+- smoke, all five passes PASSED before the review's fixes (324 / 219 /
+  54 ok, fatal 6, dead 33), after them (the same counts), and on the
+  rebased seal (324 / 219 / 54 ok, fatal 6, dead 33);
+- render: the full run before the review's fixes failed one check (the
+  guidance drill rode to the line's end of a destination off the network
+  and expected arrival there, which A317 now holds for the place itself;
+  the drill ends at the destination now); after the fixes the full run
+  PASSED (693 ok), and `--only=nav,imagery` on the rebased seal (87 ok;
+  the guidance drill's destination sits 76 m off the network);
+- mutants of the built app, each failing its own checks: A309-A310
+  together; A311-A315 together; A317-A318 together; the review's fixes
+  together (the wide miss, the dam at the take-out, the leg walked, the
+  long-way re-route judged by what is seen, the ride-start name, A318's
+  through-move and fork);
+- the 38 gate checks that need no pipeline output PASSED on the seal.
+UNKNOWN until the phone: the dam warnings on the water, the unnamed-turn
+cues in the woods, and A319's compass reading.
 
 ## Take 201 — 2026-11-18 — A whole-state HD save shows at riding zoom (A301); a finished save redraws (A302); a save ends when storage fills (A303), skips tiles the service lacks (A304), quotes only what is not saved (A305) and leaves nothing after Delete (A306); saved records act on the one tapped (A307); an address opens nearest the rider (A308)
 
