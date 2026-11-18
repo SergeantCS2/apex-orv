@@ -7044,22 +7044,33 @@ function tripResume(t){
     return true}catch(e){show('Could not resume the trip: '+e,'fail');return false}}
 function tripResumeCard(){
   var t=tripLoad();if(!t)return false;
-  /* take 199 · A283 · never offered over a ride already running: its card
-     opened the drawer over the ride (landmine 135), and its Resume clicked
-     the Ride chip, which STOPS a running ride and ended the saved trip */
-  if(rideMode||riding)return false;
+  /* take 199 · A283 · the offer over a ride already running. Until take 198
+     its card opened the drawer over the ride (landmine 135), and its Resume
+     clicked the Ride chip, which STOPS a running ride and ended the saved
+     trip. A ride with its first fix has saved its own trip over this one
+     (tripSave forces the first fix): nothing is left to offer. A ride still
+     waiting for its first fix has saved nothing: the earlier trip is
+     offered quietly (the peek line, not the drawer), and its Resume
+     continues it from that first fix without pressing Ride (the take-198
+     review: dropping the offer let the new ride overwrite the trip) */
+  if((rideMode&&gotFix)||riding)return false;
+  var wait=rideWaiting();
   var when=new Date(t.startedAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
-  show('<b>Resume your trip?</b><div class="sub">Started '+when+' \u00b7 '+
+  (wait?function(h){rideCard(h,'','Resume the trip from '+when+'? Open the drawer')}:function(h){show(h,'')})('<b>Resume your trip?</b><div class="sub">Started '+when+' \u00b7 '+
     (t.crumbMi||0).toFixed(1)+' mi recorded'+(t.lbl?' \u00b7 heading to '+t.lbl:'')+
     (t.run?' \u00b7 a run on the '+t.run.riv:'')+
     '. The app closed mid-trip; everything up to the last fix is still here.</div>'+
     '<button class="chip" id="trip-resume">'+ic('ride')+'<span>Resume</span></button> '+
-    '<button class="chip" id="trip-discard">'+ic('del')+'<span>Discard</span></button>','');
+    '<button class="chip" id="trip-discard">'+ic('del')+'<span>Discard</span></button>');
   el('trip-resume').addEventListener('click',function(){
-    /* take 199 · A283 · a ride started while the card was up (the Ride tab,
-       the folded drawer's Ride): Resume touches nothing */
-    if(rideMode||riding){logAct('act  trip resume refused: a ride is running');
-      return ack('A ride is already running. The earlier trip was not resumed.')}
+    /* take 199 · A283 · a ride that started while the card was up: still
+       waiting for its first fix, it continues the earlier trip from that
+       fix; already recording, the earlier trip has been replaced by it */
+    if((rideMode&&gotFix)||riding){logAct('act  trip resume refused: this ride is recording');
+      return ack('This ride has its first fix and records on its own; the earlier trip was replaced by it.')}
+    if(rideWaiting()){if(tripResume(t)){logAct('act  trip resumed into the waiting ride');
+      rideCard('<b>Trip resumed</b><div class="sub">Recording continues from the next GPS fix; the '+
+        crumbMi.toFixed(1)+' mi recorded are kept.</div>','',railPeekText())}return}
     /* take 188 · A223 · a refused start keeps its own card */
     /* take 189 · cold audit · nothing records before the first fix
        (startRecording runs on it): while the GPS waits the card and the
@@ -11036,7 +11047,6 @@ function cardHTML(h,s){show(h,s)}
    quiet=true sets the content and a peek summary and leaves the fold alone —
    the full text is one handle-tap away. */
 function showQuiet(h,peekLine){
-  CARDN++;
   sheetExit();   /* take 190 · A247 · a status card ends a sheet */
   var p=el('panel');p.innerHTML=h;p.className='';
   var t=el('peek-txt');
@@ -11055,6 +11065,7 @@ function showQuiet(h,peekLine){
    one handle-tap away. Results and anything carrying honesty copy stay
    cards. */
 function ack(h){
+  CARDN++;   /* take 199 · A284 · a rider's acknowledgement counts; a status card (showQuiet) does not */
   showQuiet(h,'');RAIL_MANUAL=false;railSet(false);
   toast(String(h).replace(/<[^>]*>/g,''),2400)}
 
@@ -11064,8 +11075,10 @@ function rideCard(h,s,peekLine){
 
 /* take 199 · A284 · what a slow answer (a GPS fix up to 25 s away) checks
    before it writes: no card written since it was asked for, the drawer not
-   folded if it was up, and no ride started or stopped. show() and
-   showQuiet() count every card. Set home's "My location" cleared the route a
+   folded if it was up, and no ride started or stopped. show() and ack()
+   count every card the rider caused; a status card written by itself
+   (showQuiet: an away fix, a ride's own notes) does not, so one locate's
+   away card never cancels another's answer (the take-198 review). Set home's "My location" cleared the route a
    rider had planned meanwhile, and Locate's late "No new GPS fix" opened the
    drawer over a ride (the take-198 audit, PROVEN by code read) */
 var CARDN=0;
@@ -11124,7 +11137,9 @@ el('c-locate').addEventListener('click',function(){
     if(at){flyToYou();return}
     show(why==='none'?'<b>This phone reports no GPS receiver.</b> Place yourself by hand with '+
         '<b>Start from my position</b> on the Plan tab.'
-      :'<b>No GPS fix in 25 s.</b> Location permission may be off, or the sky is hidden. Try again in the open, '+
+      :why==='error'?'<b>This phone did not give a position.</b> Location permission may be off for APEX. '+
+        'Turn it on, or place yourself by hand with <b>Start from my position</b> on the Plan tab.'
+      :'<b>No GPS fix in 25 s.</b> The sky may be hidden. Try again in the open, '+
         'or place yourself by hand with <b>Start from my position</b> on the Plan tab.','fail')},null,cardMark())});
 geo.on('error',function(){show('Location unavailable — this phone did not give a position (location permission off, or no fix yet). Place yourself by hand with <b>Start from my position</b> on the Plan tab.','fail')});
 

@@ -1867,17 +1867,20 @@ if (!NO_GPS) {
       const ls = sandbox.window.localStorage, trip0 = ls.getItem("apex.trip.v1");
       grab("c-ride").fire("click");
       const running = "ride" in grab("shell").dataset && /Stop \(GPS\)/.test(String(grab("c-ride")._html || ""));
+      /* the ride has its first fix: it has saved its own trip over the earlier
+         one, and there is nothing left to offer */
+      { const w = geo.watches.get(geo.id), at0 = sandbox.window.__route.ME;
+        w && w.cb({ coords: { longitude: at0[0], latitude: at0[1], accuracy: 8 } }); flushTimeouts(); frames(1); }
       grab("trip-resume")._listeners = {};
       const offered = N.card();
       grab("trip-resume").fire("click");
       flushTimeouts(); frames(2);
       const ph = grab("panel")._html || "";
-      const st = { running, offered: !!offered, riding: "ride" in grab("shell").dataset, trip: N.load() !== null,
-                   resumed: /Trip resumed/.test(ph) };
-      const held = (x) => x.running && !x.offered && x.riding && x.trip && !x.resumed;
+      const st = { running, offered: !!offered, riding: "ride" in grab("shell").dataset };
+      const held = (x) => x.running && !x.offered && x.riding;
       ok(held(st) && !held({ ...st, offered: true, riding: false }),
-         `A283 · with a ride already running the resume offer is not made and the ride rides on, the saved trip kept `
-         + `(${JSON.stringify(st)}); the judge rejects take 198's (offered, and its Resume stopped the ride)`);
+         `A283 · a ride with its first fix is offered nothing (its own trip is saved) and rides on (${JSON.stringify(st)}); `
+         + `the judge rejects take 198's (offered over the ride, and its Resume stopped it)`);
       /* the ride is stopped as a rider stops it (Stop ends the saved trip;
          it is put back below, for the real Resume) */
       for (let i = 0; i < 3 && "ride" in grab("shell").dataset; i++) { grab("c-ride").fire("click"); flushTimeouts(); }
@@ -4418,19 +4421,36 @@ if (!NO_GPS) {
     try { sandbox.window.__tour.close("notnow"); } catch (e) {}
     for (const id of ["modepanel", "actpanel", "lyrpanel", "diagpanel", "cmppanel", "guide"]) grab(id).hidden = true;
     const ME0 = R.ME.slice(), m0 = R.machine;
-    /* A283 · the card is shown, a ride starts (the Ride tab), then Resume */
-    N.end(); N.save(true);
-    const shown = N.card(); flushTimeouts();
+    /* A283 · a trip ridden and saved, the app relaunched (reset), the offer
+       shown; the rider presses Ride before using it, so the offer comes
+       again (quietly) to a ride waiting for its first fix; Resume, then a
+       fix: the ride rides on, and its track continues the saved one */
     SX.tab("ride"); flushTimeouts(); grab("c-ride").fire("click"); flushTimeouts();
     if (!riding()) console.log(`  ..   A283 · no ride starts in this pass (${NO_GPS ? "no receiver" : "refused"}): the Resume drill needs one`);
     else {
-      const offered = N.card();              /* a second offer, with the ride up */
+      const feed = (ll) => { const w = geo.watches.get(geo.id); w && w.cb({ coords: { longitude: ll[0], latitude: ll[1], accuracy: 8 } }); flushTimeouts(); frames(1); };
+      for (let k = 0; k < 3; k++) feed([ME0[0], ME0[1] + k * 0.002]);
+      N.save(true); const saved = N.load() || { crumbs: [] }; N.reset(); sandbox.window.hudShow(false);
+      grab("trip-resume")._listeners = {};
+      const shown = N.card(); flushTimeouts();
+      SX.tab("ride"); flushTimeouts(); grab("c-ride").fire("click"); flushTimeouts();
+      N.rail(false); flushTimeouts();
+      grab("trip-resume")._listeners = {};
+      const offered = N.card(); flushTimeouts();
+      const quiet = folded();
       const r = grab("trip-resume"); r && r.fire("click"); flushTimeouts();
-      const after = { riding: riding(), trip: !!N.load(), offered: !!offered, shown: !!shown };
-      const resumeOk = (a) => a.shown && !a.offered && a.riding && a.trip;
-      ok(resumeOk(after) && !resumeOk({ ...after, riding: false, trip: false }) && !resumeOk({ ...after, offered: true }),
-         `A283 · with a ride running, Resume on the card shown before it leaves the ride riding and the saved trip kept, and the card is `
-         + `not offered again (${JSON.stringify(after)}); the judge rejects take 198's (the ride stopped, the trip ended) and an offer over the ride`);
+      feed([ME0[0], ME0[1] + 0.006]);
+      const sn = N.snapshot() || { crumbs: [] };
+      /* the saved track carried on (a replaced trip starts again at one crumb) */
+      const kept = saved.crumbs.length >= 3 && sn.crumbs.length >= saved.crumbs.length
+        && sn.crumbs[0][0] === saved.crumbs[0][0] && sn.crumbs[0][1] === saved.crumbs[0][1];
+      const after = { shown: !!shown, offered: !!offered, quiet, riding: riding(), kept, saved: saved.crumbs.length, now: sn.crumbs.length };
+      const resumeOk = (a) => a.shown && a.offered && a.quiet && a.riding && a.kept;
+      ok(resumeOk(after) && !resumeOk({ ...after, riding: false, kept: false }) && !resumeOk({ ...after, offered: false, kept: false })
+         && !resumeOk({ ...after, quiet: false }),
+         `A283 · a ride waiting for its first fix is offered the earlier trip quietly (the drawer folded) and its Resume continues it: `
+         + `riding on, the saved track carried on through the first fix (${JSON.stringify(after)}); the judge rejects take 198's (the ride `
+         + `stopped), take 199's first build (no offer, the trip replaced) and an offer over the ride's map`);
       grab("c-ride").fire("click"); flushTimeouts();
       for (let i = 0; i < 3 && riding(); i++) { grab("c-ride").fire("click"); flushTimeouts(); }
     }
@@ -4453,11 +4473,22 @@ if (!NO_GPS) {
         return { watch: !!w, rc0, rc1: documentStub.querySelectorAll(".rc").length, home: /Home is where you are/.test(panel()) };
       };
       const a = homeRun(true), b = homeRun(false);
+      /* a status card written by itself (another locate's away fix, quietly)
+         lands while Set home waits: the rider did not move on, home is set
+         (the take-198 review: it counted as moving on) */
+      SX.tab("plan"); flushTimeouts(); grab("c-home").fire("click"); flushTimeouts();
+      const sh = geo.seq; grab("hc-me").fire("click"); const wh = newWatch(sh);
+      const sa = geo.seq; L1(); const wa = newWatch(sa);
+      fixAt(wa, [-95.0, 30.0]); flushTimeouts();
+      fixAt(wh, ME0); flushTimeouts();
+      const c = { watches: !!wh && !!wa, home: /Home is where you are/.test(panel()) };
+      try { N.pos("gps"); } catch (e) {}
       const lateOk = (x) => x.watch && x.rc0 >= 2 && x.rc1 === x.rc0 && !x.home;
       const stillOk = (x) => x.watch && x.home;
-      ok(lateOk(a) && stillOk(b) && !lateOk({ ...a, rc1: 0, home: true }),
+      ok(lateOk(a) && stillOk(b) && c.watches && c.home && !lateOk({ ...a, rc1: 0, home: true }),
          `A284 · a fix that lands after the rider planned a route leaves the ${a.rc0} route cards and sets no home (${JSON.stringify(a)}); `
-         + `with nothing done meanwhile it sets home as asked (${JSON.stringify(b)}); the judge rejects take 198's (the route cleared, home set)`);
+         + `with nothing done meanwhile it sets home as asked (${JSON.stringify(b)}), and so it does after another locate's away card (${c.home}); `
+         + `the judge rejects take 198's (the route cleared, home set)`);
       SX.tab("map"); flushTimeouts();
     }
     /* A285 · Locate: the hidden control's trigger is never called */

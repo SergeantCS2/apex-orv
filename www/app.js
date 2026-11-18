@@ -4062,18 +4062,22 @@ function tripResume(t){
 function tripResumeCard(){
   var t=tripLoad();if(!t)return false;
    
-  if(rideMode||riding)return false;
+  if((rideMode&&gotFix)||riding)return false;
+  var wait=rideWaiting();
   var when=new Date(t.startedAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
-  show('<b>Resume your trip?</b><div class="sub">Started '+when+' \u00b7 '+
+  (wait?function(h){rideCard(h,'','Resume the trip from '+when+'? Open the drawer')}:function(h){show(h,'')})('<b>Resume your trip?</b><div class="sub">Started '+when+' \u00b7 '+
     (t.crumbMi||0).toFixed(1)+' mi recorded'+(t.lbl?' \u00b7 heading to '+t.lbl:'')+
     (t.run?' \u00b7 a run on the '+t.run.riv:'')+
     '. The app closed mid-trip; everything up to the last fix is still here.</div>'+
     '<button class="chip" id="trip-resume">'+ic('ride')+'<span>Resume</span></button> '+
-    '<button class="chip" id="trip-discard">'+ic('del')+'<span>Discard</span></button>','');
+    '<button class="chip" id="trip-discard">'+ic('del')+'<span>Discard</span></button>');
   el('trip-resume').addEventListener('click',function(){
      
-    if(rideMode||riding){logAct('act  trip resume refused: a ride is running');
-      return ack('A ride is already running. The earlier trip was not resumed.')}
+    if((rideMode&&gotFix)||riding){logAct('act  trip resume refused: this ride is recording');
+      return ack('This ride has its first fix and records on its own; the earlier trip was replaced by it.')}
+    if(rideWaiting()){if(tripResume(t)){logAct('act  trip resumed into the waiting ride');
+      rideCard('<b>Trip resumed</b><div class="sub">Recording continues from the next GPS fix; the '+
+        crumbMi.toFixed(1)+' mi recorded are kept.</div>','',railPeekText())}return}
      
      
     if(tripResume(t)){el('c-ride').click();if(rideMode||riding)
@@ -7050,7 +7054,6 @@ function cardHTML(h,s){show(h,s)}
 
  
 function showQuiet(h,peekLine){
-  CARDN++;
   sheetExit();    
   var p=el('panel');p.innerHTML=h;p.className='';
   var t=el('peek-txt');
@@ -7059,6 +7062,7 @@ function showQuiet(h,peekLine){
  
  
 function ack(h){
+  CARDN++;    
   showQuiet(h,'');RAIL_MANUAL=false;railSet(false);
   toast(String(h).replace(/<[^>]*>/g,''),2400)}
 
@@ -7107,7 +7111,9 @@ el('c-locate').addEventListener('click',function(){
     if(at){flyToYou();return}
     show(why==='none'?'<b>This phone reports no GPS receiver.</b> Place yourself by hand with '+
         '<b>Start from my position</b> on the Plan tab.'
-      :'<b>No GPS fix in 25 s.</b> Location permission may be off, or the sky is hidden. Try again in the open, '+
+      :why==='error'?'<b>This phone did not give a position.</b> Location permission may be off for APEX. '+
+        'Turn it on, or place yourself by hand with <b>Start from my position</b> on the Plan tab.'
+      :'<b>No GPS fix in 25 s.</b> The sky may be hidden. Try again in the open, '+
         'or place yourself by hand with <b>Start from my position</b> on the Plan tab.','fail')},null,cardMark())});
 geo.on('error',function(){show('Location unavailable — this phone did not give a position (location permission off, or no fix yet). Place yourself by hand with <b>Start from my position</b> on the Plan tab.','fail')});
 
