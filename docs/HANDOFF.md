@@ -86,6 +86,9 @@ left):
 What I got wrong:
 - the first A279 fix opened the tool at once with a placeholder card, and
   made the card four times slower to land; measured, and ruled out;
+- the comment I wrote above the MapLibre pin quoted the very URL it was
+  about, and the gate's host scan failed CI round 2 on it; the 37 gate
+  checks were not run on the CI fix before it was pushed;
 - the A279 drill first timed the read by counting tier cards in the panel,
   and on take 197's build counted the hidden ones left by an earlier drill
   (0 ms; landmine 264). It counts cards on screen under the HD tool, and
@@ -119,6 +122,15 @@ pass with 5.24.0's (byte-identical to take 197's APK: sha256 a1f1847b…).
 The fix: ci/bundle.sh fetches 5.24.0 and checks the three files' sha256
 against take 197's; a 5.24.1 file stops the build with the landmine named
 (tested). A failed job saves no cache, so round 2 is cold too.
+
+CI, round 2 (run 132, PROVEN from its log): cold again, pipeline 1,917 s;
+the three MapLibre files passed their hashes, render passed, and the gate
+failed one check: check_provision found "maplibre.invalid in bundle.sh".
+My own comment above the pin had quoted the URL, and the manifest's host
+scan reads ci/ files, comments and all. Reproduced here (the same line),
+reworded (the comment names "a reserved .invalid host" without the host),
+and check_provision with check_offline and the other 35 checks that need
+no pipeline output passed before round 3 went up.
 
 ## Take 197 — 2026-11-07 — Every data source named, in the app and the store listing (A280); the trail card's surface (A10); the step stamps ignore the import system's scans (A207)
 

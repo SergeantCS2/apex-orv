@@ -27,7 +27,8 @@ mkdir -p www/vendor
 # take 198 · landmine 265: an EXACT version, and the files held to the bytes
 # take 197 shipped. "maplibre-gl@5" floated: unpkg resolved 5.24.1 after
 # take 197 built with 5.24.0, its main script carries a new origin string
-# (https://maplibre.invalid/), and the gate's offline check failed a build
+# (a reserved .invalid host, never named here: the gate's host scan reads
+# this file), and the gate's offline check failed a build
 # whose code had not changed (PR #15's run 131). A new MapLibre is a take of
 # its own, with its hashes and the licence check's pin moved together.
 ML=5.24.0
