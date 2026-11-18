@@ -96,6 +96,14 @@ What I got wrong:
   warning replaces with the card: it passed in the afternoon and failed in
   the evening (the narrow mutant ran at night). Its clock is pinned to a
   midsummer afternoon now (landmine 272);
+- the PR's first CI run (151) failed smoke on CI's rebuilt data, which
+  the restored local bundle could not show: G8 found the new foot class
+  drawn (97,909 edges) but neither chained nor listed per edge, and the
+  A323 drill's search found only an 18 m rise on the graph without the
+  hiking trails (its floor was 30 m). foot is drawn per edge now (as it was
+  while shipped as two-track), G8 knows it, and the drill needs 15 m (a
+  backwards direction misses by twice the rise). Both were then run on
+  run 151's own www artifact (landmine 271);
 - A327 moved a take-188 drill's "quiet" clock (04:00 at midsummer is
   before sunrise) to a quarter hour after sunrise where the rider is.
 
@@ -130,8 +138,24 @@ predates take 197):
   Belle edge as track, the new one as foot, and stops on a planted horse;
 - the 37 gate checks that need no pipeline output, check_freeway_rules,
   check_class_legality and the three new checks, on the seal: GATEFN PASSED (42).
-UNKNOWN until CI and the phone: the rebuilt graph's foot count and the
-routes it changes; the detour routable on CI's data; the voice cues on the
+On CI's rebuilt data (run 151's www artifact, with this take's app):
+smoke, all five passes PASSED (333 / 226 / 54 ok, fatal 6, dead 33) after
+the G8 and A323 fixes; render: the full run, 691 ok and 2 failures, both
+of the harness, not the app: the livery check read POIs from a hard-coded
+www/bundle/poi.json, not --www's (it compared CI's map with the old
+bundle's indices; it reads --www's now), and the campground check's new
+pick on CI's data shares its point with a boat launch, so the tap opened
+the stack's list (it opens the camp from its row now); `--only=water,camp`
+then PASSED on CI's data and on the old bundle (42 ok each). (A harness hazard on the way: a
+test www whose bundle is a symlink is not safe for --fatal-drill, whose
+copy keeps the link and strips the network from the real manifest; the
+test copy is a real one now.)
+Measured on CI's rebuilt data (run 151's www artifact, PROVEN): 97,909
+foot edges, 13,996 mi (DNR non-ORV 46,081, USFS non-ORV 18,281, named OSM
+paths 33,547), none ridable by an ORV machine; "Temporarily Open Reroute"
+is route72 (62 edges) and routable; "Closed Permanent" is closed; no camp
+named Modern is typed rustic; the gate's four bundle checks pass on it.
+UNKNOWN until the phone: the routes the change moves; the voice cues on the
 Fold's engine.
 
 ## Take 202 — 2026-11-18 — River miles on one scale (A309); a dam below the take-out said (A310); the truck in feet (A311); arrival needs a good fix (A312) and reaches an off-network place (A317); the compass says from where (A313); a long way round shown (A314); a Stop keeps the old truck spot (A315); turns between unnamed tracks cued (A318)

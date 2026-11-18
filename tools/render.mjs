@@ -829,7 +829,7 @@ if (zoomed.trails > 0) {
   {
     let hill = null;
     try {
-      const pj = JSON.parse(readFileSync("www/bundle/poi.json", "utf8"));
+      const pj = JSON.parse(readFileSync(join(WWW, "bundle", "poi.json"), "utf8"));
       const all = (pj.p || []).filter((r) => r.k === "ski");
       hill = all.find((r) => r.runs && r.runs.length && r.web) ||
              all.find((r) => r.runs && r.runs.length) || all[0] || null;
@@ -1884,7 +1884,7 @@ if (zoomed.trails > 0) {
      bundle's own data (landmine 197). */
   {
     let liv = [], livIdx = -1;
-    try { const all = JSON.parse(readFileSync("www/bundle/poi.json", "utf8")).p;
+    try { const all = JSON.parse(readFileSync(join(WWW, "bundle", "poi.json"), "utf8")).p;
       livIdx = all.findIndex((r) => r.k === "livery");
       liv = all.filter((r) => r.k === "livery"); } catch (e) { }
     ok(liv.length > 0, `the bundle carries canoe/kayak liveries (${liv.length}; e.g. ${liv[0] ? liv[0].n : "-"})`);
@@ -2774,7 +2774,7 @@ if (zoomed.trails > 0) {
        undeclared name (an implicit global) and would vanish, silently
        emptying this list, the day it is declared */
     let poiKinds = [];
-    try { poiKinds = [...new Set((JSON.parse(readFileSync("www/bundle/poi.json", "utf8")).p || []).map((r) => r.k))]; }
+    try { poiKinds = [...new Set((JSON.parse(readFileSync(join(WWW, "bundle", "poi.json"), "utf8")).p || []).map((r) => r.k))]; }
     catch (e) { poiKinds = []; }
     const bd = await page.evaluate(async (padKindsNode, poiKindsNode) => { try {
       const m = window.map, B = window.__badges, M = window.__mode, s = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -2903,7 +2903,7 @@ if (zoomed.trails > 0) {
     /* cameras from the bundle (landmine 197): its ski hills, then the
        manifest's anchors; the first with a lone named teardrop is used */
     let cams = [];
-    try { cams = (JSON.parse(readFileSync("www/bundle/poi.json", "utf8")).p || []).filter((r) => r.k === "ski" && r.p).slice(0, 3).map((r) => r.p); } catch (e) {}
+    try { cams = (JSON.parse(readFileSync(join(WWW, "bundle", "poi.json"), "utf8")).p || []).filter((r) => r.k === "ski" && r.p).slice(0, 3).map((r) => r.p); } catch (e) {}
     try { cams = cams.concat((JSON.parse(readFileSync("www/bundle/manifest.json", "utf8")).anchors || []).map((a) => [a[1], a[2]])); } catch (e) {}
     const hill = cams.length ? cams : null;
     const ht = await page.evaluate(async (cams) => { try {
@@ -3619,6 +3619,14 @@ if (zoomed.trails > 0) {
         for (const type of ["mousedown", "mouseup", "click"])
           cv.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: rc.left + pt.x, clientY: rc.top + pt.y }));
         await s(500);
+        /* take 203 · CI's data (run 151): the camp chosen shares its point
+           with a boat launch, and the tap opens the stack's list; the camp is
+           opened from its row, as a rider would */
+        const pn = () => (document.getElementById("panel") || {}).innerText || "";
+        if (/places here/.test(pn())) {
+          const row = [...document.querySelectorAll("#panel [data-si]")].find((x) => (x.textContent || "").includes(r.n || "\u0000"));
+          if (row) { row.click(); for (let k = 0; k < 30 && /places here/.test(pn()); k++) await s(300); await s(400); }
+        }
         cardType = document.body.innerText;
         campKinds = (M.MODES.find((x) => x.k === "camp").kinds || []).includes("camp");
       }
@@ -3674,7 +3682,7 @@ if (zoomed.trails > 0) {
      while Water at the same camera still draws them. */
   {
     let P = [];
-    try { P = JSON.parse(readFileSync("www/bundle/poi.json", "utf8")).p; } catch (e) { }
+    try { P = JSON.parse(readFileSync(join(WWW, "bundle", "poi.json"), "utf8")).p; } catch (e) { }
     const un = P.filter((r) => !r.n && (r.k === "launch" || r.k === "beach"));
     const byLake = P.filter((r) => r.w);
     const mt = (a, b) => Math.hypot((a[0] - b[0]) * 111320 * Math.cos(a[1] * Math.PI / 180), (a[1] - b[1]) * 111320);

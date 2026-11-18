@@ -3626,6 +3626,13 @@ from one set of categories to another fails on a key it does not know;
 a legality check reads the edges and their attributes, not a header the
 producer wrote from the same list; and a check that a class is present
 (some edge of class foot) catches the producer that drops it quietly.
+The fix's own first CI run (151) failed smoke where the local bundle could
+not show it: the restored bundle predated the fix, so it had no foot edge,
+and G8 (every drawn class chained or drawn per edge) never met the class
+CI's graph drew 97,909 times; a drill's route search tuned on the old
+graph found less on the new. Rule: when a take changes the data, run the
+app against the PR run's own built www (its `www` artifact, CI's data)
+before the next push.
 
 **272. A drill under a shifted clock leaves the app's timestamps in the
 future.** Take 203's A320 drill wandered off a route 32 times and the app

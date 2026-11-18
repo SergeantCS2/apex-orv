@@ -294,7 +294,9 @@ var NETLO=[],NETLO_MS=0,NETLO_ERR=null,
      
     NETLO_SKIP={track:'90.1-94.7% kept at z7; 704,198 stroke vertices',
                 paved:'89.6-96.9% kept at z7; 190,401 stroke vertices',
-                minor:'Hybrid draws it from z11.5 only'};
+                minor:'Hybrid draws it from z11.5 only',
+                 
+                foot:'drawn per edge as it was while shipped as two-track (take 203)'};
 try{
   var _nl0=Date.now(),NFI=[];
   nf2.forEach(function(f){if(NETLO_CLS.indexOf(f.properties.c)>=0)NFI[f.properties.i]=f.geometry.coordinates});

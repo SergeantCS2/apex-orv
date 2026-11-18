@@ -515,6 +515,10 @@ ok(netF > 1000, `net source carries real geometry (${netF} features)`);
     track: "two-track: 90.1-94.7% kept at z7 unchained, 704,198 stroke vertices (65% of the ten-class strokes)",
     paved: "paved: 89.6-96.9% kept at z7 unchained, 190,401 stroke vertices (18%)",
     minor: "minor: Hybrid draws it from z11.5 only, so a stroke could never draw",
+    /* take 203 · A322 · hiking trails (walk only), drawn per edge as they
+       were while bundles shipped them as two-track; a bundle built before
+       take 203 has none (CI's run 151 found the class in the net source) */
+    foot: "foot: hiking trails, per edge as while they shipped as two-track",
   };
   const SKIPC = Object.keys(D7_SKIP);
   const g8set = (sc, app, des) => sc.length > 0 && des.length === 5 && des.every((c) => sc.includes(c)) && !sc.some((c) => SKIPC.includes(c))
@@ -529,7 +533,8 @@ ok(netF > 1000, `net source carries real geometry (${netF} features)`);
   const unchained = (sc) => netCls.filter((c) => !SKIPC.includes(c) && !sc.includes(c));
   ok(unchained(SCOPE.filter((c) => c !== "fsroad")).join() === "fsroad",
      "G8 · the coverage judge names fsroad when a planted scope leaves it out");
-  ok(netCls.length > 5 && unchained(SCOPE).length === 0 && SKIPC.every((c) => netCls.includes(c)),
+  const hasFoot = !!(sandbox.window.__route && sandbox.window.__route.EDGES.some((e) => e.c === "foot"));
+  ok(netCls.length > 5 && unchained(SCOPE).length === 0 && SKIPC.every((c) => netCls.includes(c) || (c === "foot" && !hasFoot)),
      `G8 · every drawn network class is chained or recorded per-edge (${netCls.length} classes in the net source; per edge: ${SKIPC.join(", ")})`
      + (unchained(SCOPE).length ? " — NOT CHAINED AND NOT RECORDED: " + unchained(SCOPE).join(", ") : "")
      + (SKIPC.every((c) => netCls.includes(c)) ? "" : " — recorded but not in the net source: " + SKIPC.filter((c) => !netCls.includes(c)).join(", ")));
@@ -5434,7 +5439,7 @@ if (!NO_GPS) {
     const dmi = (a, b) => Math.hypot((b[0] - a[0]) * 0.714 * 69, (b[1] - a[1]) * 69);
     const short = R.PROFILES.find((p) => p.k === "short"), flat = R.PROFILES.find((p) => p.k === "flat");
     let best = null;
-    for (let t = 0; t < 600 && !(best && best.rise > 60); t++) {
+    for (let t = 0; t < 1500 && !(best && best.rise > 60); t++) {
       const a = Math.floor(rnd() * NODES.length), b = Math.floor(rnd() * NODES.length), d = dmi(NODES[a], NODES[b]);
       if (d < 3 || d > 9 || R.elev(a) == null || R.elev(b) == null) continue;
       const rise = Math.abs(R.elev(b) - R.elev(a)); if (best && rise <= best.rise) continue;
@@ -5461,7 +5466,10 @@ if (!NO_GPS) {
        ends are judged loosely; a direction read backwards misses by twice
        the rise, a doubled profile by the whole elevation. The exact checks
        are the reverse route's and the turn list's */
-    const ok323 = (x) => x.found && x.rise >= 30 && Math.abs((x.up - x.dn) - x.net) <= Math.max(12, 0.35 * Math.abs(x.net))
+    /* a rise of 15 m is enough: a direction read backwards misses the ends
+       by twice the rise, past the 12 m allowed (CI's graph, with the hiking
+       trails out, gave an 18 m route after the 600 tries take 203 first had) */
+    const ok323 = (x) => x.found && x.rise >= 15 && Math.abs((x.up - x.dn) - x.net) <= Math.max(12, 0.35 * Math.abs(x.net))
       && x.up === x.rdn && x.dn === x.rup && Math.abs(x.stUp - x.up) <= 1
       && Math.abs(x.p0 - x.e0) <= 15 && Math.abs(x.pN - x.eN) <= 20 && x.pmax <= 604 && x.pmin >= 170 && x.seen === "false,true";
     const ft_ = (m) => Math.round(m * 3.28084);
