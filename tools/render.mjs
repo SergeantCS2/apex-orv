@@ -2995,7 +2995,10 @@ if (zoomed.trails > 0) {
       const restored = loaded ? N.resume(loaded) : false;
       await s(500);
       let crumbNow = -1;
-      try { crumbNow = m.getSource("crumb").serialize().data.features[0].geometry.coordinates.length; } catch (e) { }
+      /* take 200 · A295 · the track is a MultiLineString (its gaps are breaks):
+         its points are counted across the parts */
+      try { const gm = m.getSource("crumb").serialize().data.features[0].geometry;
+        crumbNow = gm.type === "MultiLineString" ? gm.coordinates.reduce((n, q) => n + q.length, 0) : gm.coordinates.length; } catch (e) { }
       /* and the FIRST fix after Resume must continue the line, not restart it —
          the audit found startRecording resetting crumbs to one point here */
       N.start();
