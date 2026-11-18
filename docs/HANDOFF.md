@@ -87,6 +87,14 @@ took the busy-runner fix and run 137 went green in 31 min, its page loads
 8.9 s, 8.0 s and the palette's 7.8 s. Merged as 75310e5. Take 198 has no
 release or tag of its own (no green build of main).
 
+CI round 1 (PR #17, run 140, cold: main holds no cache since its take
+198 build failed, and a pull request cannot read another's): the ingest
+stopped at the Michigan extract's download, cut short at 283.7 of 318.1 MB
+(ContentTooShortError), with no second try. tools/osm_local.py now tries
+the download four times, with a pause that grows, removing the partial
+file each time. A local server that cuts its first answer short fails the
+old code and passes the new after two requests (PROVEN here).
+
 What I got wrong:
 - A294's first fix went where the symptom showed (Navigate this run), and
   a drill that could not fail held it; the mutant that survived showed the
