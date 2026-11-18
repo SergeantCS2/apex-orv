@@ -2118,8 +2118,11 @@ function homeCard(prefix){
           :'<b>No GPS fix in 25 s.</b> Try outside, or set home another way.','');
         HOME=at.slice();homeSave();homeMark();clearRoute();syncSafety();
          
-        if(!inRegion(at))return show('<b>Home is where you are</b> \u2014 '+mi(at,CTR).toFixed(0)+' mi from this map\u2019s region, '+
-          'outside it. <b>Return home</b> cannot route there; it is still marked, and the compass points to it.','');
+         
+        var hn=nearestNode(at),hs=hn>=0?snapMiles(at,hn):1e9;
+        if(hs>3)return show('<b>Home is where you are</b> \u2014 '+(hs<1e8?hs.toFixed(1)+' mi from':'far from')+
+          ' the nearest line a '+MACHINE[machine].lbl+' may ride on this map. <b>Return home</b> cannot route there; '+
+          'it is still marked, and the compass points to it.','');
         show('<b>Home is where you are.</b> Press and hold where you want to go and tap '+
           '<b>Route here</b>.','')},null,wm)})})}
 el('c-home').addEventListener('click',function(){
@@ -2889,7 +2892,9 @@ function renderRoutes(out,auto){
    
   var w0=RIDDEN_WARN;RIDDEN_WARN=warn[sel]||null;
   if(auto){
-    var w=warn[sel]||{},bits=[],ra=routeAuto(auto);
+    var w=warn[sel]||{},bits=[],ra=routeAuto(auto),far=out[sel]&&out[sel].far;
+     
+    if(far)bits.push('the only legal way: '+far.mi.toFixed(1)+' mi for places '+shortDist(far.crow)+' apart');
     if(w.fuel)bits.push(w.fuel.toFixed(1)+' mi past your range');
     if(w.dark)bits.push('arrives after dark');
     if(w.adv)bits.push(w.adv.toFixed(1)+' mi unverified (OSM)');
@@ -2898,7 +2903,7 @@ function renderRoutes(out,auto){
      
     if(!rideMode&&!riding){
       logAct('route cards held: the ride they were for is not running');return}
-    if((w.fuel&&!(w0&&w0.fuel))||(w.dark&&!(w0&&w0.dark)))show(html,'');
+    if(far||(w.fuel&&!(w0&&w0.fuel))||(w.dark&&!(w0&&w0.dark)))show(html,'');
     else rideCard(html,'',ra.resume
       ?(rideWaiting()?GPS_WAIT:'Trip resumed')+' \u00b7 route to '+(DESTLBL||'there')+(bits.length?' \u00b7 '+bits.join(' \u00b7 '):' is on the map')
        
@@ -3166,15 +3171,23 @@ function directions(path,startNode){
   for(var i=0;i<legs.length;i++){var L=legs[i];
     var key=L.name+'|'+(L.id||'');
      
-    var unn=!L.e.n&&!L.id,dd=acc?((L.inB-acc.out+540)%360)-180:0;
-    if(acc&&acc.key===key&&!(unn&&Math.abs(dd)>=45&&(ADJ[L.node]||[]).length>=3)){
+     
+    var cue=null;
+    if(acc&&acc.key===key&&!L.e.n&&!L.id){var jn=L.node,pi=legs[i-1].e.i,tc=((L.inB-acc.out+540)%360)-180,oth=[];
+      (ADJ[jn]||[]).forEach(function(e){if(e.i===pi||e.i===L.e.i||e.c==='closed'||e.c==='fsclosed'||!machineLegal(e))return;
+        var g2=decode(GR.g[e.i]);if(e.a!==jn)g2=g2.slice().reverse();
+        oth.push(((bearing(g2[0],g2[Math.min(1,g2.length-1)])-acc.out+540)%360)-180)});
+      if(oth.length){var so=oth.reduce(function(a,b){return Math.abs(b)<Math.abs(a)?b:a}),mo=Math.abs(so),at_=Math.abs(tc);
+        if(at_>=45&&mo<at_+60)cue=turnWord(tc);
+        else if(mo<at_-10)cue=at_>=22?turnWord(tc):(tc<so?['Keep left','bearleft']:['Keep right','bearright'])}}
+    if(acc&&acc.key===key&&!cue){
       acc.mi+=L.e.L/1609.34;acc.up+=UP[L.e.i];acc.out=L.outB;continue}
     if(acc)steps.push(acc);
     acc={key:key,name:L.name,id:L.id,cls:L.e.c,mi:L.e.L/1609.34,up:UP[L.e.i],
-      inB:L.inB,out:L.outB,at:i}}
+      inB:L.inB,out:L.outB,at:i,tw:cue}}
   if(acc)steps.push(acc);
   for(var i=0;i<steps.length;i++){
-    steps[i].turn=i===0?['Start on','start']:turnWord(steps[i].inB-steps[i-1].out)}
+    steps[i].turn=i===0?['Start on','start']:(steps[i].tw||turnWord(steps[i].inB-steps[i-1].out))}
   return steps}
 
 el('btn-steps').addEventListener('click',function(){
@@ -3939,7 +3952,7 @@ function truckPin(){
   if(!tM)tM=new maplibregl.Marker({element:mk('truck','truck')}).setLngLat(TRUCK).addTo(map);
   else tM.setLngLat(TRUCK)}
 var TRUCK_KEPT=null,STOP_T=0;
-function startRecording(at){
+function startRecording(at,sim){
    
   if(RESUMING){RESUMING=false;
     if(!crumbs.length){crumbs=[at.slice()];crumbMi=0}
@@ -3955,13 +3968,16 @@ function startRecording(at){
     return}
    
    
-  var oldT=(TRUCK&&STOP_T&&Date.now()-STOP_T<12*3600e3)?TRUCK.slice():null,kept=null;
+   
+  var oldT=(!sim&&TRUCK&&STOP_T&&Date.now()-STOP_T<12*3600e3)?TRUCK.slice():null,kept=null,repin=!!TRUCK_KEPT;
   TRUCK=at.slice(); crumbs=[at.slice()]; crumbMi=0;
   if(oldT&&mi(oldT,at)>0.1){var tn;try{tn=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}catch(e){tn='earlier'}
-    kept=markUnique('Truck before '+tn);
+     
+    kept=markUnique((repin?'Ride start before ':'Truck before ')+tn);
     if(wpAdd({n:kept,p:oldT,r:BUNDLE.region||null,ts:Date.now()})){try{wpDraw()}catch(e){}TRUCK_KEPT=kept;
       toast('The truck is pinned here now. Its last spot is saved as \u201c'+kept+'\u201d (Saved, on the Plan tab).',5000)}
     else kept=null}
+  else if(!sim)TRUCK_KEPT=null;
   rideStart(at);
   hudShow(true);
   truckPin();
@@ -4099,7 +4115,7 @@ el('btn-disp').addEventListener('click',function(){
       bits.push('Nearest junction <b>'+nm+'</b> — '+
         (nj.d<0.19?(nj.d*5280|0)+' ft':nj.d.toFixed(2)+' mi')+' '+
         compass(bearing(ME,[NODES[nj.n][0],NODES[nj.n][1]])))}
-    if(TRUCK)bits.push('Truck <b>'+truckTxt(mi(ME,TRUCK),bearing(ME,TRUCK),true)+'</b>');
+    if(TRUCK)bits.push('Truck <b>'+truckTxt(mi(ME,TRUCK),bearing(ME,TRUCK),true,2)+'</b>');
     var ev=elevAt(ME);if(ev!==null)bits.push('Elevation <b>'+ft(ev)+' ft</b>');
     var np=nearestPavement(ME);
     if(np.p)bits.push('Nearest pavement <b>'+np.d.toFixed(2)+' mi '+
@@ -4388,8 +4404,15 @@ function navRiverGuide(at,acc,st,mps){
   _rmHist.push(st.rm);if(_rmHist.length>6)_rmHist.shift();
    
   var below=null;if(bmi>=RUN.a.mi)for(var ib=0;ib<L.c.f.length;ib++){var qb=L.c.f[ib];
-    if(qb.k==='dam'&&qb.mi>bmi+0.02&&qb.mi<=bmi+0.5){below=qb;break}}
+    if(qb.k==='dam'&&qb.mi>bmi+0.05&&qb.mi<=bmi+0.5){below=qb;break}}
   var belowTxt=below?(below.n||'A dam')+' is '+shortDist(below.mi-bmi)+' below':'';
+   
+  if(below&&st.rm>bmi+0.05&&st.rm<below.mi){var dd=below.mi-st.rm,cl=dd<0.1;
+    g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('warn')+'</span>Past the take-out \u2014 '+
+      (cl?'dam just ahead, land now':'dam in '+shortDist(dd)+', land')+(below.n?' \u00b7 '+below.n:'')+'</b>';
+    var bk='below|'+below.mi.toFixed(2)+(cl?'|c':'');
+    if(VOICE.near!==bk){VOICE.near=bk;buzz([200,100,200]);navSay(cl?'Dam just ahead. Land now.':'You are past the take-out. Dam ahead. Land.')}
+    ridePublish();return true}
    
   var toB=RUN.b.p?mi(at,RUN.b.p)*1609.34:1e9;
   if(!RUN.arrived&&arriveNear(toB,acc,remain*1609.34,st.off,40,0.03*1609.34)){
@@ -4402,18 +4425,12 @@ function navRiverGuide(at,acc,st,mps){
       '. Recording continues until you stop it.</div>'+(below?'<div class="sub warn">'+belowTxt+'. Land here; past the take-out the river runs to it.</div>':''),
       '','Take-out reached \u00b7 '+(RUN.b.n||'your take-out'));
     logAct('nav  take-out reached');return true}
-  if(RUN.arrived){
-    if(below&&st.rm>bmi+0.02&&st.rm<below.mi){var dd=below.mi-st.rm,cl=dd<0.1;
-      g.hidden=false;g.innerHTML='<b><span class="arw">'+ic('warn')+'</span>Past the take-out \u2014 '+
-        (cl?'dam just ahead, land now':'dam in '+shortDist(dd)+', land')+(below.n?' \u00b7 '+below.n:'')+'</b>';
-      var bk='below|'+below.mi.toFixed(2)+(cl?'|c':'');
-      if(VOICE.near!==bk){VOICE.near=bk;buzz([200,100,200]);navSay(cl?'Dam just ahead. Land now.':'You are past the take-out. Dam ahead. Land.')}
-      ridePublish()}
-    return true}
+  if(RUN.arrived)return true;
    
   var f=L.c.f,next=null,dam=null;
    
-  for(var i=0;i<f.length;i++){var q=f[i];if((q.k==='dam'?q.mi<=st.rm:q.mi<=st.rm+0.03)||q.mi>bmi+0.02)continue;
+   
+  for(var i=0;i<f.length;i++){var q=f[i];if((q.k==='dam'?q.mi<=st.rm:q.mi<=st.rm+0.03)||q.mi>bmi+(q.k==='dam'?0.05:0.02))continue;
     if(q.k==='dam'&&!dam&&q.mi-st.rm<=3)dam=q;
     if(!next&&(q.k==='access'||q.k==='launch'||q.k==='camp')&&q.mi-st.rm<=5)next=q}
   var up=_rmHist.length>=5&&(_rmHist[0]-_rmHist[_rmHist.length-1])>0.05;
@@ -4569,7 +4586,9 @@ function navGuide(at,acc,mps){
   if(G.arrived)return;
    
   var onAppr=G.loop&&mi(at,G.pts[0])*1609.34<=G.appr+40;
-  if(pr.off>40&&!onAppr){_navOff++}else _navOff=0;
+   
+  var onLeg=offE&&remain<40&&toDest<=offE+60;
+  if(pr.off>40&&!onAppr&&!onLeg){_navOff++}else _navOff=0;
   if(_navOff>=3&&Date.now()-_navReT>20000&&RTO){
     _navReT=Date.now();_navOff=0;
      
@@ -4587,7 +4606,7 @@ function navGuide(at,acc,mps){
    
   var etaMin=navEta(remain,(G.o&&G.o.s)?G.o.s.hrs:null,G.total);
    
-  var togo=remain+offE;
+  var togo=onLeg?toDest:remain+offE;
   HUDG={togo:togo/1609.34,min:etaMin};
   var line1=ni<0
     ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(togo)+' to '+(G.lbl||'destination')+'</b>'+
@@ -4827,7 +4846,7 @@ function startSim(){
   var pts=[];path.forEach(function(e){pts=pts.concat(decode(GR.g[e.i]))});
    
   if(pts.length&&mi(ME,pts[0])>mi(ME,pts[pts.length-1]))pts.reverse();
-  startRecording(pts[0]);ME=pts[0].slice();mM.setLngLat(ME);
+  startRecording(pts[0],true);ME=pts[0].slice();mM.setLngLat(ME);
   lost=false;var i=0;
   setChip('c-ride','stop','Stop',1);
   map.easeTo({center:ME,zoom:14.2,duration:600});
@@ -6320,7 +6339,7 @@ function stSafety(){
   try{
     var c=CTR,pts=[];
     for(var i=0;i<25;i++)pts.push([c[0]+i*0.0008,c[1]+i*0.0005]);
-    startRecording(pts[0]);
+    startRecording(pts[0],true);
     for(var j=1;j<pts.length;j++)record(pts[j]);
     stAdd('SAFETY','breadcrumb',crumbMi>0.5,crumbMi.toFixed(2)+' mi from 25 fixes');
     var straight=mi(pts[0],pts[pts.length-1]);
@@ -7218,10 +7237,10 @@ var RAIL_MANUAL=false;
 var GPS_WAIT='Waiting for a GPS fix';
 function rideWaiting(){return !!(rideMode&&!gotFix&&!riding)}
  
-function truckTxt(d,b,unit){var f=d*5280;
+function truckTxt(d,b,unit,dp){var f=d*5280;
   if(f<60)return 'here';
   if(d<0.1)return Math.round(f/10)*10+' ft '+compass(b);
-  return (d<10?d.toFixed(1):Math.round(d))+(unit?' mi':'')+' '+compass(b)}
+  return (d<10?d.toFixed(dp||1):Math.round(d))+(unit?' mi':'')+' '+compass(b)}
 function railPeekText(){
   if(rideWaiting())return GPS_WAIT+' \u2014 '+(RESUMING?crumbMi.toFixed(1)+' mi recorded, kept':'nothing recorded yet');
    
