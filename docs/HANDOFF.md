@@ -1,4 +1,120 @@
-# HANDOFF — through Take 198 · V3
+# HANDOFF — through Take 199 · V3
+
+## Take 199 — 2026-11-18 — Resume never stops a running ride (A283); slow GPS answers stay out of what the rider moved on to (A284); no hidden GPS watch (A285); away fixes, failed HD saves and failed saved routes stop opening the drawer or claiming success (A286–A288); DNR boat launches designed (A290)
+
+RECORDED FIRST. The maintainer, 2026-11-18: "build take 198 - potentially
+199 and 200 … work until my usage is up", and "ensure you continue
+afterwards automatically". Built while take 198's CI ran, and rebased onto main 94dfb30 (take 198).
+
+Where the take came from: a cold audit of src/app.html for defects a rider
+would hit (a subagent, read-only, 8 findings, each traced through callers
+and callees; the pattern it hunted was take 198's A279 and A281). Each
+finding was read again here before it was fixed, and each fix has a check
+that fails on a mutant of the built app with that fix taken out.
+
+Take 198's CI, recorded here (PR #15, PROVEN from its logs): three rounds,
+every one cold ("Cache not found" for every key; main last saved ten days
+before, and a failed job saves nothing). Round 1 (run 131) failed
+check_offline: maplibre-gl@5 now resolved to 5.24.1 (landmine 265). Round 2
+(run 132, pipeline 1,917 s) failed check_provision on the pin's own comment
+naming that host. Round 3 (run 133): bundle 66 min, apk green; merged as
+94dfb30. Each red round cost about an hour: the CI fix should have had the
+37 no-pipeline gate checks run on it before it went up.
+
+A283 — the Resume card stopped a running ride. Shown 3.2 s after load with
+no check for a ride; its Resume clicked the Ride chip, which stops a ride
+already running, and Stop ended the saved trip. A take-189 check held only
+the card's words after that stop (landmine 266). Now: a ride with its first
+fix has saved its own trip over the earlier one, and nothing is offered; a
+ride still waiting for its first fix is offered the earlier trip quietly
+(the peek line, not the drawer), and its Resume continues that trip from
+the first fix without pressing Ride.
+
+A284 — slow GPS answers. Set home's My location cleared a route planned
+while it waited, and Locate's late "No new GPS fix" opened the drawer over
+a ride. show() and ack() now count every card the rider caused (a status
+card written by itself, showQuiet, does not); locateOnce takes a mark and
+drops its caller's answer when such a card was written since, the drawer
+was folded or a ride started or stopped.
+
+A285 — Locate's hidden watch. With no fix yet, Locate also triggered
+MapLibre's hidden GeolocateControl 1.2 s later, whose watch only another
+trigger closes (the vendored maplibre-gl read): a high-accuracy watch for
+the rest of the session. Locate now uses only the app's own one-off watch
+and flies when it lands; an error (permission off) and a 25 s timeout are
+said apart. The startup locate no longer takes the permission result as
+its callback.
+
+A286 — a one-off fix outside the region opened the drawer before the quiet
+away card (take 112's report). A287 — an HD save failing out of view wrote
+its card over the map or a ride; now a toast. A288 — a saved route that no
+longer routes re-selected and flew to the route planned before and claimed
+it had been routed again.
+
+A289 (OPEN, INFERRED): opening a saved route moves the start pin while GPS
+drives it; the behaviour is the maintainer's to choose.
+
+A290 (DESIGNED, waits for the maintainer): the DNR's Boating Access Sites
+layer, measured here (1,203 sites; lanes, trailer parking, Great Lakes
+access, Recreation Passport, open or closed), as the authoritative launches
+A139 and A146 left open, with a rule for MAJOR and two questions.
+
+The review of takes 199 and 200 (a subagent's cold read of the diff, 6
+findings; for take 199: 3, all fixed):
+- A283's first build dropped the offer over a running ride, and the new
+  ride then overwrote the saved trip: nothing was left to resume. It offers
+  quietly to a ride still waiting for its first fix now, and the drill
+  rides a trip, relaunches, presses Ride first and resumes;
+- showQuiet counted as the rider moving on, so one locate's away card
+  dropped Set home's answer; it is ack() that counts now, and the A284 drill
+  plants that case;
+- Locate said "No GPS fix in 25 s" for an immediate error; the two are said
+  apart.
+
+What I got wrong:
+- the three above, each found by the review, not by me;
+- the rewritten F17 check first asserted a word an earlier drill had left
+  in the panel.
+
+Verified here (Chrome 138; the bundle of main's newest green run):
+- smoke, all five passes PASSED on the final build: 305 / 214 / 54 ok,
+  fatal 6, dead 33;
+- render: the full run PASSED before the review's fixes (686 ok);
+  `--only=nav,tools` PASSED after them (the Resume card through its button,
+  the trip back whole after the app is gone);
+- render `--only=imagery` PASSED with A287, and its mutant failed it;
+- 10 mutants of the built app, each failing its own check: the card guard,
+  the handler guard, cardStill always true, take 198's 1.2 s trigger (in the
+  no-receiver pass), classifyFix loud, the svOpen re-select, the HD failure
+  card, the waiting-ride resume removed, the offer refused to a waiting
+  ride, a status card counted;
+- the 37 gate checks that need no pipeline output PASSED.
+UNKNOWN until the phone: the quiet offer's peek line on the Fold, and
+Locate's single watch in the field.
+
+After the seal (2026-11-18, before the merge): main's take 198 build (run
+134, cold) failed in the render. The water labels read 0 of 12,803 after
+one fixed 2.4 s idle, then the heavy tail's fresh browser could not load
+the page in 60 s ("Navigation timeout of 60000 ms exceeded"). Re-run once
+(take 195's run 120 precedent): the render passed (685 green) and the
+palette verifier then could not load its page in 120 s. The same code
+passed on PR runs 133 and 136, whose palette step took about 40 s, page
+load included. INFERRED: main's runners after a cold build were slow to
+serve the 257 MB bundle; UNKNOWN whether a request hung. Take 198 has no
+green build of main, so no release and no tag of its own (the tag workflow
+tags only a commit with one); its code ships in take 199's release.
+This take carries the fix (landmine 256's corollary):
+- every page load the gate makes (render's two, the palette verifier's)
+  waits up to 180 s and says how long it took; with no network quiet it
+  names the requests still open and goes on only if the app came up;
+- the water labels are read until placed, to a 20 s ceiling;
+- the gate gives the palette verifier 600 s (it had 300, less than a slow
+  load and the wait after it).
+Verified here: `--only=labels` PASSED (load 13.0 s); with the ceiling cut
+to 1 ms it said so and went on once the app was up (36.6 s); with the app
+planted dead it said "never came up" and failed; a copy whose water labels
+never draw failed after 19 reads in 20.8 s; the palette verifier PASSED
+(load 13.1 s); the 37 no-pipeline gate checks PASSED.
 
 ## Take 198 — 2026-11-18 — Back before the HD card lands folds and stays folded (A279); HD stats stop reading every saved tile (A281); stale agenda headings corrected (A282)
 

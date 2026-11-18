@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 198.* Ranked by blocking-ness, not by interest.
+*Current as of take 199.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -5949,3 +5949,153 @@ still open. A117's heading named the maintainer; it says "the maintainer".
 - **Ruled out:** rewriting the bodies. They are the record of what was
   proposed; the heading is the status.
 
+## A283 — The Resume card stops a ride already running and ends the saved trip · FOUND take 198 (the cold audit, code read) · BUILT take 199
+`tripResumeCard` is shown 3.2 s after the map loads with no check for a
+ride, and its Resume calls tripResume and then clicks the Ride chip, which
+STOPS a running ride (`if(rideMode)return stopReal()`), and Stop ends the
+saved trip. A ride pressed before the offer came up, or from the Ride tab
+while the card waited, met it: the ride stopped, the resumable trip was
+lost, and the card had opened the drawer over the ride (landmine 135). A
+take-189 smoke check held only the words of the card after that stop (F17's
+hold), so the stop itself passed as behaviour (landmine 265).
+- **Built, take 199:** a ride with its first fix has saved its own trip
+  over the earlier one (tripSave forces the first fix): nothing is offered,
+  and a Resume on a card shown before says so. A ride still waiting for its
+  first fix has saved nothing: the earlier trip is offered quietly (the
+  peek line, not the drawer, landmine 135), and its Resume continues the
+  trip from the first fix without pressing Ride. The first build dropped
+  the offer over any ride, and the new ride then overwrote the trip (the
+  review of takes 199 and 200).
+- Held by smoke 9o (a trip ridden and saved, a relaunch, Ride pressed
+  first, the quiet offer, Resume, a fix: riding on, the saved track carried
+  on) and the rewritten F17 check (a ride with its first fix is offered
+  nothing and rides on). Each judge rejects take 198's outcome and the
+  first build's; three mutants fail them.
+- **Ruled out:** merging two trips once the new ride has recorded (two
+  tracks, two clocks, one truck); the rider started a new ride on purpose.
+
+## A284 — A slow GPS answer writes over what the rider moved on to · FOUND take 198 (the cold audit, code read) · BUILT take 199
+Set home → My location waits up to 25 s for a fix, then sets home, clears
+the route and writes "Home is where you are" through show(). A rider who
+planned a route, or started a ride on one, while it waited lost the route;
+mid-ride the next fix cleared guidance. Locate with an old fix waits the
+same way and wrote "No new GPS fix" over whatever came after, mid-ride too.
+- **Built, take 199:** a card mark. show() and ack() count every card the
+  rider caused (CARDN; a status card written by itself, showQuiet, does not:
+  one locate's away card dropped Set home's answer in the first build);
+  `cardMark()` records the count, whether the drawer is up and whether a
+  ride runs; `cardStill(mark)` is true only if no card was written
+  since, the drawer was not folded and no ride started or stopped.
+  locateOnce takes a mark and drops its caller's answer when the rider has
+  moved on (the fix itself still lands: YOU, ME, the marker). Set home's My
+  location and both Locate paths pass one.
+- Held by smoke 9o: the fix after a route was planned leaves the route
+  cards and sets no home; with nothing done meanwhile it sets home as
+  asked. A mutant whose cardStill is always true fails it.
+- **Ruled out:** a timer that ignores the answer after N seconds; the
+  question is whether the rider moved on, not how long it took.
+
+## A285 — Locate starts MapLibre's hidden geolocate watch, and nothing stops it · FOUND take 198 (the cold audit; the vendored MapLibre read) · BUILT take 199
+With no fix yet this session, Locate called locateOnce() and, 1.2 s later,
+`geo.trigger()` on MapLibre's GeolocateControl, which is hidden by CSS. In
+the vendored maplibre-gl, trigger() from OFF goes to WAITING_ACTIVE and
+opens navigator.geolocation.watchPosition with trackUserLocation; only
+another trigger() closes it, and a later Locate flew to the fix without
+one. A high-accuracy watch ran for the rest of the session, off rides too,
+and the rider could neither see nor stop it (PROVEN by reading both; the
+battery cost INFERRED).
+- **Built, take 199:** Locate's cold path is the app's own one-off watch;
+  the map flies when it lands; no receiver, an error (permission off) and
+  no fix in 25 s are each said. geo.trigger() is never called.
+  The startup locate is called with no callback (handed to then(), it took
+  the permission result as one).
+- Held by smoke 9o: the GeolocateControl stub counts trigger() calls; Locate
+  makes none, in the default pass and in the no-receiver pass. A mutant
+  with take 198's 1.2 s trigger fails it in the no-receiver pass.
+- **Ruled out:** keeping MapLibre's control and calling trigger() again to
+  close it on the fix: its states (BACKGROUND, ACTIVE_LOCK) also move the
+  camera and draw its own dot; one watch of the app's own is the path the
+  self-test proves on the Fold.
+
+## A286 — A one-off fix outside the region opens the drawer · FOUND take 198 (the cold audit, code read) · BUILT take 199
+locateOnce's fix ran classifyFix, which writes the away card through show()
+(railSet(true), sheetExit) before showAway writes it quietly. The startup
+fix of an app opened outside the region opened the drawer over the map or
+the first-run tour, the report take 112's showQuiet was built for.
+- **Built, take 199:** classifyFix(at, quiet): locateOnce asks for quiet
+  and showAway says it on the peek line. A ride's fixes keep the card (a
+  ride outside the region must be told to press Ride it again).
+- Held by smoke 9o: the drawer folded, a one-off fix outside the region:
+  the away text is written, the drawer stays folded. A mutant fails it.
+- **Ruled out:** dropping the away card from a ride's fixes too: a ride that
+  leaves the region must be told, and its card says to press Ride it again.
+
+## A287 — An HD save that fails writes its card over whatever the rider is doing · FOUND take 198 (the cold audit, code read) · BUILT take 199
+startHDSave's failure path wrote "Download stopped: …" through show():
+the drawer opened over the map or a ride and any sheet ended. The success
+path already went through hdEnded and hdSeen().
+- **Built, take 199:** the card only when the HD card is what the rider is
+  looking at (hdSeen, inside its tool); otherwise a toast, "HD download
+  stopped (…). Saved tiles are kept."
+- Held by render's A287 drill (section imagery): every fetch refused, the
+  drawer folded: the toast is up, the drawer folded, no card. A mutant with
+  take 198's show() fails it.
+- **Ruled out:** no word at all when the HD card is out of view; a save that
+  stopped is news the rider needs, said where it does not take the screen.
+
+## A288 — A saved route that no longer routes re-selects the route planned before and says it was routed again · FOUND take 198 (the cold audit, code read) · BUILT take 199
+svOpen calls routeToPoint and, 80 ms later, svPrefer and the "routed again
+on the current data" note. When routing failed, svPrefer re-selected and
+flew to the previous route (`last`), and the note sat under "No legal
+route".
+- **Built, take 199:** the reselection and the note follow only a route
+  this open planned (`last` changed and is not empty).
+- Held by smoke 9o: a route planned, then a saved route that cannot route
+  (a kayak is legal on no land class) on a rebuilt bundle: the failure is
+  said, no "routed again", no fitBounds. A mutant fails it.
+- **Ruled out:** putting the start pin and machine back after a failed open;
+  the card says the saved route no longer routes, and the rider decides.
+
+## A289 — Opening a saved route moves the start pin while GPS drives it · FOUND take 198 (the cold audit, INFERRED) · OPEN
+svOpen sets ME to the saved start with no meDriven() check (Start from my
+position refuses then). While the startup locate is pending or during a
+ride, the next fix moves the start away from the route just planned.
+INFERRED from the code, not reproduced; the right behaviour (plan from the
+live position, or refuse as c-me does) is the maintainer's to choose.
+- **Ruled out:** choosing for the maintainer; both answers change what a
+  saved route means while riding.
+
+## A290 — DNR Boating Access Sites: the state's own launches, with what a trailer needs · DESIGNED take 199 (measured 2026-11-18) · waits for the maintainer
+A139 (the major Great Lakes launches) and A146 (missing launches) both left
+the source open; A136's water step named "DNR BAS". Measured here (PROVEN,
+2026-11-18, the DNR's public feature service "PRD Boating Access Sites",
+services3.arcgis.com/Jdnp1TjADvSDxMAX/.../PRDBASPublicView/FeatureServer/0,
+reachable from the cloud session):
+- 1,203 sites: 798 on inland lakes, 315 on rivers and streams, 90 on the
+  Great Lakes; 140 within 2 miles of Great Lakes access (119 within 0.5 mi);
+- launch_status Open 1,167, Closed 8, unset 28;
+- Recreation Passport required at 977, not at 151, unset 75;
+- lanes: 0 at 200 (carry-down), 1 at 732, 2+ at 249; trailer parking 20+
+  at 226 sites, 50+ at 75;
+- fields also carry waterbody, county, toilets (flush, vault), the ramp,
+  courtesy piers and accessibility features.
+What it would add, the design to approve or change:
+1. tools/poi.py ingests the layer as AUTHORITATIVE launches (like the
+   scramble areas): a DNR site replaces the OSM slipway within ~150 m of it,
+   and an OSM slipway with no DNR site stays (the take-121 rule).
+2. The card says what a rider towing a boat needs, from the DNR's own
+   fields only: "Boat launch (DNR) · 2 lanes · 48 trailer spaces · flush
+   toilets · Recreation Passport required" and the water body; a Closed
+   site says Closed and is not offered as a destination.
+3. MAJOR (A139's word, the maintainer's): a Great Lakes access site, or 2+
+   lanes, or 50+ trailer spaces, drawn in the destination tier from about
+   10 mi out (A143); the rest in the service tier.
+4. The Data sources row and the store listing gain it through the one table
+   (A280), and check_sources_credited holds it.
+- **Questions for the maintainer:** is MAJOR right (about 300 sites by
+  that rule)? Should carry-down sites (0 lanes, 200 of them, kayak drops)
+  read "Carry-down launch" and show in Water and Outdoors only?
+- **Ruled out:** the 2015 "Michigan Public Boating Access Sites" layer
+  (retired) and university mirrors of MRBIS (copies that lag).
+- **Ruled out:** a time to launch or fees beyond the Passport flag; the layer
+  does not say them.

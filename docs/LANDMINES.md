@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 198.*
+*Current as of take 199.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -175,6 +175,7 @@ Start here. Do not read top to bottom.
 | A mutant that removes a trace's record still passes: something else records it by accident | 263 |
 | A drill reads that something landed (or a timing of 0 ms) before it could have: it counted elements the rider cannot see | 264 |
 | The gate fails on code nobody changed: a file fetched at build time by a version range changed underneath | 265 |
+| A check passes while the product does the wrong thing: it judges the words said after the action, not the action | 266 |
 
 ---
 
@@ -3431,6 +3432,17 @@ made — here, that no drawn stack still holds a place the model says is
 alone — and waits for it, with a ceiling that only answers a frame that
 never comes.
 
+**Corollary (take 199) — a page load is a frame too.** Main's take 198
+build (run 134) and take 195's (run 120) died at the render's 60 s
+navigation ceiling after a cold build, run 134 having first read 0 water
+labels after one fixed 2.4 s idle, and run 134's re-run died at the
+palette verifier's 120 s; other runs of the same code passed. A ceiling
+sized for a quiet machine is a fixed ceiling. Every page load the gate
+makes waits up to 180 s, says how long it took, and with no network quiet
+names the requests still open and goes on only if the app came up; the
+water labels are read until placed, to a 20 s ceiling that only a layer
+that never draws reaches.
+
 **257. A cloud session's git can push its branch, not a tag.** Takes 185
 to 189 were tagged by the sessions on the workstation, with the
 maintainer's own git; he never ran a tag command. On 2026-11-02 this cloud
@@ -3535,3 +3547,13 @@ www/vendor). The licence check pinned 5.24.0's LICENSE by hash while the
 code itself floated. Rule: every file fetched at build time names an exact
 version and is held to its hash; moving it is a take of its own, its hash
 and every pin that names its version moved together.
+
+**266. A check that holds the words around a wrong action makes the action
+behaviour.** Take 189's review found that the Resume card's Ride press
+STOPS a ride already running, and wrote a smoke check that held only what
+the card said afterwards (no "Trip resumed" over a stopped ride). The stop
+itself, and the saved trip it ended, then passed every build until take
+198's audit read the code (A283). The check was green because it asked
+the wrong question. Rule: when a review finds an action doing the wrong
+thing, the check holds the action (the ride rides on, the trip is kept),
+and the words are a second assertion, never the only one.

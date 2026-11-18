@@ -54,7 +54,26 @@ page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text(
 page.on("requestfailed", (r) => consoleErrors.push("REQFAIL " + r.url().slice(-60)));
 await page.setViewport({ width: 412, height: 915, deviceScaleFactor: 2.6 });
 // an explicit limit: Chrome's 30 s default left about 1.3-1.9x over run 90's load (INFERRED; landmine 235)
-await page.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: "networkidle0", timeout: 120000 });
+/* take 199 · 180 s, the time it took said, and with no network quiet the
+   requests still open are named and the run goes on only if the app came
+   up: main's take 198 re-run (run 134) died here at 120 s, the render
+   before it having passed on the same runner (landmine 256's corollary) */
+{
+  const t0 = Date.now(), open = new Map();
+  page.on("request", (r) => open.set(r, 1)); page.on("requestfinished", (r) => open.delete(r)); page.on("requestfailed", (r) => open.delete(r));
+  try {
+    await page.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: "networkidle0", timeout: 180000 });
+    console.log(`  (palette: the page loaded in ${Date.now() - t0} ms)`);
+  } catch (e) {
+    if (!/timeout/i.test(String((e && e.message) || e))) throw e;
+    const still = [...open.keys()].map((r) => r.url().replace(/^https?:\/\/127\.0\.0\.1:\d+\//, "")).slice(0, 8);
+    const up = await page.waitForFunction(() => window.map && window.map.loaded && window.map.loaded(), { timeout: 120000 })
+      .then(() => true, () => false);
+    console.log(`  (palette: no network quiet in 180 s; ${open.size} request(s) still open: ${still.join(", ") || "none"}; `
+      + `the app ${up ? "is up, so the check goes on" : "never came up"}, ${Date.now() - t0} ms)`);
+    if (!up) throw e;
+  }
+}
 /* Poll for the map to APPEAR and then to load. `networkidle0` fires before the
    app has finished reading its bundle, so window.map does not exist yet — my
    first version assumed it did and threw, accusing a perfectly good page

@@ -1204,7 +1204,7 @@
        hidden, so every diagnostic that writes to them still works and the
        self-test still reports them; About shows them on demand. -->
   <div id="bar" hidden>
-    <span id="title"><b>APEX</b> ORV · Take 198</span>
+    <span id="title"><b>APEX</b> ORV · Take 199</span>
     <span class="badge" id="b-net">NET —</span>
     <span class="badge" id="b-src">GRAPH —</span>
   </div>
@@ -4305,14 +4305,14 @@ function homeCard(prefix){
           'The hit you tap becomes home.'});
         arm='homeaddr';syncArm();return}
       /* my location: one fix through the watch that demonstrably works */
-      show('Waiting for a GPS fix…','');
+      show('Waiting for a GPS fix…','');var wm=cardMark();
       locateOnce(function(at,why){
         if(!at)return show(why==='none'
           ?'<b>This phone reports no GPS receiver.</b> Set home by address or by a tap on the map.'
           :'<b>No GPS fix in 25 s.</b> Try outside, or set home another way.','');
         HOME=at.slice();homeSave();homeMark();clearRoute();syncSafety();
         show('<b>Home is where you are.</b> Press and hold where you want to go and tap '+
-          '<b>Route here</b>.','')})})})}
+          '<b>Route here</b>.','')},null,wm)})})}
 el('c-home').addEventListener('click',function(){
   if(arm==='home'||arm==='homeaddr'){arm=null;syncArm();return ack('Cancelled.')}
   homeCard('')});
@@ -4844,8 +4844,13 @@ function svOpen(rec){
       presentRoutes(out);svPrefer(rec.p)},30);
     return}
   if(!rec.t)return show('<b>'+rec.n+'</b> has no destination saved.','fail');
+  /* take 199 · A288 · only a route that was planned is re-selected and
+     noted: after a failed reroute this re-selected and flew to the route
+     planned before, and added "routed again on the current data" under "No
+     legal route" */
+  var prev=last;
   routeToPoint(rec.t,rec.lbl||'there');
-  setTimeout(function(){svPrefer(rec.p);if(note)el('panel').innerHTML+=note},80)}
+  setTimeout(function(){if(!last||last===prev)return;svPrefer(rec.p);if(note)el('panel').innerHTML+=note},80)}
 
 function svPrefer(k){
   /* reselect the profile the route was saved with, if it still exists */
@@ -7039,14 +7044,33 @@ function tripResume(t){
     return true}catch(e){show('Could not resume the trip: '+e,'fail');return false}}
 function tripResumeCard(){
   var t=tripLoad();if(!t)return false;
+  /* take 199 · A283 · the offer over a ride already running. Until take 198
+     its card opened the drawer over the ride (landmine 135), and its Resume
+     clicked the Ride chip, which STOPS a running ride and ended the saved
+     trip. A ride with its first fix has saved its own trip over this one
+     (tripSave forces the first fix): nothing is left to offer. A ride still
+     waiting for its first fix has saved nothing: the earlier trip is
+     offered quietly (the peek line, not the drawer), and its Resume
+     continues it from that first fix without pressing Ride (the take-198
+     review: dropping the offer let the new ride overwrite the trip) */
+  if((rideMode&&gotFix)||riding)return false;
+  var wait=rideWaiting();
   var when=new Date(t.startedAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
-  show('<b>Resume your trip?</b><div class="sub">Started '+when+' \u00b7 '+
+  (wait?function(h){rideCard(h,'','Resume the trip from '+when+'? Open the drawer')}:function(h){show(h,'')})('<b>Resume your trip?</b><div class="sub">Started '+when+' \u00b7 '+
     (t.crumbMi||0).toFixed(1)+' mi recorded'+(t.lbl?' \u00b7 heading to '+t.lbl:'')+
     (t.run?' \u00b7 a run on the '+t.run.riv:'')+
     '. The app closed mid-trip; everything up to the last fix is still here.</div>'+
     '<button class="chip" id="trip-resume">'+ic('ride')+'<span>Resume</span></button> '+
-    '<button class="chip" id="trip-discard">'+ic('del')+'<span>Discard</span></button>','');
+    '<button class="chip" id="trip-discard">'+ic('del')+'<span>Discard</span></button>');
   el('trip-resume').addEventListener('click',function(){
+    /* take 199 · A283 · a ride that started while the card was up: still
+       waiting for its first fix, it continues the earlier trip from that
+       fix; already recording, the earlier trip has been replaced by it */
+    if((rideMode&&gotFix)||riding){logAct('act  trip resume refused: this ride is recording');
+      return ack('This ride has its first fix and records on its own; the earlier trip was replaced by it.')}
+    if(rideWaiting()){if(tripResume(t)){logAct('act  trip resumed into the waiting ride');
+      rideCard('<b>Trip resumed</b><div class="sub">Recording continues from the next GPS fix; the '+
+        crumbMi.toFixed(1)+' mi recorded are kept.</div>','',railPeekText())}return}
     /* take 188 · A223 · a refused start keeps its own card */
     /* take 189 · cold audit · nothing records before the first fix
        (startRecording runs on it): while the GPS waits the card and the
@@ -7650,11 +7674,14 @@ function meNoun(own){var k=meIs();
     {sim:'the simulated position',away:'the planning start',pin:'the start pin'}[k]}
 function inRegion(at){var b=BUNDLE.bbox;if(!b)return true;
   return at[0]>=b[0]-0.02&&at[0]<=b[2]+0.02&&at[1]>=b[1]-0.02&&at[1]<=b[3]+0.02}
-function classifyFix(at){
+function classifyFix(at,quiet){
   logAct('gps  fix '+at[1].toFixed(5)+','+at[0].toFixed(5));
   if(inRegion(at)){posMode='gps';awayMi=0;bootEase(at);return}
   posMode='away';awayMi=mi(at,CTR);
-  show(awayHtml(!!rideMode),'')}
+  /* take 199 · A286 · a one-off fix (locateOnce) says it through showAway,
+     quietly: this card opened the drawer first, over the map and the first
+     run's tour, which take 112's showQuiet exists to prevent */
+  if(!quiet)show(awayHtml(!!rideMode),'')}
 /* review of the audit fixes · "stay off until you are in the region"
    promised live tracking comes back by itself; nothing reopens a watch, so
    a ride that meets this fix is told to press Ride it again */
@@ -8122,8 +8149,15 @@ function startHDSave(tiles,label){
   hdChipTxt('HD 0%');
   HDDL.save(tiles,function(d,t){hdChipTxt('HD '+Math.round(d/Math.max(1,t)*100)+'%');hdLive()},label)
     .then(function(r){hdChip();refreshSat();
-      if(r&&r.error)return show('<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
-        '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');
+      /* take 199 · A287 · a save fails wherever the rider is (it ran on
+         camp wifi, they rode out of it): the card when the HD card is what
+         they are looking at, inside its tool; otherwise a toast. The card
+         opened the drawer over the map or a ride and ended any sheet */
+      if(r&&r.error){
+        if(hdSeen())return toolShow('c-hdmanage','<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
+          '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');
+        logAct('act  HD save stopped out of view: '+r.error);
+        return toast('HD download stopped ('+r.error+'). Saved tiles are kept.',4000)}
       hdEnded(r)})}
 /* take 179 · A190 H2 · the three tiers, quoted from the bundle's own rings
    and the per-zoom sizes measured in 178. Each is a polygon, never a box:
@@ -9225,6 +9259,8 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
     window.__netLo={n:NETLO.length,ms:NETLO_MS,err:NETLO_ERR,z:NETLO_Z,edges:nf2.length,cls:NETLO_CLS.slice(),
       skip:Object.keys(NETLO_SKIP),layers:Object.keys(NETFT)};
     window.__hd=HD;window.__hdStore=hdStore;
+    /* take 199 · A284–A288 · the one-off locate and a saved route's open, for the drills */
+    window.__locateOnce=locateOnce;window.__svOpen=svOpen;window.__cardn=function(){return CARDN};
     /* take 145 · app.js is wrapped (the take-127 lesson): nothing reaches
        window unless placed there. The drill drives the save loop through
        these. */
@@ -10613,7 +10649,10 @@ map.on('load',function(){makeBadges();setBasemap(bmi);wpDraw();showTab('map');
   railSet(false);buildActPanel();actLabel();
   setTimeout(renderHealth,1800);
   var C=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.Geolocation;
-  if(C){try{C.requestPermissions().then(locateOnce).catch(locateOnce)}catch(e){locateOnce()}}
+  /* take 199 · A285 · the startup locate is called with nothing: handed to
+     then() it took the permission result as its callback, and threw inside
+     its try at every fix */
+  if(C){try{C.requestPermissions().then(function(){locateOnce()}).catch(function(){locateOnce()})}catch(e){locateOnce()}}
   else locateOnce()});
 
 /* One fix at startup. The app used to learn where you were only when you tapped
@@ -10621,7 +10660,7 @@ map.on('load',function(){makeBadges();setBasemap(bmi);wpDraw();showTab('map');
    nothing (take 27 field report). Knowing early costs one fix and changes the
    whole first screen. */
 var YOU=null,YOU_T=0,youM=null,LOCATE_N=0,LOCATE_MS=25000;
-function locateOnce(cb,ms){
+function locateOnce(cb,ms,mark){
   /* take 190 · A260 · a caller may give its own limit (Mark this spot: 30 s,
      the maintainer, 2026-10-02); the rest keep 25 s */
   ms=ms||LOCATE_MS;
@@ -10634,7 +10673,7 @@ function locateOnce(cb,ms){
     YOU=at.slice();YOU_T=Date.now();
     if(!youM){var d=mk('you');youM=new maplibregl.Marker({element:d}).setLngLat(YOU).addTo(map)}
     else youM.setLngLat(YOU);
-    classifyFix(at);
+    classifyFix(at,true);
     if(posMode==='away')showAway(acc); else{posMode='gps';ME=at.slice();mM.setLngLat(ME);meFix(ME);paint();syncSafety()}
     drawCoverage();
     if(cb)try{cb(at)}catch(e){}};
@@ -10643,10 +10682,14 @@ function locateOnce(cb,ms){
      on the first fix at the same 25 s, so the native watch ends too */
   var done=false,h=null,counted=false,
       fin=function(){if(counted){counted=false;LOCATE_N--}gpsClear(h)};
+  /* take 199 · A284 · a caller's mark: its answer is dropped when the rider
+     has moved on (the fix itself still lands: YOU, ME and the marker) */
+  var keep=function(){return cardStill(mark)};
   h=gpsWatch(function(at){
     if(done)return; done=true;
+    var k=keep();if(!k)cb=null;
     fin();handle(at,null);
-  },function(){ if(!done){done=true; fin(); if(cb)try{cb(null,'error')}catch(e){}} },ms);
+  },function(){ if(!done){done=true; fin(); if(cb&&keep())try{cb(null,'error')}catch(e){}} },ms);
   if(!h){if(done)return;if(cb)try{cb(null,'none')}catch(e){};return}   /* no receiver at all: say so, not "no fix" */
   /* (a driver that answered inside gpsWatch, before the handle existed,
      left nothing for fin to close: close it here) */
@@ -10654,7 +10697,7 @@ function locateOnce(cb,ms){
   /* Give up quietly after 25s rather than holding the receiver open — and
      tell a caller that asked (take 186: Set home → my location). */
   setTimeout(function(){ if(!done){done=true; fin();
-    if(cb)try{cb(null,'timeout')}catch(e){} } },ms);
+    if(cb&&keep())try{cb(null,'timeout')}catch(e){} } },ms);
   /* take 190 · A260 · a caller that gives up early (Mark's Cancel) closes the
      watch through the same driver */
   return function(){if(!done){done=true;fin()}}}
@@ -11022,6 +11065,7 @@ function showQuiet(h,peekLine){
    one handle-tap away. Results and anything carrying honesty copy stay
    cards. */
 function ack(h){
+  CARDN++;   /* take 199 · A284 · a rider's acknowledgement counts; a status card (showQuiet) does not */
   showQuiet(h,'');RAIL_MANUAL=false;railSet(false);
   toast(String(h).replace(/<[^>]*>/g,''),2400)}
 
@@ -11029,7 +11073,20 @@ function rideCard(h,s,peekLine){
   if(rideMode||riding){showQuiet(h,peekLine);return}
   show(h,s)}
 
+/* take 199 · A284 · what a slow answer (a GPS fix up to 25 s away) checks
+   before it writes: no card written since it was asked for, the drawer not
+   folded if it was up, and no ride started or stopped. show() and ack()
+   count every card the rider caused; a status card written by itself
+   (showQuiet: an away fix, a ride's own notes) does not, so one locate's
+   away card never cancels another's answer (the take-198 review). Set home's "My location" cleared the route a
+   rider had planned meanwhile, and Locate's late "No new GPS fix" opened the
+   drawer over a ride (the take-198 audit, PROVEN by code read) */
+var CARDN=0;
+function railFolded(){var r=el('rail');return !!(r&&/\bfolded\b/.test(r.className))}
+function cardMark(){return {n:CARDN,up:!railFolded(),ride:rideUp()}}
+function cardStill(m){return !m||(m.n===CARDN&&rideUp()===m.ride&&(!m.up||!railFolded()))}
 function show(h,s){
+  CARDN++;
   /* take 190 · A247 · the card a sheet row asked for opens inside the sheet,
      under the back row; any other card ends the sheet (the tab stays marked) */
   if(SHEET_PENDING&&SHEET.tab){SHEET.tool=SHEET_PENDING;SHEET_PENDING=null;sheetPaint()}
@@ -11068,9 +11125,22 @@ el('c-locate').addEventListener('click',function(){
     return locateOnce(function(at,why){
       if(at){flyToYou();return}
       show('<b>No new GPS fix.</b><br>Your last fix was at '+was+' \u2014 you may have '+
-        'moved since. Try again in the open.','')})}
-  locateOnce();
-  setTimeout(function(){if(!flyToYou())geo.trigger()},1200)});
+        'moved since. Try again in the open.','')},null,cardMark())}
+  /* take 199 · A285 · no fix yet this session: one watch of the app's own,
+     and the map flies when it lands. Until take 198 a second path ran 1.2 s
+     later, MapLibre's hidden geolocate control (geo.trigger()), whose watch
+     only another trigger() closes: it ran for the rest of the session,
+     high accuracy, off rides too (PROVEN, the vendored MapLibre's trigger
+     opens watchPosition with trackUserLocation, and nothing triggered it
+     again) */
+  locateOnce(function(at,why){
+    if(at){flyToYou();return}
+    show(why==='none'?'<b>This phone reports no GPS receiver.</b> Place yourself by hand with '+
+        '<b>Start from my position</b> on the Plan tab.'
+      :why==='error'?'<b>This phone did not give a position.</b> Location permission may be off for APEX. '+
+        'Turn it on, or place yourself by hand with <b>Start from my position</b> on the Plan tab.'
+      :'<b>No GPS fix in 25 s.</b> The sky may be hidden. Try again in the open, '+
+        'or place yourself by hand with <b>Start from my position</b> on the Plan tab.','fail')},null,cardMark())});
 geo.on('error',function(){show('Location unavailable — this phone did not give a position (location permission off, or no fix yet). Place yourself by hand with <b>Start from my position</b> on the Plan tab.','fail')});
 
 /* ── THE PLACE STRIP FOLDS INTO SEARCH (take 113) ─────────────────────────

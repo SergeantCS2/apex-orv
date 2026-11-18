@@ -280,7 +280,34 @@ await page.evaluateOnNewDocument(() => {
 await page.evaluateOnNewDocument(RH);
 await fastAnim(page);
 
-await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle0", timeout: 60000 });
+/* take 199 · the page's load waits up to 180 s, and the log says how long it
+   took. Main's take 198 build died at "Navigation timeout of 60000 ms
+   exceeded" after a cold build (run 134), as take 195's had (run 120), and
+   its re-run at the palette verifier's 120 s; the same code passed on PR
+   runs 133 and 136 (landmine 256's corollary: a ceiling answers only a load
+   that never comes). With no network quiet, the requests still open are
+   named, and the run goes on only if the app came up */
+async function gotoApp(pg, why) {
+  const t0 = Date.now(), open = new Map();
+  const onReq = (r) => open.set(r, Date.now()), onEnd = (r) => open.delete(r);
+  pg.on("request", onReq); pg.on("requestfinished", onEnd); pg.on("requestfailed", onEnd);
+  try {
+    await pg.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle0", timeout: 180000 });
+    console.log(`  (${why}: the page loaded in ${Date.now() - t0} ms)`);
+  } catch (e) {
+    /* no network quiet: say which requests were still open, and go on only
+       if the app itself came up (the map loaded); a page that never comes
+       up still fails the run here */
+    if (!/timeout/i.test(String((e && e.message) || e))) throw e;
+    const still = [...open.keys()].map((r) => r.url().replace(/^https?:\/\/127\.0\.0\.1:\d+\//, "")).slice(0, 8);
+    const up = await pg.waitForFunction(() => window.map && window.map.loaded && window.map.loaded(), { timeout: 120000 })
+      .then(() => true, () => false);
+    console.log(`  (${why}: no network quiet in 180 s; ${open.size} request(s) still open: ${still.join(", ") || "none"}; `
+      + `the app ${up ? "is up, so the run goes on" : "never came up"}, ${Date.now() - t0} ms)`);
+    if (!up) throw e;
+  } finally { pg.off("request", onReq); pg.off("requestfinished", onEnd); pg.off("requestfailed", onEnd); }
+}
+await gotoApp(page, "first load");
 
 /* Take 173 · the run outgrew one page. On a 4 GB box with one worker and no
    GPU, two hundred checks of accumulated state plus the machine-legality
@@ -312,7 +339,7 @@ async function respawn() {
   });
   await page.evaluateOnNewDocument(RH);
   await fastAnim(page);
-  await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle0", timeout: 60000 });
+  await gotoApp(page, "fresh browser");
   await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     for (let i = 0; i < 240; i++) {
@@ -559,7 +586,14 @@ if (zoomed.trails > 0) {
        reading was guaranteed zero regardless of the product (take 87). */
     m.jumpTo({ center: [-84.10916, 44.66529], zoom: 13.2 });
     await window.__rh.idle(m, 2400);
-    const out = { lake: q("lbl-lake"), stream: q("lbl-stream"), srcN, sample };
+    /* take 199 · read until the labels are placed, to a 20 s ceiling: on
+       main's run 134 one fixed 2.4 s idle read 0 of 12,803 on a runner too
+       busy to load a page in 60 s (landmine 256). A layer that never draws
+       still reads 0, 20 s later */
+    const t0w = Date.now(); let wtries = 1;
+    while (srcN > 0 && !q("lbl-lake").length && !q("lbl-stream").length && Date.now() - t0w < 20000) {
+      wtries++; m.triggerRepaint(); await window.__rh.idle(m, 2400); }
+    const out = { lake: q("lbl-lake"), stream: q("lbl-stream"), srcN, sample, wtries, wms: Date.now() - t0w };
     m.jumpTo({ center: [c.lng, c.lat], zoom: 11.4 });
     await window.__rh.idle(m, 1000);
     return out;
@@ -1146,6 +1180,46 @@ if (zoomed.trails > 0) {
        + `key cursors ${a281.a.c["index.openKeyCursor"]}), then 0 after clear; a version-1 store holding 3 tiles upgrades to `
        + `version ${a281.ver.v} with its size index and counts ${a281.u.v.tiles} / ${a281.u.v.bytes} B; the judge rejects `
        + `take 197's getAll, a wrong byte count and a count with no key cursor (${plants.length} plants)`);
+  }
+
+  /* take 199 · A287 · an HD save that fails while the rider is elsewhere
+     (the drawer folded, riding out of the camp's wifi) says so in a toast
+     and leaves the drawer as it was. Until take 198 its card went through
+     show(), which opened the drawer over the map or the ride and ended any
+     sheet. Two failures on one tile stop a save (take 178's rule), so the
+     fetcher refuses every tile. */
+  const a287 = await page.evaluate(async () => {
+    const S = window.__sat, H = window.__hd, D = window.HDDL;
+    if (!S || !H || !D || typeof window.__hdSave !== "function") return { missing: true };
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const boxes = (S.tiles.boxes || []).filter((b) => b[0] === 13);
+    const b13 = boxes[0] || [13, 4000, 3000, 4001, 3001];
+    let ox = b13[3] + 5, oy = b13[2], guard = 0;
+    while (S.inPatch(13, ox, oy) && guard++ < 200) ox += 11;
+    const n = 8192, inv = (x, y) => [x / n * 360 - 180, Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI];
+    const a = inv(ox + 0.05, oy + 0.05), c = inv(ox + 0.95, oy + 0.95);
+    const tiles = D.plan([a[0], c[1], c[0], a[1]]);
+    const f0 = D.fetchTile; await H.clear();
+    D.fetchTile = () => Promise.reject(new Error("HTTP 503"));
+    try { window.__sheet.exit(); } catch (e) {}
+    document.querySelector('#tabs .tab[data-go="map"]').click(); await sleep(250);
+    window.railSet(false); await sleep(400);
+    const rail = document.getElementById("rail"), t = document.getElementById("toast");
+    const before = /\bfolded\b/.test(rail.className);
+    window.__hdSave(tiles, "this view");
+    for (let k = 0; k < 300 && D.busy(); k++) await sleep(50);
+    await sleep(200);
+    const out = { before, busy: D.busy(), folded: /\bfolded\b/.test(rail.className),
+      toast: t && !t.hidden ? t.textContent : "", card: /Download stopped/.test(document.getElementById("panel").innerHTML) };
+    D.fetchTile = f0; await H.clear(); try { window.__hdChip(); } catch (e) {}
+    return out;
+  });
+  if (a287.missing) ok(false, "A287 · the HD save hooks are missing (window.__hdSave, HDDL)");
+  else {
+    const failOk = (x) => x.before && !x.busy && x.folded && /HD download stopped/.test(x.toast) && /Saved tiles are kept/.test(x.toast) && !x.card;
+    ok(failOk(a287) && !failOk({ ...a287, folded: false, card: true }) && !failOk({ ...a287, toast: "" }),
+       `A287 · an HD save that fails with the drawer folded says so in a toast ("${a287.toast}") and leaves the drawer folded `
+       + `(${JSON.stringify({ folded: a287.folded, card: a287.card })}); the judge rejects take 198's card over the map, and silence`);
   }
 
   /* Take 145 · the HD chip and the save loop (A160). The fetcher seam is
@@ -5151,7 +5225,7 @@ if (zoomed.trails > 0) {
   const names = [...new Set([...wl.lake, ...wl.stream])];
   ok(names.length > 0,
      `water is named on the map: ${names.length} label(s) of ${wl.srcN} in the `
-     + `source — ${names.slice(0, 4).join(", ") || "(none rendered) " + (wl.sample || "")}`);
+     + `source (read ${wl.wtries || 1} time${wl.wtries > 1 ? "s" : ""}, ${wl.wms || 0} ms) — ${names.slice(0, 4).join(", ") || "(none rendered) " + (wl.sample || "")}`);
   const iRef = order.indexOf("lbl-ref");
   ok(iTrail >= 0 && iLake > iTrail && iStream > iTrail && iRef > iTrail,
      `trail names outrank everything added since (lbl-trail ${iTrail}, `
