@@ -2180,6 +2180,8 @@ function gridRings(ll,idx,visit,maxR){
     if(visit.done(r))return}}
  
 function ringMi(r){return Math.max(0,r-0.5)*GCS*0.714*69}
+ 
+function ringMiSafe(r){return Math.max(0,r-1)*GCS*0.66*69}
 
 function nearestNode(ll){
   var G=gridBuild(), best=1e18,bi=-1;
@@ -3534,7 +3536,7 @@ function nearestPavement(ll){
     for(var j=0;j<list.length;j++){var i=list[j];if(seen[i])continue;seen[i]=1;
       var e=EDGES[i];if(e.c!=='paved'&&e.c!=='minor')continue;
       var lp=linePt(ll,decode(GR.g[i]));if(lp.d<best){best=lp.d;bp=lp.p;be=e}}};
-  visit.done=function(r){return be!==null&&ringMi(r+1)>best};
+  visit.done=function(r){return be!==null&&ringMiSafe(r+1)>best};
   gridRings(ll,G.edges,visit,400);
   if(be)return {p:bp,d:best,e:be};
   best=1e9;
@@ -3947,7 +3949,7 @@ function nearestEdge(ll){
   var visit=function(list){
     for(var j=0;j<list.length;j++){var i=list[j];if(seen[i])continue;seen[i]=1;
       var lp=linePt(ll,decode(GR.g[i]));if(lp.d<best){best=lp.d;be=EDGES[i]}}};
-  visit.done=function(r){return be!==null&&ringMi(r+1)>best};
+  visit.done=function(r){return be!==null&&ringMiSafe(r+1)>best};
   gridRings(ll,G.edges,visit,400);
   return be?{e:be,d:best}:nearestEdge_linear(ll)}
 function nearestEdge_linear(ll){

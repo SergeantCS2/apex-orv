@@ -1992,8 +1992,11 @@ def check_freeway_rules():
         k, B, nm = bk.index("fw"), G.get("b", []), G.get("nm", [])
         flagged = sum(1 for e in G.get("e", []) if e[6] >= 0 and B[e[6]][k])
         inter = sum(1 for e in G.get("e", []) if len(e) > 8 and e[8] >= 0 and m and isI(nm[e[8]]))
-        if not flagged:
-            bad.append(f"{os.path.basename(os.path.dirname(gp))}: no edge carries fw ({inter} posted as interstates)")
+        # a region with no freeway carries no mark (the take-198 review: the
+        # neml-bullgap box has none); posted interstates with no mark is the
+        # producer broken
+        if inter and not flagged:
+            bad.append(f"{os.path.basename(os.path.dirname(gp))}: no edge carries fw though {inter} are posted as interstates")
         seen.append(f"{flagged:,} freeway edges marked, {inter:,} posted as interstates")
     if bad:
         return fails.append("freeways (A291): " + "; ".join(bad))

@@ -6797,7 +6797,15 @@ for (const dev of DEVICES) {
               await frame(); out.teScroll = R.scrollTop; }
             R.scrollTop = 0; body.scrollTop = 0;
             out.pick = judge(); out.pick.isTgt = R.querySelector(".rc.sel") === tgt;
-            /* control: take 187's tap (the class toggled, nothing recounted) */
+            /* control: take 187's tap (the class toggled, nothing recounted).
+               take 200 · the first card is given clones at its foot until its
+               own count below the fit differs from the cue drawn now: its
+               own warnings matched that cue by chance once its fuel line
+               wrapped (A297), and the control passed on a stale cue */
+            for (let k = 0; k < 4 && hidOf(c0) === judge().cue; k++) {
+              const src = c0.querySelector(".warn") || tgt.querySelector(".warn");
+              const cl = src.cloneNode(true); cl.dataset.plant = "1"; c0.appendChild(cl); clones.push(cl);
+              await refit(); R.scrollTop = 0; body.scrollTop = 0; }
             cards.forEach((d) => { d.className = "rc" + (d === c0 ? " sel" : ""); });
             await s(50); out.pickStale = judge();
             c0.click(); await s(80); await settle(); await s(400); await settle(); R.scrollTop = 0; body.scrollTop = 0;

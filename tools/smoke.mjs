@@ -4552,8 +4552,12 @@ if (!NO_GPS) {
     for (const m of ["bike", "quad", "sxs", "walk"]) { R.setMachine(m); legalOn[m] = inter.filter((e) => R.machineLegal(e)).length; }
     R.setMachine("bike");
     const pavedKept = R.EDGES.filter((e) => e.c === "paved" && !e.fw).slice(0, 2000).filter((e) => R.machineLegal(e)).length;
+    /* the snapped node's legal edges that are not interstates, read from the
+       posted ref here, not from the app's own mark (the take-198 review: on a
+       build without the mark every edge read "not a freeway") */
+    const isI = (e) => !!e.rf && String(e.rf).split(";").some((x) => iv.test(x.trim()));
     const snapOk = (ll) => { const n = R.nearestNode(ll); if (n < 0) return { n, legal: 0, fw: 0 };
-      const ad = R.ADJ[n] || []; return { n, legal: ad.filter((e) => R.machineLegal(e) && !e.fw).length, fw: ad.filter((e) => e.fw).length }; };
+      const ad = R.ADJ[n] || []; return { n, legal: ad.filter((e) => R.machineLegal(e) && !isI(e)).length, fw: ad.filter(isI).length }; };
     const at = snapOk([-84.67234, 44.95824]);
     R.setMachine(m0);
     const st = { interstate: inter.length, marked: R.fwN(), legalOn, pavedKept, at };
@@ -4640,6 +4644,22 @@ if (!NO_GPS) {
         if (d > 2) longest.push({ d, m: [(g[k][0] + g[k + 1][0]) / 2, (g[k][1] + g[k + 1][1]) / 2] }); } }
     longest.sort((x, y) => y.d - x.d);
     const far = longest.slice(0, 5).map((x) => ({ span: +x.d.toFixed(1), d: +D.nearestEdge(x.m).d.toFixed(3) }));
+    /* points just inside a grid cell's edge (0.02°), against every line by
+       brute force: the search must not stop a ring early (the take-198
+       review: 68 of 400 such points read a farther line) */
+    const segMi = (p, a, b) => { const kx = Math.cos(p[1] * Math.PI / 180) * 69.172, ky = 69.172;
+      const ax = (a[0] - p[0]) * kx, ay = (a[1] - p[1]) * ky, dx = (b[0] - a[0]) * kx, dy = (b[1] - a[1]) * ky, L = dx * dx + dy * dy;
+      const t = L > 0 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L)) : 0; return Math.hypot(ax + t * dx, ay + t * dy); };
+    const brute = (p) => { let b = 1e9; for (const f of feats) { const g = f.geometry && f.geometry.coordinates; if (!g || f.properties.i === undefined) continue;
+      for (let k = 0; k + 1 < g.length; k++) { const d = segMi(p, g[k], g[k + 1]); if (d < b) b = d; } } return b; };
+    let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const edgeProbes = [];
+    for (let n = 0; n < 2000 && edgeProbes.length < 24; n++) {
+      const f = feats[Math.floor(rnd() * feats.length)]; if (!f || !f.geometry || f.properties.i === undefined) continue;
+      const v = f.geometry.coordinates[0], cx = Math.floor((v[0] + 180) / 0.02), cy = Math.floor((v[1] + 90) / 0.02);
+      const west = rnd() < 0.5, e = 0.0003;
+      edgeProbes.push(west ? [cx * 0.02 - 180 + e, v[1]] : [v[0], cy * 0.02 - 90 + e]); }
+    const edgeMiss = edgeProbes.filter((p) => D.nearestEdge(p).d > brute(p) + 1e-6).length;
     /* the ride: a route from the trail edge's one end to its other, then a fix
        at each end of the long span and its middle */
     R.setMachine("bike");
@@ -4655,13 +4675,15 @@ if (!NO_GPS) {
     const alertOn = /\bon\b/.test(String(grab("alert").className || "")), riding = flagged();
     stop(); SX.tab("map"); flushTimeouts();
     const st = { road: { d: +ne.d.toFixed(3), same: !!ne.e && ne.e.i === pv.i, span: +pv.d.toFixed(2) }, pave: +np.d.toFixed(3), far,
+                 edge: { probes: edgeProbes.length, miss: edgeMiss },
                  ride: { routed, riding, alertOn, span: +tr.d.toFixed(2) } };
     const segOk = (x) => x.road.d < 0.01 && x.pave < 0.01 && x.far.length === 5 && x.far.every((f) => f.d < 0.01)
+      && x.edge.probes >= 20 && x.edge.miss === 0
       && x.ride.routed >= 1 && x.ride.riding && !x.ride.alertOn;
     ok(segOk(st) && !segOk({ ...st, road: { ...st.road, d: 0.31 } }) && !segOk({ ...st, ride: { ...st.ride, alertOn: true } })
-       && !segOk({ ...st, far: far.map((f, i) => (i ? f : { ...f, d: 0.49 })) }),
+       && !segOk({ ...st, far: far.map((f, i) => (i ? f : { ...f, d: 0.49 })) }) && !segOk({ ...st, edge: { ...st.edge, miss: 1 } }),
        `A293 · mid-span on a ${st.road.span} mi straight paved span the nearest road is ${st.road.d} mi off (${st.road.same ? "that road" : "another on the spot"}) `
-       + `and pavement ${st.pave} mi; the middles of the five longest spans (${far.map((f) => f.span).join(", ")} mi) read their own road (${far.map((f) => f.d).join(", ")} mi); `
+       + `and pavement ${st.pave} mi; ${st.edge.probes} points at a grid cell's edge read the nearest line brute force finds (misses ${st.edge.miss}); the middles of the five longest spans (${far.map((f) => f.span).join(", ")} mi) read their own road (${far.map((f) => f.d).join(", ")} mi); `
        + `riding the middle of a ${st.ride.span} mi span of the planned line raises no Off route (${JSON.stringify(st.ride)}); `
        + `the judge rejects take 199's vertex distance, a far middle reading another road, and the false alert`);
   }
