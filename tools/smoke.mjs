@@ -5056,6 +5056,60 @@ if (!NO_GPS) {
   }
 }
 
+/* 9z · take 202 · A317 · a place off the network is arrived at, not the
+   end of the line before it, and To go counts the last leg; a place far from
+   every legal line is not routed to. Until take 201 the guide arrived at the
+   snapped node (408 of 902 campgrounds end over 0.15 mi short), and a home in
+   Milwaukee snapped 76.8 mi across the lake (the take-201 audit). */
+if (!NO_GPS) {
+  const R = sandbox.window.__route, N = sandbox.window.__nav;
+  const text = (id) => String(grab(id)._html || "").replace(/<[^>]*>/g, " ");
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1], accuracy: 5 }, extra || {}) });
+  const stop = () => { for (let i = 0; i < 3 && flagged(); i++) { grab("c-ride").fire("click"); flushTimeouts(); frames(1); } };
+  const MO9 = sandbox.window.__mode, mode0 = MO9 ? MO9.get() : null, mach0 = R.machine, ME0 = R.ME.slice();
+  if (MO9 && mode0 === "water") { MO9.apply("ride", { silent: true }); flushTimeouts(); }
+  if (!R.MACHINE[R.machine] || R.MACHINE[R.machine].mph) R.setMachine("bike");
+  stop();
+  const NODES = R.NODES, dmi = (a, b) => Math.hypot((b[0] - a[0]) * 0.714 * 69, (b[1] - a[1]) * 69);
+  let seed = 4242; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  let pick = null;
+  for (let t = 0; t < 600 && !pick; t++) {
+    const p = NODES[Math.floor(rnd() * NODES.length)], ang = rnd() * 2 * Math.PI;
+    const dest = [p[0] + Math.cos(ang) * 0.3 / (0.714 * 69), p[1] + Math.sin(ang) * 0.3 / 69], b = R.nearestNode(dest);
+    if (b < 0) continue; const sb = dmi(dest, NODES[b]); if (sb < 0.15 || sb > 0.5) continue;
+    let cur = b, prev = -1; for (let k = 0; k < 10; k++) { const ad = (R.ADJ[cur] || []).filter((e) => R.machineLegal(e) && e.c !== "closed");
+      if (!ad.length) break; const e = ad[Math.floor(rnd() * ad.length)], nx = e.a === cur ? e.b : e.a; if (nx === prev) continue; prev = cur; cur = nx; }
+    if (cur === b || dmi(NODES[cur], NODES[b]) < 0.2 || !R.route(cur, b, R.PROFILES[0].f)) continue;
+    pick = { dest, a: cur, b, sb };
+  }
+  let s317 = { pick: !!pick };
+  if (pick) {
+    R.setME(NODES[pick.a]); R.go(pick.dest.slice(), "the camp"); flushTimeouts();
+    const cards = documentStub.querySelectorAll(".rc").length;
+    grab("c-ride").fire("click"); flushTimeouts();
+    fix(NODES[pick.a], { speed: 6 }); fix(NODES[pick.a], { speed: 6 }); frames(1);
+    const G = N.guide() || {}, pts = (G.pts || []).slice();
+    for (let i = 1; i < pts.length; i++) { fix(pts[i], { speed: 6 }); frames(1); }
+    const atEnd = { arrived: !!(N.guide() || {}).arrived, strip: text("nav-g"), togo: parseFloat(text("hud-togo")) };
+    fix(pick.dest, { speed: 2 }); frames(1);
+    const atDest = { arrived: !!(N.guide() || {}).arrived, strip: text("nav-g") };
+    stop(); try { grab("btn-clear") && grab("btn-clear").fire("click"); } catch (e) {} flushTimeouts();
+    s317 = { pick: true, cards, offEnd: G.offEnd || 0, sb: pick.sb, atEnd, atDest };
+  }
+  /* a destination far from every legal line: Milwaukee */
+  R.setME(ME0); R.go([-87.906, 43.039], "home"); flushTimeouts(); const far = text("panel");
+  try { grab("btn-clear") && grab("btn-clear").fire("click"); } catch (e) {} flushTimeouts();
+  R.setMachine(mach0); if (MO9 && mode0 && MO9.get() !== mode0) { MO9.apply(mode0, { silent: true }); flushTimeouts(); }
+  s317.far = /Home is \d+\.\d mi from the nearest line/.test(far);
+  const ok317 = (x) => x.pick && x.cards > 0 && x.offEnd > 50 && !x.atEnd.arrived && /off the mapped network/.test(x.atEnd.strip)
+    && x.atEnd.togo > 0.1 && x.atDest.arrived && x.far;
+  ok(ok317(s317) && !ok317({ ...s317, atEnd: { ...(s317.atEnd || {}), arrived: true } }) && !ok317({ ...s317, far: false }),
+     `A317 · a place ${s317.sb ? s317.sb.toFixed(2) : "?"} mi off the network: at the line's end the guide has not arrived (${s317.atEnd ? s317.atEnd.arrived : "?"}), `
+     + `To go ${s317.atEnd ? s317.atEnd.togo : "?"} mi and "${s317.atEnd ? (s317.atEnd.strip.match(/the last [^)]*\)/) || ["no note"])[0] : "?"}"; at the place it has (${s317.atDest ? s317.atDest.arrived : "?"}); `
+     + `a home in Milwaukee is refused ("${(far.match(/Home is .*? on this map\./) || ["routed"])[0]}"); the judge rejects take 201's arrival at the snapped node and the route across the lake`);
+}
+
 /* 10 · nothing ever left the origin */
 ok(remoteAsked.length === 0, `zero remote requests (${remoteAsked.length})`);
 

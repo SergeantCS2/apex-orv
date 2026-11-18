@@ -2117,6 +2117,9 @@ function homeCard(prefix){
           ?'<b>This phone reports no GPS receiver.</b> Set home by address or by a tap on the map.'
           :'<b>No GPS fix in 25 s.</b> Try outside, or set home another way.','');
         HOME=at.slice();homeSave();homeMark();clearRoute();syncSafety();
+         
+        if(!inRegion(at))return show('<b>Home is where you are</b> \u2014 '+mi(at,CTR).toFixed(0)+' mi from this map\u2019s region, '+
+          'outside it. <b>Return home</b> cannot route there; it is still marked, and the compass points to it.','');
         show('<b>Home is where you are.</b> Press and hold where you want to go and tap '+
           '<b>Route here</b>.','')},null,wm)})})}
 el('c-home').addEventListener('click',function(){
@@ -2654,6 +2657,9 @@ function routeToPoint(dest,label,auto){
     if(a<0||b<0)return show('<b>Nothing legal nearby</b> for a '+
       MACHINE[machine].lbl+'. Every line within reach is off limits for that machine.','fail');
     var sa=snapMiles(ME,a),sb=snapMiles(dest,b);
+     
+    if(sb>3)return show('<b>'+(label?label.charAt(0).toUpperCase()+label.slice(1):'That place')+' is '+sb.toFixed(1)+
+      ' mi from the nearest line a '+MACHINE[machine].lbl+' may ride on this map.</b> The map routes only to places on or near it.','fail');
      
     var _dbg={a:a,b:b,sa:sa,sb:sb,tSnap:Math.round(_tSnap),got:[]};
     try{window.__routeDbg=_dbg}catch(e){}
@@ -4456,6 +4462,8 @@ function navPlan(){
   NAVG={o:o,steps:steps,marks:marks,pts:pts,cum:cum,total:cum[cum.length-1],
     dest:dst,lbl:DESTLBL,seg:sg,arrived:false,key:sel+'|'+(o.k||''),
     loop:lp,set:last,odo0:odo0,base:base,rid:base,appr:(lp&&!o.rj)?mi(dst,pts[0])*1609.34:0,
+     
+    offEnd:lp?0:mi(pts[pts.length-1],dst)*1609.34,
     legs:legs,ends:ends};
   return NAVG}
  
@@ -4540,7 +4548,9 @@ function navGuide(at,acc,mps){
   var remain=Math.max(0,G.total-pr.prog);
    
   var toDest=mi(at,G.dest)*1609.34;
-  var near=arriveNear(toDest,acc,remain,pr.off,25,25);
+   
+  var offE=G.offEnd>50?G.offEnd:0;
+  var near=arriveNear(toDest,acc,remain,pr.off,25,offE?-1:25);
   if(G.loop)near=near&&rid>=G.total*0.5;
   if(!G.arrived&&near){
     G.arrived=true;NAV.follow=false;HUDG={togo:0,min:null};navChip();
@@ -4571,9 +4581,12 @@ function navGuide(at,acc,mps){
   var ni=-1;for(var k=1;k<G.marks.length;k++){if(G.marks[k]>pr.prog+8){ni=k;break}}
    
   var etaMin=navEta(remain,(G.o&&G.o.s)?G.o.s.hrs:null,G.total);
-  HUDG={togo:remain/1609.34,min:etaMin};
+   
+  var togo=remain+offE;
+  HUDG={togo:togo/1609.34,min:etaMin};
   var line1=ni<0
-    ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(remain)+' to '+(G.lbl||'destination')+'</b>'
+    ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(togo)+' to '+(G.lbl||'destination')+'</b>'+
+      (offE&&remain<200?'<span class="sub warn">the last '+navFmt(offE)+' is off the mapped network (dashed)</span>':'')
     :'<b><span class="arw">'+ic(G.steps[ni].turn[1])+'</span>In '+navFmt(G.marks[ni]-pr.prog)+
       ' \u00b7 '+G.steps[ni].turn[0]+' onto '+G.steps[ni].name+'</b>';
    
@@ -4581,7 +4594,7 @@ function navGuide(at,acc,mps){
     if(key!==VOICE.near){VOICE.near=key;
       navSay((d<90?'':'In '+navFmt(d)+', ')+G.steps[ni].turn[0].toLowerCase()+' onto '+G.steps[ni].name)}}
   g.hidden=false;
-  g.innerHTML=line1+'<span class="eta">'+navFmt(remain)+' remaining'+
+  g.innerHTML=line1+'<span class="eta">'+navFmt(togo)+' remaining'+
     (etaMin!==null?' \u00b7 ~'+etaTxt(etaMin):'')+(pr.off>40?' \u00b7 '+navFmt(pr.off)+' off the line':'')+'</span>';
   ridePublish()}
 document.addEventListener('visibilitychange',function(){

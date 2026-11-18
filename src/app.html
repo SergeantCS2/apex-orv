@@ -4405,6 +4405,10 @@ function homeCard(prefix){
           ?'<b>This phone reports no GPS receiver.</b> Set home by address or by a tap on the map.'
           :'<b>No GPS fix in 25 s.</b> Try outside, or set home another way.','');
         HOME=at.slice();homeSave();homeMark();clearRoute();syncSafety();
+        /* take 202 · A317 · a home outside the map's region is kept, and said:
+           Return home cannot route there */
+        if(!inRegion(at))return show('<b>Home is where you are</b> \u2014 '+mi(at,CTR).toFixed(0)+' mi from this map\u2019s region, '+
+          'outside it. <b>Return home</b> cannot route there; it is still marked, and the compass points to it.','');
         show('<b>Home is where you are.</b> Press and hold where you want to go and tap '+
           '<b>Route here</b>.','')},null,wm)})})}
 el('c-home').addEventListener('click',function(){
@@ -5109,6 +5113,12 @@ function routeToPoint(dest,label,auto){
     if(a<0||b<0)return show('<b>Nothing legal nearby</b> for a '+
       MACHINE[machine].lbl+'. Every line within reach is off limits for that machine.','fail');
     var sa=snapMiles(ME,a),sb=snapMiles(dest,b);
+    /* take 202 · A317 · a destination far from every line the machine may
+       ride is not routed to: nearestNode has no limit, and a home in
+       Milwaukee snapped 76.8 mi across Lake Michigan, so the ride "arrived
+       at home" on the Michigan shore (the take-201 audit) */
+    if(sb>3)return show('<b>'+(label?label.charAt(0).toUpperCase()+label.slice(1):'That place')+' is '+sb.toFixed(1)+
+      ' mi from the nearest line a '+MACHINE[machine].lbl+' may ride on this map.</b> The map routes only to places on or near it.','fail');
     /* __routeDbg is a DELIBERATE bridge (take 117, kept at the 118 audit),
        sibling to __restrict: snap ids, snap miles, per-profile outcome and
        timing. It solved the statewide routing mystery once and costs bytes. */
@@ -7675,6 +7685,9 @@ function navPlan(){
   NAVG={o:o,steps:steps,marks:marks,pts:pts,cum:cum,total:cum[cum.length-1],
     dest:dst,lbl:DESTLBL,seg:sg,arrived:false,key:sel+'|'+(o.k||''),
     loop:lp,set:last,odo0:odo0,base:base,rid:base,appr:(lp&&!o.rj)?mi(dst,pts[0])*1609.34:0,
+    /* take 202 · A317 · the line ends at the node the destination snapped
+       to; what is left past it, off the network, in metres */
+    offEnd:lp?0:mi(pts[pts.length-1],dst)*1609.34,
     legs:legs,ends:ends};
   return NAVG}
 /* lim, want (a loop only, metres along the line): nothing past lim is
@@ -7805,7 +7818,11 @@ function navGuide(at,acc,mps){
   var remain=Math.max(0,G.total-pr.prog);
   /* arrival */
   var toDest=mi(at,G.dest)*1609.34;
-  var near=arriveNear(toDest,acc,remain,pr.off,25,25);
+  /* take 202 · A317 · with more than 50 m off the network past the line's
+     end, arrival is at the place, never at the end of the line: 408 of 902
+     campgrounds end more than 0.15 mi short of it (the take-201 audit) */
+  var offE=G.offEnd>50?G.offEnd:0;
+  var near=arriveNear(toDest,acc,remain,pr.off,25,offE?-1:25);
   if(G.loop)near=near&&rid>=G.total*0.5;
   if(!G.arrived&&near){
     G.arrived=true;NAV.follow=false;HUDG={togo:0,min:null};navChip();
@@ -7847,9 +7864,13 @@ function navGuide(at,acc,mps){
      line, and the arrival estimate — take 188 · A217 · the same one the
      strip below prints and the route card gave (navEta) */
   var etaMin=navEta(remain,(G.o&&G.o.s)?G.o.s.hrs:null,G.total);
-  HUDG={togo:remain/1609.34,min:etaMin};
+  /* A317 · To go counts the off-network last leg, and at the line's end the
+     strip says what is left is off the network */
+  var togo=remain+offE;
+  HUDG={togo:togo/1609.34,min:etaMin};
   var line1=ni<0
-    ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(remain)+' to '+(G.lbl||'destination')+'</b>'
+    ?'<b><span class="arw">'+ic('arrive')+'</span>'+navFmt(togo)+' to '+(G.lbl||'destination')+'</b>'+
+      (offE&&remain<200?'<span class="sub warn">the last '+navFmt(offE)+' is off the mapped network (dashed)</span>':'')
     :'<b><span class="arw">'+ic(G.steps[ni].turn[1])+'</span>In '+navFmt(G.marks[ni]-pr.prog)+
       ' \u00b7 '+G.steps[ni].turn[0]+' onto '+G.steps[ni].name+'</b>';
   /* take 173 · voice: once when a turn becomes the next one, once more
@@ -7858,7 +7879,7 @@ function navGuide(at,acc,mps){
     if(key!==VOICE.near){VOICE.near=key;
       navSay((d<90?'':'In '+navFmt(d)+', ')+G.steps[ni].turn[0].toLowerCase()+' onto '+G.steps[ni].name)}}
   g.hidden=false;
-  g.innerHTML=line1+'<span class="eta">'+navFmt(remain)+' remaining'+
+  g.innerHTML=line1+'<span class="eta">'+navFmt(togo)+' remaining'+
     (etaMin!==null?' \u00b7 ~'+etaTxt(etaMin):'')+(pr.off>40?' \u00b7 '+navFmt(pr.off)+' off the line':'')+'</span>';
   ridePublish()}
 document.addEventListener('visibilitychange',function(){
