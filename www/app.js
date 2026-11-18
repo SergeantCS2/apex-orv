@@ -1145,10 +1145,11 @@ function hdStore(DBN){
   function tx(mode,fn){return open().then(function(d){return new Promise(function(res,rej){
     var t=d.transaction(ST,mode),q=fn(t.objectStore(ST));
     t.oncomplete=function(){res(q?q.result:undefined)};
-    t.onerror=function(){rej(t.error)};
-    t.onabort=function(){var e=t.error;
-      rej(e&&e.name==='QuotaExceededError'?new Error('the phone has no more room for saved imagery'):
-        (e||new Error('the HD store write was aborted')))}})})}
+     
+    var named=function(e,w){return e&&e.name==='QuotaExceededError'?new Error('the phone has no more room for saved imagery'):
+      (e||new Error(w))};
+    t.onerror=function(){rej(named(t.error||(q&&q.error),'the HD store write failed'))};
+    t.onabort=function(){rej(named(t.error,'the HD store write was aborted'))}})})}
   return {
     get:function(z,x,y){return tx('readonly',function(s){return s.get(z+'/'+x+'/'+y)})
       .then(function(v){return v?v.b:null})},
@@ -1182,10 +1183,12 @@ function _satResolve(params){
     hdAncestor(z,x,y).then(function(a){return a?{data:a}:blank()})}).catch(blank);
 }
  
-function hdAncestor(z,x,y){
+function hdAncestor(z,x,y,d){
   if(z<=13||typeof createImageBitmap!=='function'||typeof OffscreenCanvas==='undefined')return Promise.resolve(null);
-  var d=z-13,ax=x>>d,ay=y>>d,k=1<<d,qx=x-(ax<<d),qy=y-(ay<<d);
-  return HD.get(13,ax,ay).then(function(b){if(!b)return null;
+   
+  d=d||1;if(z-d<13)return Promise.resolve(null);
+  var ax=x>>d,ay=y>>d,k=1<<d,qx=x-(ax<<d),qy=y-(ay<<d);
+  return HD.get(z-d,ax,ay).then(function(b){if(!b)return hdAncestor(z,x,y,d+1);
     return createImageBitmap(new Blob([b])).then(function(im){
       var c=new OffscreenCanvas(256,256),g=c.getContext('2d'),s=im.width/k;
       g.drawImage(im,qx*s,qy*s,s,s,0,0,256,256);try{im.close()}catch(e){}
@@ -1261,6 +1264,8 @@ var HDDL=(function(){
       .then(function(r){if(!r.ok){var e=new Error('HTTP '+r.status);e.status=r.status;throw e}return r.arrayBuffer()})}
    
   function missingErr(e){return !!e&&(e.status===404||/HTTP 404/.test(String(e.message||e)))}
+   
+  var MISS={};
   function sleep(ms){return new Promise(function(r){setTimeout(r,ms)})}
   function save(what,onp,label){
     if(running)return Promise.resolve(null);
@@ -1284,7 +1289,11 @@ var HDDL=(function(){
             return sleep(PAUSE).then(function(){return stopReq?null:M.fetchTile(t[0],t[1],t[2])})})
           .catch(function(e){if(missingErr(e))return 404;throw e})
            
-          .then(function(buf){if(buf===404){missing++;return}if(!buf||stopReq)return;return HD.put(t[0],t[1],t[2],buf)
+          .then(function(buf){if(buf===404){missing++;MISS[t[0]+'/'+t[1]+'/'+t[2]]=1;
+              if(missing>=24&&missing>2*done&&!err)err='the imagery service did not have '+missing+' of the first '+
+                (done+missing)+' tiles; it may have moved or be down';
+              return}
+            if(!buf||stopReq)return;return HD.put(t[0],t[1],t[2],buf)
             .then(function(){done++;bytes+=buf.byteLength})})})}
     function batch(start,end){
       var j=start;
@@ -1309,7 +1318,7 @@ var HDDL=(function(){
   var M={plan:plan,planPoly:planPoly,statePlan:statePlan,quota:quota,
     save:save,fetchTile:fetchTile,estimate:estimate,EST_Z:EST_Z,
     LANES:LANES,BATCH:BATCH,PAUSE:PAUSE,
-    progress:function(){return prog},
+    progress:function(){return prog},missed:function(k){return !!MISS[k]},
     stop:function(){stopReq=true},busy:function(){return running}};
   return M;
 })();
@@ -2432,6 +2441,9 @@ function wpAdd(rec){
 
 function wpDel(n){return wpWrite(wpLoad().filter(function(x){return x.n!==n}))}
  
+function wpDropped(){return SAVED_DROPPED?'<span class="sub warn">200 spots is the limit: the oldest, \u201c'+
+  SAVED_DROPPED+'\u201d, was removed to make room.</span><br>':''}
+ 
 function savedIdx(list,rec){var k=JSON.stringify(rec);
   for(var i=0;i<list.length;i++)if(JSON.stringify(list[i])===k)return i;return -1}
 function savedDel(load,write,rec){var a=load(),i=savedIdx(a,rec);if(i<0)return false;a.splice(i,1);return write(a)}
@@ -2496,7 +2508,9 @@ function svName(){
   var isLoop=(o.na===o.nb&&LOOP_MI>0);
   return (isLoop?'Loop ':'')+o.s.mi.toFixed(1)+' mi'+
      
-    (isLoop?'':' to '+(DESTLBL||'there'))+(o.h?' · '+String(o.h).replace(/ ·.*$/,''):'')+' · '+md}
+     
+    (isLoop?'':' to '+(DESTLBL||'there'))+(o.h?' · '+svLabel(o.h):'')+' · '+md}
+function svLabel(h){return String(h).replace(/^Loop · /,'').replace(/ ·.*$/,'')}
 
 function svOpen(rec){
   if(!rec)return;
@@ -3018,7 +3032,9 @@ function search(q,all){
   var gc=geocode(q);
    
   if(gc)out.push([-1,-1,0,{t:gc.t,k:'address',c:gc.c,cls:'addr',
-    s:gc.n>1?'Address \u00b7 the nearest of '+gc.n.toLocaleString()+(gc.q?'':' \u00b7 add a town or ZIP for another'):''}]);
+    s:(gc.n>1||gc.unk)?'Address'+(gc.unk?' \u00b7 \u201c'+gc.unk+'\u201d is not a town this map knows':'')+
+      (gc.n>1?' \u00b7 the nearest of '+gc.n.toLocaleString()+' to '+gc.who:'')+
+      (gc.q?'':' \u00b7 add a ZIP for another'):''}]);
   var qz=q.replace(/[^a-z0-9]/g,'');
   for(var i=0;i<rows.length;i++){var r=rows[i],p=r.l.indexOf(q);
     if(p>=0){
@@ -4894,7 +4910,10 @@ function hdChip(){HD.stats().then(function(st){
   if(!HDDL.busy())hdChipTxt(st.tiles?('HD · '+(st.bytes/1048576).toFixed(0)+' MB'):'HD');
   var e=el('c-hd');if(e)e.className='basebtn'+(st.tiles?' on':'')}).catch(function(){})}
  
-function refreshSat(){try{var sc=(map.style.tileManagers||map.style.sourceCaches||{})['satpatch'];
+function refreshSat(){try{
+   
+  if(typeof map.refreshTiles==='function'&&map.getSource('satpatch')){map.refreshTiles('satpatch');return}
+  var sc=(map.style.tileManagers||map.style.sourceCaches||{})['satpatch'];
   if(sc){sc.clearTiles();map.triggerRepaint()}}catch(e){}}
  
 function hdProgTxt(pr){
@@ -4923,8 +4942,11 @@ function startHDSave(tiles,label){
     .then(function(r){hdChip();refreshSat();
        
       if(r&&r.error){
+         
+        var full=/no more room/.test(r.error);
         if(hdSeen())return toolShow('c-hdmanage','<b>HD imagery</b><div class="sub">Download stopped: '+r.error+
-          '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>');
+          (full?'. Tiles already saved are kept. Free space on the phone, or delete saved HD, before saving more.</div>':
+          '. Tiles already saved are kept — run the same save again and it continues where it left off.</div>'));
         logAct('act  HD save stopped out of view: '+r.error);
         return toast('HD download stopped ('+r.error+'). Saved tiles are kept.',4000)}
       hdEnded(r)})}
@@ -4957,7 +4979,8 @@ function hdCard(confirmId){
     var st=res[0],q=res[1],busy=HDDL.busy();
      
     var saved={};(res[2]||[]).forEach(function(k){saved[k]=1});
-    tiers.forEach(function(t){t.tiles=t.tiles.filter(function(c){return !saved[c[0]+'/'+c[1]+'/'+c[2]]});
+    tiers.forEach(function(t){t.miss=0;t.tiles=t.tiles.filter(function(c){var k=c[0]+'/'+c[1]+'/'+c[2];
+        if(saved[k])return false;if(HDDL.missed(k)){t.miss++;return false}return true});
       t.n=t.tiles.length;t.mb=HDDL.estimate(t.tiles)/1048576});
      
     var h=(inSheet?'':'<b>HD imagery</b>')+
@@ -4971,7 +4994,8 @@ function hdCard(confirmId){
     for(var i=0;i<tiers.length;i++){
       var t=tiers[i],big=t.id==='view'&&t.mb>500,fits=!q.known||q.free>=t.mb*1048576*1.2;
       h+='<div class="hdtier"><div class="hdt-n">'+t.label.charAt(0).toUpperCase()+t.label.slice(1)+'</div><div class="sub">'+(t.n?t.n.toLocaleString()+' tiles · '+hdMB(t.mb)+
-        (t.note?' · '+t.note:'')+(big?' — zoom in to a smaller area to save':''):'already sharp here — built in or saved, nothing to download')+'</div>';
+        (t.note?' · '+t.note:'')+(big?' — zoom in to a smaller area to save':''):'already sharp here — built in or saved, nothing to download')+
+        (t.miss?' \u00b7 '+t.miss.toLocaleString()+' the imagery service does not have':'')+'</div>';
       if(busy||big||!t.n){h+='</div>';continue}
       if(!fits){h+='<div class="sub">Not enough space: needs '+hdMB(t.mb*1.2)+', the phone allows '+
         hdMB(q.free/1048576)+'</div></div>';continue}
@@ -5294,7 +5318,7 @@ function markAt(at){
   try{map.easeTo({center:at,zoom:Math.max(map.getZoom(),12.5),duration:600,essential:true})}catch(e){}
   toolShow('c-markme','<div class="k">MARKED \u00b7 ON THIS PHONE ONLY</div>'+
     '<div class="v">'+at[1].toFixed(4)+', '+at[0].toFixed(4)+'</div>'+
-    '<div class="sub">Find it again under <b>Saved</b> on the Plan tab.</div>'+
+    '<div class="sub">Find it again under <b>Saved</b> on the Plan tab.</div>'+wpDropped()+
     '<label class="sub" for="mk-name">Name (optional)</label>'+
     '<input id="mk-name" type="text" maxlength="42" autocomplete="off" value="'+nm.replace(/"/g,'&quot;')+'">'+
     '<div class="sub" id="mk-note"></div>'+
@@ -5553,20 +5577,28 @@ function addressAt(at,wide){
   return out}
 
  
+ 
 function placeNamed(q){q=String(q||'').toLowerCase().trim();if(!q)return null;
   var b=null;for(var i=0;i<PLACES.length;i++){var n=String(PLACES[i][0]).toLowerCase();
-    if(n===q)return [PLACES[i][1],PLACES[i][2]];if(!b&&n.indexOf(q)===0)b=[PLACES[i][1],PLACES[i][2]]}
+    if(n===q)return {c:[PLACES[i][1],PLACES[i][2]],n:PLACES[i][0]};
+    if(!b&&q.length>=4&&n.indexOf(q)===0)b={c:[PLACES[i][1],PLACES[i][2]],n:PLACES[i][0]}}
   return b}
 function geocode(q,ref){
    
   if(!ADDR||!ADDR.segs)return null;
   var m=/^\s*(\d+)\s+([^,]+?)\s*(?:,\s*(.*?))?\s*$/.exec(q);
   if(!m)return null;
-  var want=+m[1],nm=m[2].toLowerCase().replace(/\.$/,''),qual=(m[3]||'').toLowerCase().trim();
-  var zip=/^\d{5}$/.test(qual)?qual:'',at=ref||ME;
-  if(qual&&!zip){var pl=placeNamed(qual);if(pl)at=pl}
+  var want=+m[1],nm=m[2].toLowerCase().replace(/\.$/,''),zip='',town='',unk='';
+   
+  (m[3]||'').toLowerCase().split(',').forEach(function(p){
+    p=p.trim().replace(/\s+(\d{5})(?:-\d{4})?$/,function(_,z){zip=z;return ''})
+      .replace(/(?:^|\s+)(?:mi|mich|michigan)$/,'').trim();
+    if(/^\d{5}(?:-\d{4})?$/.test(p)){zip=p.slice(0,5);return}
+    if(p&&!town)town=p});
+  var at=ref||ME,who=ref?'there':(liveFix()?'you':'the start pin');
+  if(town){var pl=placeNamed(town);if(pl){at=pl.c;who=pl.n}else unk=town}
   var S=ADDR.segs,best=null,nr=[0,0];
-  for(var i=0;i<S.length;i++){var g=S[i];
+  for(var i=0;i<S.length;i++){var g=S[i],hit=false;
     var name=ADDR.names[g[0]].toLowerCase(),exact=name===nm;
     if(!exact&&name.indexOf(nm)<0)continue;
     if(zip&&String(g[9]||'')!==zip)continue;
@@ -5576,11 +5608,12 @@ function geocode(q,ref){
       if(want<lo||want>hi)return;
       var t=hi>lo?(want-rg[0])/(rg[1]-rg[0]):0.5;
       t=Math.max(0,Math.min(1,t));
-      var c=[g[1]+(g[3]-g[1])*t, g[2]+(g[4]-g[2])*t],rk=exact?0:1,d=at?mi(at,c):0;nr[rk]++;
+       
+      var c=[g[1]+(g[3]-g[1])*t, g[2]+(g[4]-g[2])*t],rk=exact?0:1,d=at?mi(at,c):0;if(!hit){nr[rk]++;hit=true}
       if(!best||rk<best.rk||(rk===best.rk&&d<best.d))
         best={c:c,t:want+' '+ADDR.names[g[0]]+(g[9]?', '+g[9]:''),rk:rk,d:d}})}
    
-  return best?{c:best.c,t:best.t,n:nr[best.rk],q:!!qual}:null}
+  return best?{c:best.c,t:best.t,n:nr[best.rk],q:!!(zip||(town&&!unk)),unk:unk,who:who}:null}
  
 function streetNear(si,at){if(!ADDR||!ADDR.segs)return null;at=at||ME;var b=null,bd=1e9;
   for(var i=0;i<ADDR.segs.length;i++){var g=ADDR.segs[i];if(g[0]!==si)continue;
@@ -5657,7 +5690,7 @@ function placeCard(at,kind,title){
         'store it \u2014 its storage may be full or blocked.','fail');
     logAct('act  saved waypoint '+nm);
     wpDraw();clearDrop();
-    show('Saved as <b>'+nm+'</b>.'+wpKept(nm0,nm)+'<br><span class="sub">On this phone only. '+
+    show('Saved as <b>'+nm+'</b>.'+wpKept(nm0,nm)+'<br>'+wpDropped()+'<span class="sub">On this phone only. '+
       'Find it again under <b>Saved</b> on the Plan tab.</span>','pass')});
   on('pc-drop',function(){clearDrop();ack('Pin removed.')});
   Array.prototype.forEach.call(document.querySelectorAll('[data-wpt]'),function(b){
@@ -5667,7 +5700,7 @@ function placeCard(at,kind,title){
         return show('<b>Could not save.</b>','fail');
       logAct('act  saved waypoint '+k);
       wpDraw();clearDrop();
-      show('Saved <b>'+nm+'</b>.'+wpKept(nm0,nm)+'<br><span class="sub">On this phone only. '+
+      show('Saved <b>'+nm+'</b>.'+wpKept(nm0,nm)+'<br>'+wpDropped()+'<span class="sub">On this phone only. '+
         'Find it again under <b>Saved</b> on the Plan tab.</span>','pass')})});
 }
 
@@ -5792,7 +5825,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
       skip:Object.keys(NETLO_SKIP),layers:Object.keys(NETFT)};
     window.__hd=HD;window.__hdStore=hdStore;
      
-    window.__locateOnce=locateOnce;window.__svOpen=svOpen;window.__saved={svLoad:svLoad,svWrite:svWrite,wpLoad:wpLoad,wpWrite:wpWrite,svAdd:svAdd,wpAdd:wpAdd,del:savedDel,rename:savedRename,dropped:function(){return SAVED_DROPPED},streetNear:streetNear,panel:buildSavedPanel};window.__cardn=function(){return CARDN};
+    window.__locateOnce=locateOnce;window.__svOpen=svOpen;window.__saved={svLoad:svLoad,svWrite:svWrite,wpLoad:wpLoad,wpWrite:wpWrite,svAdd:svAdd,wpAdd:wpAdd,del:savedDel,rename:savedRename,dropped:function(){return SAVED_DROPPED},streetNear:streetNear,panel:buildSavedPanel,svLabel:svLabel,loopH:LOOP_SHAPES.map(function(x){return x.h}),wpDropped:wpDropped};window.__cardn=function(){return CARDN};
      
     window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__hdSave=startHDSave;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};window.__back={onBack:onBack,open:backOpen,panelOpen:panelOpen,state:function(){return BACK},toast:toast};window.__privacy=function(u){var o=PRIVACY_URL;if(u!==undefined)PRIVACY_URL=u;return o};window.__tour={start:tourStart,next:tourNext,close:tourClose,seen:tourSeen,reset:tourReset,state:function(){return TOUR},steps:TOUR_STEPS};
     window.__ph={index:PHOTOS,html:photoHTML};
