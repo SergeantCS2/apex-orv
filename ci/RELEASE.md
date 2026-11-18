@@ -1,12 +1,13 @@
-**Take 197 — Every data source named; the trail card says its surface.**
+**Take 198 — Back from HD imagery stays back; saved HD no longer slows the start.**
 
-Tools, Data sources now lists every source of data in the app, the photos'
-too (Wikipedia, Wikimedia Commons), and the store listing lists the
-same sources with the same links.
+Tap HD on the map and then Back before the card has finished loading: the
+drawer folds and stays folded. Until now the card could open it again a
+moment later, over the map, with the Tools strip across it.
 
-A trail's card now says its surface where OpenStreetMap records one, for
-example "Surface sand (OpenStreetMap)", and "Surface not recorded" where
-no mapper did. Most trails record none.
+Counting the HD imagery saved on the phone no longer reads every saved
+tile into memory. It ran at every start and every time the HD card opened;
+after a whole-state save that was about 180 MB each time.
 
-On the phone: tap a trail and read the Surface line. Then Tools, Data
-sources: is the photos' source there?
+On the phone: tap HD on the map, then Back at once. Does the map stay
+clear? If you have saved HD imagery, does the HD button still show its
+size?

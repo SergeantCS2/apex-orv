@@ -1108,13 +1108,23 @@ function inPatch(z,x,y){var b=(TILES&&TILES.boxes)||[];
     if(q[0]===z&&x>=q[1]&&x<=q[3]&&y>=q[2]&&y<=q[4])return true}
   return false}
  
-var HD=(function(){
-  var DBN='apex-hd',ST='tiles',db=null;
-  function open(){return db?Promise.resolve(db):new Promise(function(res,rej){
-    var q=indexedDB.open(DBN,1);
-    q.onupgradeneeded=function(){q.result.createObjectStore(ST)};
-    q.onsuccess=function(){db=q.result;res(db)};
-    q.onerror=function(){rej(q.error)}})}
+ 
+function hdStore(DBN){
+  var ST='tiles',db=null,dbp=null;
+   
+   
+  function open(){if(db)return Promise.resolve(db);if(dbp)return dbp;
+    dbp=new Promise(function(res,rej){
+    var q=indexedDB.open(DBN,2);
+     
+    q.onupgradeneeded=function(){var d=q.result,s,has=function(l,n){return Array.prototype.indexOf.call(l,n)>=0};
+      s=has(d.objectStoreNames,ST)?q.transaction.objectStore(ST):d.createObjectStore(ST);
+      if(!has(s.indexNames,'s'))s.createIndex('s','s')};
+    q.onsuccess=function(){var c=q.result;db=c;
+      c.onversionchange=function(){try{c.close()}catch(e){}if(db===c){db=null;dbp=null}};res(c)};
+    q.onerror=function(){dbp=null;rej(q.error)};
+    q.onblocked=function(){rej(new Error('the HD store is open elsewhere'))}});
+    return dbp}
   function tx(mode,fn){return open().then(function(d){return new Promise(function(res,rej){
     var t=d.transaction(ST,mode),q=fn(t.objectStore(ST));
     t.oncomplete=function(){res(q?q.result:undefined)};
@@ -1125,11 +1135,17 @@ var HD=(function(){
     put:function(z,x,y,buf){return tx('readwrite',function(s){
       return s.put({b:buf,s:buf.byteLength,t:Date.now()},z+'/'+x+'/'+y)})},
     del:function(z,x,y){return tx('readwrite',function(s){return s.delete(z+'/'+x+'/'+y)})},
-    stats:function(){return tx('readonly',function(s){return s.getAll()})
-      .then(function(all){all=all||[];var b=0;for(var i=0;i<all.length;i++)b+=(all[i].s||0);
-        return {tiles:all.length,bytes:b}})},
+     
+    stats:function(){return open().then(function(d){return new Promise(function(res,rej){
+      var t=d.transaction(ST,'readonly'),s=t.objectStore(ST),n=0,b=0,c=s.count(),k=s.index('s').openKeyCursor();
+      c.onsuccess=function(){n=c.result};
+      k.onsuccess=function(){var r=k.result;if(r){b+=(+r.key||0);r.continue()}};
+      t.oncomplete=function(){res({tiles:n,bytes:b})};
+      t.onerror=function(){rej(t.error)};
+      t.onabort=function(){rej(t.error||new Error('the HD count was aborted'))}})})},
     clear:function(){return tx('readwrite',function(s){return s.clear()})}};
-})();
+}
+var HD=hdStore('apex-hd');
  
 function _satResolve(params){
   var m=/apexsat:\/\/(\d+)\/(\d+)\/(\d+)/.exec(params.url||'');
@@ -4826,8 +4842,14 @@ function hdCard(confirmId){
   var conf=typeof confirmId==='string'?confirmId:null;
   var tiers=hdTiers(),pr;
    
-  var inSheet=SHEET.tab&&(SHEET_PENDING==='c-hdmanage'||SHEET.tool==='c-hdmanage'),sTab=SHEET.tab;
+  var inSheet=SHEET.tab&&(SHEET_PENDING==='c-hdmanage'||SHEET.tool==='c-hdmanage'),sTab=SHEET.tab,
+    rl=el('rail'),wasUp=!!rl&&!/\bfolded\b/.test(rl.className);
   Promise.all([HD.stats(),HDDL.quota()]).then(function(res){
+     
+    var still=SHEET.tab===sTab&&(SHEET.tool==='c-hdmanage'||(SHEET.tool===null&&!SHEET_PENDING));
+    if(inSheet&&!still)return;
+     
+    if(!inSheet&&wasUp&&rl&&/\bfolded\b/.test(rl.className))return;
     var st=res[0],q=res[1],busy=HDDL.busy();
      
     var h=(inSheet?'':'<b>HD imagery</b>')+
@@ -4855,7 +4877,7 @@ function hdCard(confirmId){
     h+='<div class="k">SAVED ON THIS PHONE</div><div class="sub" id="hd-saved">'+st.tiles.toLocaleString()+
         ' tiles · '+(st.bytes/1048576).toFixed(1)+' MB</div>'+
       (st.tiles?'<button class="chip" id="hd-del">'+ic('del')+'<span>Delete all saved HD</span></button>':'');
-    if(inSheet&&SHEET.tab===sTab&&(SHEET.tool==='c-hdmanage'||(SHEET.tool===null&&!SHEET_PENDING)))SHEET_PENDING='c-hdmanage';
+    if(inSheet)SHEET_PENDING='c-hdmanage';
     show(h);
     tiers.forEach(function(t){
       var g=el('hd-go-'+t.id);if(g)g.addEventListener('click',function(){startHDSave(t.tiles,t.label);hdCard()});
@@ -5643,7 +5665,7 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
      
     window.__netLo={n:NETLO.length,ms:NETLO_MS,err:NETLO_ERR,z:NETLO_Z,edges:nf2.length,cls:NETLO_CLS.slice(),
       skip:Object.keys(NETLO_SKIP),layers:Object.keys(NETFT)};
-    window.__hd=HD;
+    window.__hd=HD;window.__hdStore=hdStore;
      
     window.HDDL=HDDL;window.__hdChip=hdChip;window.__hdCard=hdCard;window.__hdSave=startHDSave;window.__wake=WAKE;window.__hdTiers=hdTiers;window.__inRings=inRings;window.__ctx=function(){return CTX};window.__back={onBack:onBack,open:backOpen,panelOpen:panelOpen,state:function(){return BACK},toast:toast};window.__privacy=function(u){var o=PRIVACY_URL;if(u!==undefined)PRIVACY_URL=u;return o};window.__tour={start:tourStart,next:tourNext,close:tourClose,seen:tourSeen,reset:tourReset,state:function(){return TOUR},steps:TOUR_STEPS};
     window.__ph={index:PHOTOS,html:photoHTML};

@@ -1088,6 +1088,66 @@ if (zoomed.trails > 0) {
     ok(hd.after === hd.blankLen, "a cleared store answers blank again — the store never lies about what it holds");
   }
 
+  /* take 198 · A281 · stats() counts without reading a tile's bytes. Until
+     take 197 it called getAll(), which loads every saved tile into memory to
+     count them, at every start, every HD card and every save's end. The
+     store's reads are counted while stats() runs: value reads (getAll, get,
+     value cursors) must be 0 and the sizes come from a key cursor. A
+     version-1 store with tiles in it (the store every phone has) is opened
+     through the same function, upgraded, and counts what it held. */
+  const a281 = await page.evaluate(async () => {
+    const H = window.__hd, mk = window.__hdStore;
+    if (!H || typeof mk !== "function") return { missing: true };
+    const P = [[IDBObjectStore.prototype, "getAll"], [IDBObjectStore.prototype, "get"], [IDBObjectStore.prototype, "openCursor"],
+      [IDBIndex.prototype, "getAll"], [IDBIndex.prototype, "get"], [IDBIndex.prototype, "openCursor"],
+      [IDBIndex.prototype, "openKeyCursor"], [IDBObjectStore.prototype, "count"]];
+    const counts = {}, orig = P.map(([o, k]) => o[k]);
+    P.forEach(([o, k], i) => { const nm = (o === IDBIndex.prototype ? "index." : "store.") + k; counts[nm] = 0;
+      o[k] = function () { counts[nm]++; return orig[i].apply(this, arguments); }; });
+    const spy = async (f) => { Object.keys(counts).forEach((k) => (counts[k] = 0)); const v = await f(); return { v, c: { ...counts } }; };
+    let out;
+    try {
+      await H.clear();
+      const sizes = [700, 1500, 16000, 333];
+      for (let i = 0; i < sizes.length; i++) await H.put(15, 9000 + i, 9000, new ArrayBuffer(sizes[i]));
+      const a = await spy(() => H.stats());
+      await H.clear();
+      const z = await spy(() => H.stats());
+      /* a version-1 store as take 197 made it, holding three tiles */
+      const name = "apex-hd-a281-" + Date.now();
+      await new Promise((res, rej) => { const q = indexedDB.open(name, 1);
+        q.onupgradeneeded = () => { const s = q.result.createObjectStore("tiles");
+          [[100, "15/1/1"], [2500, "15/1/2"], [40000, "15/1/3"]].forEach(([n, k]) => s.put({ b: new ArrayBuffer(n), s: n, t: 1 }, k)); };
+        q.onsuccess = () => { q.result.close(); res(); }; q.onerror = () => rej(q.error); });
+      const old = mk(name);
+      const u = await spy(() => old.stats());
+      const ver = await new Promise((res) => { const q = indexedDB.open(name); q.onsuccess = () => {
+        const d = q.result, v = d.version, ix = Array.from(d.transaction("tiles").objectStore("tiles").indexNames); d.close(); res({ v, ix }); }; });
+      await old.clear();
+      /* the scratch store goes (its open connection closes on versionchange) */
+      try { indexedDB.deleteDatabase(name); } catch (e) {}
+      out = { sizes, a, z, u, ver };
+    } finally { P.forEach(([o, k], i) => { o[k] = orig[i]; }); }
+    return out;
+  });
+  if (a281.missing) ok(false, "A281 · the HD store or its maker is not exposed (window.__hd, window.__hdStore)");
+  else {
+    const valueReads = (c) => c["store.getAll"] + c["store.get"] + c["store.openCursor"] + c["index.getAll"] + c["index.get"] + c["index.openCursor"];
+    const statOk = (r, tiles, bytes) => r.v.tiles === tiles && r.v.bytes === bytes && valueReads(r.c) === 0 && r.c["index.openKeyCursor"] >= 1;
+    const sum = a281.sizes.reduce((x, y) => x + y, 0);
+    /* the judge's controls: take 197's reading (one getAll), a wrong byte
+       count, and a count with no key cursor behind it */
+    const c0 = { "store.getAll": 0, "store.get": 0, "store.openCursor": 0, "index.getAll": 0, "index.get": 0, "index.openCursor": 0, "index.openKeyCursor": 1 };
+    const plants = [{ v: { tiles: 4, bytes: sum }, c: { ...c0, "store.getAll": 1, "index.openKeyCursor": 0 } },
+      { v: { tiles: 4, bytes: sum - 1 }, c: c0 }, { v: { tiles: 4, bytes: sum }, c: { ...c0, "index.openKeyCursor": 0 } }];
+    ok(statOk(a281.a, 4, sum) && statOk(a281.z, 0, 0) && statOk(a281.u, 3, 42600) && a281.ver.v === 2 && a281.ver.ix.includes("s")
+       && statOk({ v: { tiles: 4, bytes: sum }, c: c0 }, 4, sum) && !plants.some((p) => statOk(p, 4, sum)),
+       `A281 · HD stats count ${a281.a.v.tiles} tiles / ${a281.a.v.bytes} B with no tile read (value reads ${valueReads(a281.a.c)}, `
+       + `key cursors ${a281.a.c["index.openKeyCursor"]}), then 0 after clear; a version-1 store holding 3 tiles upgrades to `
+       + `version ${a281.ver.v} with its size index and counts ${a281.u.v.tiles} / ${a281.u.v.bytes} B; the judge rejects `
+       + `take 197's getAll, a wrong byte count and a count with no key cursor (${plants.length} plants)`);
+  }
+
   /* Take 145 · the HD chip and the save loop (A160). The fetcher seam is
      replaced with a stub, the bbox comes from the bundle's own box list
      (landmine 197), and the loop is proven whole: plan, save, progress,
@@ -4757,6 +4817,69 @@ if (zoomed.trails > 0) {
        `A259 · HD imagery from the Tools sheet lands in it ("${dg.hd.title}", ${dg.hd.tiers} tier cards) though its card is written `
        + `after a storage read; from the map's HD button ${dg.hdMap ? JSON.stringify(dg.hdMap) : "(not drawn here)"}; its control, `
        + `the same card drawn outside a sheet, is rejected (${JSON.stringify(dg.hdCtl)})`); }
+  /* take 198 · A279 · Back tapped before the HD card's storage read lands.
+     Until take 197 the late card went through show(), which opened the
+     drawer again over the map the rider had gone back to (PROVEN, a render
+     probe on take 197). Now a card the rider left is not written. The drill
+     measures the read's own time first (the HD tool up with its tier cards
+     on screen; cards left in the hidden panel do not count), waits three
+     times longer after each Back, and goes back both ways a rider can: the
+     sheet's back row when it is drawn, and the phone's Back (onBack, what
+     popstate calls). */
+  const a279 = await page.evaluate(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const SX = window.__sheet, rail = () => document.getElementById("rail");
+    const read = () => ({ tab: ((document.querySelector("#tabs .tab.on") || {}).dataset || {}).go || null,
+      kind: SX.state().kind, tool: SX.state().tool, title: (document.getElementById("sh-title") || {}).textContent || "",
+      folded: /\bfolded\b/.test(rail().className),
+      tiers: Array.from(document.querySelectorAll("#panel .hdtier")).filter((e) => e.getClientRects().length && e.getBoundingClientRect().height > 0).length });
+    const settle = async () => { try { SX.exit(); } catch (e) {} try { window.railSet(false); } catch (e) {}
+      document.querySelector('#tabs .tab[data-go="map"]').click(); await sleep(400); };
+    const b = document.getElementById("c-hd");
+    if (!b || !b.getClientRects().length) return { drawn: false };
+    await settle();
+    /* the read's own time: the tool opened from the map, polled for its cards */
+    b.click(); const t0 = performance.now(); let T = null;
+    for (let k = 0; k < 400; k++) { const r = read(); if (r.tool === "c-hdmanage" && r.tiers) { T = Math.round(performance.now() - t0); break; } await sleep(25); }
+    const landed = read();
+    document.getElementById("sh-back").click(); await sleep(400);
+    const wait = Math.max(1200, (T || 0) * 3 + 400), runs = [];
+    for (const how of ["row", "phone"]) for (const d of [0, 150]) {
+      await settle();
+      b.click(); if (d) await sleep(d);
+      const at = read();
+      if (how === "row") { const r = document.getElementById("sh-back"); if (r && r.getClientRects().length) r.click(); else window.__back.onBack(); }
+      else window.__back.onBack();
+      await sleep(wait);
+      runs.push({ how, d, at, after: read() }); }
+    await settle();
+    return { drawn: true, T, landed, wait, runs };
+  });
+  if (a279.drawn) {
+    /* at least one Back came before the card landed (the sheet still on the
+       index at the tap): a fast read would otherwise pass without the late
+       path ever running (the review of take 198) */
+    /* the read's time has a floor it cannot beat, one poll (landmine 264: on
+       take 197's build a count of hidden cards read 0 ms) */
+    /* at the tap the Tools sheet is up (its index until the read lands, or
+       the tool); after Back and the wait the drawer is folded on Map with no
+       sheet, whatever the late read did */
+    const atOk = (a) => a.tab === "tools" && (a.kind === "index" || (a.kind === "tool" && a.tool === "c-hdmanage"));
+    const afterOk = (a) => a.folded && a.tab === "map" && a.kind === null;
+    const runOk = (r) => atOk(r.at) && afterOk(r.after);
+    const good = { at: { tab: "tools", kind: "index", tool: null }, after: { folded: true, tab: "map", kind: null } };
+    /* the judge's controls: take 197's reading (the drawer opened again by
+       the late card), a sheet left up, and a tap that never opened Tools */
+    const plants = [{ ...good, after: { ...good.after, folded: false } },
+      { ...good, after: { ...good.after, tab: "tools", kind: "index" } },
+      { ...good, at: { tab: "map", kind: null, tool: null } }];
+    ok(a279.T !== null && a279.T >= 25 && a279.landed.tiers >= 2 && a279.runs.some((r) => r.at.kind === "index") && a279.wait > a279.T && a279.runs.length === 4 && a279.runs.every(runOk)
+       && runOk(good) && !plants.some(runOk),
+       `A279 · from the Map tab, Back tapped before the HD card lands folds the drawer, and the card the rider left `
+       + `never opens it again (the read took ${a279.T} ms; each Back was watched for ${a279.wait} ms): `
+       + a279.runs.map((r) => `${r.how} at ${r.d} ms ${atOk(r.at) && afterOk(r.after) ? "ok" : JSON.stringify(r)}`).join(", ")
+       + `; the judge rejects take 197's reopened drawer, a sheet left up and a tap that never opened Tools (${plants.length} plants)`);
+  } else console.log("  --   A279 · the map's HD button is not drawn in this bundle (no imagery): skipped, absence named");
   { const parentOk = (a, b) => a.tool === "c-about" && a.title === "About this build" && b.tool === "c-diag" && b.title === "Diagnostics";
     ok(parentOk(dg.about, dg.backTo) && !parentOk(dg.about, dg.viaTab),
        `A256 · About this build opens under Diagnostics ("${dg.about.title}": "${dg.about.text.replace(/\s+/g, " ")}") and back returns to `

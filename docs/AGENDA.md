@@ -1,6 +1,6 @@
 # AGENDA
 
-*Current as of take 197.* Ranked by blocking-ness, not by interest.
+*Current as of take 198.* Ranked by blocking-ness, not by interest.
 
 **Every item lists what has been RULED OUT and with what evidence.** Keep it that
 way, so nobody re-derives a dead end.
@@ -1438,7 +1438,7 @@ saved routes, the ride HUD, breadcrumb and retrace.
 - **Blocked on:** A110 and A91. Build the layers before building the shell that
   organises them, or the shell is designed against guesses.
 
-## A112 — Paddle mode: the Au Sable corridor · PROPOSED take 89
+## A112 — Paddle mode: the Au Sable corridor · PROPOSED take 89 · SHIPPED as A115 (take 102: corridors, dams drawn) and A121 (takes 103–104: the paddle card) — heading corrected take 198 (A282)
 
 The maintainer wants to run the whole Au Sable, Grayling to Lake Huron — 160 river miles.
 
@@ -1810,7 +1810,7 @@ feel more premium.
   theirs worth having, and the two-tier statewide plan already approximates it
   without a server.
 
-## A117 — Rivers, lakes and river access, properly · JACOB'S NEXT PRIORITY, after the overhaul
+## A117 — Rivers, lakes and river access, properly · THE MAINTAINER'S PRIORITY after the overhaul · the corridor, access points in river order with the gaps, and the dams SHIPPED (A115 take 102, A121 takes 103–104); NHD geometry and a time estimate OPEN (A115) — heading corrected take 198 (A282)
 
 The maintainer, take 98: *"I'm making rivers and lakes a priority as well, where they're
 drawn on the map properly with all major drops/pickups or campgrounds"* — and,
@@ -2281,7 +2281,7 @@ route profiles at 84–102 ms, suites green (smoke 274+/5 modes, render 124).
   A96 typed arrays, residential display layer) → A136/A137 references and
   modes.
 
-## A139 — Great Lakes destination POI · RECORDED take 118 (the maintainer)
+## A139 — Great Lakes destination POI · RECORDED take 118 (the maintainer) · lighthouses SHIPPED take 131 (tools/poi.py, src/app.html "A139 (take 131)"); the major launches OPEN (source: DNR Boating Access Sites, not chosen) — heading corrected take 198 (A282)
 
 The big lakes are not rivers: no put-ins/take-outs, no float times — corridor
 treatment does not apply and never will. What they get instead, in a future
@@ -2343,19 +2343,19 @@ reseal must bump the take, not reuse it.
 - **Do:** verify Δ on Bull Gap after the next build; if it is still 49 ft
   with a bundle hash of 3509f18c or later, THEN the cache is the suspect.
 
-### A142 — the tan state wash covers the map · P1 · statewide visual
+### A142 — the tan state wash covers the map · P1 · statewide visual · BUILT take 121 (src/app.html "A142 (take 121)")
 At state/regional zoom the context land polygon draws OVER landcover: the
 whole peninsula reads as a flat tan sheet with a dark outline (the maintainer's
 "tan overlay covers the map"). Move the land fill beneath the ground
 layers or fade it out by z8; keep the outline.
 
-### A143 — POI prominence tiers · P2 · trip planning
+### A143 — POI prominence tiers · P2 · trip planning · BUILT take 121, made stable take 123 (A151)
 "Major" places — trailheads, campgrounds, riding areas, dunes, launches —
 should be ~2× the badge size and visible from ~10 mi out (z≈9); food, fuel,
 stores from ~3 mi (z≈11+). Today one size, one minzoom. Two tiers in the
 poi payload (`t: 1|2`), two symbol layers.
 
-### A144 — bottom sheet bleeds into the Layers/Locate/Search row · P2
+### A144 — bottom sheet bleeds into the Layers/Locate/Search row · P2 · BUILT take 121
 Screenshots at Silver Lake: the folded sheet's top edge overlaps the
 button row. Fold height vs button row bottom margin; check on the Fold's
 411×960 inner screen with the Android gesture bar.
@@ -2363,28 +2363,28 @@ button row. Fold height vs button row bottom margin; check on the Fold's
 (landmines 87, 95; tools/render.mjs labels it "fold (cover screen)"). The
 inner screen has never been measured (A197 Q3).*
 
-### A145 — elevation readout + basemap selector: move up, recolour · P3
+### A145 — elevation readout + basemap selector: move up, recolour · P3 · BUILT take 121
 Now the quick chips are gone the top-left stack can rise; the readout is
 white and invisible on the light map (fine on Hybrid). Use the chrome
 dark on light, white on sat — same rule as the labels' halo.
 
-### A146 — missing lake access: beaches, launches, parks · P2 · data
+### A146 — missing lake access: beaches, launches, parks · P2 · data · BUILT take 121 (unnamed slipways and beaches ship, tools/poi.py); DNR Boating Access Sites not ingested (with A139)
 Waterford: Pontiac Lake beach, Dodge Park, public kayak launches absent.
 poi.py tags to widen: leisure=beach_resort, natural=beach (named),
 leisure=slipway, canoe=put_in / canoe=yes, leisure=park with water access,
 DNR Boating Access Sites (DNR has a BAS layer — authoritative, like the
 scramble areas). Ties into A139 (Great Lakes destinations).
 
-### A147 — How-to guide did not open on first launch · P3
+### A147 — How-to guide did not open on first launch · P3 · BUILT take 133 (the key versioned with the guide)
 It works from Tools; one launch showed a broken card (screenshot
 6ddfb0.jpg) that self-healed after load. Likely a race between the guide
 and the loader on the 38 MB graph parse.
 
-### A148 — compass phases in and out · P3
+### A148 — compass phases in and out · P3 · folded into A201 (OPEN, waits on the phone's COMPASS line)
 Heading reads well but skips/fades while in use. Magnetometer sample
 smoothing / stale-reading fallback to GPS course while moving.
 
-### A149 — self-test drives the map to Bull Gap · P4 · box-era premise
+### A149 — self-test drives the map to Bull Gap · P4 · box-era premise · BUILT take 121
 stRouting drills Bull Gap → Pink Store (hardcoded box anchors, landmine
 197) and leaves the map there; the maintainer read it as the app "zeroing". Derive
 the drill from the anchors nearest the rider and restore the view after.
@@ -2479,7 +2479,7 @@ grid builds lazily so it may or may not fall inside the timed window. Report
 all six calls separately plus window.__gridMs (exposed at A96, never read)
 before optimising anything.
 
-### A156 · P1 · out-of-state bleed (the maintainer, 24331) — DATA, do before A151
+### A156 · P1 · out-of-state bleed (the maintainer, 24331) — DATA, do before A151 · BUILT take 122 (tools/ingest.py clips to the state; gate 6c3 holds the polygon). The number is also "## A156 — Ski & snowboard hills"; neither is renumbered (A93)
 Agency layers are fetched with the region BBOX and never clipped to the state
 polygon. 7,413 of 474,047 edges sit outside every Michigan county: Lakeland
 ATV and Price County snowmobile trails (Wisconsin), Chequamegon-Nicolet forest
@@ -2525,7 +2525,7 @@ data-derived trail country (was vacuous at Silver Lake for three takes).
 - **Ruled out:** hardcoding a trail-country coordinate for trail-names
   (landmine 197) — it is derived from the nearest designated edge to CTR.
 
-### A136/A137 · Modes — DESIGNED, not built (docs/DESIGN-modes.md)
+### A136/A137 · Modes — DESIGNED (docs/DESIGN-modes.md) · BUILT: the table and chip take 125, the picker take 130, Hunt take 132, Camp take 174 (src/app.html MODES: Off-road, Outdoors, Hunt, Water, Camp); DNR Boating Access Sites not ingested (A139) — heading corrected take 198 (A282)
 Three modes as presets over tables that already exist: Ride (ORV/MTB),
 Outdoors (hike/camp/fish/hunt), Water (beach/kayak/tube/boat). Foot routes
 (69,628) and bike routes (2,949) are already in the bundle, show-only, never
@@ -3407,7 +3407,7 @@ the bundle's OSM date, on the card like every other pin's source line.
   are kept by the region's box, as the other OSM layers are, so the
   border's slivers show (a plate reader in Sylvania, Ohio).
 
-## A190 — HD download tiers: this view, this county, whole state at z13 · BUILDING (H1 take 178 · H2 take 179 · field verdict pending)
+## A190 — HD download tiers: this view, this county, whole state at z13 · BUILT (H1 take 178 · H2 take 179) · field verdict pending
 The maintainer asked whether "download all of Michigan" is possible. Measured:
 z13–15 statewide is 877,182 tiles and ~22.8 GB — not offered. z13 alone
 is 41,904 tiles / ~860 MB over the bounding box, and clipping to the
@@ -3949,7 +3949,7 @@ before a build, judged on the Fold.
   strokes source with twin layer ids (17 ids to keep in lock-step); chaining
   minor (Hybrid draws it only from z11.5, so it would be pure cost).
 
-## A203 — UI overhaul: easier, better looking, more premium, same features and more · DESIGNED (V4 study, docs/DESIGN-v4.md) · BUILDING: take 187 the foundation, take 188 the study's 188–190
+## A203 — UI overhaul: easier, better looking, more premium, same features and more · DESIGNED (V4 study, docs/DESIGN-v4.md) · BUILT: take 187 the foundation, take 188 the study's 188–190, take 190 artboards 10–23 (A247–A264); the Fold's verdict pending — heading corrected take 198 (A282)
 The maintainer, 2026-09-23: "At some point I would like to do what I did
 with pins and do a UI overhaul of some kind." An umbrella for A197, A200
 and A202 and whatever the tester round adds; not a take of its own until a
@@ -5839,7 +5839,7 @@ as closed (INFERRED, the likely half).
   and scrolls the first row into the panel's view before the tap (a
   rider's thumb would). `--only=tools` and `--only=tools,ui` both passed.
 
-## A279 — Back tapped while the HD card is still loading leaves the Tools strip over the map · FOUND take 196 (render probes, PROVEN in render) · OPEN
+## A279 — Back tapped while the HD card is still loading leaves the Tools strip over the map · FOUND take 196 (render probes, PROVEN in render) · BUILT take 198
 The map's HD button opens HD imagery under Tools; its card is written after
 a storage read (about 300 ms in render). In render, Back tapped at 700 ms
 on a section run, before the card had landed, read the sheet's tool as null,
@@ -5859,6 +5859,28 @@ strip's visibility after Back at 0, 100, 200 and 300 ms from the HD tap.
   the map's HD button does not land on the HD tool from this state, and
   whether the phone does the same (UNKNOWN); intended (plan190 §4) is "the
   map's HD button opens the same tool under Tools, and back folds".
+- **Found, take 198 (PROVEN by reading hdCard, then in render):** the card
+  is written after a storage read, and the write went through show() even
+  when the rider had left. Back folded the drawer, then the late card
+  opened it again on the Map tab with no sheet: the drawer open and the
+  Tools strip over it, the state A279 recorded. From the Map tab the read
+  is slow in render because the drawer opens from folded and every step of
+  its slide redraws the map (A241); before it lands the sheet shows the
+  Tools index, which is why "the HD tool never registered".
+- **Built, take 198:** a card the rider left is not written. Still there
+  means the HD tool up, or the Tools index its row was tapped from with no
+  other row's card pending (src/app.html hdCard). Render's A279 drill
+  measures the read's own time, then from the Map tab taps HD and goes back
+  at 0 and 150 ms by the sheet's back row and by the phone's Back (onBack),
+  each watched for three times the read: the drawer stays folded on Map
+  with no sheet. On take 197's build it fails (the drawer opened again
+  after the 150 ms Back, PROVEN); its judge rejects 3 plants.
+- **Ruled out (measured, take 198):** opening the tool at once with a
+  one-line "reading" card. The drawer shrank to the line and grew back, and
+  in render the card then took 4.4 s to land against under 0.7 s (A259's
+  drill failed on it). A late card dropped is the whole fix.
+- **Ruled out:** a timer that ignores Back for a moment after the tap; a
+  rider's Back is never swallowed.
 
 ## A280 — Google Play refused the listing: "Insufficient Sources Provided" · FOUND 2026-11-06 (Play's review, the maintainer's note 2026-11-07) · BUILT take 197 (the console is the maintainer's)
 Play, under the Misleading Claims policy: "Your app's description statement
@@ -5885,4 +5907,45 @@ was wrong, PROVEN by reading:
   the listing; the photo credit stays, and the source is listed too).
 - **Ruled out:** a second hand-written copy of the list in play_assets.py
   (it is what drifted; landmine 107).
+
+## A281 — HD stats read every saved tile into memory to count them · FOUND take 198 (code read; measured in render) · BUILT take 198
+`HD.stats()` (src/app.html, the saved-HD store) called `getAll()`, which
+loads every saved tile's bytes into the page to count tiles and add up
+sizes. It runs at every start (`hdChip`), every time the HD card opens and
+at the end of every save. A whole-state save is about 12,500 tiles and 180 MB
+(A190), so each start would pull 180 MB into the WebView's memory beside a
+38 MB graph (INFERRED from the code; the phone's cost UNKNOWN, no phone here).
+- **Built, take 198:** the store is version 2 with an index on each tile's
+  size (`s`). stats() takes the count from count() and the bytes from the
+  index's keys (openKeyCursor), so no tile's bytes leave the store. The
+  upgrade builds the index over the tiles already saved, inside the
+  browser. The store is made by `hdStore(name)`, so render opens a scratch
+  version-1 store holding three tiles through the same code.
+- Held by render's A281 drill (section imagery): stats() with every
+  IndexedDB read counted, value reads 0 and one key cursor; 4 tiles of
+  known sizes counted to the byte, 0 after clear; a version-1 store with 3
+  tiles upgrades to version 2 with the index and counts 3 tiles, 42,600 B.
+  The judge rejects 3 plants (take 197's getAll among them); a mutant of
+  the built app with take 197's stats() fails it (PROVEN).
+- **Ruled out:** a running total kept beside the tiles. Every put of a tile
+  already saved would have to read the old size first, and a total that
+  drifts says the wrong megabytes forever; the index cannot drift.
+- **Ruled out:** a value cursor (one tile at a time). It still reads all
+  180 MB from storage, only not at once.
+
+## A282 — Agenda headings that read open for work shipped long ago · FOUND take 198 (the session's start, reading the agenda) · BUILT take 198
+CLAUDE.md's read order greps the agenda for OPEN, BUILDING, DESIGNED and
+pending. Fifteen headings read as open work that the code shows shipped,
+and cost this session's start time: A112 (PROPOSED take 89; shipped as A115
+and A121), A117 (the maintainer's "next priority"; its corridor, river-order
+access and dams shipped in takes 102–104), A139 (lighthouses shipped take
+131), A142–A147 and A149 (built takes 121–133, each with its marker in
+src/app.html or tools/poi.py), A148 (folded into A201), the out-of-state
+bleed numbered A156 (built take 122), A190 (BUILDING; built takes
+178–179), A136/A137 (modes "not built"; five modes built takes 125–174)
+and A203 (BUILDING; the V4 overhaul built takes 187–190). Each heading now says what shipped, citing the code, and what is
+still open. A117's heading named the maintainer; it says "the maintainer".
+- **Ruled out:** renumbering the two A156 items (A93: never renumber).
+- **Ruled out:** rewriting the bodies. They are the record of what was
+  proposed; the heading is the status.
 

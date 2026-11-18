@@ -1,4 +1,136 @@
-# HANDOFF — through Take 197 · V3
+# HANDOFF — through Take 198 · V3
+
+## Take 198 — 2026-11-18 — Back before the HD card lands folds and stays folded (A279); HD stats stop reading every saved tile (A281); stale agenda headings corrected (A282)
+
+RECORDED FIRST. The maintainer, 2026-11-18: "go, build take 198 -
+potentially 199 and 200. You have permission to work until my usage is up.
+One large PR or a bunch of small PRs - your choice", then "I won't be
+around to merge 198, so ensure you continue afterwards automatically" (the
+standing go of 2026-11-02 lets a session merge its own pull request once CI
+is green). Built on main c77faf4 (take 197).
+
+Take 197's CI, recorded here (PROVEN from the logs):
+- PR #14's run: the cache was restored from main's key, and every compute
+  step re-ran, because tools/stepstamp.py is an input to each one; the
+  pipeline took 799 s (cold 2,538 s). A10 on real data, from graph.py:
+  896 of 28,561 agency lines take the surface of the OSM duplicate on them
+  (22,017 cells from 30,133 points of dropped duplicates with a surface);
+  103,342 OSM lines carry their own. Smoke 9n: 205,629 of 578,359 edges
+  carry a surface (202,895 OSM, 2,734 DNR/USFS). check_sources_credited,
+  check_surface_rules, the render and the gate passed.
+- main's run 127 (c77faf4): bundle job 39 min, apk 4 min; release take-127
+  "APEX ORV — take 197" with the APK, the AAB and play-assets-197.zip;
+  CI tagged t197. The zip's listing.md holds the 3,933-character
+  description the maintainer pastes into Play Console (A280), checked
+  against the file the session sent.
+
+A279 — Back before the HD card lands. Found by reading hdCard, then proven
+in render: the card is written after a storage read, and the write went
+through show() even when the rider had left. Back folded the drawer, then
+the late card opened it again on the Map tab with no sheet, the Tools strip
+over it: the state take 197 measured. Before it lands the sheet shows the
+Tools index, which is why "the HD tool never registered". From the Map tab
+the read is slow in render (3.0 s here) because the drawer opens from
+folded and each step of its slide redraws the map (A241).
+- The fix: a card the rider left is not written (still there: the HD tool
+  up, or the Tools index its row was tapped from, no other card pending).
+- Render's A279 drill (section tools): it measures the read's own time,
+  then from the Map tab taps HD and goes back at 0 and 150 ms by the
+  sheet's back row and by the phone's Back (onBack), each watched for
+  three times the read. The drawer must stay folded on Map with no sheet.
+  The judge rejects 3 plants. On take 197's build it fails: after the
+  150 ms Back the late card opened the drawer again (PROVEN).
+- **Ruled out (measured):** opening the tool at once with a one-line
+  "reading" card. The drawer shrank to the line and grew back, and the
+  card took 4.4 s to land against under 0.7 s; A259's drill failed on it.
+
+A281 — HD stats read every saved tile. `HD.stats()` called getAll(), which
+loads every saved tile's bytes into the page to count them, at every start
+(hdChip), every HD card and every save's end; a whole-state save is about
+12,500 tiles and 180 MB (A190). INFERRED from the code: each start pulled
+that into the WebView beside the 38 MB graph; the phone's cost is UNKNOWN.
+- The store is version 2 with an index on each tile's size; stats() counts
+  with count() and sums the index's keys (openKeyCursor), so no tile's
+  bytes leave the store. The upgrade builds the index over the tiles
+  already saved. `hdStore(name)` makes the store, so render opens a scratch
+  version-1 store with tiles in it through the same code.
+- Render's A281 drill (section imagery): every IndexedDB read counted
+  while stats() runs, value reads 0 and one key cursor; 4 tiles of known
+  sizes counted to the byte; 0 after clear; a version-1 store holding 3
+  tiles upgrades to version 2 with the index and counts 3 tiles, 42,600 B.
+  3 plants rejected; a mutant of the built app with take 197's stats()
+  fails it.
+
+A282 — fifteen agenda headings read as open for work the code shows
+shipped (A112, A117, A136/A137, A139, A142–A149, the bleed numbered A156,
+A190, A203). Each says what shipped, citing the code, and what is still
+open.
+
+The review of take 198 (the code-review skill, 7 findings; 4 fixed, 3
+left):
+- render's A279 drill now requires one Back to come before the card lands
+  (the index at the tap); a fast read would have passed it untested;
+- the same late card outside a sheet (a save's end redrawing the card) is
+  dropped when the rider folded the drawer meanwhile;
+- the HD store shares one pending open: the boot's hdChip and the tile
+  resolver opened together and made two connections, and a versionchange
+  closed whichever one `db` named; each connection now closes itself;
+- stats() settles when its transaction aborts, instead of never;
+- left: onblocked rejects while the open stays alive (the next call finds
+  it); the tiers are planned before the read (planned after, "this view"
+  would quote the view after the drawer moved); the per-tile key walk at
+  start (A281 rules out a running total).
+- considered: take 197's code never meets the version-2 store. Android
+  refuses a lower versionCode, and versionCode is the take (A177).
+
+What I got wrong:
+- the first A279 fix opened the tool at once with a placeholder card, and
+  made the card four times slower to land; measured, and ruled out;
+- the comment I wrote above the MapLibre pin quoted the very URL it was
+  about, and the gate's host scan failed CI round 2 on it; the 37 gate
+  checks were not run on the CI fix before it was pushed;
+- the A279 drill first timed the read by counting tier cards in the panel,
+  and on take 197's build counted the hidden ones left by an earlier drill
+  (0 ms; landmine 264). It counts cards on screen under the HD tool, and
+  the time has a floor.
+
+Verified here (Chrome 138; the bundle of main's newest green run, plus this
+container's hazards payload and slope bands):
+- smoke, all five passes PASSED on the final build: 300 / 212 / 54 ok,
+  fatal 6, dead 33;
+- render, the full run PASSED on the final build: 685 ok, 0 failed (the
+  contour-lines line names its absence, as before);
+- render `--only=imagery,tools` PASSED before the review's fixes, A279's
+  read 3.0 s from the Map tab;
+- watched failing: the A279 drill on take 197's build (the late card
+  opened the drawer after the 150 ms Back); the A281 drill on a mutant of
+  the built app with take 197's stats() (value reads 1, key cursors 0);
+- the 37 gate checks that need no pipeline output PASSED.
+UNKNOWN until the phone: the HD read's time on the Fold, and what the start
+costs after a whole-state save there.
+
+CI, round 1 (PR #15, run 131, PROVEN from its log): the cache was not
+found for any key (main's last save was run 127 on 2026-11-08, ten days
+before; INFERRED: GitHub evicts a cache unused for seven days), so the
+build was cold: pipeline 1,640 s, every compute step stamped afresh.
+Smoke passed five times (607), render passed (685), and the gate failed
+one check: check_offline found `https://maplibre.invalid/` in
+vendor/maplibre-gl-csp.js. ci/bundle.sh fetched `maplibre-gl@5` from
+unpkg, which now resolves 5.24.1; take 197 shipped 5.24.0 (landmine 265).
+Reproduced here: the same failure with 5.24.1's file in www/vendor, a
+pass with 5.24.0's (byte-identical to take 197's APK: sha256 a1f1847b…).
+The fix: ci/bundle.sh fetches 5.24.0 and checks the three files' sha256
+against take 197's; a 5.24.1 file stops the build with the landmine named
+(tested). A failed job saves no cache, so round 2 is cold too.
+
+CI, round 2 (run 132, PROVEN from its log): cold again, pipeline 1,917 s;
+the three MapLibre files passed their hashes, render passed, and the gate
+failed one check: check_provision found "maplibre.invalid in bundle.sh".
+My own comment above the pin had quoted the URL, and the manifest's host
+scan reads ci/ files, comments and all. Reproduced here (the same line),
+reworded (the comment names "a reserved .invalid host" without the host),
+and check_provision with check_offline and the other 35 checks that need
+no pipeline output passed before round 3 went up.
 
 ## Take 197 — 2026-11-07 — Every data source named, in the app and the store listing (A280); the trail card's surface (A10); the step stamps ignore the import system's scans (A207)
 

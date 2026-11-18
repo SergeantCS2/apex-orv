@@ -24,9 +24,23 @@ cp "bundles/${REGION}/manifest.json" www/bundle/manifest.json
 mkdir -p www/vendor
 # CSP build plus a real worker file: Android WebView cannot start MapLibre's
 # blob: worker, so every source-backed layer drew nothing (landmine 47).
+# take 198 · landmine 265: an EXACT version, and the files held to the bytes
+# take 197 shipped. "maplibre-gl@5" floated: unpkg resolved 5.24.1 after
+# take 197 built with 5.24.0, its main script carries a new origin string
+# (a reserved .invalid host, never named here: the gate's host scan reads
+# this file), and the gate's offline check failed a build
+# whose code had not changed (PR #15's run 131). A new MapLibre is a take of
+# its own, with its hashes and the licence check's pin moved together.
+ML=5.24.0
 for f in maplibre-gl.css maplibre-gl-csp.js maplibre-gl-csp-worker.js; do
-  curl -fsSL -o "www/vendor/$f" "https://unpkg.com/maplibre-gl@5/dist/$f"
+  curl -fsSL -o "www/vendor/$f" "https://unpkg.com/maplibre-gl@${ML}/dist/$f"
 done
+( cd www/vendor && sha256sum -c - <<'SUMS'
+ab1e70d59ec40465bae7e7030da2f3ccf28133fd502e62bd598eefbadfd7a732  maplibre-gl.css
+a1f1847bac64aa00acbf80fbb79b2c5af24d8eecaaa5e2ad14080fab81f1de95  maplibre-gl-csp.js
+f950e7b15c49c8b9c7bb52136df2a2df2f6f03b83b8927774573fc98b067f7f0  maplibre-gl-csp-worker.js
+SUMS
+) || { echo "bundle: the vendored MapLibre ${ML} is not the one take 197 shipped (landmine 265)"; exit 1; }
 test -s www/vendor/maplibre-gl-csp-worker.js
 
 # The render check found a map that had drawn nothing for 14 takes. Without a
