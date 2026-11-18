@@ -3927,6 +3927,7 @@ function trackDraw(){
 function truckPin(){
   if(!tM)tM=new maplibregl.Marker({element:mk('truck','truck')}).setLngLat(TRUCK).addTo(map);
   else tM.setLngLat(TRUCK)}
+var TRUCK_KEPT=null,STOP_T=0;
 function startRecording(at){
    
   if(RESUMING){RESUMING=false;
@@ -3941,7 +3942,15 @@ function startRecording(at){
      
     hudShow(true);
     return}
+   
+   
+  var oldT=(TRUCK&&STOP_T&&Date.now()-STOP_T<12*3600e3)?TRUCK.slice():null,kept=null;
   TRUCK=at.slice(); crumbs=[at.slice()]; crumbMi=0;
+  if(oldT&&mi(oldT,at)>0.1){var tn;try{tn=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}catch(e){tn='earlier'}
+    kept=markUnique('Truck before '+tn);
+    if(wpAdd({n:kept,p:oldT,r:BUNDLE.region||null,ts:Date.now()})){try{wpDraw()}catch(e){}TRUCK_KEPT=kept;
+      toast('The truck is pinned here now. Its last spot is saved as \u201c'+kept+'\u201d (Saved, on the Plan tab).',5000)}
+    else kept=null}
   rideStart(at);
   hudShow(true);
   truckPin();
@@ -4669,7 +4678,10 @@ function gpsStart(onFix,onFail){
 function gpsStop(){
   if(watchId===null)return;
   gpsClear(watchId);watchId=null}
-function stopReal(){var had=gotFix,wasRes=RESUMING;
+ 
+function STOP_NOTE(){return TRUCK?'<div class="sub">Ride again starts a new trip and pins the truck where you are then; '+
+  'within 12 hours, its spot now is kept under Saved.</div>':''}
+function stopReal(){var had=gotFix,wasRes=RESUMING;STOP_T=Date.now();
   gpsStop();rideMode=null;posMode=gotFix?'gps':'none';gotFix=false;
    
   RESUMING=false;RESUMED_RIDE=null;
@@ -4683,7 +4695,7 @@ function stopReal(){var had=gotFix,wasRes=RESUMING;
     (crumbs.length>1?(wasRes?' Its ':' The last ')+'track ('+crumbMi.toFixed(2)+
       ' mi) is still on the map; <b>Retrace</b> follows it back.':''),'');
   if(!R)return show('Recording stopped. <b>'+crumbMi.toFixed(2)+
-    ' mi</b> on the track. <b>Retrace</b> follows it back.','');
+    ' mi</b> on the track. <b>Retrace</b> follows it back.'+STOP_NOTE(),'');
   logAct('ride end '+(R.hrs*60).toFixed(0)+'min '+R.fixes+' fixes');
   var txt=rideReport(R);
   show('<b>Ride recorded — '+crumbMi.toFixed(2)+' mi</b><br>'+
@@ -4691,7 +4703,7 @@ function stopReal(){var had=gotFix,wasRes=RESUMING;
     (R.medAcc!==null?' · median ±'+Math.round(R.medAcc*3.281)+' ft':'')+
     (R.drops?' · <b>'+R.drops+' GPS dropouts</b>':' · no dropouts')+
     (R.drain!==null?' · '+(R.drain*100).toFixed(1)+'% battery':'')+'</span><br>'+
-    '<b>Retrace</b> follows the track back.'+
+    '<b>Retrace</b> follows the track back.'+STOP_NOTE()+
     '<div style="margin-top:8px"><button class="chip" id="rr-copy">Copy ride report</button> '+
     '<button class="chip" id="rr-share">Share</button></div>','');
   var cp=el('rr-copy');

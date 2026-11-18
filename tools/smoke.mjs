@@ -4981,6 +4981,7 @@ if (!NO_GPS) {
     fix(north(30), { speed: 1 }); flushTimeouts(); frames(1);
     c30 = String(grab("v-truck").textContent || ""); p30 = N.peekText(); }
   stop();
+  const stopCard = String(grab("panel")._html || "").replace(/<[^>]*>/g, " ");
   /* A313 · the compass says where its bearings are measured from */
   const SX = sandbox.window.__sheet; let cmpTxt = "";
   if (SX && T) { SX.tab("tools"); flushTimeouts(); grab("c-compass").fire("click"); flushTimeouts();
@@ -4990,6 +4991,20 @@ if (!NO_GPS) {
   const ok313 = (t) => from313.test(t) && t.search(from313) < t.indexOf("Truck");
   ok(ok313(cmpTxt) && !ok313(cmpTxt.replace(from313, "")),
      `A313 · the compass's rows say where they are measured from before the first bearing ("${(cmpTxt.match(/From [^|]*/) || ["none"])[0].trim()}"); the judge rejects take 201's rows with no origin`);
+  /* A315 · Ride again 0.3 mi away: a new trip pins the truck there, and the
+     spot it held is kept as a waypoint */
+  const SVx = sandbox.window.__saved, wp0 = SVx ? SVx.wpLoad() : [];
+  let T2 = null, keptW = null;
+  if (T && SVx) { grab("c-ride").fire("click"); flushTimeouts();
+    const C = [T[0], T[1] + 0.3 / 69]; fix(C, { speed: 2 }); flushTimeouts(); frames(1);
+    T2 = N.truck(); keptW = SVx.wpLoad().find((w) => /^Truck before /.test(w.n)) || null;
+    stop(); SVx.wpWrite(wp0); }
+  const s315 = { note: /Ride again starts a new trip and pins the truck where you are then/.test(stopCard),
+                 moved: !!T2 && Math.abs(T2[1] - (T[1] + 0.3 / 69)) < 1e-6, kept: !!keptW && Math.abs(keptW.p[0] - T[0]) < 1e-9 && Math.abs(keptW.p[1] - T[1]) < 1e-9 };
+  const ok315 = (x) => x.note && x.moved && x.kept;
+  ok(ok315(s315) && !ok315({ ...s315, kept: false }) && !ok315({ ...s315, note: false }),
+     `A315 · the Stop card says Ride starts a new trip that re-pins the truck (${s315.note}); Ride again 0.3 mi away pins it there (${s315.moved}) `
+     + `and keeps the old spot as "${keptW ? keptW.n : "nothing"}" (${s315.kept}); the judge rejects take 201's lost truck and a silent Stop card`);
   const st = { T: !!T, c140, p140, c30, p30 };
   const okT = (x) => x.T && x.c140 === "140 ft S" && x.p140 === "Truck 140 ft S" && x.c30 === "here" && x.p30 === "Truck here";
   ok(okT(st) && !okT({ ...st, c140: "0.0 S", p140: "Truck 0.0 mi S" }) && !okT({ ...st, c30: "0.0 S" }),
