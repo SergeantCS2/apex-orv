@@ -515,6 +515,10 @@ ok(netF > 1000, `net source carries real geometry (${netF} features)`);
     track: "two-track: 90.1-94.7% kept at z7 unchained, 704,198 stroke vertices (65% of the ten-class strokes)",
     paved: "paved: 89.6-96.9% kept at z7 unchained, 190,401 stroke vertices (18%)",
     minor: "minor: Hybrid draws it from z11.5 only, so a stroke could never draw",
+    /* take 203 · A322 · hiking trails (walk only), drawn per edge as they
+       were while bundles shipped them as two-track; a bundle built before
+       take 203 has none (CI's run 151 found the class in the net source) */
+    foot: "foot: hiking trails, per edge as while they shipped as two-track",
   };
   const SKIPC = Object.keys(D7_SKIP);
   const g8set = (sc, app, des) => sc.length > 0 && des.length === 5 && des.every((c) => sc.includes(c)) && !sc.some((c) => SKIPC.includes(c))
@@ -529,7 +533,8 @@ ok(netF > 1000, `net source carries real geometry (${netF} features)`);
   const unchained = (sc) => netCls.filter((c) => !SKIPC.includes(c) && !sc.includes(c));
   ok(unchained(SCOPE.filter((c) => c !== "fsroad")).join() === "fsroad",
      "G8 · the coverage judge names fsroad when a planted scope leaves it out");
-  ok(netCls.length > 5 && unchained(SCOPE).length === 0 && SKIPC.every((c) => netCls.includes(c)),
+  const hasFoot = !!(sandbox.window.__route && sandbox.window.__route.EDGES.some((e) => e.c === "foot"));
+  ok(netCls.length > 5 && unchained(SCOPE).length === 0 && SKIPC.every((c) => netCls.includes(c) || (c === "foot" && !hasFoot)),
      `G8 · every drawn network class is chained or recorded per-edge (${netCls.length} classes in the net source; per edge: ${SKIPC.join(", ")})`
      + (unchained(SCOPE).length ? " — NOT CHAINED AND NOT RECORDED: " + unchained(SCOPE).join(", ") : "")
      + (SKIPC.every((c) => netCls.includes(c)) ? "" : " — recorded but not in the net source: " + SKIPC.filter((c) => !netCls.includes(c)).join(", ")));
@@ -1817,8 +1822,10 @@ if (!NO_GPS) {
      review ran this at 19:45, past sunset). Here the rider sits where the
      restart above left them, far off the network, so the re-planned route is
      long. The block therefore runs with the range OFF and on a pinned clock —
-     04:00 at midsummer — so the quiet case has neither warning, and each
-     loud case switches on exactly one: a 0.01 mi range, then a winter night.
+     a quarter hour after sunrise at midsummer, where the rider is (take 203,
+     A327: it was 04:00, which is before sunrise, and the card now says so)
+     — so the quiet case has neither warning, and each loud case switches on
+     exactly one: a 0.01 mi range, then a winter night.
      Only `new Date()` with no argument is pinned; Date.now keeps running,
      moved on by `skew` ms wherever the re-route's 20-second debounce has to
      have passed. Range and clock are restored at the end. */
@@ -1829,7 +1836,12 @@ if (!NO_GPS) {
     static now() { return RealDate.now() + skew; }
   }
   sandbox.Date = PinnedDate;
-  pinAt = new RealDate(2026, 5, 21, 4, 0).getTime();           /* 04:00, midsummer */
+  {
+    const RS = sandbox.window.__route, me = RS && RS.ME ? RS.ME : null,
+          st = (RS && RS.sun && me) ? RS.sun(me[1], me[0], new RealDate(2026, 5, 21, 12, 0)) : null;
+    pinAt = st ? new RealDate(2026, 5, 21, 0, 0).getTime() + Math.round((st.rise + 0.25) * 3600000)
+               : new RealDate(2026, 5, 21, 10, 30).getTime();  /* sunrise + 15 min, midsummer */
+  }
   const fuel0 = N && N.fuel ? N.fuel() : null;
   if (N && N.fuel) N.fuel(0);                                  /* range off */
   if (N && N.card) {
@@ -3020,7 +3032,17 @@ if (!NO_GPS) {
         /* off the line: a point ~450 m to the side of the line a little ahead */
         const ka = Math.min(pts.length - 2, cum.findIndex((m) => m >= cum[k1] + 300));
         const dx = pts[ka + 1][0] - pts[ka][0], dy = pts[ka + 1][1] - pts[ka][1], L = Math.hypot(dx, dy) || 1;
-        const off = [pts[ka][0] - (dy / L) * 0.0045 / Math.cos(pts[ka][1] * Math.PI / 180), pts[ka][1] + (dx / L) * 0.0045];
+        /* take 203 · the side the app's own projection says is clear of every
+           stretch of the loop (as render's drill does): a fixed side lands
+           beside another stretch when the loop doubles back, and is then not
+           off route at all. A322 changed this loop's shape and found that */
+        const offAt = (k) => [pts[ka][0] - (dy / L) * k / Math.cos(pts[ka][1] * Math.PI / 180), pts[ka][1] + (dx / L) * k];
+        /* and one from which this machine has a legal way back: since A322 a
+           spot beside the loop can snap to ridable lines that joined it only
+           through a hiking trail, and "No legal route" is then the true answer */
+        const RR = sandbox.window.__route, back = (c) => { const n0 = RR.nearestNode(c); return n0 >= 0 && !!RR.route(n0, G.o.nb, RR.PROFILES[0].f); };
+        let off = offAt(0.0045);
+        for (const k of [0.0045, -0.0045, 0.006, -0.006, 0.0075, -0.0075, 0.004, -0.004]) { const c = offAt(k), pr = N.project(c); if (pr && pr.off > 350 && back(c)) { off = c; break; } }
         for (let i = 0; i < 3; i++) fix(off, spd);
         flushTimeouts(); frames(1);
         const peek = String(grab("peek-txt").textContent), panel = text("panel"), strip = text("nav-g");
@@ -5191,6 +5213,437 @@ if (!NO_GPS) {
        `A318 · at a junction of ${found ? (ADJ[found.j] || []).length : "?"} lines an unnamed two-track turning ${found ? found.turn : "?"}° onto another is its own step (${found ? found.st.join(" → ") : "none found in " + seen + " junctions"}); `
        + `strip and voice name it "${nm}"; a ${through ? through.tc : "?"}° move whose other legal ways are ${through ? through.mo : "?"}° or sharper stays ${through ? through.n : "?"} step; `
        + `a fork onto the branch ${fork ? fork.tc : "?"}° off with another at ${fork ? fork.so : "?"}° is cued "${fork ? fork.w : "none found"}"; the judge rejects take 201's one merged step, a through-move cued, and a fork unsaid`);
+  }
+}
+
+/* 9zb · take 203 · A321 · a loop resumed after the app was gone is the
+   same loop, carried on from where the rider was. The trip held only the
+   loop's start and its shape key, so Resume planned a point-to-point route
+   from the last fix to the start (the take-201 audit). A real loop from the
+   chooser, ridden to about a third, saved, the app's state wiped, loaded and
+   resumed; and a trip saved on another bundle falls back, saying so. */
+if (!NO_GPS) {
+  const N = sandbox.window.__nav, R = sandbox.window.__route, MO = sandbox.window.__mode;
+  const text = (id) => String(grab(id)._html || "").replace(/<[^>]*>/g, " ");
+  const flagged = () => "ride" in grab("shell").dataset;
+  const fix = (p, extra) => geo.cb && geo.cb({ coords: Object.assign({ longitude: p[0], latitude: p[1], accuracy: 5 }, extra || {}) });
+  const stop = () => { for (let i = 0; i < 3 && flagged(); i++) { grab("c-ride").fire("click"); flushTimeouts(); frames(1); } };
+  const mode0 = MO.get(), mach0 = R.machine;
+  /* a midsummer afternoon at Mio, pinned: the resumed route's card opens
+     instead of the peek line when it arrives after dark, so the peek this
+     drill reads depended on the hour it ran (the narrow mutant ran in the
+     evening and read the ride's peek line; landmine 272) */
+  const RD321 = sandbox.Date, pin321 = Date.UTC(2026, 5, 21, 17, 30);
+  sandbox.Date = class extends RD321 { constructor(...a) { if (a.length) super(...a); else super(pin321); } static now() { return RD321.now(); } };
+  if (mode0 === "water") { MO.apply("ride", { silent: true }); flushTimeouts(); }
+  if (!R.MACHINE[R.machine] || R.MACHINE[R.machine].mph) R.setMachine("bike");
+  stop();
+  /* the start pin where a loop exists: the Mio anchor (the region's centre
+     sits in that trail country); earlier drills leave it anywhere (landmine 270) */
+  const ME9 = R.ME.slice(), mio = (sandbox.window.PLACES || []).find((p) => p[0] === "Mio");
+  if (mio) R.setME([mio[1], mio[2]]);
+  grab("c-loop").fire("click"); flushTimeouts();
+  const pk = documentStub.querySelectorAll("[data-loop]").find((x) => x.dataset.loop === "10") || documentStub.querySelectorAll("[data-loop]")[0];
+  if (pk) { pk.fire("click"); grab("lp-find").fire("click"); flushTimeouts(); }
+  const G = N.plan(), why321 = text("panel").replace(/\s+/g, " ").slice(0, 160);
+  let s321 = { planned: !!G && G.loop, why: why321 };
+  if (G && G.loop) {
+    const pts = G.pts.slice(), cum = G.cum.slice(), total = G.total;
+    grab("c-ride").fire("click"); flushTimeouts();
+    fix(pts[0], { speed: 8, heading: 90 }); fix(pts[0], { speed: 8, heading: 90 }); frames(1);
+    for (let i = 1; i < pts.length && cum[i] < total * 0.35; i++) { fix(pts[i], { speed: 8, heading: 90 }); frames(1); }
+    const rid0 = (N.guide() || {}).rid || 0;
+    N.save(true);
+    /* the app gone: ride state AND the planned route (N.reset keeps the
+       route, and a resume that restored nothing would find the old loop) */
+    N.reset(); flushTimeouts(); grab("btn-clear").fire("click"); flushTimeouts();
+    const cleared = !N.plan();
+    /* as the Resume button does: the trip, then Ride, before the planner's beat */
+    const t = N.load(); const okRes = t ? N.resume(t) : false; grab("c-ride").fire("click"); flushTimeouts(); frames(1);
+    const G2 = N.plan(), peek = String(grab("peek-txt").textContent || "");
+    stop(); N.reset(); flushTimeouts();
+    /* a trip saved on another bundle: the route to the start, and a word */
+    let fb = null;
+    if (t && t.loop) { const t2 = JSON.parse(JSON.stringify(t)); t2.loop.bid = "another bundle"; t2.ended = false;
+      grab("btn-clear").fire("click"); flushTimeouts(); grab("toast").textContent = ""; N.resume(t2); flushTimeouts(); frames(1);
+      const G3 = N.plan(); fb = { loop: !!(G3 && G3.loop), toast: String(grab("toast").textContent || "") };
+      stop(); N.reset(); flushTimeouts(); }
+    /* the review of take 203 · a line of the loop closed since it was
+       saved: replayed blind it would be ridden; it must fall back and say why */
+    let shut = null;
+    if (t && t.loop && t.loop.p.length > 3) { const e = R.EDGES[t.loop.p[2]], c0 = e.c, t3 = JSON.parse(JSON.stringify(t)); t3.ended = false;
+      try { e.c = "closed"; grab("btn-clear").fire("click"); flushTimeouts(); grab("toast").textContent = ""; N.resume(t3); flushTimeouts(); frames(1);
+        const G4 = N.plan(); shut = { loop: !!(G4 && G4.loop), toast: String(grab("toast").textContent || "") };
+      } finally { e.c = c0; } stop(); N.reset(); flushTimeouts(); }
+    s321 = { planned: true, cleared, saved: !!(t && t.loop), resumed: okRes, loop: !!(G2 && G2.loop), total0: Math.round(total), total2: G2 ? Math.round(G2.total) : 0,
+             rid0: Math.round(rid0), base2: G2 ? Math.round(G2.base || 0) : -1, peek, fb, shut };
+  }
+  sandbox.Date = RD321;
+  R.setMachine(mach0); R.setME(ME9); if (MO.get() !== mode0) { MO.apply(mode0, { silent: true }); flushTimeouts(); }
+  const ok321 = (x) => x.planned && x.cleared && x.saved && x.resumed && x.loop && Math.abs(x.total2 - x.total0) < 30 && x.rid0 > 300 && Math.abs(x.base2 - x.rid0) < 60
+    && /the loop/.test(x.peek || "") && !!x.fb && !x.fb.loop && /could not be restored \(the map was updated/.test(x.fb.toast)
+    && !!x.shut && !x.shut.loop && /could not be restored \(part of it is not legal/.test(x.shut.toast);
+  ok(ok321(s321) && !ok321({ ...s321, loop: false, total2: 0 }) && !ok321({ ...s321, base2: 0 }) && !ok321({ ...s321, fb: { loop: false, toast: "" } })
+     && !ok321({ ...s321, shut: { loop: true, toast: "" } }),
+     `A321 · a ${s321.total0 ? (s321.total0 / 1609.34).toFixed(1) : "?"} mi loop ridden to ${s321.rid0 ? (s321.rid0 / 1609.34).toFixed(1) : "?"} mi, saved and resumed after the app was gone, is the same loop `
+     + `(loop ${s321.loop}, ${s321.total2 ? (s321.total2 / 1609.34).toFixed(1) : "?"} mi) carried on from ${s321.base2 >= 0 ? (s321.base2 / 1609.34).toFixed(1) : "?"} mi, the peek line "${(s321.peek || "").slice(0, 60)}"; `
+     + `saved on another bundle it routes to the start (${s321.fb ? "loop " + s321.fb.loop : "?"}) and says "${s321.fb ? s321.fb.toast.slice(0, 50) : ""}"; with one of its lines closed since, it falls back too (${s321.shut ? "loop " + s321.shut.loop : "?"}: "${s321.shut ? s321.shut.toast.slice(0, 70) : ""}"); the judge rejects take 202's route to the start, a progress lost and a silent fallback`
+     + (s321.planned ? "" : ` — NO LOOP PLANNED: "${s321.why}"`));
+}
+
+/* 9zc · take 203 · A322 · an agency's non-ORV line (a DNR or USFS hiking
+   trail) is walkable and never ridable. Bundles built before take 203
+   shipped the routable class `foot` as `track` (emit_graph's list lacked
+   it): 64,377 edges, 10,576 mi, legal for every ORV machine (the take-202
+   audit; this bundle is one of them). Every machine's reading over every
+   such edge, and a dirt-bike route along the Iron Belle. */
+{
+  const R = sandbox.window.__route;
+  if (!R || !R.attrs) ok(false, "A322 · route hooks missing");
+  else {
+    const mach0 = R.machine, E = R.EDGES, non = E.filter((e) => e.bi >= 0 && R.attrs(e).auth === "nonorv");
+    const legalN = {};
+    for (const m of ["bike", "quad", "sxs", "walk"]) { R.setMachine(m); legalN[m] = non.filter((e) => R.machineLegal(e)).length; }
+    /* a route between two points of the Iron Belle, a dirt bike's */
+    const ib = non.filter((e) => /Iron Belle/i.test(String(R.attrs(e).n || "") + String(e.n || "")));
+    let rt = null;
+    if (ib.length > 20) { R.setMachine("bike");
+      const a = ib[0].a, b = ib[Math.min(ib.length - 1, 15)].b, pa = R.route(a, b, R.PROFILES[0].f);
+      rt = { found: !!pa, non: pa ? pa.filter((e) => e.bi >= 0 && R.attrs(e).auth === "nonorv").length : 0, n: pa ? pa.length : 0 }; }
+    R.setMachine(mach0);
+    const s322 = { non: non.length, legalN, rt };
+    const ok322 = (x) => x.non > 1000 && x.legalN.bike === 0 && x.legalN.quad === 0 && x.legalN.sxs === 0 && x.legalN.walk > 1000 && (!x.rt || x.rt.non === 0);
+    ok(ok322(s322) && !ok322({ ...s322, legalN: { ...legalN, bike: legalN.walk } }) && !ok322({ ...s322, rt: { found: true, non: 40, n: 50 } }),
+       `A322 · of ${non.length.toLocaleString()} non-ORV agency edges a dirt bike may ride ${legalN.bike}, a quad ${legalN.quad}, a side-by-side ${legalN.sxs}, on foot ${legalN.walk.toLocaleString()}; `
+       + `${rt ? "a dirt-bike route between two points of the Iron Belle uses " + rt.non + " of them (" + (rt.found ? rt.n + " edges" : "no legal route") + ")" : "no Iron Belle in this bundle"}; the judge rejects take 202's (every one ridable)`);
+  }
+}
+
+/* 9zd · take 203 · A320 · a turn is said far at most once and near at most
+   once, a far cue never after its near one, and a re-route's new route is
+   said from its first turn. The one voice key (step number, near or far)
+   outlived a re-route, so the new route's step 1 was silent; a rider
+   stopped about 90 m short heard the cue at every fix that crossed 90 m;
+   two close turns with the same words lost the second to navSay's repeat
+   filter (the take-201 audit). A captured phone engine counts what is said
+   on a real route ridden through the guide. */
+if (!NO_GPS) {
+  const R = sandbox.window.__route, N = sandbox.window.__nav, V = sandbox.window.__voice;
+  if (!R || !N || !V || !N.guide || !R.directions) ok(false, "A320 · route, nav and voice hooks missing");
+  else {
+    const flagged = () => "ride" in grab("shell").dataset;
+    const fix = (p) => geo.cb && geo.cb({ coords: { longitude: p[0], latitude: p[1], accuracy: 5, speed: 6 } });
+    const stop = () => { for (let i = 0; i < 3 && flagged(); i++) { grab("c-ride").fire("click"); flushTimeouts(); frames(1); } };
+    const clear = () => { try { grab("btn-clear") && grab("btn-clear").fire("click"); } catch (e) {} flushTimeouts(); };
+    const MO = sandbox.window.__mode, mode0 = MO ? MO.get() : null, mach0 = R.machine, ME0 = R.ME.slice();
+    if (MO && mode0 === "water") { MO.apply("ride", { silent: true }); flushTimeouts(); }
+    R.setMachine("bike"); stop();
+    const vWas = { ok: V.ok, on: V.on, drv: V.drv, nat: V.nat, last: V.last, near: V.near }, hadCap = "Capacitor" in sandbox, capWas = sandbox.Capacitor;
+    const said = [];
+    sandbox.Capacitor = { Plugins: { TextToSpeech: { speak: (o) => { said.push(String(o && o.text)); return Promise.resolve(); },
+      stop: () => Promise.resolve(), isLanguageSupported: () => Promise.resolve({ supported: true }),
+      getSupportedVoices: () => Promise.resolve({ voices: [] }) } } };
+    V.drv = "native"; V.nat = { en: true, voices: [], tries: 1 }; V.ok = true; V.on = true; V.last = ""; V.near = "";
+    /* a point m metres along the guide's line, and one d metres to its side */
+    const at = (G, m) => { const c = G.cum, p = G.pts; m = Math.max(0, Math.min(m, c[c.length - 1]));
+      let i = 0; while (i < c.length - 2 && c[i + 1] < m) i++;
+      const t = c[i + 1] > c[i] ? (m - c[i]) / (c[i + 1] - c[i]) : 0;
+      return [p[i][0] + (p[i + 1][0] - p[i][0]) * t, p[i][1] + (p[i + 1][1] - p[i][1]) * t]; };
+    const side = (G, m, d) => { const a = at(G, m - 8), b = at(G, m + 8), k = Math.cos(a[1] * Math.PI / 180);
+      const dx = (b[0] - a[0]) * k, dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, c = at(G, m);
+      return [c[0] + (-dy / L) * d / (111320 * k), c[1] + (dx / L) * d / 111320]; };
+    const cueOf = (G, k) => G.steps[k].turn[0].toLowerCase() + " onto " + N.stepName(G.steps[k]);
+    const count = (list, cue) => ({ far: list.filter((t) => t.startsWith("In ") && t.endsWith(", " + cue)).length, near: list.filter((t) => t === cue).length });
+    const NODES = R.NODES, ADJ = R.ADJ;
+    let seed = 32032; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const dmi = (a, b) => Math.hypot((b[0] - a[0]) * 0.714 * 69, (b[1] - a[1]) * 69);
+    /* routes whose first turn is 400 m or more from the start and the next
+       250 m or more past it, found on the bundle, seeded */
+    const pairs = [];
+    for (let t = 0; t < 4000 && pairs.length < 8; t++) {
+      const a = Math.floor(rnd() * NODES.length); if ((ADJ[a] || []).filter((e) => R.machineLegal(e)).length < 1) continue;
+      let b = -1; for (let u = 0; u < 30; u++) { const c = Math.floor(rnd() * NODES.length), d = dmi(NODES[a], NODES[c]); if (d > 1.2 && d < 2.5) { b = c; break; } }
+      if (b < 0) continue;
+      const path = R.route(a, b, R.PROFILES[0].f); if (!path || !path.length) continue;
+      const st = R.directions(path, a); if (st.length < 4) continue;
+      const mk = st.map((s) => path.slice(0, s.at).reduce((q, e) => q + e.L, 0));
+      if (mk[1] >= 450 && mk[2] - mk[1] >= 300) pairs.push({ a, b });
+    }
+    const plan = (pr) => { stop(); clear(); R.setME(NODES[pr.a]); R.go(NODES[pr.b].slice(), "the drill's end"); flushTimeouts();
+      grab("c-ride").fire("click"); flushTimeouts(); fix(NODES[pr.a]); fix(NODES[pr.a]); frames(1);
+      const G = N.guide(); return (G && G.marks && G.marks.length > 3 && G.marks[1] >= 400 && G.marks[2] - G.marks[1] >= 250) ? G : null; };
+    /* the re-route waits 20 s after the last one, and an earlier drill's
+       shifted clock can leave that mark in the future (landmine 270): the
+       drill sets it back before each wander, and says where it found it */
+    const reT0 = N.reT ? N.reT() : null, ahead = reT0 ? Math.round((reT0 - Date.now()) / 60000) : null;
+    let A = null, B = null, C = null, tried = 0; const why = [];
+    try {
+      for (const pr of pairs) {
+        /* A · a stop about 90 m short: one far cue, one near, nothing more */
+        if (!A) { said.length = 0; const G = plan(pr); if (!G) continue; const m1 = G.marks[1], cue = cueOf(G, 1);
+          for (const m of [m1 - 300, m1 - 250]) { fix(at(G, m)); frames(1); }
+          fix(at(G, m1 - 80)); frames(1);
+          for (const m of [m1 - 100, m1 - 80, m1 - 105, m1 - 75, m1 - 110, m1 - 82]) { fix(at(G, m)); frames(1); }
+          const c = count(said, cue); A = { cue, far: c.far, near: c.near, all: said.length, ni: 1, same: N.guide() === G }; }
+        /* B · wander off before the first turn, its far cue said: the
+           re-route's first turn is step 1 again; it must be said */
+        if (!B) { for (const d of [160, -160, 260, -260]) { tried++;
+            said.length = 0; const G = plan(pr); if (!G) break; const m1 = G.marks[1];
+            fix(at(G, m1 - 250)); frames(1);
+            const before = said.slice(), off = side(G, m1 - 250, d);
+            const offM = Math.round(N.project(off).off);
+            if (N.reT) N.reT(0);
+            for (let k = 0; k < 3; k++) { fix(off); frames(1); } flushTimeouts(); fix(off); frames(1); fix(off); frames(1);
+            const G3 = N.guide(); if (!G3 || G3 === G || !G3.marks) { why.push((!G3 ? "no guide" : G3 === G ? "not re-routed" : "no marks") + " " + offM + " m off"); continue; }
+            const pr3 = N.project(off), ni3 = G3.marks.findIndex((q, k) => k >= 1 && q > pr3.prog + 8), d3 = ni3 > 0 ? G3.marks[ni3] - pr3.prog : -1;
+            /* take 202's key would read "1|far" again only if the new next turn is step 1, 90 m or more away */
+            if (ni3 !== 1 || d3 < 90) { why.push(`next ${ni3} at ${Math.round(d3)} m`); continue; }
+            const after = said.slice(before.length), cue3 = cueOf(G3, ni3), c3 = count(after, cue3);
+            B = { d, d3: Math.round(d3), first: before.length, cue3, said: c3.far + c3.near, after: after.slice(0, 3) }; break; } }
+        /* C · two close turns with the same words (planted on a real guide:
+           its step 2 made a copy of step 1, 60 m past it) */
+        if (!C) { said.length = 0; const G = plan(pr); if (!G) continue; const m1 = G.marks[1];
+          G.steps[2] = Object.assign({}, G.steps[1]); G.marks[2] = m1 + 60; const cue = cueOf(G, 1);
+          fix(at(G, m1 - 80)); frames(1); fix(at(G, m1 + 20)); frames(1);
+          C = { cue, near: count(said, cue).near }; }
+        if (A && B && C) break;
+      }
+    } finally {
+      stop(); clear();
+      Object.assign(V, vWas); if (hadCap) sandbox.Capacitor = capWas; else delete sandbox.Capacitor;
+      R.setME(ME0); R.setMachine(mach0); if (MO && mode0 && MO.get() !== mode0) { MO.apply(mode0, { silent: true }); flushTimeouts(); }
+    }
+    const s320 = { pairs: pairs.length, A, B, C };
+    const ok320 = (x) => !!x.A && x.A.far === 1 && x.A.near === 1 && x.A.same && !!x.B && x.B.said >= 1 && !!x.C && x.C.near === 2;
+    ok(ok320(s320) && !ok320({ ...s320, A: { ...(A || {}), far: 2, near: 2 } }) && !ok320({ ...s320, B: { ...(B || {}), said: 0 } })
+       && !ok320({ ...s320, C: { ...(C || {}), near: 1 } }),
+       `A320 · on a real route (${pairs.length} found) "${A ? A.cue : "?"}" is said ${A ? A.far : "?"} time(s) far and ${A ? A.near : "?"} near over six fixes either side of 90 m; `
+       + `${B ? "wandering " + Math.abs(B.d) + " m off before it and re-routed, the new route's first turn (" + B.d3 + " m on) is said " + B.said + " time(s) (\"" + B.cue3 + "\"; heard: " + JSON.stringify(B.after) + ")" : "no re-route scene whose next turn is step 1 again (" + tried + " tried: " + why.slice(0, 8).join("; ") + ")"}; `
+       + `two turns 60 m apart with the same words are both said (${C ? C.near : "?"}); the re-route mark was ${ahead === null ? "unset" : ahead + " min from now"} when the drill began; the judge rejects take 202's repeats, a silent re-route and a swallowed second turn`);
+  }
+}
+
+/* 9ze · take 203 · A323 · climb, drop and the profile follow the way a
+   route is ridden. Each edge's gain and loss were added in the edge's own
+   a-to-b sense, so a route and its reverse read the same climb, and the
+   profile added the start node's elevation to values that already held it
+   (every elevation about doubled; the take-202 audit). Judged against the
+   node elevations, which the drill reads itself: a route's climb minus its
+   drop is its end's elevation minus its start's. */
+{
+  const R = sandbox.window.__route;
+  if (!R || !R.summarise || !R.elev || !R.route) ok(false, "A323 · summarise and elevation hooks missing");
+  else {
+    const mach0 = R.machine; if (!R.MACHINE[R.machine] || R.MACHINE[R.machine].mph) R.setMachine("bike");
+    const NODES = R.NODES; let seed = 3233; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const dmi = (a, b) => Math.hypot((b[0] - a[0]) * 0.714 * 69, (b[1] - a[1]) * 69);
+    const short = R.PROFILES.find((p) => p.k === "short"), flat = R.PROFILES.find((p) => p.k === "flat");
+    let best = null;
+    for (let t = 0; t < 1500 && !(best && best.rise > 60); t++) {
+      const a = Math.floor(rnd() * NODES.length), b = Math.floor(rnd() * NODES.length), d = dmi(NODES[a], NODES[b]);
+      if (d < 3 || d > 9 || R.elev(a) == null || R.elev(b) == null) continue;
+      const rise = Math.abs(R.elev(b) - R.elev(a)); if (best && rise <= best.rise) continue;
+      const P = R.route(a, b, short.f); if (!P || P.length < 8) continue;
+      /* a path that rides some edges b-to-a, or the bug cannot show */
+      let cur = a, back = 0; for (const e of P) { if (e.b === cur && e.a !== cur) back++; cur = e.a === cur ? e.b : e.a; }
+      if (back < 2 || back > P.length - 2) continue;
+      best = { a, b, P, rise, back };
+    }
+    let s323 = { found: !!best };
+    if (best) {
+      const { a, b, P } = best, f = R.summarise(P, a), r = R.summarise(P.slice().reverse(), b), net = R.elev(b) - R.elev(a);
+      /* the router hands each cost the way the edge is taken */
+      const seen = new Set(); R.route(a, b, (e, fwd) => { seen.add(String(fwd)); return flat.f(e, fwd); });
+      const st = R.directions(P, a), stUp = st.reduce((q, x) => q + (x.up || 0), 0);
+      const prof = f.prof, pr = r.prof;
+      s323 = { found: true, n: P.length, back: best.back, up: f.up, dn: f.dn, rup: r.up, rdn: r.dn, net, stUp,
+        p0: prof[0], pN: prof[prof.length - 1], e0: R.elev(a), eN: R.elev(b), pmax: Math.max(...prof), pmin: Math.min(...prof),
+        rise: best.rise, seen: [...seen].sort().join(",") };
+    }
+    R.setMachine(mach0);
+    /* node elevations are a noisy truth: 3% of edges start or end on a
+       sample up to 50 m from their node's (measured on this bundle), so the
+       ends are judged loosely; a direction read backwards misses by twice
+       the rise, a doubled profile by the whole elevation. The exact checks
+       are the reverse route's and the turn list's */
+    /* a rise of 15 m is enough: a direction read backwards misses the ends
+       by twice the rise, past the 12 m allowed (CI's graph, with the hiking
+       trails out, gave an 18 m route after the 600 tries take 203 first had) */
+    const ok323 = (x) => x.found && x.rise >= 15 && Math.abs((x.up - x.dn) - x.net) <= Math.max(12, 0.35 * Math.abs(x.net))
+      && x.up === x.rdn && x.dn === x.rup && Math.abs(x.stUp - x.up) <= 1
+      && Math.abs(x.p0 - x.e0) <= 15 && Math.abs(x.pN - x.eN) <= 20 && x.pmax <= 604 && x.pmin >= 170 && x.seen === "false,true";
+    const ft_ = (m) => Math.round(m * 3.28084);
+    ok(ok323(s323) && !ok323({ ...s323, rup: s323.up, rdn: s323.dn }) && !ok323({ ...s323, p0: (s323.p0 || 0) * 2 }) && !ok323({ ...s323, seen: "undefined" })
+       && !ok323({ ...s323, up: s323.dn, dn: s323.up, rup: s323.up, rdn: s323.dn }),
+       `A323 · a ${s323.n || "?"}-edge route ridden ${s323.back || "?"} edges against their own sense: climb ${ft_(s323.up || 0)} / drop ${ft_(s323.dn || 0)} ft, its reverse ${ft_(s323.rup || 0)} / ${ft_(s323.rdn || 0)}; `
+       + `climb minus drop ${ft_((s323.up || 0) - (s323.dn || 0))} ft against the ends' ${ft_(s323.net || 0)} ft; the turn list's climbs sum to ${ft_(s323.stUp || 0)}; `
+       + `the profile runs ${ft_(s323.p0 || 0)} to ${ft_(s323.pN || 0)} ft (the ends ${ft_(s323.e0 || 0)} and ${ft_(s323.eN || 0)}), ${ft_(s323.pmin || 0)}-${ft_(s323.pmax || 0)} ft; `
+       + `the router gives each cost its direction (${s323.seen}); the judge rejects take 202's same climb both ways, a doubled profile and a cost without a direction`);
+  }
+}
+
+/* 9zf · take 203 · A324 · A325 · a published closure closes a line to
+   everyone, the signed detour is open, and the trail card's tags say what
+   the router does. Ingest closed a class only when the status began
+   "Temporarily" (so "Temporarily Open Reroute" was closed and "Closed
+   Permanent" open), the card's source tag read "DNR · legal" on hiking
+   trails, and "illegal for your machine" read the class alone (the
+   take-202 audit). Every closed-status edge, every machine; and the card
+   tapped through the map's own click. */
+{
+  const R = sandbox.window.__route, MO = sandbox.window.__mode;
+  if (!R || !R.attrs) ok(false, "A324 · route hooks missing");
+  else {
+    const mach0 = R.machine, mode0 = MO ? MO.get() : null, E = R.EDGES, st = (e) => (e.bi >= 0 && R.attrs(e).st) || "";
+    if (MO && mode0 === "water") { MO.apply("ride", { silent: true }); flushTimeouts(); }
+    const closedSt = E.filter((e) => /closed/i.test(st(e)));
+    const legalN = {};
+    for (const m of ["bike", "quad", "sxs", "walk"]) { R.setMachine(m); legalN[m] = closedSt.filter((e) => R.machineLegal(e)).length; }
+    const tap = (e) => { const p = R.NODES[e.a];
+      theMap._hit = []; theMap.fire("click", { lngLat: { lng: p[0], lat: p[1] }, point: { x: 300, y: 500 } }); flushTimeouts();
+      theMap._hit = [{ properties: { i: e.i, c: e.c }, layer: { id: e.c } }]; grab("panel")._html = "";
+      theMap.fire("click", { lngLat: { lng: p[0], lat: p[1] }, point: { x: 300, y: 500 } }); flushTimeouts(); theMap._hit = [];
+      return String(grab("panel")._html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " "); };
+    R.setMachine("bike");
+    const eNon = E.find((e) => e.bi >= 0 && R.attrs(e).auth === "nonorv" && !/closed/i.test(st(e)) && R.attrs(e).src === "dnr");
+    const eRe = E.find((e) => /reroute/i.test(st(e))), eUnk = E.find((e) => st(e) === "Unknown"), ePerm = E.find((e) => /closed permanent/i.test(st(e)));
+    const cNon = eNon ? tap(eNon) : "", cRe = eRe ? tap(eRe) : "", cUnk = eUnk ? tap(eUnk) : "", cPerm = ePerm ? tap(ePerm) : "";
+    /* a quad on a line its class allows and a per-vehicle rule takes away */
+    R.setMachine("quad");
+    const ePer = E.find((e) => R.MACHINE.quad.ok.includes(e.c) && !R.machineLegal(e) && !e.fw && !/closed/i.test(st(e)) && R.attrs(e).auth !== "nonorv");
+    const cPer = ePer ? tap(ePer) : "";
+    R.setMachine(mach0); if (MO && mode0 && MO.get() !== mode0) { MO.apply(mode0, { silent: true }); flushTimeouts(); }
+    const s324 = { n: closedSt.length, legalN, cNon, cRe, cUnk, cPerm, cPer, has: { non: !!eNon, re: !!eRe, unk: !!eUnk, perm: !!ePerm, per: !!ePer } };
+    const ill = /illegal for your machine/;
+    const ok324 = (x) => x.n > 100 && Object.values(x.legalN).every((v) => v === 0)
+      && x.has.non && /DNR · not an ORV trail/.test(x.cNon) && !/DNR · legal/.test(x.cNon) && ill.test(x.cNon)
+      && (!x.has.re || (/open reroute/.test(x.cRe) && !/\bclosed\b/.test(x.cRe)))
+      && (!x.has.unk || /status not published/.test(x.cUnk))
+      && (!x.has.perm || /\bclosed\b/.test(x.cPerm))
+      && x.has.per && ill.test(x.cPer);
+    const cut = (t) => t.slice(0, 90);
+    ok(ok324(s324) && !ok324({ ...s324, legalN: { ...legalN, bike: 4 } }) && !ok324({ ...s324, cNon: "Iron Belle DNR · legal 1.2 mi segment" })
+       && !ok324({ ...s324, cPer: "Trail USFS · legal Moto open" }) && (!eRe || !ok324({ ...s324, cRe: "X DNR · legal closed" })),
+       `A324 · of ${closedSt.length} edges whose status says closed, a dirt bike may ride ${legalN.bike}, a quad ${legalN.quad}, a side-by-side ${legalN.sxs}, on foot ${legalN.walk}; `
+       + `cards: a DNR hiking trail "${cut(cNon)}"; the detour ${eRe ? "\"" + cut(cRe) + "\"" : "(none in this bundle)"}; Unknown ${eUnk ? "\"" + cut(cUnk) + "\"" : "(none)"}; Closed Permanent ${ePerm ? "\"" + cut(cPerm) + "\"" : "(none)"}; `
+       + `A325 · a quad on a line a per-vehicle rule closes "${cut(cPer)}"; the judge rejects take 202's (closed lines ridable, "DNR · legal" on a hiking trail, no tag where the router refuses, the detour called closed)`);
+  }
+}
+
+/* 9zg · take 203 · A326 · a riding area's card names who runs it and says
+   its season is not in this map's data. Every area read "DNR scramble area
+   · trail permit required" and open year-round, The Mounds (a county park)
+   and Bull Gap (federal) included (the take-202 audit). */
+{
+  const AR = sandbox.window.__areas;
+  if (!AR || !AR.card) ok(false, "A326 · the area card hook is missing");
+  else {
+    const card = (p) => { grab("panel")._html = ""; AR.card(p); return String(grab("panel")._html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " "); };
+    const cty = card({ n: "The Mounds ORV Park", o: "County", ac: 213 }), fed = card({ n: "Bull Gap Hill Climb", o: "Federal", ac: 3 }),
+          sta = card({ n: "St. Helen Motorsport Area", o: "State", ac: 1285 });
+    const mixed = card({ n: "Somewhere Riding Area", o: "Mixed ownership", ac: 50 });
+    const okArea = (c, f, s) => [c, f, s].every((t) => !/DNR scramble area/.test(t) && /On the DNR’s list of riding areas/.test(t)
+        && /season and hours are not in this map/.test(t) && /never across/.test(t))
+      && /County land/.test(c) && !/trail permit/.test(c) && /its operator’s own pass and rules apply/.test(c)
+      && /Federal land/.test(f) && /State land/.test(s) && /trail permit required/.test(s)
+      && /ownership: Mixed ownership/.test(mixed) && !/mixed ownership operator/i.test(mixed);
+    ok(okArea(cty, fed, sta) && !okArea("The Mounds DNR scramble area · County land ORV licence and trail permit required", fed, sta)
+       && !okArea(cty, fed, "St. Helen DNR scramble area · State land ORV licence and trail permit required"),
+       `A326 · The Mounds: "${cty.slice(0, 150)}"; Bull Gap: "${fed.slice(0, 70)}"; St. Helen: "${sta.slice(0, 60)}"; an area of mixed ownership "${mixed.slice(0, 80)}"; every card says its season is not in the map's data and names no operator; the judge rejects take 202's "DNR scramble area", on county or state land`);
+  }
+}
+
+/* 9zh · take 203 · A327 · sunrise and sunset by NOAA's solar calculator,
+   and darkness at either end of a trip. The short form put the equation of
+   time on the declination's angle (4.6 min late at the winter solstice);
+   only the end of a trip was checked, so a 05:00 start in November had no
+   warning; a river run had no darkness line at all (the take-202 audit).
+   The reference is the USNO almanac algorithm, a different method. */
+{
+  const R = sandbox.window.__route, P = sandbox.window.__paddle;
+  if (!R || !R.sun || !R.darkOf || !P || !P.run) ok(false, "A327 · sun, darkness and paddle hooks missing");
+  else {
+    /* the reference is the U.S. Naval Observatory's almanac algorithm, a
+       different method from the app's (the review of take 203: a copy of
+       the app's own formula could not fail on a shared error); it agrees
+       with NOAA's to about a minute, and the short form missed it by 6.5 */
+    const Dg = Math.PI / 180;
+    const usno = (lat, lon, y, m, d, rising) => {
+      const N = Math.round((Date.UTC(y, m, d) - Date.UTC(y, 0, 0)) / 864e5), lh = lon / 15;
+      const t = N + ((rising ? 6 : 18) - lh) / 24, M = 0.9856 * t - 3.289;
+      const L = (M + 1.916 * Math.sin(M * Dg) + 0.020 * Math.sin(2 * M * Dg) + 282.634 + 720) % 360;
+      let RA = (Math.atan(0.91764 * Math.tan(L * Dg)) / Dg + 720) % 360;
+      RA = (RA + Math.floor(L / 90) * 90 - Math.floor(RA / 90) * 90) / 15;
+      const sd = 0.39782 * Math.sin(L * Dg), cd = Math.cos(Math.asin(sd));
+      const H = (rising ? 360 - Math.acos((Math.cos(90.833 * Dg) - sd * Math.sin(lat * Dg)) / (cd * Math.cos(lat * Dg))) / Dg
+                        : Math.acos((Math.cos(90.833 * Dg) - sd * Math.sin(lat * Dg)) / (cd * Math.cos(lat * Dg))) / Dg) / 15;
+      return (((H + RA - 0.06571 * t - 6.622 - lh) % 24) + 24) % 24; };   /* UTC hours */
+    const RD = sandbox.Date, here = [-84.13, 44.65], wrap = (x) => ((x % 24) + 36) % 24 - 12;
+    let worst = 0;
+    for (let m = 0; m < 12; m++) for (const dd of [1, 11, 21]) {
+      const a = R.sun(here[1], here[0], new RD(Date.UTC(2026, m, dd, 17))), b0 = Date.UTC(2026, m, dd);
+      worst = Math.max(worst, Math.abs(wrap((a.riseT - b0) / 3600000 - usno(here[1], here[0], 2026, m, dd, true))) * 60,
+                              Math.abs(wrap((a.setT - b0) / 3600000 - usno(here[1], here[0], 2026, m, dd, false))) * 60);
+    }
+    /* a summer evening read on absolute time, whatever zone the phone is
+       on: 20:30 EDT on June 21, a 2 h ride, arrives after dark */
+    const summer = R.darkOf(2, here, new RD(Date.UTC(2026, 5, 22, 0, 30)));
+    /* a trip's darkness, on the app's own reader, at either end */
+    const nov = R.sun(here[1], here[0], new RD(2026, 10, 18, 12)), at = (h) => { const d = new RD(2026, 10, 18, 0, 0); d.setMinutes(Math.round(h * 60)); return d; };
+    const pre = R.darkOf(1, here, at(nov.rise - 2.5)), mid = R.darkOf(1, here, at(nov.rise + 2)), eve = R.darkOf(1, here, at(nov.set - 0.5));
+    /* the route card and the river run card, on a pinned clock */
+    let pinAt = null; sandbox.Date = class extends RD { constructor(...a) { if (a.length || pinAt === null) super(...a); else super(pinAt); } static now() { return RD.now(); } };
+    let card = "", runEve = "", runMid = "";
+    try {
+      const NODES = R.NODES, mach0 = R.machine, ME0 = R.ME.slice(), MO = sandbox.window.__mode, mode0 = MO ? MO.get() : null;
+      if (MO && mode0 === "water") { MO.apply("ride", { silent: true }); flushTimeouts(); }
+      if (!R.MACHINE[R.machine] || R.MACHINE[R.machine].mph) R.setMachine("bike");
+      pinAt = at(nov.rise - 2.5).getTime();
+      const a0 = R.nearestNode(here), b0 = R.nearestNode([here[0] + 0.05, here[1] + 0.02]);
+      R.setME(NODES[a0]); R.go(NODES[b0].slice(), "the pre-dawn drill"); flushTimeouts();
+      card = String(grab("panel")._html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+      try { grab("btn-clear") && grab("btn-clear").fire("click"); } catch (e) {} flushTimeouts();
+      R.setME(ME0); R.setMachine(mach0); if (MO && mode0 && MO.get() !== mode0) { MO.apply(mode0, { silent: true }); flushTimeouts(); }
+      /* a run of four miles or more on the first river with one */
+      const rv = (P.data && P.data.c || []).find((c) => { const f = c.f.filter((x) => x.k !== "parking"); return f.length > 1 && f[f.length - 1].mi - f[0].mi > 4; });
+      if (rv) { const f = rv.f.filter((x) => x.k !== "parking"), a = f[0], b = f.find((x) => x.mi - a.mi > 4) || f[f.length - 1];
+        const sp = R.sun(a.p[1], a.p[0], new RD(2026, 10, 18, 12));
+        const runAt = (h) => { pinAt = at(h).getTime(); grab("panel")._html = ""; P.run(a, b, rv.n); return String(grab("panel")._html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " "); };
+        runEve = runAt(sp.set - 1); runMid = runAt(sp.rise + 1.5); }
+    } finally { sandbox.Date = RD; }
+    const s327 = { worst, pre, mid, eve, card, runEve, runMid, summer };
+    const ok327 = (x) => x.worst < 2 && !!x.summer && x.summer.k === "dark" && !!x.pre && x.pre.k === "early" && x.mid === null && !!x.eve && x.eve.k === "dark"
+      && /starts before sunrise \(/.test(x.card) && /Ends after sunset \(/.test(x.runEve) && !/sunset|sunrise/.test(x.runMid);
+    ok(ok327(s327) && !ok327({ ...s327, worst: 6.5 }) && !ok327({ ...s327, pre: null }) && !ok327({ ...s327, runEve: "About ~2 hr of paddling" })
+       && !ok327({ ...s327, summer: { k: "early" } }),
+       `A327 · sunrise and sunset agree with the USNO almanac algorithm within ${worst.toFixed(2)} min over 36 days; 20:30 EDT at midsummer, a 2 h ride, reads "${summer ? summer.txt : "nothing"}" on any phone zone; in November a trip at 2.5 h before sunrise reads "${pre ? pre.txt : "nothing"}", at mid-morning ${mid ? "\"" + mid.txt + "\"" : "nothing"}, a 1 h trip half an hour before sunset "${eve ? eve.txt : "nothing"}"; `
+       + `the route card before dawn says "${(card.match(/starts before sunrise \([^)]*\)/) || ["no darkness line"])[0]}"; a river run launched an hour before sunset says "${(runEve.match(/Ends after sunset[^.]*\./) || ["nothing"])[0]}", at mid-morning ${/sunset|sunrise/.test(runMid) ? "a darkness line" : "nothing"}; the judge rejects the short form's 6.5 min, a summer evening read as before sunrise, a silent pre-dawn start and a silent float`);
+  }
+}
+
+/* 9zi · take 203 · A328 · a campground's type is what OSM records, and a
+   state park is not called a state forest campground. poi.py called every
+   untagged DNR or USFS camp "rustic", and the card printed "rustic — vault
+   toilets, no hookups" for Algonac-Modern Riverfront and two state parks
+   (the take-202 audit). The card, through the map's own click, on a real
+   camp's feature with its record set three ways. */
+{
+  const PF = record.sources.poi && record.sources.poi.data && record.sources.poi.data.features;
+  const tpl = Array.isArray(PF) ? PF.find((f) => f.properties && f.properties.k === "camp" && f.geometry) : null;
+  if (!tpl) ok(false, "A328 · no campground feature on the map to tap");
+  else {
+    const tapCamp = (n, ct) => { const f = { ...tpl, properties: { ...tpl.properties, n, named: true, ct: JSON.stringify(ct) } }, p = f.geometry.coordinates;
+      theMap._hit = []; theMap.fire("click", { lngLat: { lng: p[0], lat: p[1] }, point: { x: 300, y: 700 } }); flushTimeouts();
+      theMap._hit = [Object.assign({ layer: { id: "poi-dot" } }, f)]; grab("panel")._html = "";
+      theMap.fire("click", { lngLat: { lng: p[0], lat: p[1] }, point: { x: 300, y: 700 } }); flushTimeouts(); theMap._hit = [];
+      return String(grab("panel")._html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " "); };
+    const modern = tapCamp("Algonac-Modern Riverfront", { op: "dnr", ty: "rustic" }), park = tapCamp("Burt Lake State Park", { op: "dnr" }),
+          forest = tapCamp("Canoe Harbor State Forest Campground", { op: "dnr", ty: "rustic" }), other = tapCamp("Big Bend", { op: "dnr" });
+    const ok328 = (m, p, f, o) => !/rustic/.test(m) && /State park campground \(DNR\)/.test(p) && !/State forest/.test(p)
+      && /State forest campground \(DNR\) · rustic \(basic sites, as OSM records it\)/.test(f) && !/vault toilets/.test(f) && /DNR campground/.test(o);
+    ok(ok328(modern, park, forest, other) && !ok328("Algonac-Modern Riverfront State forest campground (DNR) · rustic — vault toilets, no hookups", park, forest, other)
+       && !ok328(modern, "Burt Lake State Park State forest campground (DNR)", forest, other),
+       `A328 · "Algonac-Modern Riverfront" recorded rustic by old data reads "${(modern.match(/(State|DNR)[^·]*?\(DNR\)[^C]*?(?=\s[A-Z]|$)/) || [modern.slice(0, 80)])[0].slice(0, 80)}"; Burt Lake State Park "${(park.match(/State park campground \(DNR\)|State forest campground \(DNR\)|DNR campground/) || ["?"])[0]}"; a state forest camp tagged basic "${(forest.match(/State forest campground \(DNR\)[^.]*?OSM records it\)/) || ["?"])[0]}"; another DNR camp "${(other.match(/DNR campground|State forest campground \(DNR\)/) || ["?"])[0]}"; the judge rejects take 202's vault toilets on a Modern camp and a state park called a state forest camp`);
   }
 }
 

@@ -171,6 +171,10 @@ function machineLegal(e){
 function _machineLegal(e){
   if(MACHINE[machine].ok.indexOf(e.c)<0)return false;
    
+  if(machine!=='walk'&&e.bi>=0&&attrs(e).auth==='nonorv')return false;
+   
+  if(e.bi>=0){var _st=attrs(e).st;if(_st&&/closed/i.test(_st))return false}
+   
   var _r=restrictOf(e);
   if(_r&&_r.ban&&_r.ban.indexOf(machine)>=0)return false;
   if(e.c==='closed'||e.c==='fsclosed')return false;
@@ -290,7 +294,9 @@ var NETLO=[],NETLO_MS=0,NETLO_ERR=null,
      
     NETLO_SKIP={track:'90.1-94.7% kept at z7; 704,198 stroke vertices',
                 paved:'89.6-96.9% kept at z7; 190,401 stroke vertices',
-                minor:'Hybrid draws it from z11.5 only'};
+                minor:'Hybrid draws it from z11.5 only',
+                 
+                foot:'drawn per edge as it was while shipped as two-track (take 203)'};
 try{
   var _nl0=Date.now(),NFI=[];
   nf2.forEach(function(f){if(NETLO_CLS.indexOf(f.properties.c)>=0)NFI[f.properties.i]=f.geometry.coordinates});
@@ -602,6 +608,8 @@ function paddlePace(){var mc=MACHINE[machine]||{};
   return mc.mph?{mph:mc.mph,spr:mc.spread||PADDLE_SPREAD,craft:mc.lbl}:{mph:PADDLE_MPH,spr:PADDLE_SPREAD,craft:null}}
  
 function paddleMin(miles){return miles/paddlePace().mph*60}
+ 
+function paddleMinSlow(miles){var pp=paddlePace();return miles/Math.max(0.5,pp.mph-pp.spr)*60}
 function paddleHours(miles){
    
   var pp=paddlePace();
@@ -855,6 +863,10 @@ function runCard(a,b,riv){
       (_mc.mph-_mc.spread)+'\u2013'+(_mc.mph+_mc.spread)+' mph, calibrated '
       :'at 2\u20133 mph, which is what these floats work out at ')+
     'against the liveries\u2019 own times)</span>');
+   
+  var _pc=(putIn.p&&putIn.p.length===2)?putIn.p:ME,_dk=darkOf(paddleMinSlow(hi-lo)/60,_pc);
+  if(_dk)rows.push('<b style="color:var(--warn)">'+(_dk.k==='dark'?'Ends after sunset ('+clockOf(_dk.at)+
+    ') if you launch now, at the slow end of that pace':'Starts before sunrise ('+clockOf(_dk.at)+')')+'.</b>');
   logAct('act  run '+nm(putIn)+' -> '+nm(takeOut));
   show('<div class="tn">The run \u2014 <span class="sub">'+riv+'</span></div>'+
     rows.join('<br>')+
@@ -896,13 +908,17 @@ function pubCard(pr){
 function areaCard(pr){
   logAct('tap  area '+pr.n);
   var c=null;try{c=typeof pr.c==='string'?JSON.parse(pr.c):pr.c}catch(e){}
+   
+  var st_=pr.o==='State',land=/^(State|County|Federal|City|Township|Private)$/.test(pr.o||'')?pr.o+' land':'ownership: '+(pr.o||'not recorded');
   return show('<b>'+pr.n+'</b>'+
-    '<div class="sub">DNR scramble area \u00b7 '+pr.o+' land</div>'+
+    '<div class="sub">On the DNR\u2019s list of riding areas \u00b7 '+land+'</div>'+
     photoHTML('area',pr.n,c)+
     '<div class="k">OPEN RIDING</div>'+
-    '<div class="sub">About '+pr.ac+' acres you may ride anywhere on \u2014 '+
+    '<div class="sub">About '+pr.ac+' acres you may ride anywhere on when it is open \u2014 '+
     'this is ground, not a trail, so Return home and Route here plan to its '+
-    'edge, never across it. ORV licence and trail permit required.</div>'+
+    'edge, never across it. '+(st_?'ORV licence and trail permit required; its operator\u2019s own pass and rules may apply.':
+      'ORV licence required; its operator\u2019s own pass and rules apply.')+
+    ' Its season and hours are not in this map\u2019s data: check them before you go.</div>'+
     (c?'<div class="k">WHERE</div><span class="tn">'+c[1].toFixed(5)+'  '+c[0].toFixed(5)+'</span>'+
        '<div class="sub">'+placeDist(c)+'</div>':''),'');
 }
@@ -2279,7 +2295,7 @@ function route(from,to,cost){
       if(e.c==='closed'||e.c==='fsclosed')continue;    
       if(!machineLegal(e))continue;                     
       var v=e.a===u?e.b:e.a;if(done[v])continue;
-      var nd=d+cost(e);
+      var nd=d+cost(e,e.a===u);    
       if(nd<dist[v]){dist[v]=nd;prev[v]=u;pe[v]=e.i;push([nd,v])}}}
   if(!isFinite(dist[to]))return null;
   var path=[],u=to;while(u!==from&&prev[u]>=0){path.push(EDGES[pe[u]]);u=prev[u]}
@@ -2289,8 +2305,13 @@ function route(from,to,cost){
 var DESIG={route72:1,trail50:1,moto24:1,mccct:1,fstrail:1};
 var DIRT={fsroad:1,track:1};
 
-function summarise(path){
+ 
+function climbOf(e,fwd){var A=fwd===false?DN:UP;return (A&&A[e.i])||0}
+function pathStart(path){if(!path||!path.length)return null;if(path.length<2)return path[0].a;
+  var e0=path[0],e1=path[1];return (e0.b===e1.a||e0.b===e1.b)?e0.a:e0.b}
+function summarise(path,na){
   var mi=0,hrs=0,off=0,adv=0,hardest=0,names={},up=0,dn=0,prof=[],run=0;
+  var cur=(na!=null&&na>=0)?na:pathStart(path);
    
   var mDes=0,mDirt=0,mRoad=0;
   path.forEach(function(e){var L=e.L/1609.34;mi+=L;hrs+=L/spd(e);
@@ -2299,9 +2320,10 @@ function summarise(path){
     var a=attrs(e);if(a.auth!=='legal')adv+=L;
     var h=HARD.indexOf(e.c);if(h>hardest)hardest=h;
     if(e.n)names[e.n]=1;
-    up+=(UP&&UP[e.i])||0;dn+=(DN&&DN[e.i])||0;
-    var ep=edgeProfile(e.i),base=(NE&&NE[e.a])||0;
-    for(var k=0;k<ep.length;k+=2)prof.push(base+ep[k]);
+    var fwd=e.b===cur&&e.a!==cur?false:true;cur=fwd?e.b:e.a;
+    up+=climbOf(e,fwd);dn+=climbOf(e,!fwd);
+    var ep=edgeProfile(e.i);if(!fwd)ep=ep.slice().reverse();
+    for(var k=0;k<ep.length;k+=2)prof.push(ep[k]);
     run+=L});
    
   hrs+=(up*3.28084/100)/60;
@@ -2310,28 +2332,47 @@ function summarise(path){
           turns:Object.keys(names).length,path:path}}
 
  
-function sunset(lat,lon,date){
-  var d=Math.floor((date-new Date(date.getFullYear(),0,0))/864e5);
-  var g=(360/365.24)*(d+10)*Math.PI/180;
-  var decl=-23.44*Math.cos(g)*Math.PI/180, L=lat*Math.PI/180;
-  var cosH=(Math.cos(90.833*Math.PI/180)-Math.sin(L)*Math.sin(decl))/(Math.cos(L)*Math.cos(decl));
+ 
+function sunCore(lat,lon,y,m,d){
+  var D=Math.PI/180,jd=Date.UTC(y,m,d,12)/864e5+2440587.5-lon/360,
+      T=(jd-2451545)/36525,L0=(280.46646+T*(36000.76983+T*0.0003032))%360,
+      M=357.52911+T*(35999.05029-0.0001537*T),e=0.016708634-T*(0.000042037+0.0000001267*T),
+      C=Math.sin(M*D)*(1.914602-T*(0.004817+0.000014*T))+Math.sin(2*M*D)*(0.019993-0.000101*T)+Math.sin(3*M*D)*0.000289,
+      om=(125.04-1934.136*T)*D,lam=(L0+C-0.00569-0.00478*Math.sin(om))*D,
+      eps=(23+(26+(21.448-T*(46.815+T*(0.00059-T*0.001813)))/60)/60+0.00256*Math.cos(om))*D,
+      decl=Math.asin(Math.sin(eps)*Math.sin(lam)),q=Math.pow(Math.tan(eps/2),2),
+      eqt=4/D*(q*Math.sin(2*L0*D)-2*e*Math.sin(M*D)+4*e*q*Math.sin(M*D)*Math.cos(2*L0*D)
+        -0.5*q*q*Math.sin(4*L0*D)-1.25*e*e*Math.sin(2*M*D)),
+      cosH=Math.cos(90.833*D)/(Math.cos(lat*D)*Math.cos(decl))-Math.tan(lat*D)*Math.tan(decl);
   if(cosH>1||cosH<-1)return null;
-  var H=Math.acos(cosH)*180/Math.PI;
-  var eq=229.18*(0.000075+0.001868*Math.cos(g)-0.032077*Math.sin(g)
-        -0.014615*Math.cos(2*g)-0.040849*Math.sin(2*g));
-  var mins=720+4*(-lon+H)-eq;
-  var off=-date.getTimezoneOffset();
-  return (mins+off)/60}
+  var H=Math.acos(cosH)/D,noon=720-4*lon-eqt;
+  return {rise:noon-4*H,set:noon+4*H}}
+ 
+function sunTimes(lat,lon,date){
+  var sd=new Date(date.getTime()+lon/15*3600000),y=sd.getUTCFullYear(),m=sd.getUTCMonth(),d=sd.getUTCDate(),
+      c=sunCore(lat,lon,y,m,d);if(!c)return null;
+  var b=Date.UTC(y,m,d),rT=b+c.rise*60000,sT=b+c.set*60000,x=new Date(rT);x.setHours(0,0,0,0);
+  return {riseT:rT,setT:sT,rise:(rT-x.getTime())/3600000,set:(sT-x.getTime())/3600000}}
+function sunset(lat,lon,date){var t=sunTimes(lat,lon,date);return t?t.set:null}
+ 
+function clockOf(ms){try{return new Date(ms).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
+  catch(e){var x=new Date(ms);return x.getHours()+':'+('0'+x.getMinutes()).slice(-2)}}
+ 
+function darkOf(hrs,at,now){now=now||new Date();var t=sunTimes(at[1],at[0],now);if(!t)return null;
+  var n=now.getTime();
+  if(n+hrs*3600000>t.setT)return {k:'dark',txt:'arrives after dark',at:t.setT};
+  if(n<t.riseT)return {k:'early',txt:'starts before sunrise ('+clockOf(t.riseT)+')',at:t.riseT};
+  return null}
 
 var PROFILES=[
    
   {k:'trail',h:'Most trail',f:function(e){
      return e.L*(DESIG[e.c]?0.55:DIRT[e.c]?1.3:8)}},
   {k:'fast',h:'Fastest',f:function(e){return e.L/spd(e)}},
-  {k:'easy',h:'Easiest',f:function(e){return e.L*(EFFORT[e.c]||2)+UP[e.i]*CLIMB_K}},
+  {k:'easy',h:'Easiest',f:function(e,fwd){return e.L*(EFFORT[e.c]||2)+climbOf(e,fwd)*CLIMB_K}},
   {k:'pave',h:'Pavement soonest',f:function(e){return e.L*(PAVED[e.c]?1:9)}},
   {k:'short',h:'Shortest',f:function(e){return e.L}},
-  {k:'flat',h:'Least climbing',f:function(e){return e.L*0.35+UP[e.i]*45}}
+  {k:'flat',h:'Least climbing',f:function(e,fwd){return e.L*0.35+climbOf(e,fwd)*45}}
 ];
 
  
@@ -2676,10 +2717,10 @@ function routeToPoint(dest,label,auto){
       if(_len>Math.max(DETOUR.min,_crow*DETOUR.k+DETOUR.add)){
         _dbg.got[_dbg.got.length-1]+=':absurd('+Math.round(_len)+'mi)';
         if(!far||_len<far.len)far={p:p,pa:pa,len:_len};return}
-      out.push({h:p.h,k:p.k,s:summarise(pa),snap:sa+sb,na:a,nb:b})});
+      out.push({h:p.h,k:p.k,s:summarise(pa,a),snap:sa+sb,na:a,nb:b})});
     try{window.__routeDbg=_dbg}catch(e){}
      
-    if(!out.length&&far)out.push({h:far.p.h,k:far.p.k,s:summarise(far.pa),snap:sa+sb,na:a,nb:b,
+    if(!out.length&&far)out.push({h:far.p.h,k:far.p.k,s:summarise(far.pa,a),snap:sa+sb,na:a,nb:b,
       far:{mi:far.len,crow:_crow}});
     if(!out.length)return show('<b>No legal route</b> for a '+
       MACHINE[machine].lbl+' between those two points. Try a wider machine, or move the pins nearer a trail.','fail');
@@ -2768,7 +2809,7 @@ function buildLoops(startNode,targetMi){
       var score=f.err+f.L.repeat*0.9;
       if(!best||score<best.score){best={score:score,L:f.L}}}
      
-    if(best)out.push({h:sh.h,k:sh.k,s:summarise(best.L.path),snap:2*snapMiles(ME,startNode),
+    if(best)out.push({h:sh.h,k:sh.k,s:summarise(best.L.path,startNode),snap:2*snapMiles(ME,startNode),
                       na:startNode,nb:startNode,repeat:best.L.repeat})});
   return out}
 el('btn-home').addEventListener('click',function(){
@@ -2836,16 +2877,15 @@ function rcSel(){
     d.className='rc'+(+d.dataset.i===sel?' sel':'')});
   rcFit()}
 function renderRoutes(out,auto){
-  var fuel=FUELS[fi],now=new Date(),
-      ss=sunset(ME[1],ME[0],now),nowH=now.getHours()+now.getMinutes()/60;
+  var fuel=FUELS[fi],now=new Date();
   var html='<div id="routes">',warn=[];
   out.forEach(function(o,i){
     var s=o.s,mins=Math.round(s.hrs*60),
-        arrive=nowH+s.hrs,dark=(ss!==null&&arrive>ss),
+        dk=darkOf(s.hrs,ME,now),dark=!!dk,
          
         tot=s.mi+(o.snap>0.15?o.snap:0),
         overFuel=(fuel&&tot>fuel);
-    warn[i]={fuel:overFuel?tot-fuel:0,dark:dark,
+    warn[i]={fuel:overFuel?tot-fuel:0,dark:dark,darkK:dk?dk.k:'',darkTxt:dk?dk.txt:'',
              adv:s.adv>0.05?s.adv:0,snap:o.snap>0.15?o.snap:0};
     html+='<div class="rc'+(i===sel?' sel':'')+'" data-i="'+i+'">'+
       '<h5>'+o.h+(o.dup?' ·<span class="sub"> same line</span>':'')+'</h5>'+
@@ -2856,7 +2896,7 @@ function renderRoutes(out,auto){
       (o.note?'<div class="sub">'+o.note+'</div>':'')+
        
       (overFuel?'<div class="sub warn">'+ic('fuel')+(tot-fuel).toFixed(1)+' mi past your range</div>':'')+
-      (dark?'<div class="sub warn">'+ic('dark')+'arrives after dark</div>':'')+
+      (dark?'<div class="sub warn">'+ic('dark')+dk.txt+'</div>':'')+
       (s.adv>0.05?'<div class="sub warn">'+s.adv.toFixed(1)+' mi unverified (OSM)</div>':'')+
       (o.snap>0.15?'<div class="sub warn">+'+o.snap.toFixed(1)+
         ' mi off-network (dashed) to reach the trail</div>':'')+
@@ -2896,16 +2936,20 @@ function renderRoutes(out,auto){
      
     if(far)bits.push('the only legal way: '+far.mi.toFixed(1)+' mi for places '+shortDist(far.crow)+' apart');
     if(w.fuel)bits.push(w.fuel.toFixed(1)+' mi past your range');
-    if(w.dark)bits.push('arrives after dark');
+    if(w.dark)bits.push(w.darkTxt||'arrives after dark');
     if(w.adv)bits.push(w.adv.toFixed(1)+' mi unverified (OSM)');
      
     if(w.snap)bits.push(ra.rejoin?w.snap.toFixed(1)+' mi of it off-network':'+'+w.snap.toFixed(1)+' mi off-network');
      
     if(!rideMode&&!riding){
       logAct('route cards held: the ride they were for is not running');return}
-    if(far||(w.fuel&&!(w0&&w0.fuel))||(w.dark&&!(w0&&w0.dark)))show(html,'');
+     
+    if(far||(w.fuel&&!(w0&&w0.fuel))||(w.dark&&!(w0&&w0.dark&&w0.darkK===w.darkK)))show(html,'');
     else rideCard(html,'',ra.resume
-      ?(rideWaiting()?GPS_WAIT:'Trip resumed')+' \u00b7 route to '+(DESTLBL||'there')+(bits.length?' \u00b7 '+bits.join(' \u00b7 '):' is on the map')
+      ?(rideWaiting()?GPS_WAIT:'Trip resumed')+(out[sel]&&(out[sel].na===out[sel].nb||out[sel].rj)
+         
+        ?' \u00b7 the loop, back to '+(DESTLBL||'the start')
+        :' \u00b7 route to '+(DESTLBL||'there'))+(bits.length?' \u00b7 '+bits.join(' \u00b7 '):' is on the map')
        
       :ra.rejoin?'Back to the loop \u00b7 '+navFmt(ra.rejoin.leg*1609.34)+' to it, '+ra.rejoin.rest.toFixed(1)+' mi of it left'+
         (bits.length?' \u00b7 '+bits.join(' \u00b7 '):'')
@@ -2965,7 +3009,7 @@ function spark(p,up,dn){
 
 function label(c){return {route72:'ORV route 72"',trail50:'ORV trail 50"',
   moto24:'motorcycle 24"',mccct:'MCCCT',fstrail:'USFS trail',fsroad:'USFS road',
-  paved:'pavement',minor:'county road',track:'two-track'}[c]||c}
+  paved:'pavement',minor:'county road',track:'two-track',foot:'hiking trail'}[c]||c}
 
 function geomOf(o){return o.s.path.map(function(e){return {type:'Feature',properties:{},
   geometry:{type:'LineString',coordinates:decode(GR.g[e.i])}}})}
@@ -3165,7 +3209,7 @@ function directions(path,startNode){
     var fwd=(e.a===cur);if(!fwd)g=g.slice().reverse();
     legs.push({e:e,g:g,name:e.n||label(e.c),id:e.id,node:cur,
       inB:bearing(g[0],g[Math.min(1,g.length-1)]),
-      outB:bearing(g[Math.max(0,g.length-2)],g[g.length-1])});
+      outB:bearing(g[Math.max(0,g.length-2)],g[g.length-1]),fwd:fwd});
     cur=fwd?e.b:e.a}
   var steps=[],acc=null;
   for(var i=0;i<legs.length;i++){var L=legs[i];
@@ -3181,9 +3225,9 @@ function directions(path,startNode){
         if(at_>=45&&mo<at_+60)cue=turnWord(tc);
         else if(mo<at_-10)cue=at_>=22?turnWord(tc):(tc<so?['Keep left','bearleft']:['Keep right','bearright'])}}
     if(acc&&acc.key===key&&!cue){
-      acc.mi+=L.e.L/1609.34;acc.up+=UP[L.e.i];acc.out=L.outB;continue}
+      acc.mi+=L.e.L/1609.34;acc.up+=climbOf(L.e,L.fwd);acc.out=L.outB;continue}
     if(acc)steps.push(acc);
-    acc={key:key,name:L.name,id:L.id,cls:L.e.c,mi:L.e.L/1609.34,up:UP[L.e.i],
+    acc={key:key,name:L.name,id:L.id,cls:L.e.c,mi:L.e.L/1609.34,up:climbOf(L.e,L.fwd),
       inB:L.inB,out:L.outB,at:i,tw:cue}}
   if(acc)steps.push(acc);
   for(var i=0;i<steps.length;i++){
@@ -4163,9 +4207,31 @@ var rideMode=null,gotFix=false,fixN=0;
  
 var TRIPKEY='apex.trip.v1',_tripT=0,RESUMING=false,RESUMED_RIDE=null;
 var NAV={on:false,follow:true,northUp:false,brg:0,mps:0,lastAt:null,lock:null};
+ 
+function bundleId(){return (BUNDLE.built||'')+'|'+EDGES.length+'|'+NODES.length}
+var TRIP_LOOP_WHY='';
+function tripLoop(){var o=last&&sel!==null&&last[sel];if(!o||!o.s||!o.s.path||!o.s.path.length||!(o.na===o.nb||o.rj))return null;
+  var G=(NAVG&&NAVG.loop&&NAVG.set===last)?NAVG:null;
+  return {p:o.s.path.map(function(e){return e.i}),na:o.na,nb:o.nb,k:o.k||null,h:o.h||'Loop',rj:o.rj||null,
+    rid:G?Math.round(G.rid||0):0,bid:bundleId()}}
+function tripLoopRestore(t){var L=t.loop;TRIP_LOOP_WHY='';
+  if(!L||!L.p||!L.p.length)return false;
+  if(L.bid!==bundleId()){TRIP_LOOP_WHY='the map was updated since it was planned';return false}
+  var path=[],cur=L.na;
+   
+  for(var i=0;i<L.p.length;i++){var e=EDGES[L.p[i]];if(!e||(e.a!==cur&&e.b!==cur))return false;
+    if(e.c==='closed'||e.c==='fsclosed'||!machineLegal(e)){TRIP_LOOP_WHY='part of it is not legal for a '+MACHINE[machine].lbl;return false}
+    path.push(e);cur=e.a===cur?e.b:e.a}
+  if(cur!==L.nb)return false;
+  var opt={h:L.h,k:L.k,s:summarise(path,L.na),snap:0,na:L.na,nb:L.nb};if(L.rj)opt.rj=L.rj;
+  DESTLBL=t.lbl||'the start';RTO=(t.to||NODES[L.nb]).slice(0,2);RIDDEN_WARN=null;
+  if(!(LOOP_MI>0))LOOP_MI=opt.s.mi;
+   
+  setTimeout(function(){presentRoutes([opt],{k:L.k,resume:true});LOOPWAS={set:last,rid:L.rid||0};NAVG=null},30);
+  return true}
 function tripSnapshot(){
   return {v:1,startedAt:(RIDE&&RIDE.t0)||Date.now(),mode:mode,machine:machine,
-    to:RTO,lbl:DESTLBL,prof:(last&&sel!==null&&last[sel])?last[sel].k:null,
+    to:RTO,lbl:DESTLBL,prof:(last&&sel!==null&&last[sel])?last[sel].k:null,loop:tripLoop(),
     run:RUNFROM?{riv:RUNFROM.riv,mi:RUNFROM.mi,n:RUNFROM.n,k:RUNFROM.k}:null,
     runNav:RUN?{riv:RUN.riv,a:RUN.a,b:RUN.b}:null,
     nav:{northUp:NAV.northUp},crumbs:crumbs,crumbMi:crumbMi,
@@ -4198,7 +4264,9 @@ function tripResume(t){
     if(t.runNav)runSet(t.runNav.riv,t.runNav.a,t.runNav.b);
     NAV.northUp=!!(t.nav&&t.nav.northUp);
      
-    if(t.to){DESTLBL=t.lbl||'there';RTO=t.to.slice();RIDDEN_WARN=null;routeToPoint(t.to,t.lbl,{k:t.prof||null,resume:true});
+    var loopBack=t.loop?tripLoopRestore(t):false;
+    if(t.loop&&!loopBack)toast('The loop could not be restored ('+(TRIP_LOOP_WHY||'its saved path no longer joins up')+'): routing back to its start instead.',5000);
+    if(!loopBack&&t.to){DESTLBL=t.lbl||'there';RTO=t.to.slice();RIDDEN_WARN=null;routeToPoint(t.to,t.lbl,{k:t.prof||null,resume:true});
        
       setTimeout(function(){if(last&&t.prof){var i=-1;
         for(var q=0;q<last.length;q++)if(last[q].k===t.prof){i=q;break}
@@ -4543,7 +4611,7 @@ function loopRejoin(at,G,pr){try{
     var skip=Math.max(0,(G.cum[L[cut]]-pr.prog)/1609.34);
      
     var snap=snapMiles(at,a),toIt=legMi+snap;
-    var opt={h:'Back to the loop',k:o.k,s:summarise(np),snap:snap,na:a,nb:o.nb,
+    var opt={h:'Back to the loop',k:o.k,s:summarise(np,a),snap:snap,na:a,nb:o.nb,
       rj:{leg:toIt,snap:snap,rest:restMi,skip:skip},
       note:navFmt(toIt*1609.34)+' back to the loop, then the rest of it to the start ('+restMi.toFixed(1)+' mi)'+
         (skip>=0.1?' \u00b7 '+skip.toFixed(1)+' mi of it skipped':'')};
@@ -4614,8 +4682,8 @@ function navGuide(at,acc,mps){
     :'<b><span class="arw">'+ic(G.steps[ni].turn[1])+'</span>In '+navFmt(G.marks[ni]-pr.prog)+
       ' \u00b7 '+G.steps[ni].turn[0]+' onto '+stepName(G.steps[ni])+'</b>';
    
-  if(ni>=0){var d=G.marks[ni]-pr.prog,key=ni+'|'+(d<90?'near':'far');
-    if(key!==VOICE.near){VOICE.near=key;
+  if(ni>=0){var d=G.marks[ni]-pr.prog,ph=d<90?'near':'far',said=G.said||(G.said={});
+    if(!said[ni+'|near']&&!said[ni+'|'+ph]){said[ni+'|'+ph]=1;VOICE.last='';
       navSay((d<90?'':'In '+navFmt(d)+', ')+G.steps[ni].turn[0].toLowerCase()+' onto '+stepName(G.steps[ni]))}}
   g.hidden=false;
   g.innerHTML=line1+'<span class="eta">'+navFmt(togo)+' remaining'+
@@ -5878,6 +5946,8 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
                    addressAt:addressAt,get ME(){return ME}};
     window.__route={buildLoops:buildLoops,nearestNode:nearestNode,isFreeway:isFreeway,fwN:function(){return FW_N},
                     route:route,PROFILES:PROFILES,NODES:NODES,go:routeToPoint,setME:function(p){ME=p.slice()},DETOUR:DETOUR,directions:directions,
+                     
+                    summarise:summarise,climbOf:climbOf,elev:function(n){return NE?NE[n]:null},sun:sunTimes,darkOf:darkOf,
                     machineLegal:machineLegal,EDGES:EDGES,ADJ:ADJ,attrs:attrs,
                     setMachine:function(m){if(MACHINE[m])machine=m},
                     get machine(){return machine},spd:spd,MACHINE:MACHINE,
@@ -5952,6 +6022,8 @@ try{window.map=map;window.PLACES=PLACES;window.placeCard=placeCard;
          
         stale:function(){return fixStale()},
         fixT:function(v){if(v!==undefined)FIX_T=v;return FIX_T},
+         
+        reT:function(v){if(v!==undefined)_navReT=v;return _navReT},
          
         dist:function(p){return placeDist(p)},
          
@@ -6285,7 +6357,7 @@ function stRouting(){
   var got=0,detail=[];
   PROFILES.forEach(function(pf){
     try{var path=route(na,nb,pf.f);
-      if(path&&path.length){got++;var s=summarise(path);
+      if(path&&path.length){got++;var s=summarise(path,na);
         detail.push(pf.h+' '+s.mi.toFixed(1)+'mi')}}
     catch(e){detail.push(pf.h+' threw: '+(e&&e.message||e))}});
   stAdd('ROUTE','profiles',got>=2,got+'/'+PROFILES.length+' · '+detail.join(', '));
@@ -7115,9 +7187,13 @@ map.on('click',function(e){
     var campLine='';
     if(pr.k==='camp'){var ct=null;try{ct=pr.ct?JSON.parse(pr.ct):null}catch(e){}
       var bits=[];
-      if(ct&&ct.op)bits.push({dnr:'State forest campground (DNR)',usfs:'National forest campground (USFS)',
-        county:'County or municipal',private:'Private'}[ct.op]||ct.op);
-      if(ct&&ct.ty)bits.push(ct.ty==='rustic'?'rustic — vault toilets, no hookups':'modern — hookups or services');
+       
+      var _nm=String(pr.n||'');
+      if(ct&&ct.op)bits.push(ct.op==='dnr'?(/state park|recreation area/i.test(_nm)?'State park campground (DNR)':
+          /state forest/i.test(_nm)?'State forest campground (DNR)':'DNR campground'):
+        ({usfs:'National forest campground (USFS)',county:'County or municipal',private:'Private'}[ct.op]||ct.op));
+      if(ct&&ct.ty&&!(ct.ty==='rustic'&&/modern/i.test(_nm)))
+        bits.push(ct.ty==='rustic'?'rustic (basic sites, as OSM records it)':'modern — hookups or services');
       if(ct&&ct.fee===true)bits.push('fee');if(ct&&ct.fee===false)bits.push('free');
       if(ct&&ct.disp)bits.push('dispersed');
       campLine='<div class="sub">'+(bits.length?bits.join(' \u00b7 '):'Type not recorded in the source')+'</div>'}
@@ -7202,12 +7278,18 @@ map.on('click',function(e){
    
   if(loHit)out+='<div class="sub">The nearest '+label(ed.c)+' segment to your tap at this zoom '+
     '\u2014 zoom in and tap again for the exact one. Everything on this card is about that segment.</div>';
+   
   out+='<span class="tag '+(a.auth==='legal'?'legal':'adv')+'">'+
-    (a.src==='dnr'?'DNR · legal':a.src==='usfs'?'USFS · legal':'OSM · advisory')+'</span>';
-  if(a.st&&a.st.toLowerCase().indexOf('temporarily')===0)out+='<span class="tag shut">closed</span>';
+    (a.src==='dnr'||a.src==='usfs'?(a.src==='dnr'?'DNR':'USFS')+(a.auth==='nonorv'?' · not an ORV trail':' · legal'):'OSM · advisory')+'</span>';
+   
+  var _stl=(a.st||'').toLowerCase();
+  if(/closed/.test(_stl))out+='<span class="tag shut">closed</span>';
+  else if(/reroute/.test(_stl))out+='<span class="tag legal">open reroute</span>';
+  else if(_stl==='unknown')out+='<span class="tag adv">status not published</span>';
    
   if(ed.fw)out+='<span class="tag shut">freeway: no ORV, no one on foot</span>';
-  else if(MACHINE[machine].ok.indexOf(ed.c)<0)
+   
+  else if(!machineLegal(ed)&&!/closed/.test(_stl))
     out+='<span class="tag shut">illegal for your machine</span>';
   out+='<br>';
   var bits=[];
@@ -7226,7 +7308,8 @@ map.on('click',function(e){
     bits.push('<br><b'+(banned?' style="color:var(--danger-text)"':'')+'>'+(loHit?'This segment \u2014 ':'')+
       (banned?'NOT for your machine — ':'Restriction: ')+'</b>'+_rs.say+
       (_rs.unknown?' <span class="sub">(as published; not interpreted)</span>':''));}
-  if(UP[ed.i]||DN[ed.i])bits.push('+'+ft(UP[ed.i])+' / -'+ft(DN[ed.i])+' ft');
+   
+  if(UP[ed.i]||DN[ed.i])bits.push('+'+ft(UP[ed.i])+' / -'+ft(DN[ed.i])+' ft one way (the other way, the reverse)');
   show(out+bits.join(' · '),'')});
 
  

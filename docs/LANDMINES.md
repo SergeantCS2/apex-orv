@@ -1,6 +1,6 @@
 # LANDMINES
 
-*Current as of take 202.*
+*Current as of take 203.*
 
 Numbered so they can be cited. Never renumber. Add, correct, or mark superseded —
 but the number stays with the finding.
@@ -180,6 +180,8 @@ Start here. Do not read top to bottom.
 | An HD save ends and the map keeps its old tiles: a library internal read by name returned nothing after a rename | 268 |
 | A drill passes the build it was written to fail: its planted fault landed where the real one does not | 269 |
 | A drill's search over real data finds nothing: an earlier drill left the machine or mode it depends on | 270 |
+| A category the producer does not know ships as another one (`ci.get(c, default)`) and a header check cannot see it | 271 |
+| A time-gated path never fires in a drill, or a drill passes by day and fails at night: an earlier drill stamped the app in the future, or the wall clock decides a warning | 272 |
 
 ---
 
@@ -3610,3 +3612,38 @@ found a pair 0.2 mi apart whose legal routes run 11.5 to 13.9 mi. Rule: a
 drill sets what its reading depends on (mode, machine, start pin), says it
 in its line, and puts it back; a search that finds nothing reports what it
 searched with.
+
+**271. A lookup with a default turns an unknown category into a known one.**
+tools/emit_graph.py packed each edge's class as `ci.get(c, 10)`: any class
+missing from its fixed list became index 10, `track`. graph.py began
+emitting the routable class `foot` (a hiking trail, walkable only) at take
+134, the list was never told, and for 69 takes every DNR and USFS hiking
+trail (64,377 edges, 10,576 mi) shipped as two-track, legal for every ORV
+machine (the take-202 audit, PROVEN on the shipped bundle). The gate's
+check_class_legality read only the graph's `cls` header, which the same
+list wrote, so it could never see a class the list lacked. Rule: a mapping
+from one set of categories to another fails on a key it does not know;
+a legality check reads the edges and their attributes, not a header the
+producer wrote from the same list; and a check that a class is present
+(some edge of class foot) catches the producer that drops it quietly.
+The fix's own first CI run (151) failed smoke where the local bundle could
+not show it: the restored bundle predated the fix, so it had no foot edge,
+and G8 (every drawn class chained or drawn per edge) never met the class
+CI's graph drew 97,909 times; a drill's route search tuned on the old
+graph found less on the new. Rule: when a take changes the data, run the
+app against the PR run's own built www (its `www` artifact, CI's data)
+before the next push.
+
+**272. A drill under a shifted clock leaves the app's timestamps in the
+future.** Take 203's A320 drill wandered off a route 32 times and the app
+never re-routed: its 20-second debounce mark had been set by an earlier
+drill running under a clock shifted forward, and stood 120 minutes ahead
+of real time when the drill began, so every later re-route waited. Shifting
+the drill's own clock a minute did not reach it. The same take's A321 drill
+read a resumed route's peek line, which a darkness warning replaces with
+its card: it passed in the afternoon and failed in the evening (a mutant
+run found it). Rule (landmine 270's, for clocks): a drill that depends on
+a time-gated path sets that gate itself (a hook, here `__nav.reT`) and
+says where it found it; a drill that shifts the clock puts back what the
+app stamped under it, not only the clock; and a drill that reads what a
+route's warnings decide (the card or the peek line) pins the clock.

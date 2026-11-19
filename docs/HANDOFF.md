@@ -1,4 +1,162 @@
-# HANDOFF — through Take 202 · V3
+# HANDOFF — through Take 203 · V3
+
+## Take 203 — Hiking trails walk-only (A322); a resumed loop carried on (A321); voice after a re-route (A320); climb by direction (A323); closures by status (A324); card tags by the router (A325); the riding-area card (A326); darkness at both ends (A327); camp type as recorded (A328)
+
+RECORDED FIRST. The maintainer, 2026-11-18: "Haven't checked anything yet -
+proceed with the next take and ensure you're testing/validating as much as
+you can as normal. Actually running our code." Built on take 202 (main
+8320981).
+
+Where the take came from: A320 and A321 (OPEN since take 202), and a fifth
+read-only audit (a subagent) of trail legality, elevation, darkness,
+closures, gauges and the place cards: 8 findings and 4 minor. Six were
+built here (A322-A328, each with a drill watched failing); the gauges
+(A329), the card's seasons and width text (A330) and the minor ones (A331)
+are recorded OPEN.
+
+A322 (the most severe) — tools/emit_graph.py packed classes with
+`ci.get(c, 10)`, and its list never had `foot`, the hiking class graph.py
+has emitted since take 134: every DNR and USFS hiking trail (64,377 edges,
+10,576 mi) and every named OSM path shipped as two-track, legal for every
+ORV machine. The audit's simulated dirt-bike route ran 8.3 of 8.4 mi on the
+Iron Belle. check_class_legality read the class header, which the same list
+wrote (landmine 271). Now emit_graph names foot and stops on a class it
+cannot name; machineLegal refuses an agency non-ORV line to every machine
+but walking (the restored bundle is safe too); the gate's
+check_nonorv_routes reads the edges. CI's rebuilt graph will hold the
+named OSM paths as foot too: how many is UNKNOWN until its run (the gate's
+note prints the foot count).
+
+A321 — a resumed loop is the same loop: the trip record keeps its edges,
+shape and progress with the bundle id; resumed on the same bundle it
+carries on from where the rider was, on another it routes to the start and
+says why.
+
+A320 — what has been said is kept per guide and step: far once, near once,
+never far after near; a re-route's first turn is said; two close turns with
+the same words are both said.
+
+A323 — climb, drop, the turn list's climbs, the Easiest and Least climbing
+costs and the profile follow the way each edge is ridden; the profile no
+longer adds the start elevation twice (2,867 ft on one route before).
+
+A324 — closed is what the DNR's status says: the signed detour
+("Temporarily Open Reroute", 62 edges) is open (CI's ingest), "Closed
+Permanent" and closed hiking trails refuse every machine and walkers
+(machineLegal); the card says "open reroute" and "status not published".
+A325 — the card's "illegal for your machine" is the router's own rule, and
+an agency hiking trail reads "DNR · not an ORV trail". A326 — a county or
+federal riding area is not called a DNR scramble area, and every area says
+its season is not in the map's data. A327 — sunrise and sunset by NOAA's
+solar calculator (the short form ran up to 6.5 min off, 4.6 min late at
+the winter solstice); a trip before sunrise says so, and a river run that
+ends after sunset at the slow end of the pace says so. A328 — a campground
+is typed only as OSM records it; a state park is named a state park.
+
+The review of take 203 (a subagent's cold read of the diff; 9 findings,
+all acted on):
+- the render's campground check read "State forest campground" on the
+  first typed DNR camp, which on this bundle is Algonac-Modern Riverfront,
+  whose card no longer calls it rustic: it picks a camp not named Modern,
+  and accepts the DNR line by name;
+- a resumed loop was replayed without the router's checks; a line closed
+  since, or a machine that may not ride part of it, now falls back to the
+  start and says which ("part of it is not legal for a Dirt bike"), and an
+  empty loop is never saved;
+- darkOf compared clock hours: a phone on UTC read a summer evening as
+  "before sunrise", and a night that changes the clock moved sunrise an
+  hour. Sunrise and sunset are instants on the place's own day now;
+- the A327 drill's reference was a copy of the app's formula; it is the
+  USNO almanac algorithm now (the app within 1.18 min of it, the short form
+  6.51 min off);
+- "arrives after dark" and "starts before sunrise" shared one flag, so a
+  re-route that newly arrives after dark on a ride begun before sunrise
+  stayed quiet; the kinds are compared;
+- a non-ORV line's status was the first of its ORV, snowmobile and
+  non-motorised fields; for walkers it is the non-motorised one (CI's
+  ingest);
+- the area card said "DNR scramble area" of state land a county runs
+  (Holly Oaks), and "the mixed ownership operator"; it names the land and
+  no operator now;
+- the trail card's "+x / -y ft" did not say it is one way.
+
+What I got wrong:
+- A322 changed the graph a take-189 drill stood on: the A234 loop's off
+  point now snapped to lines that joined the loop only through a hiking
+  trail, and the app's honest "No legal route" failed the drill. The drill
+  now picks a point with a legal way back, and says so;
+- my first A320 re-route scene never re-routed: an earlier drill under a
+  shifted clock had left the re-route's 20 s mark 120 min in the future,
+  and shifting my own clock a minute did not reach it (landmine 272). A hook
+  sets the mark now, and the drill reports where it found it;
+- A323's first drill judged by node elevations to 2 m; 3% of edges start
+  or end on a sample up to 50 m from their node's (measured on the
+  bundle). The exact checks are the reverse route and the turn list;
+- my A321 drill read the resumed route's peek line, which a darkness
+  warning replaces with the card: it passed in the afternoon and failed in
+  the evening (the narrow mutant ran at night). Its clock is pinned to a
+  midsummer afternoon now (landmine 272);
+- the PR's first CI run (151) failed smoke on CI's rebuilt data, which
+  the restored local bundle could not show: G8 found the new foot class
+  drawn (97,909 edges) but neither chained nor listed per edge, and the
+  A323 drill's search found only an 18 m rise on the graph without the
+  hiking trails (its floor was 30 m). foot is drawn per edge now (as it was
+  while shipped as two-track), G8 knows it, and the drill needs 15 m (a
+  backwards direction misses by twice the rise). Both were then run on
+  run 151's own www artifact (landmine 271);
+- A327 moved a take-188 drill's "quiet" clock (04:00 at midsummer is
+  before sunrise) to a quarter hour after sunrise where the rider is.
+
+Take 202's CI, recorded here (PROVEN from CI): PR run went green and was
+merged as 8320981; main's run 148 released take-148 and CI tagged t202.
+
+Verified here (Chrome 138; the bundle of main's newest green run, which
+predates take 197):
+- smoke, all five passes PASSED before the review's fixes and after them
+  (332 / 225 / 54 ok, fatal 6, dead 33), and the default pass again with
+  A321's clock pinned (332);
+- render: the full run before the review's fixes, 692 ok and one failure:
+  the campground check A328 had to change (its fix was not yet in the file
+  the run had loaded); after the review's fixes `--only=labels,camp,routes,
+  nav,paddle,trails` PASSED (103 ok);
+- the probe's take-203 scenes in real Chrome on Michigan time (sent to the
+  maintainer): a hiking trail's card as a dirt bike, a Closed Permanent
+  card, a route before sunrise, a river run ending after sunset, The
+  Mounds, and Algonac-Modern;
+- mutants of the built app: the A322 guard alone fails 9zc only (64,377
+  ridable; the Iron Belle route used 1,154 of them); every other take-203
+  app fix reverted together fails exactly its 7 drills (A320's old key said
+  one turn 4 times far and 4 times near, and the re-route's first turn 0
+  times; A324's let a dirt bike ride 4 closed edges and walkers 493), before
+  and after the review's fixes; the review's restore check and instants
+  reverted fail A321's closed line and A327's summer evening only;
+- the gate's new checks: check_nonorv_routes, check_closure_status and
+  check_camp_type pass on the tree, fail on the pre-fix bundle (64,377 and
+  no foot edge; 62 detours closed and 493 closed lines ridable; a Modern
+  camp typed rustic), and check_nonorv_routes passes on that bundle with its
+  non-ORV edges reclassed foot; main's emit_graph ships a planted Iron
+  Belle edge as track, the new one as foot, and stops on a planted horse;
+- the 37 gate checks that need no pipeline output, check_freeway_rules,
+  check_class_legality and the three new checks, on the seal: GATEFN PASSED (42).
+On CI's rebuilt data (run 151's www artifact, with this take's app):
+smoke, all five passes PASSED (333 / 226 / 54 ok, fatal 6, dead 33) after
+the G8 and A323 fixes; render: the full run, 691 ok and 2 failures, both
+of the harness, not the app: the livery check read POIs from a hard-coded
+www/bundle/poi.json, not --www's (it compared CI's map with the old
+bundle's indices; it reads --www's now), and the campground check's new
+pick on CI's data shares its point with a boat launch, so the tap opened
+the stack's list (it opens the camp from its row now); `--only=water,camp`
+then PASSED on CI's data and on the old bundle (42 ok each). (A harness hazard on the way: a
+test www whose bundle is a symlink is not safe for --fatal-drill, whose
+copy keeps the link and strips the network from the real manifest; the
+test copy is a real one now.)
+Measured on CI's rebuilt data (run 151's www artifact, PROVEN): 97,909
+foot edges, 13,996 mi (DNR non-ORV 46,081, USFS non-ORV 18,281, named OSM
+paths 33,547), none ridable by an ORV machine; "Temporarily Open Reroute"
+is route72 (62 edges) and routable; "Closed Permanent" is closed; no camp
+named Modern is typed rustic; the gate's four bundle checks pass on it.
+UNKNOWN until the phone: the routes the change moves; the voice cues on the
+Fold's engine.
 
 ## Take 202 — 2026-11-18 — River miles on one scale (A309); a dam below the take-out said (A310); the truck in feet (A311); arrival needs a good fix (A312) and reaches an off-network place (A317); the compass says from where (A313); a long way round shown (A314); a Stop keeps the old truck spot (A315); turns between unnamed tracks cued (A318)
 

@@ -196,6 +196,20 @@ def centre(e):
     return sum(xs) / len(xs), sum(ys) / len(ys)
 
 
+def camp_type(t):
+    """take 203 · A328 · a campground's type, only as OSM records it. Any
+    DNR or USFS camp with no camp_site tag was called "rustic", and the card
+    printed "rustic — vault toilets, no hookups" for Algonac-Modern
+    Riverfront, Ionia-Modern, Burt Lake and P.H. Hoeft state parks (the
+    take-202 audit). Untagged is unknown: the card says "type not recorded"."""
+    cs = (t.get("camp_site") or "").lower()
+    if cs == "basic" or t.get("backcountry") == "yes":
+        return "rustic"
+    if cs in ("standard", "serviced", "deluxe") or t.get("power_supply") in ("yes", "true"):
+        return "modern"
+    return None
+
+
 def classify(t):
     for kind, key, vals, unnamed_ok in KINDS:
         if t.get(key) in vals:
@@ -297,10 +311,7 @@ def main():
                    else "usfs" if ("forest service" in op or "usfs" in op or "usda" in op)
                    else "county" if ("county" in op or "township" in op or "city of" in op)
                    else "private" if op else None)
-            ty = ("rustic" if (cs == "basic" or t.get("backcountry") == "yes" or
-                               (who in ("dnr", "usfs") and not cs and t.get("power_supply") in (None, "no")))
-                  else "modern" if cs in ("standard", "serviced", "deluxe") or t.get("power_supply") in ("yes", "true")
-                  else None)
+            ty = camp_type(t)
             ct = {}
             if who: ct["op"] = who
             if ty: ct["ty"] = ty

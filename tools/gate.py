@@ -1954,6 +1954,178 @@ def check_surface_rules():
                  "taken, half-covered none, a split both said, OSM and kept values left alone); graph to card wired")
 
 
+def _nonorv_ridable(gp, ride_cls):
+    """The edges of a built graph whose attribute bundle says auth nonorv (an
+    agency's non-ORV line) and whose class an ORV machine may ride."""
+    g = json.load(open(gp)) if isinstance(gp, str) else gp
+    bk, B, cls = g.get("bk", []), g.get("b", []), g.get("cls", [])
+    if "auth" not in bk:
+        return None
+    ai = bk.index("auth")
+    nonorv = {i for i, v in enumerate(B) if len(v) > ai and v[ai] == "nonorv"}
+    return sum(1 for e in g.get("e", [])
+               if e[6] in nonorv and 0 <= e[3] < len(cls) and cls[e[3]] in ride_cls)
+
+
+def check_nonorv_routes():
+    """take 203 (A322): an agency's non-ORV line is walkable, never ridable.
+    emit_graph shipped the routable class `foot` as `track` (its class list
+    lacked it), and about 10,576 mi of DNR and USFS hiking trail were legal
+    for every ORV machine. Held three ways: emit_graph names foot and stops
+    on a class it cannot name; machineLegal refuses a non-ORV line to every
+    machine but walking; and a built bundle may carry no non-ORV edge in a
+    class an ORV machine's allow-list names (two planted controls)."""
+    import glob
+    eg, app = read("tools", "emit_graph.py") or "", read("src", "app.html") or ""
+    bad = []
+    for src, need, what in ((eg, '"paved", "minor", "track", "foot"]', "emit_graph names foot"),
+                            (eg, 'raise SystemExit(f"emit_graph: routable classes the bundle cannot name', "emit_graph stops on a class it cannot name"),
+                            (eg, 'ci[e["c"]], name_id(', "emit_graph indexes classes strictly"),
+                            (app, "if(machine!=='walk'&&e.bi>=0&&attrs(e).auth==='nonorv')return false;",
+                             "machineLegal refuses a non-ORV line to every machine but walking")):
+        if need not in src:
+            bad.append(f"not wired: {what}")
+    ride = set()
+    for mid, ok in re.findall(r"(\w+):\{lbl:'[^']*',ic:'[^']*',ok:\[([^\]]*)\]", app):
+        if mid != "walk":
+            ride |= set(re.findall(r"'([a-z0-9]+)'", ok))
+    if not ride or "track" not in ride or "foot" in ride:
+        bad.append(f"the ORV machines' allow-lists read wrong ({sorted(ride)[:6]})")
+    plant = {"bk": ["src", "auth"], "b": [["dnr", "nonorv"], ["osm", "advisory"]], "cls": ["track", "foot"],
+             "e": [[0, 1, 10, 0, 0, -1, 0, 1, -1], [1, 2, 10, 1, 0, -1, 0, 1, -1], [2, 3, 10, 0, 0, -1, 1, 1, -1]]}
+    if _nonorv_ridable(plant, ride) != 1:
+        bad.append("the check misses a planted non-ORV edge shipped as track (its control)")
+    if _nonorv_ridable(dict(plant, e=[plant["e"][1], plant["e"][2]]), ride) != 0:
+        bad.append("the check flags a non-ORV foot edge or an OSM track (its control)")
+    seen, feet = 0, []
+    for gp in sorted(glob.glob(os.path.join(ROOT, "bundles", "*", "graph.json"))):
+        seen += 1
+        g = json.load(open(gp))
+        rn = os.path.basename(os.path.dirname(gp))
+        n = _nonorv_ridable(g, ride)
+        if n:
+            bad.append(f"{rn}: {n:,} edges of agency non-ORV lines carry a class an ORV machine may ride")
+        # a bundle with no foot edge at all means the class was lost again on
+        # the way out (the producer broke quietly, as it did from take 134)
+        cls = g.get("cls", [])
+        fi = cls.index("foot") if "foot" in cls else -1
+        nf = sum(1 for e in g.get("e", []) if e[3] == fi) if fi >= 0 else 0
+        if not nf:
+            bad.append(f"{rn}: no edge of class foot: the hiking trails were bundled as another class")
+        feet.append(f"{rn} {nf:,} foot edges")
+    if bad:
+        return fails.append("non-ORV lines (A322): " + "; ".join(bad[:4]))
+    notes.append("non-ORV lines (A322): emit_graph names foot and stops on an unknown class; machineLegal "
+                 "walks them only; " + (f"{seen} built bundle(s), none ridable ({', '.join(feet)})" if seen else
+                 "no built bundle here (CI's carries it)") + "; 2 planted controls caught")
+
+
+def _status_bad(g, ride_cls):
+    """Edges of a built graph whose status is a signed detour yet closed, or
+    says closed yet carries a class an ORV machine may ride (take 203, A324)."""
+    bk, B, cls = g.get("bk", []), g.get("b", []), g.get("cls", [])
+    if "st" not in bk:
+        return None
+    si = bk.index("st")
+    st = [str(v[si] or "").lower() if len(v) > si else "" for v in B]
+    re_closed = shut_open = 0
+    for e in g.get("e", []):
+        if e[6] < 0 or not (0 <= e[3] < len(cls)):
+            continue
+        s = st[e[6]]
+        if "reroute" in s and "closed" not in s and cls[e[3]] in ("closed", "fsclosed"):
+            re_closed += 1
+        if "closed" in s and cls[e[3]] in ride_cls:
+            shut_open += 1
+    return re_closed, shut_open
+
+
+def check_closure_status():
+    """take 203 (A324): closed is what the DNR's status says, not its first
+    word. ingest.py closed a class when the status began "Temporarily", so
+    the signed detour ("Temporarily Open Reroute", 62 edges) was refused and
+    "Closed Permanent" (4 MCCCT edges) was ridable. Held three ways: ingest
+    reads "closed" in the status; machineLegal refuses a line whose status
+    says closed, to every machine; and a built bundle carries no detour as
+    closed and no closed status in a class an ORV machine may ride (two
+    planted controls)."""
+    import glob
+    ing, app = read("tools", "ingest.py") or "", read("src", "app.html") or ""
+    bad = []
+    for src, need, what in ((ing, '"c": "closed" if "closed" in status.lower() else cls,', "ingest closes on the word closed"),
+                            (app, "if(e.bi>=0){var _st=attrs(e).st;if(_st&&/closed/i.test(_st))return false}",
+                             "machineLegal refuses a published closure")):
+        if need not in src:
+            bad.append(f"not wired: {what}")
+    if 'startswith("temporarily")' in ing:
+        bad.append("ingest still closes on the first word")
+    ride = set()
+    for mid, ok in re.findall(r"(\w+):\{lbl:'[^']*',ic:'[^']*',ok:\[([^\]]*)\]", app):
+        if mid != "walk":
+            ride |= set(re.findall(r"'([a-z0-9]+)'", ok))
+    plant = {"bk": ["src", "st"], "cls": ["route72", "closed", "mccct"],
+             "b": [["dnr", "Temporarily Open Reroute"], ["dnr", "Closed Permanent"], ["dnr", "Open"]],
+             "e": [[0, 1, 9, 1, 0, -1, 0, 1, -1], [1, 2, 9, 2, 0, -1, 1, 1, -1], [2, 3, 9, 0, 0, -1, 2, 1, -1]]}
+    if _status_bad(plant, ride) != (1, 1):
+        bad.append(f"the check misses a planted closed detour or an open closure (its control: {_status_bad(plant, ride)})")
+    if _status_bad(dict(plant, e=[plant["e"][2]]), ride) != (0, 0):
+        bad.append("the check flags an open route (its control)")
+    seen = 0
+    for gp in sorted(glob.glob(os.path.join(ROOT, "bundles", "*", "graph.json"))):
+        seen += 1
+        r = _status_bad(json.load(open(gp)), ride)
+        if r and any(r):
+            bad.append(f"{os.path.basename(os.path.dirname(gp))}: {r[0]} detour edge(s) bundled closed, "
+                       f"{r[1]} edge(s) whose status says closed in a class an ORV machine may ride")
+    if bad:
+        return fails.append("closure status (A324): " + "; ".join(bad[:4]))
+    notes.append("closure status (A324): ingest closes on the word, machineLegal refuses a published closure; "
+                 + (f"{seen} built bundle(s) clean" if seen else "no built bundle here (CI's carries it)")
+                 + "; 2 planted controls caught")
+
+
+def check_camp_type():
+    """take 203 (A328): a campground's type is only what OSM records. poi.py
+    called every untagged DNR or USFS camp "rustic", and the card printed
+    vault toilets for camps named Modern. poi.camp_type is run here on
+    planted tags (the old guess is the control), and a built bundle may type
+    no camp named Modern as rustic."""
+    import glob, importlib.util, sys as _sys
+    bad = []
+    try:
+        _sys.path.insert(0, os.path.join(ROOT, "tools"))
+        spec = importlib.util.spec_from_file_location("poi_a328", os.path.join(ROOT, "tools", "poi.py"))
+        m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+        ct = m.camp_type
+    except Exception as e:
+        return fails.append(f"camp type (A328): poi.camp_type could not be read ({e})")
+    want = [({}, None), ({"operator": "Michigan DNR"}, None), ({"power_supply": "no"}, None),
+            ({"camp_site": "basic"}, "rustic"), ({"backcountry": "yes"}, "rustic"),
+            ({"camp_site": "serviced"}, "modern"), ({"power_supply": "yes"}, "modern")]
+    for t, w in want:
+        if ct(t) != w:
+            bad.append(f"camp_type({t}) is {ct(t)!r}, not {w!r}")
+    old = lambda t, who: ("rustic" if (who in ("dnr", "usfs") and not t.get("camp_site")
+                                         and t.get("power_supply") in (None, "no")) else None)
+    if old({}, "dnr") != "rustic" or ct({}) is not None:
+        bad.append("the control (take 202's guess) does not differ from camp_type")
+    seen = 0
+    for pp in sorted(glob.glob(os.path.join(ROOT, "bundles", "*", "poi.json"))):
+        seen += 1
+        P = json.load(open(pp))
+        rows = P.get("p", P) if isinstance(P, dict) else P
+        for r in rows if isinstance(rows, list) else []:
+            if isinstance(r, dict) and r.get("k") == "camp" and re.search(r"modern", str(r.get("n") or ""), re.I) \
+                    and (r.get("ct") or {}).get("ty") == "rustic":
+                bad.append(f"{os.path.basename(os.path.dirname(pp))}: {r.get('n')} typed rustic")
+                break
+    if bad:
+        return fails.append("camp type (A328): " + "; ".join(bad[:4]))
+    notes.append(f"camp type (A328): {len(want)} planted tag sets read as OSM records them; take 202's guess is "
+                 f"the control; " + (f"{seen} built bundle(s): no Modern camp typed rustic" if seen
+                 else "no built bundle here (CI's carries it)"))
+
+
 def check_freeway_rules():
     """take 200 (A291): no machine, and no one on foot, is routed on a
     freeway. graph.py marks OSM's motorways (fw), emit_graph bundles the
@@ -3629,7 +3801,7 @@ def check_ledger_order():
 for fn in (check_handoff, check_stamps, check_release_notes, check_offline, check_splash, check_scrub,
            check_style, check_palette, check_badges, check_tokens, check_scale, check_icons, check_glyphs,
            check_licences, check_machine_legality,
-           check_ledgers, check_osm_fallback, check_gauges_fallback, check_hazards_rules, check_stepstamp, check_slope_rules, check_sources_credited, check_surface_rules, check_freeway_rules, check_drawn,
+           check_ledgers, check_osm_fallback, check_gauges_fallback, check_hazards_rules, check_stepstamp, check_slope_rules, check_sources_credited, check_surface_rules, check_freeway_rules, check_nonorv_routes, check_closure_status, check_camp_type, check_drawn,
            check_region_clean, check_no_duplicate_defs, check_ledger_order,
            check_layer_control,
            check_artifacts_agree, check_agenda, check_syntax, check_stubs,
